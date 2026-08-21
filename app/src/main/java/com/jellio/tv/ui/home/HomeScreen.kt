@@ -96,6 +96,11 @@ fun HomeScreen(
     // file's own card stays in the DOM until its own overlay's
     // setTimeout finishes.
     var removingItemId by remember { mutableStateOf<String?>(null) }
+    // Real port of components/cardOptionsMenu.js's own window.confirm()
+    // step before deleteItem() ever fires: the card options menu itself
+    // only ever sets this, RemoveFromLibraryConfirm below owns the
+    // actual real deletion call.
+    var pendingDeleteItem by remember { mutableStateOf<BaseItemDto?>(null) }
     // Real components/homeCustomizer.js's own header: editMode lives
     // only in this real local closure, reset to off on every fresh
     // visit to this screen the same way that file's own real editMode
@@ -249,7 +254,20 @@ fun HomeScreen(
                 onRemoveFromRow = if (continueWatching || upNext) { { removingItemId = item.Id } } else null,
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
+                canDelete = !continueWatching && !upNext && uiState.canDeleteItems,
+                onDeleteItem = { pendingDeleteItem = item },
                 onDismiss = { cardMenuTarget = null },
+            )
+        }
+
+        pendingDeleteItem?.let { item ->
+            RemoveFromLibraryConfirm(
+                item = item,
+                onConfirm = {
+                    pendingDeleteItem = null
+                    viewModel.deleteItem(item)
+                },
+                onCancel = { pendingDeleteItem = null },
             )
         }
 
