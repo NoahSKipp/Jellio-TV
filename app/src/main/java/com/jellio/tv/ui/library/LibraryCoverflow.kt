@@ -171,7 +171,7 @@ fun LibraryCoverflow(
                 val dotWidth by animateDpAsState(targetValue = if (active) 30.dp else 8.dp, animationSpec = tween(320), label = "dotWidth")
                 Surface(
                     onClick = { index = i },
-                    shape = RoundedCornerShape(999.dp),
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (active) JellioText else Color.White.copy(alpha = 0.3f),
                     ),
