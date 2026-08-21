@@ -61,6 +61,12 @@ data class HomeUiState(
     // them the same way that file's own single #rows container does.
     val rows: List<HomeRow> = emptyList(),
     val customization: HomeCustomizationDto = HomeCustomizationDto(),
+    // Real gate components/cardOptionsMenu.js's own header documents:
+    // Jellyfin's own DELETE /Items/{id} only actually succeeds for an
+    // admin or a user with their own real
+    // Policy.EnableContentDeletion, fetched once here alongside the
+    // rest of this screen's own load() rather than per card.
+    val canDeleteItems: Boolean = false,
     val error: String? = null,
 )
 
@@ -213,12 +219,16 @@ class HomeViewModel @Inject constructor(
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
 
+                    val policy = user?.Policy
+                    val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
+
                     _uiState.value = HomeUiState(
                         isLoading = false,
                         heroItems = heroCandidates,
                         greeting = greeting,
                         rows = rows,
                         customization = customization,
+                        canDeleteItems = canDeleteItems,
                     )
                 }
             } catch (err: Exception) {
@@ -274,6 +284,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.setPlayed(session.userId, item.Id, true) }.getOrNull() ?: return@launch
             removeItemFromRows(item.Id)
+        }
+    }
+
+    // Real port of components/cardOptionsMenu.js's own Remove from
+    // Library option: the confirm step itself already happened
+    // (HomeScreen's own RemoveFromLibraryConfirm), this only fires
+    // the real DELETE call and drops the item from every row holding
+    // it, same real reasoning removeItemFromRows() above already
+    // documents for a toggle.
+    fun deleteItem(item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.deleteItem(item.Id) }
+                .onSuccess { removeItemFromRows(item.Id) }
         }
     }
 

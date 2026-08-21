@@ -713,6 +713,15 @@ class JellioRepository @Inject constructor(
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
+    // Real port of runtime/api.js's own deleteItem(): removes the
+    // item's own record outright. The caller's own job to gate this
+    // behind Policy.IsAdministrator/EnableContentDeletion first, same
+    // real reason components/cardOptionsMenu.js's own header gives:
+    // showing this to every reader and letting the request itself
+    // fail reads live as a broken button, not a real permission
+    // boundary.
+    suspend fun deleteItem(itemId: String) = api.deleteItem(itemId)
+
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
