@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -88,6 +89,7 @@ fun GroupWatchButton(onClick: () -> Unit, contentFocusRequester: FocusRequester,
 // either drives. See GroupWatchViewModel's own header comment for the
 // real scope this covers (membership, chat) and does not (playback
 // lockstep).
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun GroupWatchOverlay(
     state: GroupWatchUiState,
