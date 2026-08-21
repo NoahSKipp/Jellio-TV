@@ -38,12 +38,34 @@ private val TRENDING_ANIME_NAME = Regex("anilist.*trending|trending.*anilist", R
 private const val ANIME_EMPTY_MESSAGE =
     "No anime catalogs are configured on this server yet. Enable CreateCollection on an AniList catalog in Gelato to see it here."
 
+// Real port of screens/library.js's own SORT_OPTIONS: governs only
+// this page's own top row, the per genre rows below stay fixed
+// "browse by genre" shortcuts either way, same real reason that
+// file's own header comment gives.
+data class LibrarySortOption(val value: String, val label: String)
+
+val LIBRARY_SORT_OPTIONS = listOf(
+    LibrarySortOption("DateCreated:Descending", "Recently added"),
+    LibrarySortOption("SortName:Ascending", "Name (A-Z)"),
+    LibrarySortOption("SortName:Descending", "Name (Z-A)"),
+    LibrarySortOption("CommunityRating:Descending", "Top rated"),
+    LibrarySortOption("PremiereDate:Descending", "Newest release"),
+)
+
 data class LibraryUiState(
     val isLoading: Boolean = true,
     val title: String = "",
     val coverflowItems: List<BaseItemDto> = emptyList(),
     val coverflowBadge: String? = null,
     val editorial: ShowsEditorial? = null,
+    // The main, sort/genre-filterable row: kept apart from the fixed
+    // per genre rows in sections below so changeSort()/changeGenre()
+    // below can re-fetch just this one row, same real scope
+    // screens/library.js's own loadMainRow() keeps.
+    val mainRow: HomeSection? = null,
+    val selectedSort: String = LIBRARY_SORT_OPTIONS.first().value,
+    val selectedGenre: String? = null,
+    val genreOptions: List<String> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     val emptyMessage: String? = null,
     val canDeleteItems: Boolean = false,
@@ -67,11 +89,19 @@ class LibraryViewModel @Inject constructor(
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     private var loadedFor: String? = null
+    // Kept for changeSort()/changeGenre() below, called well after
+    // load()'s own real call: neither one wants to force a full real
+    // reload (coverflow, genre rows, canDeleteItems) just to
+    // re-fetch this one row with a different real sort/genre.
+    private var currentLibrary: BaseItemDto? = null
+    private var currentItemType: String? = null
 
     fun load(session: Session, library: BaseItemDto) {
         val key = library.Id + (library.Name ?: "")
         if (loadedFor == key) return
         loadedFor = key
+        currentLibrary = library
+        currentItemType = if (library.CollectionType == "movies") "Movie" else "Series"
         viewModelScope.launch {
             _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
             if (repository.isAnimeLibrary(library)) {
@@ -130,22 +160,21 @@ class LibraryViewModel @Inject constructor(
         // closure there either (only the initial row fetch above does),
         // same real (if perhaps unintended) behaviour kept here rather
         // than "fixed" beyond what that file actually does.
-        val sections = mutableListOf(
-            HomeSection(
-                "Recently Added",
-                mainItems,
-                fetchAll = {
-                    repository.getLibraryItems(
-                        session.userId,
-                        library.Id,
-                        limit = ROW_LIST_LIMIT,
-                        includeItemTypes = itemType,
-                        sortBy = "DateCreated",
-                        sortOrder = "Descending",
-                    )
-                },
-            ),
+        val mainRow = HomeSection(
+            sortLabel(LIBRARY_SORT_OPTIONS.first().value),
+            mainItems,
+            fetchAll = {
+                repository.getLibraryItems(
+                    session.userId,
+                    library.Id,
+                    limit = ROW_LIST_LIMIT,
+                    includeItemTypes = itemType,
+                    sortBy = "DateCreated",
+                    sortOrder = "Descending",
+                )
+            },
         )
+        val sections = mutableListOf<HomeSection>()
         genreItemsDeferred.forEach { (genre, deferred) ->
             val items = deferred.await().filterNot { excludeIds.contains(it.Id) }
             if (items.isNotEmpty()) {
@@ -174,9 +203,50 @@ class LibraryViewModel @Inject constructor(
             title = library.Name ?: "Library",
             coverflowItems = coverflowItems,
             editorial = editorial,
+            mainRow = mainRow,
+            genreOptions = genres,
             sections = sections,
             canDeleteItems = canDeleteDeferred.await(),
         )
+    }
+
+    private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.label ?: "Browse"
+
+    // Real port of screens/library.js's own loadMainRow(): only this
+    // one row re-fetches, the coverflow and every fixed per genre row
+    // below stay exactly as load() above already built them, same
+    // real scope that file's own header comment documents.
+    fun changeSort(session: Session, sort: String) {
+        val library = currentLibrary ?: return
+        _uiState.value = _uiState.value.copy(selectedSort = sort)
+        reloadMainRow(session, library, sort, _uiState.value.selectedGenre)
+    }
+
+    fun changeGenre(session: Session, genre: String?) {
+        val library = currentLibrary ?: return
+        _uiState.value = _uiState.value.copy(selectedGenre = genre)
+        reloadMainRow(session, library, _uiState.value.selectedSort, genre)
+    }
+
+    private fun reloadMainRow(session: Session, library: BaseItemDto, sort: String, genre: String?) {
+        val itemType = currentItemType ?: return
+        val parts = sort.split(":")
+        val sortBy = parts.getOrElse(0) { "DateCreated" }
+        val sortOrder = parts.getOrElse(1) { "Descending" }
+        viewModelScope.launch {
+            val items = runCatching {
+                repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)
+            }.getOrDefault(emptyList())
+            _uiState.value = _uiState.value.copy(
+                mainRow = HomeSection(
+                    genre ?: sortLabel(sort),
+                    items,
+                    fetchAll = {
+                        repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIST_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)
+                    },
+                ),
+            )
+        }
     }
 
     // Real port of screens/library.js's own renderAnime(): Anime has
@@ -297,6 +367,9 @@ class LibraryViewModel @Inject constructor(
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
         _uiState.value = state.copy(
+            mainRow = state.mainRow?.let { row ->
+                if (row.items.any { it.Id == itemId }) row.copy(items = row.items.map { if (it.Id == itemId) transform(it) else it }) else row
+            },
             sections = state.sections.map { section ->
                 if (section.items.any { it.Id == itemId }) {
                     section.copy(items = section.items.map { if (it.Id == itemId) transform(it) else it })
@@ -310,6 +383,9 @@ class LibraryViewModel @Inject constructor(
     private fun removeItemFromSections(itemId: String) {
         val state = _uiState.value
         _uiState.value = state.copy(
+            mainRow = state.mainRow?.let { row ->
+                if (row.items.any { it.Id == itemId }) row.copy(items = row.items.filterNot { it.Id == itemId }) else row
+            },
             sections = state.sections.map { section ->
                 if (section.items.any { it.Id == itemId }) section.copy(items = section.items.filterNot { it.Id == itemId }) else section
             },
