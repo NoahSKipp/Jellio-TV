@@ -22,6 +22,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
+import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
@@ -43,6 +44,12 @@ fun WatchlistScreen(
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
     LaunchedEffect(compact) { onCompactChange(compact) }
+    val openItemOptions = rememberCardOptionsHost(
+        canDeleteItems = uiState.canDeleteItems,
+        onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
+        onToggleWatched = { viewModel.toggleWatched(session, it) },
+        onDeleteItem = { viewModel.deleteItem(it) },
+    )
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -71,10 +78,10 @@ fun WatchlistScreen(
                     )
                 }
                 if (uiState.movies.isNotEmpty()) {
-                    item { PosterRow(section = HomeSection("Movies", uiState.movies), imageUrl = imageUrl, onItemClick = onItemClick) }
+                    item { PosterRow(section = HomeSection("Movies", uiState.movies), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
                 if (uiState.series.isNotEmpty()) {
-                    item { PosterRow(section = HomeSection("Series", uiState.series), imageUrl = imageUrl, onItemClick = onItemClick) }
+                    item { PosterRow(section = HomeSection("Series", uiState.series), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
             }
         }
