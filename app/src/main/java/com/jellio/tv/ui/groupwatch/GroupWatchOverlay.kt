@@ -31,6 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,8 +60,13 @@ private fun groupSubtitle(group: SyncPlayGroupDto): String =
 // same real corner-button substitution, see MainActivity.kt's own
 // header comment above where this is placed), same real "groups"
 // Material icon that button uses.
+//
+// contentFocusRequester: same real fix NowPlayingButton's own header
+// documents, this button sat in its own separate top-right corner
+// outside TopNavPill's own LazyRow, so it never inherited that fix
+// either.
 @Composable
-fun GroupWatchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun GroupWatchButton(onClick: () -> Unit, contentFocusRequester: FocusRequester, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
@@ -66,7 +74,7 @@ fun GroupWatchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
             containerColor = JellioBgElevated.copy(alpha = 0.96f),
             contentColor = JellioText,
         ),
-        modifier = modifier.size(52.dp),
+        modifier = modifier.size(52.dp).focusProperties { down = contentFocusRequester },
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(imageVector = Icons.Filled.Groups, contentDescription = "Group Watch", modifier = Modifier.size(22.dp))
@@ -97,11 +105,26 @@ fun GroupWatchOverlay(
     BackHandler(onBack = { if (state.activeChat != null) onCloseChat() else onDismiss() })
     LaunchedEffect(Unit) { onRefresh() }
 
+    // Real bug found live testing on device: nothing here ever
+    // requested initial D-pad focus when this overlay opened, so
+    // focus stayed right where it was, on GroupWatchButton itself,
+    // still focusable underneath this real scrim. The reader saw the
+    // overlay draw over everything but every D-pad press kept moving
+    // focus around whatever sat behind it instead, reported live as
+    // "stuck, selection behind it". The real exit trap below closes
+    // the other half of the same real bug: without it, focus could
+    // still wander out of this overlay's own real bounds into
+    // whatever real content the scrim covers, D-pad Up from the top
+    // row here being the most direct real path out.
+    val initialFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { initialFocusRequester.requestFocus() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.7f))
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss)
+            .focusProperties { exit = { FocusRequester.Cancel } },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -118,7 +141,7 @@ fun GroupWatchOverlay(
                         onClick = onCloseChat,
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBg, contentColor = JellioText),
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(36.dp).focusRequester(initialFocusRequester),
                     ) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back to groups", modifier = Modifier.size(18.dp))
@@ -137,7 +160,7 @@ fun GroupWatchOverlay(
                     onClick = onDismiss,
                     shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBg, contentColor = JellioText),
-                    modifier = Modifier.size(36.dp),
+                    modifier = if (state.activeChat == null) Modifier.size(36.dp).focusRequester(initialFocusRequester) else Modifier.size(36.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.Close, contentDescription = "Close", modifier = Modifier.size(18.dp))
