@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder mark until real brand artwork exists: a simple play
+     triangle in the one saturated accent Jellio's own tokens define
+     (the trending accent), kept inside the adaptive icon's real safe
+     zone (centered 66x66 within this 108x108 viewport). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FF9800"
+        android:pathData="M40,36 L74,54 L40,72 Z" />
+</vector>
