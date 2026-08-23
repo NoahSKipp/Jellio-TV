@@ -15,9 +15,13 @@ release:
 	@echo "Updating versionName in app/build.gradle.kts..."
 	sed -i 's/versionName = "[^"]*"/versionName = "$(VERSION_NAME)"/' app/build.gradle.kts
 	git add app/build.gradle.kts
-	git commit -m "chore(release): bump version to $(NEW_VERSION)"
-	@echo "Pushing to git..."
-	git push
+	@if git diff --cached --quiet; then \
+		echo "app/build.gradle.kts already at $(VERSION_NAME), nothing to commit."; \
+	else \
+		git commit -m "chore(release): bump version to $(NEW_VERSION)"; \
+		echo "Pushing to git..."; \
+		git push; \
+	fi
 	@echo "Creating GitHub release..."
 	gh release create $(NEW_VERSION) --title "$(NEW_VERSION)" --notes-file /tmp/release_notes.md
 	@echo "Release $(NEW_VERSION) created successfully!"
