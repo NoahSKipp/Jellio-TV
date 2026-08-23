@@ -5,16 +5,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,22 +31,35 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Mirrors components/navShared.js's own real getPrimaryNavLinks()
-// order: Profile leads, Settings trails, everything the reader's own
-// real server actually has (libraries) sits between the fixed links.
-// Library carries real id/name/collectionType rather than an index,
-// so equality (used for the selected highlight) tracks the real
-// library, not just a position that could point at a different one
-// after a library list refresh.
+// Mirrors components/mobileNav.js's own real link set and its own
+// consolidated Library button (components/libraryPicker.js's own
+// popover behind it), not components/sidebar.js's desktop rail: this
+// pill is a floating bar the same shape as the phone's own, not a
+// tall scrollable rail with room for one entry per real library.
+// Library carries no per-library identity here on purpose, same
+// reason mobileNav.js's own buildLibraryButton() stores its real
+// hashes as a group rather than one hash per button: which library is
+// currently open is real screen state (MainActivity's own
+// selectedLibrary), not nav identity.
 sealed interface JellioRoute {
     data object Profile : JellioRoute
     data object Home : JellioRoute
     data object Search : JellioRoute
     data object Watchlist : JellioRoute
     data object Calendar : JellioRoute
-    data class Library(val id: String, val name: String, val collectionType: String?) : JellioRoute
+    data object Library : JellioRoute
     data object Settings : JellioRoute
 }
+
+val JellioNavItems: List<JellioRoute> = listOf(
+    JellioRoute.Profile,
+    JellioRoute.Home,
+    JellioRoute.Search,
+    JellioRoute.Watchlist,
+    JellioRoute.Calendar,
+    JellioRoute.Library,
+    JellioRoute.Settings,
+)
 
 private fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Profile -> Icons.Filled.AccountCircle
@@ -55,11 +67,7 @@ private fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Search -> Icons.Filled.Search
     JellioRoute.Watchlist -> Icons.Filled.BookmarkAdded
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
-    is JellioRoute.Library -> when (collectionType) {
-        "movies" -> Icons.Filled.Movie
-        "tvshows" -> Icons.Filled.Tv
-        else -> Icons.Filled.VideoLibrary
-    }
+    JellioRoute.Library -> Icons.Filled.VideoLibrary
     JellioRoute.Settings -> Icons.Filled.Settings
 }
 
@@ -69,19 +77,21 @@ private fun JellioRoute.label(): String = when (this) {
     JellioRoute.Search -> "Search"
     JellioRoute.Watchlist -> "Watchlist"
     JellioRoute.Calendar -> "Calendar"
-    is JellioRoute.Library -> name
+    JellioRoute.Library -> "Library"
     JellioRoute.Settings -> "Settings"
 }
+
+private val PillIconSize = 30.dp
 
 // The same real floating pill css/app.css's own .jellio-mobile-nav
 // defines for a phone (rounded, solid elevated background at 0.96
 // alpha, a faint white border, no live backdrop blur so it never
 // re-samples scrolling content underneath it every frame), anchored
-// to the top of the screen instead of the bottom: a D-pad's own "up"
-// out of any row lands here on a TV the same way it lands on a phone
-// pulling the pill up from below, and a top bar is where every real
-// TV app (this app's own row content included) already expects its
-// primary nav to live.
+// to the top of the screen instead of the bottom, and sized for a
+// real 10-foot living room viewing distance rather than a phone held
+// in hand: real feedback live was that the first pass read as native
+// Jellyfin's own default, cramped TV chrome, default/small Compose
+// component sizing exactly why.
 @Composable
 fun TopNavPill(
     items: List<JellioRoute>,
@@ -92,11 +102,11 @@ fun TopNavPill(
     Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
         Row(
             modifier = Modifier
-                .padding(top = 24.dp)
+                .padding(top = 32.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             items.forEach { route ->
                 NavPillItem(
@@ -125,21 +135,22 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, onClick: () -> 
             focusedSelectedContainerColor = Color.White.copy(alpha = 0.18f),
             focusedSelectedContentColor = JellioText,
         ),
-        modifier = Modifier.padding(horizontal = 4.dp),
+        modifier = Modifier.padding(horizontal = 5.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = route.icon(),
                 contentDescription = null,
                 tint = LocalContentColor.current,
+                modifier = Modifier.size(PillIconSize),
             )
             Text(
                 text = route.label(),
                 color = LocalContentColor.current,
-                modifier = Modifier.padding(start = 10.dp),
+                modifier = Modifier.padding(start = 12.dp),
             )
         }
     }

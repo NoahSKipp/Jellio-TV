@@ -58,12 +58,15 @@ class AppViewModel @Inject constructor(
         viewModelScope.launch { repository.logout() }
     }
 
+    // A Gelato-imported item commonly has a real Primary poster but no
+    // distinct Backdrop art at all (real gap found live: the hero
+    // stayed blank for exactly this reason on titles with no backdrop
+    // tag). Falls back to the Primary image rather than requesting a
+    // Backdrop type that was never going to exist server side.
     fun imageUrl(session: Session, item: BaseItemDto, imageType: String, maxWidth: Int): String {
-        val tag = if (imageType == "Backdrop") {
-            item.BackdropImageTags?.firstOrNull()
-        } else {
-            item.ImageTags?.get(imageType)
-        }
-        return repository.imageUrl(session.serverAddress, item.Id, tag, imageType, maxWidth)
+        val backdropTag = item.BackdropImageTags?.firstOrNull()
+        val resolvedType = if (imageType == "Backdrop" && backdropTag == null) "Primary" else imageType
+        val tag = if (resolvedType == "Backdrop") backdropTag else item.ImageTags?.get(resolvedType)
+        return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth)
     }
 }

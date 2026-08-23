@@ -12,6 +12,12 @@ import javax.inject.Singleton
 
 private const val APP_VERSION = "0.1.0"
 
+// BackdropImageTags is not included by default (real bug found live:
+// the hero backdrop silently never loaded because this app never
+// asked the server whether one even existed), same real field
+// screens/home.js's own hero already knows to ask for.
+private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
+
 sealed interface LoginResult {
     data object Success : LoginResult
     data class Failure(val message: String) : LoginResult
@@ -51,7 +57,8 @@ class JellioRepository @Inject constructor(
 
     suspend fun getLibraries(userId: String): List<BaseItemDto> = api.getUserViews(userId).Items
 
-    suspend fun getContinueWatching(userId: String): List<BaseItemDto> = api.getResumeItems(userId).Items
+    suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
+        api.getResumeItems(userId, fields = ITEM_FIELDS).Items
 
     suspend fun getLibraryItems(userId: String, parentId: String, limit: Int = 24): List<BaseItemDto> =
         api.getItems(
@@ -61,7 +68,7 @@ class JellioRepository @Inject constructor(
             limit = limit,
             sortBy = "DateCreated",
             sortOrder = "Descending",
-            fields = "PrimaryImageAspectRatio",
+            fields = ITEM_FIELDS,
         ).Items
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
