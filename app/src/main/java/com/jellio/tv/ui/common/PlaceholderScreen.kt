@@ -1,4 +1,4 @@
-package com.jellio.tv.ui.home
+package com.jellio.tv.ui.common
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +10,10 @@ import androidx.tv.material3.Text
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Shared shell for every route that has no real screen yet (Search,
-// Watchlist, Calendar, Settings). One composable, not four
-// near-identical files, until each of these actually grows its own
-// real content and earns its own file the way HomeScreen already
-// has.
+// Watchlist, Calendar, individual library browsing, Settings). One
+// composable, not several near-identical files, until each of these
+// actually grows its own real content and earns its own file the way
+// HomeScreen/ProfileScreen already have.
 @Composable
 fun PlaceholderScreen(title: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
