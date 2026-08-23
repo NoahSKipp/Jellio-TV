@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -64,6 +65,10 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     val libraries by appViewModel.libraries.collectAsState()
+    // Shared with TopNavPill below: the one real D-pad Down landing
+    // spot Home's own content attaches itself to, so the pill has
+    // somewhere real to send focus instead of trapping it.
+    val homeContentFocusRequester = remember { FocusRequester() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (route) {
@@ -75,6 +80,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
             JellioRoute.Home -> HomeScreen(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                contentFocusRequester = homeContentFocusRequester,
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Search -> PlaceholderScreen("Search", modifier = Modifier.fillMaxSize())
@@ -89,6 +95,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
         TopNavPill(
             items = JellioNavItems,
             selected = route,
+            contentFocusRequester = homeContentFocusRequester,
             onSelect = { clicked ->
                 // Mirrors components/mobileNav.js's own single Library
                 // button: a tap opens the picker rather than

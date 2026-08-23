@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -107,6 +109,7 @@ fun TopNavPill(
     items: List<JellioRoute>,
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
+    contentFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
@@ -118,6 +121,20 @@ fun TopNavPill(
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
+                // Real feedback live: D-pad Down from here went nowhere,
+                // the system saw nothing focusable below to land on.
+                // Gated on the real active screen rather than applied
+                // unconditionally: contentFocusRequester's own target
+                // only actually exists while Home is the one composed
+                // beneath this pill, same real screen HomeScreen itself
+                // attaches it to.
+                .then(
+                    if (selected == JellioRoute.Home) {
+                        Modifier.focusProperties { down = contentFocusRequester }
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(horizontal = 12.dp),
         ) {
             items.forEach { route ->
