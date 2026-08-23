@@ -10,12 +10,15 @@ plugins {
 
 android {
     namespace = "com.jellio.tv"
-    compileSdk = 35
+    // androidx.activity:activity-compose 1.11.0 (pulled in by the
+    // Compose BOM) requires compileSdk 36+, real CI failure, not
+    // guessed at. NuvioTV itself already builds clean against 36.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.jellio.tv"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         // GITHUB_RUN_NUMBER only ever goes up across the real release
         // history this repo will ever have, same real property a
         // versionName tag from git-cliff has no use for (Google Play
