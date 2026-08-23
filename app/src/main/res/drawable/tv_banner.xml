@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder until real brand artwork exists: android:banner needs
+     a real resource at manifest-parse time (a real Android TV
+     launcher row reads it directly, no code path here to fall back
+     through), sized to the real 320x180dp banner slot every launcher
+     row expects. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#FF9800"
+        android:pathData="M130,72 L190,90 L130,108 Z" />
+</vector>
