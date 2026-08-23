@@ -41,7 +41,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import androidx.tv.material3.CircularProgressIndicator
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import com.jellio.tv.data.session.Session
@@ -78,7 +77,7 @@ fun PlayerScreen(
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                Text(text = "Loading...", color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

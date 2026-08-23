@@ -2,6 +2,7 @@ package com.jellio.tv.ui.settings
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +50,7 @@ fun SettingsScreen(session: Session, onLogout: () -> Unit, modifier: Modifier = 
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable Column.() -> Unit) {
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.padding(top = 32.dp)) {
         Text(text = title, style = MaterialTheme.typography.titleMedium, color = JellioTextSecondary)
         Column(modifier = Modifier.padding(top = 12.dp)) { content() }
