@@ -53,6 +53,7 @@ interface JellyfinApi {
     suspend fun getNextUp(
         @Query("userId") userId: String,
         @Query("Limit") limit: Int = 20,
+        @Query("Fields") fields: String? = null,
     ): ItemsResultDto
 
     @POST("Users/{userId}/FavoriteItems/{itemId}")

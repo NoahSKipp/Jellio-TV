@@ -129,6 +129,25 @@ class JellioRepository @Inject constructor(
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
         api.getResumeItems(userId, fields = ITEM_FIELDS).Items
 
+    suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> =
+        api.getNextUp(userId, limit, fields = ITEM_FIELDS).Items
+
+    // Mirrors runtime/api.js's own getHeroCandidates(): a real random
+    // Movie/Series, never an Episode (the web hero never once asks for
+    // one), so there is no episode title/art to ever land in a hero in
+    // the first place, same real reasoning as the fix itself rather
+    // than a patch bolted onto whatever a Continue Watching item
+    // happened to be.
+    suspend fun getHeroCandidates(userId: String, limit: Int = 8): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = limit,
+            sortBy = "Random",
+            fields = ITEM_FIELDS,
+        ).Items
+
     suspend fun getLibraryItems(userId: String, parentId: String, limit: Int = 24): List<BaseItemDto> =
         api.getItems(
             userId = userId,
