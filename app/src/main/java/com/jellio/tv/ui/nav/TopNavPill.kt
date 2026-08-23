@@ -8,14 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.BookmarkAdded
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +15,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
@@ -33,56 +24,6 @@ import androidx.tv.material3.Text
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-
-// Mirrors components/mobileNav.js's own real link set and its own
-// consolidated Library button (components/libraryPicker.js's own
-// popover behind it), not components/sidebar.js's desktop rail: this
-// pill is a floating bar the same shape as the phone's own, not a
-// tall scrollable rail with room for one entry per real library.
-// Library carries no per-library identity here on purpose, same
-// reason mobileNav.js's own buildLibraryButton() stores its real
-// hashes as a group rather than one hash per button: which library is
-// currently open is real screen state (MainActivity's own
-// selectedLibrary), not nav identity.
-sealed interface JellioRoute {
-    data object Profile : JellioRoute
-    data object Home : JellioRoute
-    data object Search : JellioRoute
-    data object Watchlist : JellioRoute
-    data object Calendar : JellioRoute
-    data object Library : JellioRoute
-    data object Settings : JellioRoute
-}
-
-val JellioNavItems: List<JellioRoute> = listOf(
-    JellioRoute.Profile,
-    JellioRoute.Home,
-    JellioRoute.Search,
-    JellioRoute.Watchlist,
-    JellioRoute.Calendar,
-    JellioRoute.Library,
-    JellioRoute.Settings,
-)
-
-private fun JellioRoute.icon(): ImageVector = when (this) {
-    JellioRoute.Profile -> Icons.Filled.AccountCircle
-    JellioRoute.Home -> Icons.Filled.Home
-    JellioRoute.Search -> Icons.Filled.Search
-    JellioRoute.Watchlist -> Icons.Filled.BookmarkAdded
-    JellioRoute.Calendar -> Icons.Filled.CalendarMonth
-    JellioRoute.Library -> Icons.Filled.VideoLibrary
-    JellioRoute.Settings -> Icons.Filled.Settings
-}
-
-private fun JellioRoute.label(): String = when (this) {
-    JellioRoute.Profile -> "Profile"
-    JellioRoute.Home -> "Home"
-    JellioRoute.Search -> "Search"
-    JellioRoute.Watchlist -> "Watchlist"
-    JellioRoute.Calendar -> "Calendar"
-    JellioRoute.Library -> "Library"
-    JellioRoute.Settings -> "Settings"
-}
 
 private val PillIconSize = 28.dp
 

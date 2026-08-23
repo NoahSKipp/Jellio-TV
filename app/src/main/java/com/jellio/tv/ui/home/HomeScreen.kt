@@ -27,6 +27,7 @@ fun HomeScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     contentFocusRequester: FocusRequester,
+    onItemClick: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -60,9 +61,9 @@ fun HomeScreen(
                     .focusGroup()
                     .focusRequester(contentFocusRequester),
             ) {
-                item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl) }
+                item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
                 items(uiState.sections, key = { it.title }) { section ->
-                    PosterRow(section = section, imageUrl = imageUrl)
+                    PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
                 }
             }
         }
