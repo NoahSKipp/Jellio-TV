@@ -12,39 +12,25 @@ import androidx.tv.material3.Typography
 // the web build itself hits on a client with no path to Google Fonts.
 val JellioFontFamily = FontFamily.Default
 
-// Sized for a real 10-foot living room viewing distance, not a phone
-// held in hand: real feedback live was that the first pass read as
-// native Jellyfin's own default, cramped TV UI rather than Nuvio's
-// own deliberately oversized one, and default/small Compose text
-// sizes were exactly why.
 val JellioTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 44.sp,
+        fontSize = 32.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
+        fontSize = 22.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 20.sp,
+        fontSize = 16.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-    ),
-    // css/app.css's own .jellio-mobile-nav-label: 0.66em against that
-    // pill's own 22px base, the nav pill's own small icon-under label,
-    // real feedback found the taller labelMedium default too big
-    // there.
-    labelSmall = TextStyle(
-        fontFamily = JellioFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 13.sp,
+        fontSize = 14.sp,
     ),
 )
