@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.recommend.RecommendationDataSource
+import com.jellio.tv.data.recommend.buildRecommendationRows
+import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,14 +24,16 @@ data class HomeUiState(
     val error: String? = null,
 )
 
-// Real per-library rows plus Continue Watching/Up Next, mirroring
-// screens/home.js's own buildHomeSections() at a reduced but real
-// scale: Continue Watching then Up Next is the real order real
-// feedback settled on there, ahead of anything else. No Coming
-// Soon/studio hub/recommendation/genre rows yet, those land once the
-// matching real Gelato-backed catalog logic earns its own real row;
-// the per-library rows below are this app's own stand in for that
-// until then, not a real screens/home.js concept themselves.
+// Real per-library rows plus Continue Watching/Up Next/recommendation
+// rows, mirroring screens/home.js's own buildHomeSections() at a
+// reduced but real scale: Continue Watching then Up Next is the real
+// order real feedback settled on there, RecommendationEngine's own
+// real "Top Picks for You"/"Because you watched X"/"Because you're
+// watching X"/"More with X" rows next (real feedback: the genre
+// aggregate row leads, ahead of every per-title row), per-library rows
+// last, this app's own stand in for screens/home.js's own real Coming
+// Soon/Studio Hub/catalog/genre rows until the matching real
+// Gelato-backed catalog logic earns its own real row here.
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -65,11 +70,28 @@ class HomeViewModel @Inject constructor(
                     emptyList()
                 }
 
+                val recommendationSource = RecommendationDataSource(
+                    getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
+                    getNextUp = { limit -> repository.getNextUp(session.userId, limit) },
+                    getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
+                    getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
+                    getPersonItems = { personId, limit -> repository.getPersonItems(session.userId, personId, limit) },
+                )
+                // Shared across recommendation and per-library rows, same
+                // real reasoning screens/home.js's own shared `seen` object
+                // documents: a title one row already picked should not
+                // also turn up further down the same page.
+                val exclude = mutableSetOf<String>()
+                val recommendationRows = try {
+                    buildRecommendationRows(recommendationSource, exclude)
+                } catch (err: Exception) {
+                    emptyList()
+                }
+
                 val libraryRows = libraries.map { library ->
-                    HomeSection(
-                        title = library.Name ?: "Library",
-                        items = repository.getLibraryItems(session.userId, library.Id),
-                    )
+                    val items = repository.getLibraryItems(session.userId, library.Id)
+                        .filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+                    HomeSection(title = library.Name ?: "Library", items = items)
                 }
 
                 val sections = buildList {
@@ -79,6 +101,7 @@ class HomeViewModel @Inject constructor(
                     if (upNext.isNotEmpty()) {
                         add(HomeSection("Up Next", upNext))
                     }
+                    addAll(recommendationRows)
                     addAll(libraryRows.filter { it.items.isNotEmpty() })
                 }
 

@@ -9,6 +9,7 @@ import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
+import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
 import kotlinx.coroutines.flow.Flow
@@ -298,6 +299,85 @@ class JellioRepository @Inject constructor(
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         api.getSeasons(seriesId, userId).Items
+
+    // Real endpoint, runtime/recommend.js's own real seed history:
+    // real Jellyfin Filters=IsPlayed, sorted by DatePlayed, real real
+    // recency signal a Gelato server's own DateCreated cannot give
+    // (every import lands at once, DateCreated means nothing there).
+    suspend fun getRecentlyCompleted(userId: String, limit: Int): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            filters = "IsPlayed",
+            sortBy = "DatePlayed",
+            sortOrder = "Descending",
+            limit = limit,
+            fields = "Genres,People,ProductionYear,CommunityRating,RunTimeTicks",
+        ).Items
+
+    // One seed's own real candidate pool for RecommendationEngine's
+    // own scorer: its own genres and its own top billed cast/director,
+    // each a separate real query narrowed server side rather than
+    // scoring the whole library client side to fill one row. Mirrors
+    // runtime/api.js's own getRecommendationCandidates() exactly,
+    // including its own real Genres=a|b OR-join convention.
+    suspend fun getRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> {
+        val genres = seed.Genres.orEmpty()
+        val people = seed.People.orEmpty().filter { it.Id.isNotEmpty() && (it.Type == "Actor" || it.Type == "Director") }.take(5)
+        if (genres.isEmpty() && people.isEmpty()) return emptyList()
+
+        val byId = linkedMapOf<String, CandidateEntry>()
+
+        if (genres.isNotEmpty()) {
+            runCatching {
+                api.getItems(
+                    userId = userId,
+                    includeItemTypes = "Movie,Series",
+                    recursive = true,
+                    limit = limit,
+                    sortBy = "Random",
+                    fields = "Genres,ProductionYear,CommunityRating,RunTimeTicks",
+                    genres = genres.joinToString("|"),
+                ).Items
+            }.getOrDefault(emptyList()).forEach { item ->
+                byId.getOrPut(item.Id) { CandidateEntry(item, viaPerson = false) }
+            }
+        }
+
+        if (people.isNotEmpty()) {
+            runCatching {
+                api.getItems(
+                    userId = userId,
+                    includeItemTypes = "Movie,Series",
+                    recursive = true,
+                    limit = limit,
+                    sortBy = "Random",
+                    fields = "Genres,ProductionYear,CommunityRating,RunTimeTicks",
+                    personIds = people.joinToString(",") { it.Id },
+                ).Items
+            }.getOrDefault(emptyList()).forEach { item ->
+                val existing = byId[item.Id]
+                byId[item.Id] = if (existing != null) existing.copy(viaPerson = true) else CandidateEntry(item, viaPerson = true)
+            }
+        }
+
+        return byId.values.toList()
+    }
+
+    // Every real item crediting one specific person as Actor or
+    // Director, real "More with [actor]" row aggregate.
+    suspend fun getPersonItems(userId: String, personId: String, limit: Int): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = limit,
+            sortBy = "CommunityRating",
+            sortOrder = "Descending",
+            fields = "ProductionYear,CommunityRating,Genres",
+            personIds = personId,
+        ).Items
 
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
