@@ -422,7 +422,7 @@ private fun SubtitleMenu(
                 text = "Subtitles",
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, bottom = 16.dp),
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
             )
             LazyColumn {
                 item { SubtitleMenuRow(label = "Off", isSelected = selectedIndex == null, onClick = { onSelect(null) }) }

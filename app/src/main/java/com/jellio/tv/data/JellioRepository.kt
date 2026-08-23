@@ -4,6 +4,7 @@ import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.UserItemDataDto
