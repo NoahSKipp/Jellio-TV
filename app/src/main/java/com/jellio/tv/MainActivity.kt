@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -32,6 +33,7 @@ import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.TopNavPill
 import com.jellio.tv.ui.nav.isImmersive
+import com.jellio.tv.ui.person.PersonScreen
 import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
 import com.jellio.tv.ui.search.SearchScreen
@@ -39,6 +41,7 @@ import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioTvTheme
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -85,6 +88,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     // spot Home's own content attaches itself to, so the pill has
     // somewhere real to send focus instead of trapping it.
     val homeContentFocusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -99,6 +103,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     }
 
     val onNavigateToDetail: (String) -> Unit = { itemId -> push(JellioRoute.Detail(itemId)) }
+    val onNavigateToPerson: (String) -> Unit = { personId -> push(JellioRoute.Person(personId)) }
     val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> push(JellioRoute.Player(itemId, mediaSourceId)) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -155,8 +160,17 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onBack = { routeStack = routeStack.dropLast(1) },
                 onNavigateToDetail = onNavigateToDetail,
+                onNavigateToPerson = onNavigateToPerson,
                 onOpenStreamPicker = { item -> streamPickerItem = item },
                 onPlayDirect = onPlayDirect,
+                modifier = Modifier.fillMaxSize(),
+            )
+            is JellioRoute.Person -> PersonScreen(
+                session = session,
+                personId = current.personId,
+                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                onBack = { routeStack = routeStack.dropLast(1) },
+                onItemClick = onNavigateToDetail,
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Player -> PlayerScreen(
@@ -213,7 +227,11 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 loadSources = { appViewModel.getMediaSources(session, pickerItem.Id) },
                 onSelect = { source ->
                     streamPickerItem = null
-                    onPlayDirect(pickerItem.Id, source.Id)
+                    val mediaSourceId = source.Id
+                    if (mediaSourceId != null) {
+                        scope.launch { appViewModel.rememberStreamChoice(pickerItem.Id, mediaSourceId) }
+                    }
+                    onPlayDirect(pickerItem.Id, mediaSourceId)
                 },
                 onDismiss = { streamPickerItem = null },
                 modifier = Modifier.fillMaxSize(),

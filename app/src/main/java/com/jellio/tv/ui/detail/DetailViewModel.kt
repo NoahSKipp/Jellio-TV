@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +13,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+// screens/detail.js's own Play button: a real picker with nothing to
+// pick between skips itself entirely, and a remembered choice
+// (components/streamPicker.js's own isRememberStreamEnabled()) skips
+// it too as long as that source is still actually offered.
+sealed interface PlayAction {
+    data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
+    data class ShowPicker(val item: BaseItemDto) : PlayAction
+}
 
 data class SeasonUiState(val season: BaseItemDto, val episodes: List<BaseItemDto> = emptyList())
 
@@ -42,6 +52,7 @@ data class DetailUiState(
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val streamPreferences: StreamPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DetailUiState())
@@ -153,4 +164,24 @@ class DetailViewModel @Inject constructor(
 
     suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
         runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
+
+    // forceChoice mirrors screens/detail.js's own Change Stream button:
+    // it only ever skips the remembered shortcut below, a title with
+    // one real source still has nothing to change to either way.
+    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
+        val sources = getMediaSources(session, item.Id)
+        if (sources.size <= 1) return PlayAction.Direct(item.Id, sources.firstOrNull()?.Id)
+
+        if (!forceChoice && streamPreferences.isRememberEnabled()) {
+            val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
+            if (remembered != null && sources.any { it.Id == remembered }) {
+                return PlayAction.Direct(item.Id, remembered)
+            }
+        }
+        return PlayAction.ShowPicker(item)
+    }
+
+    suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
+        if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
+    }
 }

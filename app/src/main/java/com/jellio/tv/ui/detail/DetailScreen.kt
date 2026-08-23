@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.runtime.Composable
@@ -99,6 +100,7 @@ fun DetailScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
+    onNavigateToPerson: (String) -> Unit,
     onOpenStreamPicker: (BaseItemDto) -> Unit,
     onPlayDirect: (itemId: String, mediaSourceId: String?) -> Unit,
     modifier: Modifier = Modifier,
@@ -132,18 +134,27 @@ fun DetailScreen(
                                 val target = viewModel.resolvePlayTarget()
                                 if (target != null) {
                                     scope.launch {
-                                        // screens/detail.js's own real one-source fast
-                                        // path (components/streamPicker.js's own
-                                        // openStreamPicker): a picker with nothing to
-                                        // pick between is not worth showing at all.
-                                        val sources = viewModel.getMediaSources(session, target.Id)
-                                        if (sources.size <= 1) {
-                                            onPlayDirect(target.Id, sources.firstOrNull()?.Id)
-                                        } else {
-                                            onOpenStreamPicker(target)
+                                        when (val action = viewModel.resolvePlayAction(session, target)) {
+                                            is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
+                                            is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
                                         }
                                     }
                                 }
+                            },
+                            onChangeStream = if (item.Type != "Series") {
+                                {
+                                    val target = viewModel.resolvePlayTarget()
+                                    if (target != null) {
+                                        scope.launch {
+                                            when (val action = viewModel.resolvePlayAction(session, target, forceChoice = true)) {
+                                                is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
+                                                is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                null
                             },
                             onToggleWatchlist = { viewModel.toggleWatchlist(session) },
                             onToggleWatched = { viewModel.toggleWatched(session) },
@@ -164,7 +175,7 @@ fun DetailScreen(
                         }
                     }
                     if (uiState.cast.isNotEmpty()) {
-                        item { CastRow(cast = uiState.cast, imageUrl = imageUrl) }
+                        item { CastRow(cast = uiState.cast, imageUrl = imageUrl, onPersonClick = onNavigateToPerson) }
                     }
                     if (uiState.trailers.isNotEmpty()) {
                         item {
@@ -202,6 +213,7 @@ private fun DetailHero(
     imageUrl: (String, String?, String, Int) -> String,
     onSeriesClick: (String) -> Unit,
     onPlay: () -> Unit,
+    onChangeStream: (() -> Unit)?,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
     onLike: () -> Unit,
@@ -307,6 +319,14 @@ private fun DetailHero(
                     contentDescription = "Dislike",
                     onClick = onDislike,
                 )
+                if (onChangeStream != null) {
+                    IconActionButton(
+                        icon = Icons.Filled.SwapHoriz,
+                        active = false,
+                        contentDescription = "Change Stream",
+                        onClick = onChangeStream,
+                    )
+                }
             }
         }
     }
@@ -415,32 +435,39 @@ private fun EpisodeCard(episode: BaseItemDto, imageUrl: (String, String?, String
 }
 
 @Composable
-private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, Int) -> String) {
+private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, Int) -> String, onPersonClick: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = "Cast", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(cast, key = { it.Id }) { person ->
-                Column(modifier = Modifier.width(140.dp)) {
-                    Box(modifier = Modifier.width(140.dp).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
-                        val tag = person.PrimaryImageTag
-                        if (tag != null) {
-                            AsyncImage(
-                                model = imageUrl(person.Id, tag, "Primary", 300),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                Surface(
+                    onClick = { onPersonClick(person.Id) },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.width(140.dp),
+                ) {
+                    Column {
+                        Box(modifier = Modifier.width(140.dp).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
+                            val tag = person.PrimaryImageTag
+                            if (tag != null) {
+                                AsyncImage(
+                                    model = imageUrl(person.Id, tag, "Primary", 300),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                         }
-                    }
-                    Text(
-                        text = person.Name.orEmpty(),
-                        color = JellioText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                    person.Role?.let {
-                        Text(text = it, color = JellioTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = person.Name.orEmpty(),
+                            color = JellioText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        person.Role?.let {
+                            Text(text = it, color = JellioTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }

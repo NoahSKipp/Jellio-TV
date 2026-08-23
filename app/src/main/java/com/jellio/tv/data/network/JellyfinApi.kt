@@ -49,6 +49,7 @@ interface JellyfinApi {
         @Query("Genres") genres: String? = null,
         @Query("Filters") filters: String? = null,
         @Query("searchTerm") searchTerm: String? = null,
+        @Query("personIds") personIds: String? = null,
     ): ItemsResultDto
 
     @GET("Users/{userId}/Items/{itemId}")

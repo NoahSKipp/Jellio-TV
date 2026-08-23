@@ -275,6 +275,27 @@ class JellioRepository @Inject constructor(
 
     suspend fun getItem(userId: String, itemId: String): BaseItemDto = api.getItem(userId, itemId)
 
+    // screens/person.js's own real getPerson(): a plain item lookup,
+    // real Jellyfin Person items share the same BaseItemDto shape as
+    // everything else this app already reads.
+    suspend fun getPerson(userId: String, personId: String): BaseItemDto = api.getItem(userId, personId)
+
+    // Real endpoint, GET /Items?personIds=X (Jellyfin.Api's own
+    // ItemsController, confirmed against screens/person.js's own
+    // getPersonFilmography() before porting this): every real Movie/
+    // Series this person is credited on.
+    suspend fun getPersonFilmography(userId: String, personId: String, limit: Int = 50): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = limit,
+            sortBy = "PremiereDate",
+            sortOrder = "Descending",
+            fields = "PrimaryImageAspectRatio,ProductionYear",
+            personIds = personId,
+        ).Items
+
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         api.getSeasons(seriesId, userId).Items
 
