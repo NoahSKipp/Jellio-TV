@@ -1,6 +1,10 @@
 package com.jellio.tv.ui.player
 
+import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,9 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
@@ -34,17 +42,24 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
@@ -89,10 +104,19 @@ fun PlayerScreen(
                 startPositionTicks = uiState.startPositionTicks,
                 title = uiState.title,
                 subtitle = uiState.subtitle,
+                subtitleTracks = uiState.subtitleTracks,
+                selectedSubtitleIndex = uiState.selectedSubtitleIndex,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
                 onReportStopped = { viewModel.reportStopped(it) },
+                onSelectSubtitle = { track, positionTicks ->
+                    when {
+                        track == null -> viewModel.selectSubtitle(null)
+                        track.isTextBased -> viewModel.selectSubtitle(track.streamIndex)
+                        else -> viewModel.selectBurnedInSubtitle(session, track.streamIndex, positionTicks)
+                    }
+                },
             )
         }
     }
@@ -104,17 +128,37 @@ private fun PlayerSurface(
     startPositionTicks: Long,
     title: String,
     subtitle: String,
+    subtitleTracks: List<SubtitleTrackUiState>,
+    selectedSubtitleIndex: Int?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
+    onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
+    // Every real text based subtitle track declared as a real
+    // MediaItem.SubtitleConfiguration from this very first prepare()
+    // call, not added later: Media3 requires a full setMediaSource
+    // reload to attach one mid-playback, which wipes the buffer, so
+    // toggling between them afterward is real track *selection*
+    // (below), never a second real prepare().
     val player = remember(streamUrl) {
+        val subtitleConfigs = subtitleTracks.filter { it.isTextBased && it.url != null }.map { track ->
+            MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))
+                .setMimeType(MimeTypes.TEXT_VTT)
+                .setId(track.streamIndex.toString())
+                .setLabel(track.label)
+                .build()
+        }
+        val mediaItem = MediaItem.Builder()
+            .setUri(streamUrl)
+            .setSubtitleConfigurations(subtitleConfigs)
+            .build()
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(streamUrl))
+            setMediaItem(mediaItem)
             playWhenReady = true
             prepare()
         }
@@ -124,6 +168,7 @@ private fun PlayerSurface(
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var showSubtitleMenu by remember { mutableStateOf(false) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
 
@@ -139,6 +184,28 @@ private fun PlayerSurface(
             onReportStopped(player.currentPosition * TICKS_PER_MS)
             player.release()
         }
+    }
+
+    // Off, or a specific real text track: a plain real track selection
+    // override, no reload, since every text track was already declared
+    // on the MediaItem above before prepare() ever ran.
+    LaunchedEffect(player, selectedSubtitleIndex) {
+        val params = player.trackSelectionParameters.buildUpon()
+        params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        if (selectedSubtitleIndex == null) {
+            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            val targetId = selectedSubtitleIndex.toString()
+            val group = player.currentTracks.groups.firstOrNull { group ->
+                group.type == C.TRACK_TYPE_TEXT && (0 until group.length).any { i -> group.getTrackFormat(i).id == targetId }
+            }
+            if (group != null) {
+                val trackIndex = (0 until group.length).first { i -> group.getTrackFormat(i).id == targetId }
+                params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+            }
+        }
+        player.trackSelectionParameters = params.build()
     }
 
     LaunchedEffect(player, startPositionTicks) {
@@ -168,8 +235,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying) {
-        if (controlsVisible && isPlaying) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -183,6 +250,13 @@ private fun PlayerSurface(
             .focusRequester(focusRequester)
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                if (showSubtitleMenu) {
+                    if (event.key == Key.Back) {
+                        showSubtitleMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
                 when (event.key) {
                     Key.Back -> {
                         onBack()
@@ -230,8 +304,21 @@ private fun PlayerSurface(
                 isPlaying = isPlaying,
                 positionMs = positionMs,
                 durationMs = durationMs,
-                onBack = onBack,
+                hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
+                onOpenSubtitleMenu = { showSubtitleMenu = true },
+            )
+        }
+
+        if (showSubtitleMenu) {
+            SubtitleMenu(
+                tracks = subtitleTracks,
+                selectedIndex = selectedSubtitleIndex,
+                onSelect = { track ->
+                    showSubtitleMenu = false
+                    onSelectSubtitle(track, player.currentPosition * TICKS_PER_MS)
+                },
+                onDismiss = { showSubtitleMenu = false },
             )
         }
     }
@@ -244,14 +331,28 @@ private fun PlayerControls(
     isPlaying: Boolean,
     positionMs: Long,
     durationMs: Long,
-    onBack: () -> Unit,
+    hasSubtitleTracks: Boolean,
     onPlayPause: () -> Unit,
+    onOpenSubtitleMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
             Text(text = title, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             if (subtitle.isNotEmpty()) {
                 Text(text = subtitle, color = JellioTextSecondary)
+            }
+        }
+
+        if (hasSubtitleTracks) {
+            Surface(
+                onClick = onOpenSubtitleMenu,
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp).size(56.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
+                }
             }
         }
 
@@ -283,6 +384,73 @@ private fun PlayerControls(
                 Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
             }
         }
+    }
+}
+
+// Mirrors screens/player.js's own real subtitle popover: Off first,
+// then every real track this source carries, an image based one
+// (PGS, VobSub) labelled the same real "(image)" suffix that file's
+// own renderSubtitleTrackList() uses, selecting one of those a real
+// burned-in transcode rather than a plain track switch.
+@Composable
+private fun SubtitleMenu(
+    tracks: List<SubtitleTrackUiState>,
+    selectedIndex: Int?,
+    onSelect: (SubtitleTrackUiState?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(360.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(vertical = 48.dp),
+        ) {
+            Text(
+                text = "Subtitles",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                item { SubtitleMenuRow(label = "Off", isSelected = selectedIndex == null, onClick = { onSelect(null) }) }
+                items(tracks) { track ->
+                    SubtitleMenuRow(label = track.label, isSelected = selectedIndex == track.streamIndex, onClick = { onSelect(track) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubtitleMenuRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
+            contentColor = JellioText,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+        )
     }
 }
 
