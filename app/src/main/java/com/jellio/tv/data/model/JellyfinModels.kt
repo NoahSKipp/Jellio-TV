@@ -70,6 +70,15 @@ data class MediaStreamDto(
     val BitRate: Long? = null,
     val Channels: Int? = null,
     val Index: Int? = null,
+    // Real fields screens/player.js's own subtitle track list reads:
+    // an image based track (PGS, VobSub) has no WebVTT form, nothing
+    // a side-loaded text track can render, only a burned in transcode
+    // can show one at all.
+    val IsTextSubtitleStream: Boolean? = null,
+    val DisplayTitle: String? = null,
+    val DeliveryMethod: String? = null,
+    val DeliveryUrl: String? = null,
+    val IsExternalUrl: Boolean? = null,
 )
 
 @JsonClass(generateAdapter = true)

@@ -67,6 +67,14 @@ private val DIRECT_PLAY_CONTAINERS = setOf("mp4", "webm", "m4v", "mkv", "m2ts", 
 private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8", "vp9", "av1", "mpeg4")
 private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "ac3", "eac3", "dts", "truehd")
 
+// Real fallback runtime/api.js's own estimateVideoBitrate() uses when
+// a source reports no real bitrate of its own to negotiate a forced
+// transcode against: leaving this unset let the server fall back to
+// its own real default, real feedback found every transcoded stream
+// coming back noticeably, incorrectly low quality regardless of the
+// source's own real resolution.
+private const val FALLBACK_VIDEO_BITRATE = 20000000L
+
 // The one real place both auth and every other Jellyfin call go
 // through, mirroring runtime/auth.js and runtime/api.js's own
 // combined real job on the web side.
@@ -443,6 +451,7 @@ class JellioRepository @Inject constructor(
         itemId: String,
         mediaSourceId: String?,
         startTimeTicks: Long,
+        burnInSubtitleStreamIndex: Int? = null,
     ): PlaybackTarget {
         val response = api.getPlaybackInfo(
             itemId,
@@ -452,38 +461,63 @@ class JellioRepository @Inject constructor(
             ?: response.MediaSources.firstOrNull()
             ?: throw IllegalStateException("No playable source for this title")
 
-        val directPlay = canDirectPlay(mediaSource)
+        // Mirrors runtime/api.js's own buildStreamUrl() exactly: always
+        // this app's own /Videos/{id}/stream.{container} endpoint, never
+        // MediaSourceInfo.TranscodingUrl (that file never once reads
+        // that field either, a forced transcode is this same endpoint
+        // with VideoCodec/AudioCodec params instead of Static=true).
+        val directPlay = burnInSubtitleStreamIndex == null && canDirectPlay(mediaSource)
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
+        val container = if (directPlay) mediaSource.Container ?: "mp4" else "mp4"
 
-        val streamUrl = if (directPlay) {
-            val container = mediaSource.Container ?: "mp4"
-            buildString {
-                append(serverAddress)
-                append("/Videos/").append(itemId).append("/stream.").append(container)
-                append("?MediaSourceId=").append(resolvedMediaSourceId)
-                append("&DeviceId=").append(deviceId)
-                append("&api_key=").append(token)
+        val streamUrl = buildString {
+            append(serverAddress)
+            append("/Videos/").append(itemId).append("/stream.").append(container)
+            append("?MediaSourceId=").append(resolvedMediaSourceId)
+            append("&DeviceId=").append(deviceId)
+            append("&api_key=").append(token)
+            append("&StartTimeTicks=").append(startTimeTicks)
+            response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
+            if (directPlay) {
                 append("&Static=true")
-                append("&StartTimeTicks=").append(startTimeTicks)
-                response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
-            }
-        } else {
-            mediaSource.TranscodingUrl?.let { serverAddress + it } ?: buildString {
-                append(serverAddress)
-                append("/Videos/").append(itemId).append("/stream.mp4")
-                append("?MediaSourceId=").append(resolvedMediaSourceId)
-                append("&DeviceId=").append(deviceId)
-                append("&api_key=").append(token)
+            } else {
                 append("&VideoCodec=h264&AudioCodec=aac")
-                append("&StartTimeTicks=").append(startTimeTicks)
-                response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
+                append("&VideoBitRate=").append(estimateVideoBitrate(mediaSource))
+                append("&AudioBitRate=192000")
+            }
+            if (burnInSubtitleStreamIndex != null) {
+                append("&SubtitleStreamIndex=").append(burnInSubtitleStreamIndex)
+                append("&SubtitleMethod=Encode")
             }
         }
 
         return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks)
+    }
+
+    private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
+        val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
+        return video?.BitRate ?: mediaSource.Bitrate ?: FALLBACK_VIDEO_BITRATE
+    }
+
+    // Real endpoint confirmed against SubtitleController.cs's own
+    // registered route: GET /Videos/{itemId}/{mediaSourceId}/Subtitles/
+    // {streamIndex}/Stream.vtt converts any real text subtitle format
+    // to WebVTT server side, so requesting .vtt always works for a
+    // text stream regardless of its own real source codec. An already
+    // external stream (DeliveryMethod == "External") carries its own
+    // DeliveryUrl instead, absolute when IsExternalUrl is set,
+    // otherwise still relative to this same server.
+    suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto): String {
+        val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
+        if (stream.DeliveryMethod == "External" && !stream.DeliveryUrl.isNullOrEmpty()) {
+            return if (stream.IsExternalUrl == true) stream.DeliveryUrl else serverAddress + stream.DeliveryUrl
+        }
+        val token = sessionManager.accessToken()
+        val base = "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/Stream.vtt"
+        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token" else base
     }
 
     private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
