@@ -17,7 +17,12 @@ import com.jellio.tv.data.model.BaseItemDto
 // Watching name, not an invented category) over a horizontally
 // scrolling real-content track.
 @Composable
-fun PosterRow(section: HomeSection, imageUrl: (BaseItemDto, String, Int) -> String, modifier: Modifier = Modifier) {
+fun PosterRow(
+    section: HomeSection,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    onItemClick: (BaseItemDto) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         Text(
@@ -30,7 +35,7 @@ fun PosterRow(section: HomeSection, imageUrl: (BaseItemDto, String, Int) -> Stri
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(section.items, key = { it.Id }) { item ->
-                PosterCard(item = item, imageUrl = imageUrl)
+                PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) })
             }
         }
     }

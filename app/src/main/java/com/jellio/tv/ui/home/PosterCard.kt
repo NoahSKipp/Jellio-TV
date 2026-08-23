@@ -20,9 +20,14 @@ private val PosterWidth = 170.dp
 // heading and, later, a focused card's own detail panel), the same
 // real reasoning card.js's own header gives for keeping a grid dense.
 @Composable
-fun PosterCard(item: BaseItemDto, imageUrl: (BaseItemDto, String, Int) -> String, modifier: Modifier = Modifier) {
+fun PosterCard(
+    item: BaseItemDto,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
-        onClick = {},
+        onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
         modifier = modifier.width(PosterWidth),

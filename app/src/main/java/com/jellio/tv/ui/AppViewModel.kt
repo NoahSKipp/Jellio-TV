@@ -69,4 +69,18 @@ class AppViewModel @Inject constructor(
         val tag = if (resolvedType == "Backdrop") backdropTag else item.ImageTags?.get(resolvedType)
         return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth)
     }
+
+    // The general form imageUrl() above builds on top of: an arbitrary
+    // itemId/tag pair, not necessarily the item currently being
+    // rendered. screens/detail.js's own heroBackdropUrl() needs exactly
+    // this for its own ParentBackdropItemId/ParentBackdropImageTags
+    // fallback, a real backdrop borrowed from a different item (an
+    // episode's own series) than the one this hero is actually showing.
+    fun rawImageUrl(session: Session, itemId: String, tag: String?, imageType: String, maxWidth: Int): String =
+        repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth)
+
+    // components/streamPicker.js's own real source list, resolved once
+    // MainActivity's own picker overlay actually opens rather than
+    // eagerly for every item this screen ever renders.
+    suspend fun getMediaSources(session: Session, itemId: String) = repository.getMediaSources(session.userId, itemId)
 }
