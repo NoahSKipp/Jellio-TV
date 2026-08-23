@@ -12,25 +12,30 @@ import androidx.tv.material3.Typography
 // the web build itself hits on a client with no path to Google Fonts.
 val JellioFontFamily = FontFamily.Default
 
+// Sized for a real 10-foot living room viewing distance, not a phone
+// held in hand: real feedback live was that the first pass read as
+// native Jellyfin's own default, cramped TV UI rather than Nuvio's
+// own deliberately oversized one, and default/small Compose text
+// sizes were exactly why.
 val JellioTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 32.sp,
+        fontSize = 44.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
+        fontSize = 26.sp,
     ),
     bodyLarge = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
+        fontSize = 20.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = JellioFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
+        fontSize = 18.sp,
     ),
 )

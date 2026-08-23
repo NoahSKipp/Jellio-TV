@@ -15,13 +15,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
+import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.AppViewModel
 import com.jellio.tv.ui.AuthState
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.common.PlaceholderScreen
 import com.jellio.tv.ui.home.HomeScreen
+import com.jellio.tv.ui.nav.JellioNavItems
 import com.jellio.tv.ui.nav.JellioRoute
+import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.TopNavPill
 import com.jellio.tv.ui.profile.ProfileScreen
 import com.jellio.tv.ui.theme.JellioTvTheme
@@ -58,26 +61,12 @@ private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
 @Composable
 private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     var route by remember { mutableStateOf<JellioRoute>(JellioRoute.Home) }
+    var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
+    var showLibraryPicker by remember { mutableStateOf(false) }
     val libraries by appViewModel.libraries.collectAsState()
 
-    val navItems = remember(libraries) {
-        buildList {
-            add(JellioRoute.Profile)
-            add(JellioRoute.Home)
-            add(JellioRoute.Search)
-            add(JellioRoute.Watchlist)
-            add(JellioRoute.Calendar)
-            libraries
-                .filter { it.CollectionType == "movies" || it.CollectionType == "tvshows" }
-                .forEach { library ->
-                    add(JellioRoute.Library(library.Id, library.Name ?: "Library", library.CollectionType))
-                }
-            add(JellioRoute.Settings)
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
-        when (val current = route) {
+        when (route) {
             JellioRoute.Profile -> ProfileScreen(
                 session = session,
                 onLogout = { appViewModel.logout() },
@@ -91,14 +80,39 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
             JellioRoute.Search -> PlaceholderScreen("Search", modifier = Modifier.fillMaxSize())
             JellioRoute.Watchlist -> PlaceholderScreen("Watchlist", modifier = Modifier.fillMaxSize())
             JellioRoute.Calendar -> PlaceholderScreen("Calendar", modifier = Modifier.fillMaxSize())
-            is JellioRoute.Library -> PlaceholderScreen(current.name, modifier = Modifier.fillMaxSize())
+            JellioRoute.Library -> PlaceholderScreen(
+                selectedLibrary?.Name ?: "Library",
+                modifier = Modifier.fillMaxSize(),
+            )
             JellioRoute.Settings -> PlaceholderScreen("Settings", modifier = Modifier.fillMaxSize())
         }
         TopNavPill(
-            items = navItems,
+            items = JellioNavItems,
             selected = route,
-            onSelect = { route = it },
+            onSelect = { clicked ->
+                // Mirrors components/mobileNav.js's own single Library
+                // button: a tap opens the picker rather than
+                // navigating straight there, since no one real
+                // library speaks for the button itself.
+                if (clicked is JellioRoute.Library) {
+                    showLibraryPicker = true
+                } else {
+                    route = clicked
+                }
+            },
             modifier = Modifier.fillMaxSize(),
         )
+        if (showLibraryPicker) {
+            LibraryPickerOverlay(
+                libraries = libraries.filter { it.CollectionType == "movies" || it.CollectionType == "tvshows" },
+                onSelect = { library ->
+                    selectedLibrary = library
+                    route = JellioRoute.Library
+                    showLibraryPicker = false
+                },
+                onDismiss = { showLibraryPicker = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
