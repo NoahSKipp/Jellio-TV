@@ -21,11 +21,14 @@ data class HomeUiState(
     val error: String? = null,
 )
 
-// Real per-library rows plus Continue Watching, mirroring
+// Real per-library rows plus Continue Watching/Up Next, mirroring
 // screens/home.js's own buildHomeSections() at a reduced but real
-// scale: no Up Next/recommendation rows yet, those land once the
-// matching real endpoints (/Shows/NextUp already exists in
-// JellyfinApi, not wired here yet) earn their own real row.
+// scale: Continue Watching then Up Next is the real order real
+// feedback settled on there, ahead of anything else. No Coming
+// Soon/studio hub/recommendation/genre rows yet, those land once the
+// matching real Gelato-backed catalog logic earns its own real row;
+// the per-library rows below are this app's own stand in for that
+// until then, not a real screens/home.js concept themselves.
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -46,6 +49,21 @@ class HomeViewModel @Inject constructor(
                     .filter { it.CollectionType == "movies" || it.CollectionType == "tvshows" }
 
                 val continueWatching = repository.getContinueWatching(session.userId)
+                val upNext = try {
+                    repository.getNextUp(session.userId)
+                } catch (err: Exception) {
+                    emptyList()
+                }
+
+                // Real web hero (runtime/api.js's own getHeroCandidates())
+                // never draws from Continue Watching at all, only a
+                // random real Movie/Series: fetched independently rather
+                // than reusing whatever led the rows above.
+                val heroCandidates = try {
+                    repository.getHeroCandidates(session.userId)
+                } catch (err: Exception) {
+                    emptyList()
+                }
 
                 val libraryRows = libraries.map { library ->
                     HomeSection(
@@ -58,11 +76,13 @@ class HomeViewModel @Inject constructor(
                     if (continueWatching.isNotEmpty()) {
                         add(HomeSection("Continue Watching", continueWatching))
                     }
+                    if (upNext.isNotEmpty()) {
+                        add(HomeSection("Up Next", upNext))
+                    }
                     addAll(libraryRows.filter { it.items.isNotEmpty() })
                 }
 
-                val hero = continueWatching.firstOrNull()
-                    ?: sections.firstOrNull()?.items?.firstOrNull()
+                val hero = heroCandidates.firstOrNull()
 
                 _uiState.value = HomeUiState(isLoading = false, heroItem = hero, sections = sections)
             } catch (err: Exception) {
