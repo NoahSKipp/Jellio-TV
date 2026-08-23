@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.CircularProgressIndicator
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -105,7 +104,7 @@ fun StreamPickerOverlay(
             val currentSources = sources
             when {
                 currentSources == null -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    Text(text = "Loading...", color = JellioTextSecondary)
                 }
                 currentSources.isEmpty() -> Text(
                     text = "No streams found for this title.",
