@@ -2,7 +2,12 @@ package com.jellio.tv.data.network
 
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AuthenticationResultDto
+import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.ItemsResultDto
+import com.jellio.tv.data.model.PlaybackInfoRequest
+import com.jellio.tv.data.model.PlaybackInfoResponseDto
+import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
 import com.jellio.tv.data.model.UserItemDataDto
 import retrofit2.http.Body
@@ -37,10 +42,21 @@ interface JellyfinApi {
         @Query("IncludeItemTypes") includeItemTypes: String? = null,
         @Query("Recursive") recursive: Boolean = true,
         @Query("Limit") limit: Int? = null,
+        @Query("StartIndex") startIndex: Int? = null,
         @Query("SortBy") sortBy: String? = null,
         @Query("SortOrder") sortOrder: String? = null,
         @Query("Fields") fields: String? = null,
+        @Query("Genres") genres: String? = null,
+        @Query("Filters") filters: String? = null,
+        @Query("searchTerm") searchTerm: String? = null,
     ): ItemsResultDto
+
+    @GET("Users/{userId}/Items/{itemId}")
+    suspend fun getItem(
+        @Path("userId") userId: String,
+        @Path("itemId") itemId: String,
+        @Query("Fields") fields: String? = null,
+    ): BaseItemDto
 
     @GET("Users/{userId}/Items/Resume")
     suspend fun getResumeItems(
@@ -54,13 +70,63 @@ interface JellyfinApi {
         @Query("userId") userId: String,
         @Query("Limit") limit: Int = 20,
         @Query("Fields") fields: String? = null,
+        @Query("seriesId") seriesId: String? = null,
+        @Query("enableResumable") enableResumable: Boolean? = null,
     ): ItemsResultDto
+
+    @GET("Shows/{seriesId}/Seasons")
+    suspend fun getSeasons(
+        @Path("seriesId") seriesId: String,
+        @Query("userId") userId: String,
+    ): ItemsResultDto
+
+    @GET("Shows/{seriesId}/Episodes")
+    suspend fun getEpisodes(
+        @Path("seriesId") seriesId: String,
+        @Query("userId") userId: String,
+        @Query("seasonId") seasonId: String,
+        @Query("Fields") fields: String? = null,
+    ): ItemsResultDto
+
+    @POST("Items/{itemId}/PlaybackInfo")
+    suspend fun getPlaybackInfo(
+        @Path("itemId") itemId: String,
+        @Body body: PlaybackInfoRequest,
+    ): PlaybackInfoResponseDto
+
+    @POST("Sessions/Playing")
+    suspend fun reportPlaybackStart(@Body body: PlaybackReportRequest)
+
+    @POST("Sessions/Playing/Progress")
+    suspend fun reportPlaybackProgress(@Body body: PlaybackReportRequest)
+
+    @POST("Sessions/Playing/Stopped")
+    suspend fun reportPlaybackStopped(@Body body: PlaybackReportRequest)
 
     @POST("Users/{userId}/FavoriteItems/{itemId}")
     suspend fun addFavorite(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
     @DELETE("Users/{userId}/FavoriteItems/{itemId}")
     suspend fun removeFavorite(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
+
+    @POST("Users/{userId}/PlayedItems/{itemId}")
+    suspend fun markPlayed(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
+
+    @DELETE("Users/{userId}/PlayedItems/{itemId}")
+    suspend fun markUnplayed(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
+
+    @POST("Users/{userId}/Items/{itemId}/Rating")
+    suspend fun setRating(
+        @Path("userId") userId: String,
+        @Path("itemId") itemId: String,
+        @Query("likes") likes: Boolean,
+    ): UserItemDataDto
+
+    @DELETE("Users/{userId}/Items/{itemId}/Rating")
+    suspend fun clearRating(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
+
+    @GET("Jellio/calendar")
+    suspend fun getCalendarEntries(): List<CalendarEntryDto>
 }
 
 // Real Jellyfin auth convention every client sends, confirmed against
