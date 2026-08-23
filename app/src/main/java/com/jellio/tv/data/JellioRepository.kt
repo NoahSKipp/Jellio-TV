@@ -2,6 +2,11 @@ package com.jellio.tv.data
 
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.PlaybackInfoRequest
+import com.jellio.tv.data.model.PlaybackReportRequest
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.session.Session
@@ -18,6 +23,11 @@ private const val APP_VERSION = "0.1.0"
 // screens/home.js's own hero already knows to ask for.
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
+// Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
+// real metadata a plain row/grid fetch never asks for.
+private const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
+    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
+
 // Two distinct real patterns, same distinction navShared.js's own
 // getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
 // Anime library is only ever literally named that, but a collection
@@ -31,6 +41,30 @@ sealed interface LoginResult {
     data object Success : LoginResult
     data class Failure(val message: String) : LoginResult
 }
+
+data class SeriesPlayTarget(val episode: BaseItemDto, val resume: Boolean)
+
+// Real MediaSource plus the one real playback session id
+// (PlaySessionId) a fresh PlaybackInfo negotiation hands back, both a
+// player screen needs to build a real stream URL and report real
+// progress against.
+data class PlaybackTarget(
+    val streamUrl: String,
+    val mediaSource: MediaSourceDto,
+    val playSessionId: String?,
+    val startPositionTicks: Long,
+)
+
+// A native Media3/ExoPlayer decode envelope on real Android TV
+// hardware is far broader than a browser <video> element's own (HEVC,
+// AC3/EAC3, MKV all commonly hardware or software decode here), so
+// this real allowlist is deliberately wider than runtime/api.js's own
+// canBrowserDirectPlay(), not a guess: the same real MediaSourceInfo
+// fields, judged against what this real player can actually decode
+// instead of what a browser tag can.
+private val DIRECT_PLAY_CONTAINERS = setOf("mp4", "webm", "m4v", "mkv", "m2ts", "ts", "avi")
+private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8", "vp9", "av1", "mpeg4")
+private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "ac3", "eac3", "dts", "truehd")
 
 // The one real place both auth and every other Jellyfin call go
 // through, mirroring runtime/auth.js and runtime/api.js's own
@@ -130,7 +164,15 @@ class JellioRepository @Inject constructor(
         api.getResumeItems(userId, fields = ITEM_FIELDS).Items
 
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> =
-        api.getNextUp(userId, limit, fields = ITEM_FIELDS).Items
+        api.getNextUp(userId, limit, fields = ITEM_FIELDS, enableResumable = false).Items
+
+    // Scoped to one series, screens/detail.js's own resolveSeriesPlayTarget():
+    // enableResumable stays at its own real server default (true) here,
+    // unlike the Up Next row above, this call's whole point is
+    // surfacing a title actually in progress.
+    suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? =
+        api.getNextUp(userId, limit = 1, fields = "PrimaryImageAspectRatio,RunTimeTicks", seriesId = seriesId)
+            .Items.firstOrNull()
 
     // Mirrors runtime/api.js's own getHeroCandidates(): a real random
     // Movie/Series, never an Episode (the web hero never once asks for
@@ -148,16 +190,129 @@ class JellioRepository @Inject constructor(
             fields = ITEM_FIELDS,
         ).Items
 
-    suspend fun getLibraryItems(userId: String, parentId: String, limit: Int = 24): List<BaseItemDto> =
+    suspend fun getLibraryItems(
+        userId: String,
+        parentId: String,
+        limit: Int = 24,
+        includeItemTypes: String? = null,
+        sortBy: String = "DateCreated",
+        sortOrder: String = "Descending",
+        genre: String? = null,
+        startIndex: Int? = null,
+    ): List<BaseItemDto> =
         api.getItems(
             userId = userId,
             parentId = parentId,
+            includeItemTypes = includeItemTypes,
             recursive = true,
             limit = limit,
-            sortBy = "DateCreated",
-            sortOrder = "Descending",
+            startIndex = startIndex,
+            sortBy = sortBy,
+            sortOrder = sortOrder,
+            genres = genre,
             fields = ITEM_FIELDS,
         ).Items
+
+    // Sampled rather than a real dedicated endpoint (none exists),
+    // mirrors runtime/api.js's own discoverGenres(): counted off a
+    // random sample of the library, not every genre Jellyfin has ever
+    // heard of, dropped below a real minimum count so a genre row is
+    // never built with nothing worth scrolling behind it.
+    suspend fun discoverGenres(userId: String, parentId: String, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
+        val sample = api.getItems(
+            userId = userId,
+            parentId = parentId,
+            includeItemTypes = itemType,
+            recursive = true,
+            limit = 300,
+            sortBy = "Random",
+            fields = "Genres",
+        ).Items
+        val counts = linkedMapOf<String, Int>()
+        sample.forEach { item ->
+            item.Genres?.forEach { genre -> counts[genre] = (counts[genre] ?: 0) + 1 }
+        }
+        return counts.filterValues { it >= minCount }.keys.take(limit).toList()
+    }
+
+    suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            parentId = parentId,
+            includeItemTypes = itemType,
+            recursive = true,
+            limit = limit,
+            genres = genre,
+            sortBy = "CommunityRating",
+            sortOrder = "Descending",
+            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating",
+        ).Items
+
+    suspend fun searchItems(userId: String, term: String, limit: Int = 50): List<BaseItemDto> {
+        if (term.isBlank()) return emptyList()
+        return api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = limit,
+            searchTerm = term,
+            fields = "PrimaryImageAspectRatio",
+        ).Items
+    }
+
+    suspend fun getWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = limit,
+            filters = "IsFavorite",
+            fields = ITEM_FIELDS,
+        ).Items
+
+    suspend fun getItemDetails(userId: String, itemId: String): BaseItemDto =
+        api.getItem(userId, itemId, fields = DETAIL_FIELDS)
+
+    suspend fun getItem(userId: String, itemId: String): BaseItemDto = api.getItem(userId, itemId)
+
+    suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
+        api.getSeasons(seriesId, userId).Items
+
+    suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
+        api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+
+    // A series' own hero Play button (screens/detail.js's own
+    // resolveSeriesPlayTarget()): the next real unfinished episode if
+    // one exists, otherwise season one's own first episode, a real
+    // fallback for a series with no watch history at all.
+    suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
+        val nextUp = try {
+            getSeriesNextUp(seriesId, userId)
+        } catch (err: Exception) {
+            null
+        }
+        val episode = nextUp ?: try {
+            val seasons = getSeasons(seriesId, userId)
+            val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
+            val firstSeason = ordered.firstOrNull()
+            firstSeason?.let { getEpisodes(seriesId, userId, it.Id).firstOrNull() }
+        } catch (err: Exception) {
+            null
+        } ?: return null
+
+        val isFirstEpisode = episode.ParentIndexNumber == 1 && episode.IndexNumber == 1
+        val hasProgress = (episode.UserData?.PlaybackPositionTicks ?: 0) > 0
+        val resume = hasProgress || !isFirstEpisode
+        return SeriesPlayTarget(episode, resume)
+    }
+
+    fun isSpecialsSeason(season: BaseItemDto): Boolean {
+        if (season.IndexNumber == 0) return true
+        return Regex("special", RegexOption.IGNORE_CASE).containsMatchIn(season.Name ?: "")
+    }
+
+    suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> =
+        api.getItem(userId, itemId, fields = "MediaSources").MediaSources ?: emptyList()
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
@@ -165,6 +320,98 @@ class JellioRepository @Inject constructor(
             api.removeFavorite(userId, item.Id).IsFavorite
         } else {
             api.addFavorite(userId, item.Id).IsFavorite
+        }
+    }
+
+    suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto =
+        if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
+
+    suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
+        if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
+
+    suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+
+    // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
+    // buildStreamUrl(): POST /Items/{id}/PlaybackInfo negotiates a real
+    // MediaSource plus a PlaySessionId, then a plain /Videos/{id}/stream
+    // URL carrying that source's own id is something ExoPlayer can just
+    // open directly, same real flow, no jellyfin-web playbackManager
+    // involved.
+    suspend fun resolvePlayback(
+        userId: String,
+        itemId: String,
+        mediaSourceId: String?,
+        startTimeTicks: Long,
+    ): PlaybackTarget {
+        val response = api.getPlaybackInfo(
+            itemId,
+            PlaybackInfoRequest(UserId = userId, StartTimeTicks = startTimeTicks, MediaSourceId = mediaSourceId),
+        )
+        val mediaSource = response.MediaSources.firstOrNull { it.Id == mediaSourceId }
+            ?: response.MediaSources.firstOrNull()
+            ?: throw IllegalStateException("No playable source for this title")
+
+        val directPlay = canDirectPlay(mediaSource)
+        val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
+        val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
+        val deviceId = sessionManager.deviceId()
+        val resolvedMediaSourceId = mediaSource.Id ?: itemId
+
+        val streamUrl = if (directPlay) {
+            val container = mediaSource.Container ?: "mp4"
+            buildString {
+                append(serverAddress)
+                append("/Videos/").append(itemId).append("/stream.").append(container)
+                append("?MediaSourceId=").append(resolvedMediaSourceId)
+                append("&DeviceId=").append(deviceId)
+                append("&api_key=").append(token)
+                append("&Static=true")
+                append("&StartTimeTicks=").append(startTimeTicks)
+                response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
+            }
+        } else {
+            mediaSource.TranscodingUrl?.let { serverAddress + it } ?: buildString {
+                append(serverAddress)
+                append("/Videos/").append(itemId).append("/stream.mp4")
+                append("?MediaSourceId=").append(resolvedMediaSourceId)
+                append("&DeviceId=").append(deviceId)
+                append("&api_key=").append(token)
+                append("&VideoCodec=h264&AudioCodec=aac")
+                append("&StartTimeTicks=").append(startTimeTicks)
+                response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
+            }
+        }
+
+        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks)
+    }
+
+    private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
+        if (mediaSource.SupportsDirectPlay == false && mediaSource.SupportsDirectStream == false) return false
+        val container = mediaSource.Container?.lowercase() ?: return false
+        if (container !in DIRECT_PLAY_CONTAINERS) return false
+        val streams = mediaSource.MediaStreams ?: emptyList()
+        val video = streams.firstOrNull { it.Type == "Video" }
+        val audio = streams.firstOrNull { it.Type == "Audio" }
+        if (video != null && video.Codec?.lowercase() !in DIRECT_PLAY_VIDEO_CODECS) return false
+        if (audio != null && audio.Codec?.lowercase() !in DIRECT_PLAY_AUDIO_CODECS) return false
+        return true
+    }
+
+    suspend fun reportPlaybackStart(itemId: String, mediaSourceId: String?, positionTicks: Long) {
+        runCatching {
+            api.reportPlaybackStart(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
+        }
+    }
+
+    suspend fun reportPlaybackProgress(itemId: String, mediaSourceId: String?, positionTicks: Long, isPaused: Boolean) {
+        runCatching {
+            api.reportPlaybackProgress(PlaybackReportRequest(itemId, mediaSourceId, positionTicks, isPaused))
+        }
+    }
+
+    suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) {
+        runCatching {
+            api.reportPlaybackStopped(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
         }
     }
 
