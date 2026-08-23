@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ sealed interface AuthState {
 @HiltViewModel
 class AppViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val streamPreferences: StreamPreferences,
 ) : ViewModel() {
 
     val authState: StateFlow<AuthState> = repository.sessionFlow
@@ -83,4 +85,11 @@ class AppViewModel @Inject constructor(
     // MainActivity's own picker overlay actually opens rather than
     // eagerly for every item this screen ever renders.
     suspend fun getMediaSources(session: Session, itemId: String) = repository.getMediaSources(session.userId, itemId)
+
+    // The picker's own real onSelect, components/streamPicker.js's own
+    // rememberSourceChoice(): only actually written when the reader's
+    // own real "remember my stream" preference is still on.
+    suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
+        if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
+    }
 }

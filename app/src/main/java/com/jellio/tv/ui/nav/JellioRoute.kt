@@ -35,6 +35,7 @@ sealed interface JellioRoute {
     data object Library : JellioRoute
     data object Settings : JellioRoute
     data class Detail(val itemId: String) : JellioRoute
+    data class Person(val personId: String) : JellioRoute
     data class Player(val itemId: String, val mediaSourceId: String?) : JellioRoute
 }
 
@@ -56,7 +57,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
     JellioRoute.Library -> Icons.Filled.VideoLibrary
     JellioRoute.Settings -> Icons.Filled.Settings
-    is JellioRoute.Detail, is JellioRoute.Player -> Icons.Filled.Home
+    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Player -> Icons.Filled.Home
 }
 
 fun JellioRoute.label(): String = when (this) {
@@ -67,7 +68,7 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Calendar -> "Calendar"
     JellioRoute.Library -> "Library"
     JellioRoute.Settings -> "Settings"
-    is JellioRoute.Detail, is JellioRoute.Player -> ""
+    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Player -> ""
 }
 
 // Detail/Player are full screen immersive views (real backdrop art,
@@ -75,4 +76,5 @@ fun JellioRoute.label(): String = when (this) {
 // stay reserved for the fixed tab set above them, same real
 // distinction the web build draws between the sidebar/mobile nav and
 // screens/detail.js's own hero, which renders no nav chrome of its own.
-fun JellioRoute.isImmersive(): Boolean = this is JellioRoute.Detail || this is JellioRoute.Player
+fun JellioRoute.isImmersive(): Boolean =
+    this is JellioRoute.Detail || this is JellioRoute.Person || this is JellioRoute.Player
