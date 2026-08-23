@@ -43,6 +43,10 @@ android {
 
     buildFeatures {
         compose = true
+        // AGP 8's own real default flipped this off (real gap: without
+        // it there is no BuildConfig class at all), SettingsScreen's
+        // own real About section needs BuildConfig.VERSION_NAME.
+        buildConfig = true
     }
 
     packaging {
