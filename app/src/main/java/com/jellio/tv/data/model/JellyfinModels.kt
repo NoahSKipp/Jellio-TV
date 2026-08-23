@@ -54,6 +54,7 @@ data class BaseItemDto(
     val BackdropImageTags: List<String>? = null,
     val UserData: UserItemDataDto? = null,
     val RunTimeTicks: Long? = null,
+    val ProviderIds: Map<String, String>? = null,
 )
 
 @JsonClass(generateAdapter = true)

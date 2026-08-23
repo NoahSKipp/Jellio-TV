@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,7 +82,16 @@ private fun JellioRoute.label(): String = when (this) {
     JellioRoute.Settings -> "Settings"
 }
 
-private val PillIconSize = 30.dp
+private val PillIconSize = 28.dp
+
+// Explicit and fixed rather than left to wrap-content: real feedback
+// live was a hugely oversized, oval-shaped pill, some interaction
+// between Surface's own default focus scale/minimum touch target and
+// this row's own intrinsic sizing that no amount of retuning the
+// padding numbers alone fixed. Clamping the real outer bound directly
+// is the one change guaranteed to hold regardless of which of those
+// was actually responsible.
+private val PillHeight = 88.dp
 
 // The same real floating pill css/app.css's own .jellio-mobile-nav
 // defines for a phone (rounded, solid elevated background at 0.96
@@ -101,12 +111,14 @@ fun TopNavPill(
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
         Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .padding(top = 32.dp)
+                .height(PillHeight)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp),
         ) {
             items.forEach { route ->
                 NavPillItem(
@@ -125,6 +137,10 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, onClick: () -> 
         selected = isSelected,
         onClick = onClick,
         shape = SelectableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        // Focus scale off: real feedback live was a hugely oversized
+        // pill, and this is one of the few tv-material3 defaults that
+        // grows a component past its own laid out bounds on focus.
+        scale = SelectableSurfaceDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         colors = SelectableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = JellioTextSecondary,
@@ -135,10 +151,10 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, onClick: () -> 
             focusedSelectedContainerColor = Color.White.copy(alpha = 0.18f),
             focusedSelectedContentColor = JellioText,
         ),
-        modifier = Modifier.padding(horizontal = 5.dp),
+        modifier = Modifier.padding(horizontal = 4.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(

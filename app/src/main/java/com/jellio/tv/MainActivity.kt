@@ -104,7 +104,10 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
         )
         if (showLibraryPicker) {
             LibraryPickerOverlay(
-                libraries = libraries.filter { it.CollectionType == "movies" || it.CollectionType == "tvshows" },
+                // Already the real curated nav set (Movies/Shows/Anime,
+                // JellioRepository.getLibraryNavEntries()'s own real
+                // job), not filtered again here.
+                libraries = libraries,
                 onSelect = { library ->
                     selectedLibrary = library
                     route = JellioRoute.Library
