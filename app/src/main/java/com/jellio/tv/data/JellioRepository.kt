@@ -18,6 +18,15 @@ private const val APP_VERSION = "0.1.0"
 // screens/home.js's own hero already knows to ask for.
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
+// Two distinct real patterns, same distinction navShared.js's own
+// getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
+// Anime library is only ever literally named that, but a collection
+// with no Stremio provider id to fall back on (anything imported
+// before Gelato started writing one, or made by hand) is matched
+// more loosely.
+private val ANIME_VIEW_NAME = Regex("anime", RegexOption.IGNORE_CASE)
+private val ANIME_COLLECTION_NAME = Regex("anime|anilist|kitsu", RegexOption.IGNORE_CASE)
+
 sealed interface LoginResult {
     data object Success : LoginResult
     data class Failure(val message: String) : LoginResult
@@ -56,6 +65,66 @@ class JellioRepository @Inject constructor(
     suspend fun logout() = sessionManager.clearSession()
 
     suspend fun getLibraries(userId: String): List<BaseItemDto> = api.getUserViews(userId).Items
+
+    // Mirrors components/navShared.js's own real getPrimaryNavLinks():
+    // Anime has no real Jellyfin library of its own (Gelato resolves
+    // one global SeriesPath for every series import, so AniList
+    // titles physically live in the TV library). A real hand-made
+    // Anime view wins if one exists; otherwise the TV library itself
+    // stands in for it, but only when there is really something to
+    // show behind it (a real anime/anilist catalog among the reader's
+    // own collections), same real ProviderIds.Stremio check
+    // isAnimeCollection() already makes on the web side.
+    suspend fun getLibraryNavEntries(userId: String): List<BaseItemDto> {
+        val views = try {
+            getLibraries(userId)
+        } catch (err: Exception) {
+            emptyList()
+        }
+
+        val moviesView = views.firstOrNull { it.CollectionType == "movies" }
+        val tvView = views.firstOrNull { it.CollectionType == "tvshows" }
+        val realAnimeView = views.firstOrNull { ANIME_VIEW_NAME.containsMatchIn(it.Name ?: "") }
+
+        val animeEntry = when {
+            realAnimeView != null -> realAnimeView
+            tvView != null -> {
+                val hasAnimeCatalogs = try {
+                    getCollections(userId).any { isAnimeCollection(it) }
+                } catch (err: Exception) {
+                    false
+                }
+                if (hasAnimeCatalogs) tvView.copy(Name = "Anime") else null
+            }
+            else -> null
+        }
+
+        return listOfNotNull(moviesView, tvView, animeEntry)
+    }
+
+    suspend fun getCollections(userId: String): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            includeItemTypes = "BoxSet",
+            recursive = true,
+            limit = 200,
+            sortBy = "SortName",
+            fields = "ProviderIds,ChildCount",
+        ).Items
+
+    // Gelato's own GetOrCreateBoxSetAsync writes a collection's
+    // ProviderIds.Stremio as "{catalogType}.{catalogId}", catalogType
+    // being the literal type string configured on that catalog in
+    // AIOStreams: "movie", "series", or "anime". A real signal
+    // straight from Gelato, not a guess off a name a reader can
+    // rename freely.
+    private fun isAnimeCollection(collection: BaseItemDto): Boolean {
+        val stremio = collection.ProviderIds?.get("Stremio") ?: collection.ProviderIds?.get("stremio")
+        if (!stremio.isNullOrEmpty()) {
+            return stremio.substringBefore('.').lowercase() == "anime"
+        }
+        return ANIME_COLLECTION_NAME.containsMatchIn(collection.Name ?: "")
+    }
 
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
         api.getResumeItems(userId, fields = ITEM_FIELDS).Items

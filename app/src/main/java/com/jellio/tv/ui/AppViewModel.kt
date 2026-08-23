@@ -43,7 +43,7 @@ class AppViewModel @Inject constructor(
             authState.collectLatest { state ->
                 if (state is AuthState.LoggedIn) {
                     _libraries.value = try {
-                        repository.getLibraries(state.session.userId)
+                        repository.getLibraryNavEntries(state.session.userId)
                     } catch (err: Exception) {
                         emptyList()
                     }
