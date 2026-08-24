@@ -262,11 +262,23 @@ class JellioRepository @Inject constructor(
             fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres,BackdropImageTags",
         ).Items
 
+    // Real runtime/api.js's own getResumeItems(): RunTimeTicks
+    // alongside the fields already asked for, real bug that file's own
+    // comment documents and fixes: components/card.js's own landscape
+    // Continue Watching card computes a real "Nm left" label from that
+    // and UserData.PlaybackPositionTicks (already a default real
+    // field), not something this query fetched before.
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
-        api.getResumeItems(userId, fields = ITEM_FIELDS).Items
+        api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items
 
+    // Real runtime/api.js's own getNextUp(): Genres/People beyond the
+    // default PrimaryImageAspectRatio (the same real fields
+    // runtime/recommend.js's own scorer needs off this exact shared
+    // real fetch, no second query added just to get them), RunTimeTicks
+    // for the same real landscape card reason getResumeItems above
+    // documents.
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> =
-        api.getNextUp(userId, limit, fields = ITEM_FIELDS, enableResumable = false).Items
+        api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
 
     // Scoped to one series, screens/detail.js's own resolveSeriesPlayTarget():
     // enableResumable stays at its own real server default (true) here,
