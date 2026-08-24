@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.MaterialTheme
@@ -59,7 +60,8 @@ fun WatchlistScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 140.dp),
+                    .padding(top = 140.dp)
+                    .focusRestorer(),
             ) {
                 item {
                     Text(
