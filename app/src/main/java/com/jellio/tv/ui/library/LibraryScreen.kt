@@ -27,6 +27,7 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
+import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
@@ -45,6 +46,12 @@ fun LibraryScreen(
     val listState = rememberLazyListState()
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
+    val openItemOptions = rememberCardOptionsHost(
+        canDeleteItems = uiState.canDeleteItems,
+        onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
+        onToggleWatched = { viewModel.toggleWatched(session, it) },
+        onDeleteItem = { viewModel.deleteItem(it) },
+    )
 
     // Keyed on both real Id and Name: getLibraryNavEntries()'s own
     // synthetic Anime stand-in shares the plain Shows library's exact
@@ -95,6 +102,7 @@ fun LibraryScreen(
                         section = section,
                         imageUrl = imageUrl,
                         onItemClick = onItemClick,
+                        onItemOptions = openItemOptions,
                         onTitleClick = { rowListTarget = section },
                     )
                 }

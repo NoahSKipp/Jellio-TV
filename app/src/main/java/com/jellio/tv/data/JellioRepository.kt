@@ -722,6 +722,17 @@ class JellioRepository @Inject constructor(
     // boundary.
     suspend fun deleteItem(itemId: String) = api.deleteItem(itemId)
 
+    // Shared real gate every screen offering Remove from Library
+    // checks before showing it at all, same real Policy fields
+    // deleteItem()'s own header documents. Failing the underlying
+    // getUser() call (a real network hiccup, not a real permission
+    // answer) reads as false rather than throwing, same real
+    // fail-closed default a broken button would otherwise become.
+    suspend fun canDeleteItems(userId: String): Boolean {
+        val policy = runCatching { getUser(userId) }.getOrNull()?.Policy ?: return false
+        return policy.IsAdministrator || policy.EnableContentDeletion
+    }
+
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()

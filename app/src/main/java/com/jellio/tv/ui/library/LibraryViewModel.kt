@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.ShowsEditorial
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.showsEditorial
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
@@ -45,6 +46,7 @@ data class LibraryUiState(
     val editorial: ShowsEditorial? = null,
     val sections: List<HomeSection> = emptyList(),
     val emptyMessage: String? = null,
+    val canDeleteItems: Boolean = false,
 )
 
 // Real port of screens/library.js: a coverflow carousel (real random
@@ -107,6 +109,7 @@ class LibraryViewModel @Inject constructor(
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = "DateCreated", sortOrder = "Descending")
             }.getOrDefault(emptyList())
         }
+        val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
         // discoverGenres is a real data dependency for the per-genre
         // fetch below, same real reason it stays its own real await
         // before that one fires, unlike the three above.
@@ -172,6 +175,7 @@ class LibraryViewModel @Inject constructor(
             coverflowItems = coverflowItems,
             editorial = editorial,
             sections = sections,
+            canDeleteItems = canDeleteDeferred.await(),
         )
     }
 
@@ -186,12 +190,13 @@ class LibraryViewModel @Inject constructor(
     // showing nothing is the honest outcome when no catalog is
     // configured, not a copy of the Shows page.
     private suspend fun loadAnime(session: Session) = coroutineScope {
+        val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
         val collections = runCatching { repository.getCollections(session.userId) }
             .getOrDefault(emptyList())
             .filter { repository.isAnimeCollection(it) }
 
         if (collections.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
+            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE, canDeleteItems = canDeleteDeferred.await())
             return@coroutineScope
         }
 
@@ -247,7 +252,7 @@ class LibraryViewModel @Inject constructor(
         }
 
         if (sections.isEmpty() && !coverflowIsTrending) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
+            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE, canDeleteItems = canDeleteDeferred.await())
             return@coroutineScope
         }
 
@@ -257,6 +262,57 @@ class LibraryViewModel @Inject constructor(
             coverflowItems = coverflowSource,
             coverflowBadge = if (coverflowIsTrending) "Trending on AniList" else null,
             sections = sections,
+            canDeleteItems = canDeleteDeferred.await(),
+        )
+    }
+
+    // Real port of components/cardOptionsMenu.js's own Watchlist/Mark
+    // Watched/Remove from Library options, same real handlers
+    // HomeViewModel's own toggleWatchlist()/toggleWatched()/
+    // deleteItem() already give the home screen, this screen's own
+    // sections just live as a plain List<HomeSection> rather than the
+    // sealed HomeRow hierarchy Home's own rows need for Continue
+    // Watching/Up Next's own real different card shapes.
+    fun toggleWatchlist(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        }
+    }
+
+    fun toggleWatched(session: Session, item: BaseItemDto) {
+        val next = !(item.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = updated) }
+        }
+    }
+
+    fun deleteItem(item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.deleteItem(item.Id) }.onSuccess { removeItemFromSections(item.Id) }
+        }
+    }
+
+    private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            sections = state.sections.map { section ->
+                if (section.items.any { it.Id == itemId }) {
+                    section.copy(items = section.items.map { if (it.Id == itemId) transform(it) else it })
+                } else {
+                    section
+                }
+            },
+        )
+    }
+
+    private fun removeItemFromSections(itemId: String) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            sections = state.sections.map { section ->
+                if (section.items.any { it.Id == itemId }) section.copy(items = section.items.filterNot { it.Id == itemId }) else section
+            },
         )
     }
 }

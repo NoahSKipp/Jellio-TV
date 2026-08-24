@@ -28,6 +28,7 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.PosterCard
+import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -49,6 +50,13 @@ fun SearchScreen(
     val gridState = rememberLazyGridState()
     val compact = rememberNavCompact(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
     LaunchedEffect(compact) { onCompactChange(compact) }
+    LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
+    val openItemOptions = rememberCardOptionsHost(
+        canDeleteItems = uiState.canDeleteItems,
+        onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
+        onToggleWatched = { viewModel.toggleWatched(session, it) },
+        onDeleteItem = { viewModel.deleteItem(it) },
+    )
 
     // Real bug found live: D-pad Down from TopNavPill only ever worked
     // on Home, since only Home's own content attached itself to the
@@ -88,7 +96,7 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(uiState.results, key = { it.Id }) { item ->
-                    PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) })
+                    PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) }, onOptionsClick = { openItemOptions(item) })
                 }
             }
         }
