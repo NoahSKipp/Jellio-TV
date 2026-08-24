@@ -1,6 +1,5 @@
 package com.jellio.tv.ui.library
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,9 +80,7 @@ fun LibraryScreen(
             }
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusGroup(),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {

@@ -1,6 +1,5 @@
 package com.jellio.tv.ui.calendar
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -120,7 +119,6 @@ fun CalendarScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .focusGroup()
                         .padding(top = 140.dp),
                 ) {
                     item {
