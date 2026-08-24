@@ -18,7 +18,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
@@ -104,12 +103,6 @@ private fun JellioTvApp(
     var showLibraryPicker by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    // Shared with TopNavPill below: the one real D-pad Down landing
-    // spot every non-immersive screen's own top scrollable container
-    // attaches itself to (only one is ever actually composed at a
-    // time), so the pill has somewhere real to send focus instead of
-    // trapping it, regardless of which one of them is on real screen.
-    val contentFocusRequester = remember { FocusRequester() }
     // Real components/mobileNav.js's own scroll-driven compact state,
     // threaded up from whichever non-immersive screen is actually
     // composed (each reports its own real scroll position via
@@ -171,7 +164,6 @@ private fun JellioTvApp(
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 rawImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 serviceLogoUrl = { name -> appViewModel.serviceLogoUrl(session, name) },
-                contentFocusRequester = contentFocusRequester,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
@@ -198,7 +190,6 @@ private fun JellioTvApp(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
-                contentFocusRequester = contentFocusRequester,
                 onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -206,14 +197,12 @@ private fun JellioTvApp(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
-                contentFocusRequester = contentFocusRequester,
                 onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Calendar -> CalendarScreen(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onItemClick = onNavigateToDetail,
-                contentFocusRequester = contentFocusRequester,
                 onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -225,7 +214,6 @@ private fun JellioTvApp(
                         library = library,
                         imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
-                        contentFocusRequester = contentFocusRequester,
                         onCompactChange = { navCompact = it },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -276,7 +264,6 @@ private fun JellioTvApp(
             TopNavPill(
                 items = JellioNavItems,
                 selected = route,
-                contentFocusRequester = contentFocusRequester,
                 isCompact = navCompact,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
@@ -301,7 +288,6 @@ private fun JellioTvApp(
             NowPlayingButton(
                 sessionCount = nowPlayingSessions.size,
                 onClick = { showNowPlayingPanel = !showNowPlayingPanel },
-                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 32.dp),
             )
             if (showNowPlayingPanel) {
@@ -318,7 +304,6 @@ private fun JellioTvApp(
             // this app has none of.
             GroupWatchButton(
                 onClick = { showGroupWatch = true },
-                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 96.dp),
             )
             if (showGroupWatch) {

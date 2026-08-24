@@ -27,8 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,15 +50,8 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // TopNavPill on every non-immersive screen, this app's own real
 // equivalent of that file's own sidebar-anchored button), the real
 // active-session count as a badge rather than a bare icon.
-//
-// contentFocusRequester mirrors TopNavPill's own real fix, real bug
-// found live testing on device a third time: that fix only ever
-// covered the pill's own LazyRow, not this button or GroupWatchButton
-// sitting beside it in their own separate top-right corner, so D-pad
-// Down from either one still went nowhere, reported live as "can't
-// leave the nav bar at all".
 @Composable
-fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, contentFocusRequester: FocusRequester, modifier: Modifier = Modifier) {
+fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
@@ -68,7 +59,7 @@ fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, contentFocusRequest
             containerColor = JellioBgElevated.copy(alpha = 0.96f),
             contentColor = JellioText,
         ),
-        modifier = modifier.size(52.dp).focusProperties { down = contentFocusRequester },
+        modifier = modifier.size(52.dp),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(imageVector = Icons.Filled.LiveTv, contentDescription = "Now playing", modifier = Modifier.size(22.dp))
