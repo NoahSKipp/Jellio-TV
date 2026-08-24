@@ -156,7 +156,7 @@ fun HomeScreen(
                         .focusGroup()
                         .focusRequester(contentFocusRequester),
                 ) {
-                    item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
+                    item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real
                     // feedback found "Welcome back" read as a placeholder
                     // the moment it was ever anything else, a real

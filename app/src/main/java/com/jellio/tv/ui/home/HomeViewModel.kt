@@ -46,7 +46,7 @@ data class HomeSection(
 
 data class HomeUiState(
     val isLoading: Boolean = true,
-    val heroItem: BaseItemDto? = null,
+    val heroItems: List<BaseItemDto> = emptyList(),
     // Real screens/home.js's own greetingText(): local device clock,
     // the reader's own real name when it resolves, "Welcome back"
     // real feedback found always wrong the moment it was actually
@@ -213,11 +213,9 @@ class HomeViewModel @Inject constructor(
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
 
-                    val hero = heroCandidates.firstOrNull()
-
                     _uiState.value = HomeUiState(
                         isLoading = false,
-                        heroItem = hero,
+                        heroItems = heroCandidates,
                         greeting = greeting,
                         rows = rows,
                         customization = customization,
