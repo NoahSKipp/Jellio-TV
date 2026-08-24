@@ -119,6 +119,7 @@ data class BaseItemDto(
     val SeriesId: String? = null,
     val SeriesName: String? = null,
     val SeriesPrimaryImageTag: String? = null,
+    val SeasonId: String? = null,
     val ProductionYear: Int? = null,
     val PremiereDate: String? = null,
     val Overview: String? = null,
