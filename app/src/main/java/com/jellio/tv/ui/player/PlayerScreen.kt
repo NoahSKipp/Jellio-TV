@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -98,6 +99,10 @@ private fun formatSpeed(speed: Float): String {
     return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
 }
 
+// Real screens/player.js's own SLEEP_TIMER_OPTIONS: the same five real
+// durations its own sleep popover offers.
+private val SLEEP_TIMER_OPTIONS = listOf(15, 30, 45, 60, 90)
+
 // Real port of screens/player.js's own shouldShowUpNextNow(), ported
 // from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
 // Credits segment starts the outro, so showing the card there reads as
@@ -154,6 +159,7 @@ fun PlayerScreen(
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
+                sleepTimerEndTimeMs = uiState.sleepTimerEndTimeMs,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
@@ -167,6 +173,8 @@ fun PlayerScreen(
                 },
                 onRestart = { viewModel.restart(session) },
                 onPlayNext = onPlayNext,
+                onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
             )
         }
     }
@@ -184,6 +192,7 @@ private fun PlayerSurface(
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
+    sleepTimerEndTimeMs: Long?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
@@ -191,6 +200,8 @@ private fun PlayerSurface(
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
     onRestart: () -> Unit,
     onPlayNext: (String) -> Unit,
+    onStartSleepTimer: (Int) -> Unit,
+    onCancelSleepTimer: () -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -242,6 +253,7 @@ private fun PlayerSurface(
     // across a real src reassignment on the web side.
     var playbackSpeed by remember { mutableStateOf(1f) }
     var showSpeedMenu by remember { mutableStateOf(false) }
+    var showSleepMenu by remember { mutableStateOf(false) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
@@ -256,6 +268,20 @@ private fun PlayerSurface(
     // instead of quietly resetting to 1x.
     LaunchedEffect(player, playbackSpeed) {
         player.setPlaybackSpeed(playbackSpeed)
+    }
+
+    // Real local enforcement of the sleep timer (see
+    // SleepTimerStatusDto's own header comment for why this player
+    // cannot just trust the real server side
+    // SendPlaystateCommand(Stop) the way a real WebSocket-connected
+    // Jellyfin client could): waits out the exact same real remaining
+    // time PlayerViewModel already computed, then leaves the player the
+    // same real way that command's own target ends playback.
+    LaunchedEffect(sleepTimerEndTimeMs) {
+        val endTimeMs = sleepTimerEndTimeMs ?: return@LaunchedEffect
+        val remaining = endTimeMs - System.currentTimeMillis()
+        if (remaining > 0) delay(remaining)
+        onBack()
     }
 
     DisposableEffect(player) {
@@ -358,8 +384,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -383,6 +409,13 @@ private fun PlayerSurface(
                 if (showSpeedMenu) {
                     if (event.key == Key.Back) {
                         showSpeedMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (showSleepMenu) {
+                    if (event.key == Key.Back) {
+                        showSleepMenu = false
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -460,9 +493,11 @@ private fun PlayerSurface(
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 speedLabel = formatSpeed(playbackSpeed),
+                sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
                 onOpenSpeedMenu = { showSpeedMenu = true },
+                onOpenSleepMenu = { showSleepMenu = true },
             )
         }
 
@@ -474,6 +509,20 @@ private fun PlayerSurface(
                     playbackSpeed = speed
                 },
                 onDismiss = { showSpeedMenu = false },
+            )
+        }
+
+        if (showSleepMenu) {
+            SleepMenu(
+                onSelect = { minutes ->
+                    showSleepMenu = false
+                    onStartSleepTimer(minutes)
+                },
+                onCancel = {
+                    showSleepMenu = false
+                    onCancelSleepTimer()
+                },
+                onDismiss = { showSleepMenu = false },
             )
         }
 
@@ -541,9 +590,11 @@ private fun PlayerControls(
     durationMs: Long,
     hasSubtitleTracks: Boolean,
     speedLabel: String,
+    sleepTimerActive: Boolean,
     onPlayPause: () -> Unit,
     onOpenSubtitleMenu: () -> Unit,
     onOpenSpeedMenu: () -> Unit,
+    onOpenSleepMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -584,6 +635,24 @@ private fun PlayerControls(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
                     }
+                }
+            }
+            // Real port of the pill's own sleepButton: no live countdown
+            // label the way that file's own button never gets one
+            // either, just its own real jellio-player-pill-btn-active
+            // class toggled on and off, ported here as a real tinted
+            // background instead.
+            Surface(
+                onClick = onOpenSleepMenu,
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = if (sleepTimerActive) JellioSecondary else Color.Black.copy(alpha = 0.4f),
+                    contentColor = JellioText,
+                ),
+                modifier = Modifier.size(56.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.Bedtime, contentDescription = "Sleep timer", tint = JellioText)
                 }
             }
         }
@@ -832,6 +901,52 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
                         text = formatSpeed(speed),
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own sleep timer popover: "Cancel
+// timer" first (shown unconditionally there too, a real cancel call
+// with nothing active just 404s quietly), then the exact same five
+// real SLEEP_TIMER_OPTIONS durations.
+@Composable
+private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 104.dp, end = 48.dp)
+                .width(180.dp)
+                .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                .padding(vertical = 8.dp),
+        ) {
+            Surface(
+                onClick = onCancel,
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(text = "Cancel timer", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
+            }
+            SLEEP_TIMER_OPTIONS.forEach { minutes ->
+                Surface(
+                    onClick = { onSelect(minutes) },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(text = "$minutes min", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
                 }
             }
         }

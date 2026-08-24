@@ -97,6 +97,11 @@ data class PlayerUiState(
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
     val skipSegments: IntroSkipperSegmentsDto? = null,
+    // Device epoch millis, converted once here from the real server's
+    // own EndTimeUtc so PlayerSurface's own local enforcement (see
+    // SleepTimerStatusDto's own header comment for why that has to
+    // exist) never has to parse a timestamp itself.
+    val sleepTimerEndTimeMs: Long? = null,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -177,6 +182,23 @@ class PlayerViewModel @Inject constructor(
                     val segments = repository.getIntroSkipperSegments(itemId)
                     if (segments != null && (segments.Introduction != null || segments.Credits != null)) {
                         _uiState.value = _uiState.value.copy(skipSegments = segments)
+                    }
+                }
+
+                // Real port of screens/player.js's own real fire-and-
+                // forget getSleepTimerStatus().then(...): a real timer
+                // started before this exact title was opened (still
+                // running server side against this same user/device
+                // pair) picks back up here rather than reading as
+                // cancelled just because a fresh PlayerViewModel state
+                // object was built for this real title.
+                viewModelScope.launch {
+                    val status = repository.getSleepTimerStatus()
+                    if (status?.Active == true) {
+                        val endMs = parseSleepTimerEndTimeMs(status.EndTimeUtc)
+                        if (endMs != null) {
+                            _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = endMs)
+                        }
                     }
                 }
             } catch (err: Exception) {
@@ -334,4 +356,33 @@ class PlayerViewModel @Inject constructor(
         val id = itemId ?: return
         viewModelScope.launch { repository.reportPlaybackStopped(id, uiState.value.mediaSourceId, positionTicks) }
     }
+
+    // Real port of screens/player.js's own startSleepTimer(minutes)
+    // handler: the real server call still fires (for real cross-client
+    // status parity, see SleepTimerStatusDto's own header comment), the
+    // real end time computed locally from `minutes` directly rather
+    // than round-tripping through the server's own response, so
+    // PlayerSurface's own local countdown can start immediately without
+    // waiting on that request.
+    fun startSleepTimer(minutes: Int) {
+        val endMs = System.currentTimeMillis() + minutes * 60_000L
+        _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = endMs)
+        viewModelScope.launch { runCatching { repository.startSleepTimer(minutes) } }
+    }
+
+    fun cancelSleepTimer() {
+        _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = null)
+        viewModelScope.launch { repository.cancelSleepTimer() }
+    }
+}
+
+// Real .NET DateTime "O"-style UTC timestamp (fractional seconds up to
+// 100ns ticks) EndTimeUtc always serializes as: Instant.parse() already
+// accepts that exact real ISO-8601 shape, no custom parsing needed. A
+// failure here (an unexpected real format) leaves the real timer
+// un-restored rather than crashing the whole screen over a best-effort
+// status refresh.
+private fun parseSleepTimerEndTimeMs(endTimeUtc: String?): Long? {
+    endTimeUtc ?: return null
+    return runCatching { java.time.Instant.parse(endTimeUtc).toEpochMilli() }.getOrNull()
 }
