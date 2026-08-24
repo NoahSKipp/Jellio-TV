@@ -24,9 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,8 +59,15 @@ fun PersonScreen(
     viewModel: PersonViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
+    // Same real immersive-screen gap DetailScreen's own header comment
+    // documents: no TopNavPill mounts here for a D-pad press to search
+    // Down from, so nothing ever requests focus into this screen
+    // without this.
+    val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(personId) { viewModel.load(session, personId) }
+    LaunchedEffect(uiState.person) {
+        if (uiState.person != null) contentFocusRequester.requestFocus()
+    }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
@@ -68,7 +79,7 @@ fun PersonScreen(
             }
             uiState.person != null -> {
                 val person = uiState.person!!
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRequester(contentFocusRequester).focusRestorer()) {
                     item {
                         Row(modifier = Modifier.padding(horizontal = 48.dp)) {
                             val tag = person.ImageTags?.get("Primary")
