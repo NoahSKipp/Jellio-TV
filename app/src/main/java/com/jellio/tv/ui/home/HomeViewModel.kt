@@ -12,6 +12,9 @@ import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -100,100 +103,102 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = HomeUiState(isLoading = true)
             try {
-                val continueWatching = repository.getContinueWatching(session.userId)
-                val upNext = try {
-                    repository.getNextUp(session.userId)
-                } catch (err: Exception) {
-                    emptyList()
-                }
+                coroutineScope {
+                    // Real port of screens/home.js's own buildHomeSections():
+                    // every real fetch with no dependency on another's own
+                    // result fires together (that file's own first
+                    // Promise.allSettled), not one after another. A real
+                    // perf bug found live testing on device: awaiting these
+                    // one at a time used to add real seconds to every Home
+                    // load, reported live as "loading takes forever".
+                    val continueWatchingDeferred = async { runCatching { repository.getContinueWatching(session.userId) }.getOrDefault(emptyList()) }
+                    val upNextDeferred = async { runCatching { repository.getNextUp(session.userId) }.getOrDefault(emptyList()) }
+                    // Real web hero (runtime/api.js's own getHeroCandidates())
+                    // never draws from Continue Watching at all, only a
+                    // random real Movie/Series: fetched independently rather
+                    // than reusing whatever led the rows above.
+                    val heroCandidatesDeferred = async { runCatching { repository.getHeroCandidates(session.userId) }.getOrDefault(emptyList()) }
+                    val comingSoonDeferred = async { runCatching { repository.getCalendarEntries().take(COMING_SOON_LIMIT) }.getOrDefault(emptyList()) }
+                    val collectionsDeferred = async { runCatching { repository.getCollections(session.userId) }.getOrDefault(emptyList()) }
 
-                // Real web hero (runtime/api.js's own getHeroCandidates())
-                // never draws from Continue Watching at all, only a
-                // random real Movie/Series: fetched independently rather
-                // than reusing whatever led the rows above.
-                val heroCandidates = try {
-                    repository.getHeroCandidates(session.userId)
-                } catch (err: Exception) {
-                    emptyList()
-                }
+                    val continueWatching = continueWatchingDeferred.await()
+                    val upNext = upNextDeferred.await()
+                    val heroCandidates = heroCandidatesDeferred.await()
+                    val comingSoon = comingSoonDeferred.await()
+                    val collections = collectionsDeferred.await()
 
-                val comingSoon = try {
-                    repository.getCalendarEntries().take(COMING_SOON_LIMIT)
-                } catch (err: Exception) {
-                    emptyList()
-                }
+                    val studioHubs = groupByService(collections).keys.sorted()
 
-                val recommendationSource = RecommendationDataSource(
-                    getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
-                    getNextUp = { limit -> repository.getNextUp(session.userId, limit) },
-                    getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
-                    getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
-                    getPersonItems = { personId, limit -> repository.getPersonItems(session.userId, personId, limit) },
-                )
-                // Shared across recommendation and per-library rows, same
-                // real reasoning screens/home.js's own shared `seen` object
-                // documents: a title one row already picked should not
-                // also turn up further down the same page.
-                val exclude = mutableSetOf<String>()
-                val recommendationRows = try {
-                    buildRecommendationRows(recommendationSource, exclude)
-                } catch (err: Exception) {
-                    emptyList()
-                }
+                    val recommendationSource = RecommendationDataSource(
+                        getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
+                        getNextUp = { limit -> repository.getNextUp(session.userId, limit) },
+                        getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
+                        getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
+                        getPersonItems = { personId, limit -> repository.getPersonItems(session.userId, personId, limit) },
+                    )
+                    // Shared across recommendation, catalog and genre rows,
+                    // same real reasoning screens/home.js's own shared
+                    // `seen` object documents: a title one row already
+                    // picked should not also turn up further down the same
+                    // page. Only the synchronous dedupe step below actually
+                    // needs the three phases' own real priority order
+                    // though, none of their own real network fetches depend
+                    // on the other two at all, so all three fire together
+                    // next, same real port of that file's own second
+                    // Promise.all.
+                    val exclude = mutableSetOf<String>()
+                    val recommendationDeferred = async { runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList()) }
+                    val catalogDataDeferred = async { runCatching { fetchCatalogRowData(session.userId, collections) }.getOrDefault(emptyList()) }
+                    val genreDataDeferred = async { runCatching { fetchGenreRowData(session.userId) }.getOrDefault(emptyList()) }
 
-                val collections = try {
-                    repository.getCollections(session.userId)
-                } catch (err: Exception) {
-                    emptyList()
-                }
+                    val recommendationRows = recommendationDeferred.await()
+                    val catalogData = catalogDataDeferred.await()
+                    val genreData = genreDataDeferred.await()
 
-                val studioHubs = groupByService(collections).keys.sorted()
+                    val catalogRows = buildCatalogRowsFromData(catalogData, exclude)
+                    val genreRows = buildGenreRowsFromData(genreData, exclude)
 
-                val catalogRows = try {
-                    buildCatalogRows(session.userId, collections, exclude)
-                } catch (err: Exception) {
-                    emptyList()
-                }
-
-                val genreRows = try {
-                    buildGenreRows(session.userId, exclude)
-                } catch (err: Exception) {
-                    emptyList()
-                }
-
-                val leadingSections = buildList {
-                    if (continueWatching.isNotEmpty()) {
-                        add(HomeSection("Continue Watching", continueWatching))
+                    val leadingSections = buildList {
+                        if (continueWatching.isNotEmpty()) {
+                            add(HomeSection("Continue Watching", continueWatching))
+                        }
+                        if (upNext.isNotEmpty()) {
+                            add(HomeSection("Up Next", upNext))
+                        }
                     }
-                    if (upNext.isNotEmpty()) {
-                        add(HomeSection("Up Next", upNext))
+
+                    val sections = buildList {
+                        addAll(recommendationRows)
+                        addAll(catalogRows)
+                        addAll(genreRows)
                     }
+
+                    val hero = heroCandidates.firstOrNull()
+
+                    _uiState.value = HomeUiState(
+                        isLoading = false,
+                        heroItem = hero,
+                        leadingSections = leadingSections,
+                        comingSoon = comingSoon,
+                        studioHubs = studioHubs,
+                        sections = sections,
+                    )
                 }
-
-                val sections = buildList {
-                    addAll(recommendationRows)
-                    addAll(catalogRows)
-                    addAll(genreRows)
-                }
-
-                val hero = heroCandidates.firstOrNull()
-
-                _uiState.value = HomeUiState(
-                    isLoading = false,
-                    heroItem = hero,
-                    leadingSections = leadingSections,
-                    comingSoon = comingSoon,
-                    studioHubs = studioHubs,
-                    sections = sections,
-                )
             } catch (err: Exception) {
                 _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
             }
         }
     }
 
-    // Mirrors screens/home.js's own fetchCatalogRows()/buildCatalogRows():
-    // real Gelato catalog collections (Trending, Popular, Top Rated,
+    private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>)
+
+    // Mirrors screens/home.js's own fetchCatalogRows(): the real fetch
+    // phase only, no exclude touched here at all (real port of that
+    // file's own comment: "fetching has no dependency on seen/exclude
+    // at all"), so every real Gelato catalog collection's own real
+    // network round trip fires together via Promise.all rather than
+    // the second collection waiting on the first one's own response.
+    // Real Gelato catalog collections (Trending, Popular, Top Rated,
     // ...), led by LEAD's own real order then by ChildCount, at most
     // MAX_ANIME_CATALOG_ROWS of them from the anime library (that
     // library has a page of its own carrying every one of those),
@@ -203,7 +208,7 @@ class HomeViewModel @Inject constructor(
     // own behind that tile, same real reason fetchCatalogRows() itself
     // excludes it, a Netflix row directly under the Netflix tile would
     // be the same content twice.
-    private suspend fun buildCatalogRows(userId: String, collections: List<BaseItemDto>, exclude: MutableSet<String>): List<HomeSection> {
+    private suspend fun fetchCatalogRowData(userId: String, collections: List<BaseItemDto>): List<CatalogRowEntry> = coroutineScope {
         var usable = collections.filter { serviceOf(it.Name) == null && (it.ChildCount ?: 0) >= MIN_CATALOG_ITEMS }
         usable = usable.sortedWith(
             compareBy<BaseItemDto> { leadIndex(it.Name) }.thenByDescending { it.ChildCount ?: 0 },
@@ -218,48 +223,68 @@ class HomeViewModel @Inject constructor(
 
         usable = usable.take(MAX_CATALOG_ROWS)
 
-        val sections = mutableListOf<HomeSection>()
-        usable.forEach { collection ->
-            val kind = repository.collectionKind(collection)
-            val items = try {
-                repository.getCollectionItems(userId, collection.Id, kind, CATALOG_ROW_LIMIT)
-            } catch (err: Exception) {
-                emptyList()
+        usable.map { collection ->
+            async {
+                val kind = repository.collectionKind(collection)
+                val items = runCatching { repository.getCollectionItems(userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.getOrDefault(emptyList())
+                CatalogRowEntry(title = titleFor(collection.Name, kind), items = items)
             }
-            val deduped = items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        }.awaitAll()
+    }
+
+    // Mirrors screens/home.js's own buildCatalogRows(): the real
+    // synchronous dedupe step, run only after fetchCatalogRowData's own
+    // real network phase above (and its sibling recommendation/genre
+    // phases) have all already resolved, same real priority order that
+    // file's own comment documents.
+    private fun buildCatalogRowsFromData(data: List<CatalogRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
+        val sections = mutableListOf<HomeSection>()
+        data.forEach { entry ->
+            val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
             deduped.forEach { item ->
                 exclude.add(item.Id)
                 exclude.add(titleKey(item))
             }
             if (deduped.isNotEmpty()) {
-                sections.add(HomeSection(title = titleFor(collection.Name, kind), items = deduped))
+                sections.add(HomeSection(title = entry.title, items = deduped))
             }
         }
         return sections
     }
 
-    // Mirrors screens/home.js's own fetchGenreRows()/buildGenreRows():
-    // real genres discoverGenres() finds enough of across the whole
-    // real library (no parentId, unlike LibraryScreen's own per-library
-    // call), last in line for the shared exclude set, same real
-    // priority order screens/home.js's own comment documents
-    // (recommendation rows first pick, then catalog, genre rows last).
-    private suspend fun buildGenreRows(userId: String, exclude: MutableSet<String>): List<HomeSection> {
+    private data class GenreRowEntry(val genre: String, val items: List<BaseItemDto>)
+
+    // Mirrors screens/home.js's own fetchGenreRows(): real genres
+    // discoverGenres() finds enough of across the whole real library
+    // (no parentId, unlike LibraryScreen's own per-library call), every
+    // genre's own real item fetch fired together via Promise.all once
+    // discoverGenres() itself resolves (a real data dependency, unlike
+    // the catalog collections above), not one genre waiting on the
+    // last.
+    private suspend fun fetchGenreRowData(userId: String): List<GenreRowEntry> = coroutineScope {
         val genres = repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
-        val sections = mutableListOf<HomeSection>()
-        genres.forEach { genre ->
-            val items = try {
-                repository.getGenreItems(userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT)
-            } catch (err: Exception) {
-                emptyList()
+        genres.map { genre ->
+            async {
+                val items = runCatching { repository.getGenreItems(userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.getOrDefault(emptyList())
+                GenreRowEntry(genre = genre, items = items)
             }
-            val deduped = items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        }.awaitAll()
+    }
+
+    // Mirrors screens/home.js's own buildGenreRows(): last in line for
+    // the shared exclude set, same real priority order that file's own
+    // comment documents (recommendation rows first pick, then catalog,
+    // genre rows last).
+    private fun buildGenreRowsFromData(data: List<GenreRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
+        val sections = mutableListOf<HomeSection>()
+        data.forEach { entry ->
+            val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
             deduped.forEach { item ->
                 exclude.add(item.Id)
                 exclude.add(titleKey(item))
             }
             if (deduped.isNotEmpty()) {
-                sections.add(HomeSection(title = genre, items = deduped))
+                sections.add(HomeSection(title = entry.genre, items = deduped))
             }
         }
         return sections
