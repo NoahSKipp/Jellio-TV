@@ -27,9 +27,11 @@ fun HomeScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     rawImageUrl: (String, String?, String, Int) -> String,
+    serviceLogoUrl: (String) -> String,
     contentFocusRequester: FocusRequester,
     onItemClick: (BaseItemDto) -> Unit,
     onComingSoonClick: (String) -> Unit,
+    onServiceClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -47,7 +49,7 @@ fun HomeScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
             }
-            uiState.sections.isEmpty() && uiState.leadingSections.isEmpty() && uiState.comingSoon.isEmpty() -> {
+            uiState.sections.isEmpty() && uiState.leadingSections.isEmpty() && uiState.comingSoon.isEmpty() && uiState.studioHubs.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = "Nothing here yet.", color = JellioTextSecondary)
                 }
@@ -71,6 +73,9 @@ fun HomeScreen(
                 }
                 item {
                     ComingSoonRow(entries = uiState.comingSoon, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
+                }
+                item {
+                    StudioHubRow(services = uiState.studioHubs, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                 }
                 items(uiState.sections, key = { it.title }) { section ->
                     PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)

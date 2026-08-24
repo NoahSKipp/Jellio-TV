@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.logoUrl
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -80,6 +81,12 @@ class AppViewModel @Inject constructor(
     // episode's own series) than the one this hero is actually showing.
     fun rawImageUrl(session: Session, itemId: String, tag: String?, imageType: String, maxWidth: Int): String =
         repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth)
+
+    // components/services.js's own real logoUrl(): the plugin's own
+    // FrontendController.cs serves these SVGs straight off the
+    // Jellyfin server itself, not through Coil's usual Items/Images
+    // endpoint.
+    fun serviceLogoUrl(session: Session, name: String): String = logoUrl(session.serverAddress, name)
 
     // components/streamPicker.js's own real source list, resolved once
     // MainActivity's own picker overlay actually opens rather than
