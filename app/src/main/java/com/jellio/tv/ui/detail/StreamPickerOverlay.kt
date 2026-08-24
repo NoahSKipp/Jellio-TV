@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
@@ -192,6 +194,7 @@ fun StreamPickerOverlay(
     var state by remember { mutableStateOf<SourcesState>(SourcesState.Loading) }
     var reloadKey by remember { mutableIntStateOf(0) }
     var remembered by remember { mutableStateOf<String?>(null) }
+    var selectedLanguage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -202,6 +205,7 @@ fun StreamPickerOverlay(
         }
     }
     LaunchedEffect(item.Id) { remembered = rememberedSourceId() }
+    LaunchedEffect(item.Id) { selectedLanguage = null }
     BackHandler(onBack = onDismiss)
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
@@ -270,8 +274,30 @@ fun StreamPickerOverlay(
                             }
                         }
                     }
+                    // Real port of streamPicker.js's own language filter
+                    // chip bar: only worth showing when there is a real
+                    // choice behind it, same real reasoning the whole
+                    // picker already skips itself for a single-source
+                    // title. Counted and ordered the same real way that
+                    // file's own languageCounts/languages sort does, led
+                    // by count then a real alphabetical languageName tie
+                    // break.
+                    val languageCounts = linkedMapOf<String, Int>()
+                    currentState.sources.forEach { source ->
+                        sourceAudioLanguages(source).forEach { code -> languageCounts[code] = (languageCounts[code] ?: 0) + 1 }
+                    }
+                    val languages = languageCounts.keys.sortedWith(
+                        compareByDescending<String> { languageCounts[it] ?: 0 }.thenBy { languageName(it) },
+                    )
+                    val filteredSources = selectedLanguage?.let { code ->
+                        currentState.sources.filter { sourceAudioLanguages(it).contains(code) }
+                    } ?: currentState.sources
+
+                    if (languages.size > 1) {
+                        LanguageFilterChips(languages = languages, selected = selectedLanguage, onSelect = { selectedLanguage = it })
+                    }
                     Text(
-                        text = "${currentState.sources.size} stream${if (currentState.sources.size == 1) "" else "s"} found",
+                        text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                     )
@@ -279,7 +305,7 @@ fun StreamPickerOverlay(
                         contentPadding = PaddingValues(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(currentState.sources) { source -> SourceCard(source = source, onClick = { onSelect(source) }) }
+                        items(filteredSources) { source -> SourceCard(source = source, onClick = { onSelect(source) }) }
                     }
                 }
             }
@@ -292,6 +318,32 @@ fun StreamPickerOverlay(
             modifier = Modifier.padding(top = 32.dp, start = 32.dp),
         ) {
             Text(text = "Back", color = JellioText, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+        }
+    }
+}
+
+@Composable
+private fun LanguageFilterChips(languages: List<String>, selected: String?, onSelect: (String?) -> Unit) {
+    val chips = buildList {
+        add(null to "All")
+        languages.forEach { code -> add(code to languageName(code)) }
+    }
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(top = 20.dp),
+    ) {
+        items(chips, key = { it.first ?: "all" }) { (code, label) ->
+            val isSelected = code == selected
+            Surface(
+                onClick = { onSelect(code) },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = if (isSelected) JellioSecondary else JellioBgElevated,
+                    contentColor = if (isSelected) JellioBg else JellioText,
+                ),
+            ) {
+                Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+            }
         }
     }
 }
