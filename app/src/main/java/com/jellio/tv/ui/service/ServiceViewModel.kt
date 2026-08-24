@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.groupByService
 import com.jellio.tv.data.model.rowTitle
 import com.jellio.tv.data.session.Session
@@ -47,6 +48,7 @@ data class ServiceUiState(
     // capped at ten, same real chip bar that file's own buildChips()
     // renders after All/Movies/TV Shows.
     val topGenres: List<String> = emptyList(),
+    val canDeleteItems: Boolean = false,
 )
 
 // Real port of screens/service.js: every real catalog collection
@@ -104,6 +106,7 @@ class ServiceViewModel @Inject constructor(
                     heroItem = heroItem,
                     rows = rows,
                     topGenres = topGenres(rows),
+                    canDeleteItems = repository.canDeleteItems(session.userId),
                 )
             } catch (err: Exception) {
                 _uiState.value = ServiceUiState(isLoading = false, error = err.message ?: "Could not load $serviceName", serviceName = serviceName)
@@ -128,5 +131,40 @@ class ServiceViewModel @Inject constructor(
             .entries.sortedByDescending { it.value }
             .map { it.key }
             .take(TOP_GENRES_LIMIT)
+    }
+
+    fun toggleWatchlist(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        }
+    }
+
+    fun toggleWatched(session: Session, item: BaseItemDto) {
+        val next = !(item.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = updated) }
+        }
+    }
+
+    fun deleteItem(item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.deleteItem(item.Id) }.onSuccess { removeItemFromRows(item.Id) }
+        }
+    }
+
+    private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            rows = state.rows.map { row -> row.copy(items = row.items.map { if (it.Id == itemId) transform(it) else it }) },
+        )
+    }
+
+    private fun removeItemFromRows(itemId: String) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            rows = state.rows.map { row -> row.copy(items = row.items.filterNot { it.Id == itemId }) },
+        )
     }
 }

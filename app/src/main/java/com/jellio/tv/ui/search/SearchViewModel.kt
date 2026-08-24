@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -22,6 +23,7 @@ data class SearchUiState(
     val results: List<BaseItemDto> = emptyList(),
     val hasSearched: Boolean = false,
     val error: String? = null,
+    val canDeleteItems: Boolean = false,
 )
 
 // Mirrors runtime/api.js's own searchItems(): the real /Users/{id}/Items
@@ -37,6 +39,19 @@ class SearchViewModel @Inject constructor(
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var permissionsLoadedFor: String? = null
+
+    // Decoupled from onQueryChange's own debounce below on purpose:
+    // real Policy fetched once per real session rather than once per
+    // real keystroke.
+    fun loadPermissions(session: Session) {
+        if (permissionsLoadedFor == session.userId) return
+        permissionsLoadedFor = session.userId
+        viewModelScope.launch {
+            val canDelete = repository.canDeleteItems(session.userId)
+            _uiState.value = _uiState.value.copy(canDeleteItems = canDelete)
+        }
+    }
 
     fun onQueryChange(session: Session, query: String) {
         _uiState.value = _uiState.value.copy(query = query)
@@ -70,5 +85,35 @@ class SearchViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun toggleWatchlist(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        }
+    }
+
+    fun toggleWatched(session: Session, item: BaseItemDto) {
+        val next = !(item.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = updated) }
+        }
+    }
+
+    fun deleteItem(item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.deleteItem(item.Id) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(results = _uiState.value.results.filterNot { it.Id == item.Id })
+                }
+        }
+    }
+
+    private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
+        _uiState.value = _uiState.value.copy(
+            results = _uiState.value.results.map { if (it.Id == itemId) transform(it) else it },
+        )
     }
 }
