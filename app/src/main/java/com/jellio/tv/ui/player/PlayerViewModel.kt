@@ -3,6 +3,7 @@ package com.jellio.tv.ui.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 // Real fields screens/player.js's own subtitle popover reads off each
 // real MediaStream (Index/DisplayTitle/Language/IsTextSubtitleStream),
@@ -25,17 +27,35 @@ data class SubtitleTrackUiState(
     val url: String?,
 )
 
+// Real port of screens/player.js's own buildResumePrompt()/
+// buildPauseOverlay() data needs: a real choice offered once, over the
+// paused frame already sitting at the saved position, instead of just
+// always seeking straight there with no way back to the real start.
+data class PauseOverlayInfo(
+    val backdropUrl: String?,
+    val title: String,
+    val rating: String?,
+    val year: String?,
+    val officialRating: String?,
+    val isEpisode: Boolean,
+    val episodeCode: String?,
+    val episodeTitle: String?,
+    val overview: String?,
+)
+
 data class PlayerUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val streamUrl: String? = null,
     val mediaSourceId: String? = null,
     val startPositionTicks: Long = 0,
+    val resumePercent: Int? = null,
     val title: String = "",
     val subtitle: String = "",
     val subtitleTracks: List<SubtitleTrackUiState> = emptyList(),
     val selectedSubtitleIndex: Int? = null,
     val isSwitchingSubtitle: Boolean = false,
+    val pauseInfo: PauseOverlayInfo? = null,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -65,7 +85,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
             try {
-                val item = repository.getItem(session.userId, itemId)
+                val item = repository.getItemDetails(session.userId, itemId)
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
                 val target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
@@ -76,18 +96,82 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource)
+                val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 }?.roundToInt()
 
                 _uiState.value = PlayerUiState(
                     isLoading = false,
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
+                    resumePercent = resumePercent,
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
                     subtitleTracks = subtitleTracks,
+                    pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
             } catch (err: Exception) {
                 _uiState.value = PlayerUiState(isLoading = false, error = err.message ?: "Could not start playback")
+            }
+        }
+    }
+
+    // Real port of screens/player.js's own seriesAwareArtworkUrl(): an
+    // Episode's own real BackdropImageTags/ImageTags.Primary are the
+    // episode's own thumbnail, not the show's own real artwork every
+    // other real pause screen shows here, so SeriesId/
+    // ParentBackdropImageTags/SeriesPrimaryImageTag are what this reads
+    // instead for one; a movie has no series to prefer over its own.
+    private fun buildPauseOverlayInfo(session: Session, item: BaseItemDto, isEpisode: Boolean): PauseOverlayInfo {
+        val seriesId = item.SeriesId
+        val artId = if (isEpisode && seriesId != null) seriesId else item.Id
+        val backdropTag = if (isEpisode) item.ParentBackdropImageTags?.firstOrNull() else item.BackdropImageTags?.firstOrNull()
+        val primaryTag = if (isEpisode) item.SeriesPrimaryImageTag else item.ImageTags?.get("Primary")
+        val tag = backdropTag ?: primaryTag
+        val backdropUrl = tag?.let {
+            repository.imageUrl(session.serverAddress, artId, it, if (backdropTag != null) "Backdrop" else "Primary", 1600)
+        }
+        val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
+        return PauseOverlayInfo(
+            backdropUrl = backdropUrl,
+            title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
+            rating = item.CommunityRating?.let { "%.1f ★".format(it) },
+            year = item.ProductionYear?.toString(),
+            officialRating = item.OfficialRating,
+            isEpisode = isEpisode,
+            episodeCode = if (isEpisode && hasEpisodeCode) "S${item.ParentIndexNumber}E${item.IndexNumber}" else null,
+            episodeTitle = if (isEpisode) item.Name else null,
+            overview = item.Overview,
+        )
+    }
+
+    // Real port of screens/player.js's own Start Over button: video.
+    // currentTime = 0 alone used to just resume anyway there, real
+    // feedback traced to a forced transcode only ever encoding forward
+    // from its own saved start position, nothing earlier ever existing
+    // in that stream at all. A fresh real PlaybackInfo negotiation at
+    // ticks 0 instead asks the server for a real stream that actually
+    // starts there, same real reason selectBurnedInSubtitle above needs
+    // one too.
+    fun restart(session: Session) {
+        val id = itemId ?: return
+        viewModelScope.launch {
+            try {
+                val target = repository.resolvePlayback(session.userId, id, mediaSourceIdParam, 0)
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                _uiState.value = _uiState.value.copy(
+                    streamUrl = target.streamUrl,
+                    mediaSourceId = target.mediaSource.Id,
+                    startPositionTicks = target.startPositionTicks,
+                    resumePercent = null,
+                    selectedSubtitleIndex = null,
+                    subtitleTracks = subtitleTracks,
+                )
+            } catch (err: Exception) {
+                // Real feedback the web side already surfaces via a toast
+                // (showPlayerToast('Could not start over: ...')): this
+                // screen has none of that chrome ported yet, so the
+                // existing stream just keeps playing rather than losing
+                // playback entirely over a failed re-negotiation.
             }
         }
     }

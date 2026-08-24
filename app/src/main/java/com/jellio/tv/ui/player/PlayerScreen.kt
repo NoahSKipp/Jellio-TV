@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -35,12 +37,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,9 +61,11 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
@@ -102,10 +108,12 @@ fun PlayerScreen(
             uiState.streamUrl != null -> PlayerSurface(
                 streamUrl = uiState.streamUrl!!,
                 startPositionTicks = uiState.startPositionTicks,
+                resumePercent = uiState.resumePercent,
                 title = uiState.title,
                 subtitle = uiState.subtitle,
                 subtitleTracks = uiState.subtitleTracks,
                 selectedSubtitleIndex = uiState.selectedSubtitleIndex,
+                pauseInfo = uiState.pauseInfo,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
@@ -117,6 +125,7 @@ fun PlayerScreen(
                         else -> viewModel.selectBurnedInSubtitle(session, track.streamIndex, positionTicks)
                     }
                 },
+                onRestart = { viewModel.restart(session) },
             )
         }
     }
@@ -126,15 +135,18 @@ fun PlayerScreen(
 private fun PlayerSurface(
     streamUrl: String,
     startPositionTicks: Long,
+    resumePercent: Int?,
     title: String,
     subtitle: String,
     subtitleTracks: List<SubtitleTrackUiState>,
     selectedSubtitleIndex: Int?,
+    pauseInfo: PauseOverlayInfo?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
+    onRestart: () -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -159,16 +171,26 @@ private fun PlayerSurface(
             .build()
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(mediaItem)
-            playWhenReady = true
+            // Real port of screens/player.js's own hasResumePosition
+            // gate: autoplay stays off until the reader actually picks
+            // Resume or Start Over on the prompt below, the paused frame
+            // at the saved position showing through behind that choice
+            // instead of playback already running underneath it. A fresh
+            // item with no saved position keeps starting immediately,
+            // same as before this existed.
+            playWhenReady = startPositionTicks <= 0
             prepare()
         }
     }
 
     var isPlaying by remember { mutableStateOf(true) }
+    var playWhenReadyState by remember(streamUrl) { mutableStateOf(startPositionTicks <= 0) }
+    var isEnded by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
     var showSubtitleMenu by remember { mutableStateOf(false) }
+    var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
 
@@ -176,6 +198,12 @@ private fun PlayerSurface(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+            }
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                playWhenReadyState = playWhenReady
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                isEnded = state == Player.STATE_ENDED
             }
         }
         player.addListener(listener)
@@ -216,7 +244,13 @@ private fun PlayerSurface(
                     seekedToResume = true
                     player.seekTo(startPositionTicks / TICKS_PER_MS)
                 }
-                if (!hasReportedStart) {
+                // Gated on real playback actually running (matches
+                // screens/player.js's own timeupdate-driven trigger,
+                // never metadata alone), not just duration being known:
+                // a resume prompt still waiting on the reader's own
+                // choice has a real duration already but has not
+                // started playing yet.
+                if (!hasReportedStart && isPlaying) {
                     hasReportedStart = true
                     onReportStart(player.currentPosition * TICKS_PER_MS)
                 }
@@ -253,6 +287,19 @@ private fun PlayerSurface(
                 if (showSubtitleMenu) {
                     if (event.key == Key.Back) {
                         showSubtitleMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                // Real port of screens/player.js's own hasResumePosition
+                // gate: seeking/play-pause stay inert behind this real
+                // choice, the same way showSubtitleMenu above already
+                // blocks them behind its own popover; Resume/Start Over
+                // themselves are plain focusable Surfaces below, reached
+                // through the TV focus system rather than a key here.
+                if (showResumePrompt) {
+                    if (event.key == Key.Back) {
+                        onBack()
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -297,6 +344,17 @@ private fun PlayerSurface(
             modifier = Modifier.fillMaxSize(),
         )
 
+        // Real port of screens/player.js's own pauseOverlay visibility
+        // rule: hasReportedStart && !video.ended, !showResumePrompt on
+        // top of that here since this player also gates real playback
+        // start behind that prompt (see the playWhenReady comment
+        // above), a state the web side's own always-autoplaying video
+        // element never had to account for.
+        val showPauseOverlay = pauseInfo != null && hasReportedStart && !showResumePrompt && !playWhenReadyState && !isEnded
+        if (showPauseOverlay) {
+            PauseOverlay(info = pauseInfo!!)
+        }
+
         if (controlsVisible) {
             PlayerControls(
                 title = title,
@@ -319,6 +377,20 @@ private fun PlayerSurface(
                     onSelectSubtitle(track, player.currentPosition * TICKS_PER_MS)
                 },
                 onDismiss = { showSubtitleMenu = false },
+            )
+        }
+
+        if (showResumePrompt) {
+            ResumePrompt(
+                percent = resumePercent,
+                onResume = {
+                    showResumePrompt = false
+                    player.play()
+                },
+                onRestart = {
+                    showResumePrompt = false
+                    onRestart()
+                },
             )
         }
     }
@@ -370,7 +442,7 @@ private fun PlayerControls(
 
         Column(
             modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, JellioBg)),
+                Brush.verticalGradient(listOf(Color.Transparent, JellioBg)),
             ).padding(horizontal = 48.dp, vertical = 32.dp),
         ) {
             val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
@@ -382,6 +454,109 @@ private fun PlayerControls(
             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text(text = formatMs(positionMs), color = JellioTextSecondary)
                 Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own buildPauseOverlay(): an eyebrow
+// naming what is playing, the series (or movie) own name and rating,
+// the exact episode this pause landed on and its own overview, not the
+// item alone (an Episode's own Overview is the episode's, its own Name
+// never was the series name). pauseInfo.backdropUrl already carries
+// seriesAwareArtworkUrl()'s own real fallback chain, computed once in
+// PlayerViewModel rather than here.
+@Composable
+private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (info.backdropUrl != null) {
+            AsyncImage(
+                model = info.backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.9f))),
+            ),
+        )
+        Column(
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 48.dp, end = 96.dp).widthIn(max = 640.dp),
+        ) {
+            Text(text = "You're watching", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
+            Text(
+                text = info.title,
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                info.rating?.let { Text(text = it, color = JellioTextSecondary) }
+                info.year?.let { Text(text = it, color = JellioTextSecondary) }
+                info.officialRating?.let { Text(text = it, color = JellioTextSecondary) }
+            }
+            if (info.isEpisode) {
+                info.episodeCode?.let {
+                    Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
+                }
+                info.episodeTitle?.takeIf { it.isNotEmpty() }?.let {
+                    Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+                }
+            }
+            info.overview?.takeIf { it.isNotEmpty() }?.let {
+                Text(
+                    text = it,
+                    color = JellioTextSecondary,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own buildResumePrompt(), ported
+// from Harbor's own player/resume-prompt.tsx idea in turn (that file's
+// own comment): a real choice instead of always just seeking straight
+// to the saved position, shown once over the paused frame already
+// sitting there (see PlayerSurface's own playWhenReady comment above),
+// Start Over a real choice this player did not offer before rather
+// than something to dig for elsewhere.
+@Composable
+private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
+    val resumeFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { resumeFocusRequester.requestFocus() }
+    Box(
+        modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.background(JellioBgElevated, RoundedCornerShape(16.dp)).padding(horizontal = 32.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(text = "Resume playback?", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            if (percent != null) {
+                Text(text = "$percent% watched", color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+            }
+            Row(modifier = Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    onClick = onResume,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioText),
+                    modifier = Modifier.focusRequester(resumeFocusRequester),
+                ) {
+                    Text(text = "Resume", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
+                Surface(
+                    onClick = onRestart,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+                ) {
+                    Text(text = "Start Over", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
             }
         }
     }
