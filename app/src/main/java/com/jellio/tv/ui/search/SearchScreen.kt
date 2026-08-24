@@ -52,6 +52,9 @@ fun SearchScreen(
             uiState.isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Searching...", color = JellioTextSecondary)
             }
+            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = uiState.error ?: "", color = JellioTextSecondary)
+            }
             uiState.hasSearched && uiState.results.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "No results for \"${uiState.query}\"", color = JellioTextSecondary)
             }
