@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.groupByService
+import com.jellio.tv.data.model.serviceOf
 import com.jellio.tv.data.recommend.RecommendationDataSource
 import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
@@ -26,6 +28,10 @@ data class HomeUiState(
     // the real order screens/home.js's own buildHomeSections() uses.
     val leadingSections: List<HomeSection> = emptyList(),
     val comingSoon: List<CalendarEntryDto> = emptyList(),
+    // Real service names groupByService(collections) actually found,
+    // sorted the same way components/services.js's own buildHubStrip()
+    // sorts its own tile strip.
+    val studioHubs: List<String> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     val error: String? = null,
 )
@@ -59,16 +65,19 @@ private fun titleFor(name: String?, kind: String): String {
 }
 
 // Real per-library rows plus Continue Watching/Up Next/Coming Soon/
-// recommendation/catalog rows, mirroring screens/home.js's own
-// buildHomeSections() at a reduced but real scale: Continue Watching,
-// Up Next, Coming Soon (real CalendarController answer, same
+// Studio Hubs/recommendation/catalog rows, mirroring screens/home.js's
+// own buildHomeSections() at a reduced but real scale: Continue
+// Watching, Up Next, Coming Soon (real CalendarController answer, same
 // GET Jellio/calendar endpoint screens/calendar.js's own full page
-// already uses), RecommendationEngine's own real rows next, then real
-// Gelato catalog rows (Trending/Popular/Top Rated/a service's own row,
-// ChildCount>=3, capped at MAX_CATALOG_ROWS with at most
-// MAX_ANIME_CATALOG_ROWS from the anime library), per-library rows
-// last, this app's own stand in for screens/home.js's own real Studio
-// Hub strip and genre rows until those earn their own real row here.
+// already uses), the Studio Hub strip (real service tiles, one per
+// real service groupByService(collections) actually found, each
+// opening its own real ServiceScreen), RecommendationEngine's own real
+// rows next, then real Gelato catalog rows (Trending/Popular/Top
+// Rated/..., a service's own collection filtered out since it already
+// has a hub tile, ChildCount>=3, capped at MAX_CATALOG_ROWS with at
+// most MAX_ANIME_CATALOG_ROWS from the anime library), per-library
+// rows last, this app's own stand in for screens/home.js's own real
+// genre rows until those earn their own real row here.
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -129,8 +138,16 @@ class HomeViewModel @Inject constructor(
                     emptyList()
                 }
 
+                val collections = try {
+                    repository.getCollections(session.userId)
+                } catch (err: Exception) {
+                    emptyList()
+                }
+
+                val studioHubs = groupByService(collections).keys.sorted()
+
                 val catalogRows = try {
-                    buildCatalogRows(session.userId, exclude)
+                    buildCatalogRows(session.userId, collections, exclude)
                 } catch (err: Exception) {
                     emptyList()
                 }
@@ -163,6 +180,7 @@ class HomeViewModel @Inject constructor(
                     heroItem = hero,
                     leadingSections = leadingSections,
                     comingSoon = comingSoon,
+                    studioHubs = studioHubs,
                     sections = sections,
                 )
             } catch (err: Exception) {
@@ -172,19 +190,18 @@ class HomeViewModel @Inject constructor(
     }
 
     // Mirrors screens/home.js's own fetchCatalogRows()/buildCatalogRows():
-    // real Gelato catalog collections (Trending, Popular, Top Rated, a
-    // service's own row, ...), led by LEAD's own real order then by
-    // ChildCount, at most MAX_ANIME_CATALOG_ROWS of them from the anime
-    // library (that library has a page of its own carrying every one of
-    // those), capped at MAX_CATALOG_ROWS total. A service's own
-    // collection is not filtered out here yet (screens/home.js's own
-    // real reason is that it already has a tile in the Studio Hub strip,
-    // not built here yet either); once that strip lands here too, this
-    // filter lands with it rather than hiding those catalogs with
-    // nowhere else on this screen to find them in the meantime.
-    private suspend fun buildCatalogRows(userId: String, exclude: MutableSet<String>): List<HomeSection> {
-        val collections = repository.getCollections(userId)
-        var usable = collections.filter { (it.ChildCount ?: 0) >= MIN_CATALOG_ITEMS }
+    // real Gelato catalog collections (Trending, Popular, Top Rated,
+    // ...), led by LEAD's own real order then by ChildCount, at most
+    // MAX_ANIME_CATALOG_ROWS of them from the anime library (that
+    // library has a page of its own carrying every one of those),
+    // capped at MAX_CATALOG_ROWS total. A service's own collection is
+    // filtered out here (serviceOf(name) != null): it already has a
+    // real tile in the Studio Hub strip above and a real page of its
+    // own behind that tile, same real reason fetchCatalogRows() itself
+    // excludes it, a Netflix row directly under the Netflix tile would
+    // be the same content twice.
+    private suspend fun buildCatalogRows(userId: String, collections: List<BaseItemDto>, exclude: MutableSet<String>): List<HomeSection> {
+        var usable = collections.filter { serviceOf(it.Name) == null && (it.ChildCount ?: 0) >= MIN_CATALOG_ITEMS }
         usable = usable.sortedWith(
             compareBy<BaseItemDto> { leadIndex(it.Name) }.thenByDescending { it.ChildCount ?: 0 },
         )

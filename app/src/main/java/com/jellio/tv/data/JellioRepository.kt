@@ -214,7 +214,11 @@ class JellioRepository @Inject constructor(
             recursive = true,
             limit = limit,
             sortBy = "SortName",
-            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres",
+            // BackdropImageTags is not part of the default field set:
+            // screens/service.js's own pickHeroItem() needs it to judge
+            // which real item across a matched collection is even
+            // eligible to lead that page's own hero.
+            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres,BackdropImageTags",
         ).Items
 
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =

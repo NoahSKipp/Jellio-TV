@@ -37,6 +37,7 @@ import com.jellio.tv.ui.person.PersonScreen
 import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
 import com.jellio.tv.ui.search.SearchScreen
+import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioTvTheme
 import com.jellio.tv.ui.watchlist.WatchlistScreen
@@ -117,9 +118,11 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 rawImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                serviceLogoUrl = { name -> appViewModel.serviceLogoUrl(session, name) },
                 contentFocusRequester = homeContentFocusRequester,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
+                onServiceClick = { name -> push(JellioRoute.Service(name)) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Search -> SearchScreen(
@@ -173,6 +176,13 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onBack = { routeStack = routeStack.dropLast(1) },
                 onItemClick = onNavigateToDetail,
+                modifier = Modifier.fillMaxSize(),
+            )
+            is JellioRoute.Service -> ServiceScreen(
+                session = session,
+                serviceName = current.name,
+                imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                onItemClick = { item -> onNavigateToDetail(item.Id) },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Player -> PlayerScreen(
