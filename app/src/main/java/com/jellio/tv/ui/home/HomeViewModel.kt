@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.greetingText
 import com.jellio.tv.data.model.groupByService
 import com.jellio.tv.data.model.serviceOf
@@ -199,6 +200,41 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
             }
         }
+    }
+
+    // Real port of components/card.js's own buildCardActions() handlers:
+    // an optimistic-free round trip to the real server, then patched
+    // back into whichever real row(s) actually hold this item, same
+    // real reasoning updateItem() below documents.
+    fun toggleWatchlist(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        }
+    }
+
+    fun toggleWatched(session: Session, item: BaseItemDto) {
+        val next = !(item.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = updated) }
+        }
+    }
+
+    // A real item can appear in more than one real row at once (a
+    // recommendation row and a genre row both drawing from the same
+    // real library), so a toggle patches every real row holding it
+    // rather than just the one the real options menu was opened from.
+    private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
+        val state = _uiState.value
+        fun mapSections(sections: List<HomeSection>) = sections.map { section ->
+            if (section.items.none { it.Id == itemId }) section
+            else section.copy(items = section.items.map { if (it.Id == itemId) transform(it) else it })
+        }
+        _uiState.value = state.copy(
+            leadingSections = mapSections(state.leadingSections),
+            sections = mapSections(state.sections),
+        )
     }
 
     private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>)

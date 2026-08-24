@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -44,6 +47,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+    var cardMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
 
     LaunchedEffect(session.userId) {
         viewModel.load(session)
@@ -101,9 +105,27 @@ fun HomeScreen(
                     StudioHubRow(services = uiState.studioHubs, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                 }
                 items(uiState.sections, key = { it.title }) { section ->
-                    PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
+                    PosterRow(
+                        section = section,
+                        imageUrl = imageUrl,
+                        onItemClick = onItemClick,
+                        onItemOptions = { cardMenuTarget = it },
+                    )
                 }
             }
+        }
+
+        // Rendered at this screen's own root Box, not inside the
+        // LazyColumn/PosterRow/PosterCard chain above: see PosterCard's
+        // own header comment for why a full-screen menu has to live
+        // here rather than inside a LazyRow item.
+        cardMenuTarget?.let { target ->
+            CardOptionsMenu(
+                item = target,
+                onToggleWatchlist = { viewModel.toggleWatchlist(session, target) },
+                onToggleWatched = { viewModel.toggleWatched(session, target) },
+                onDismiss = { cardMenuTarget = null },
+            )
         }
     }
 }
