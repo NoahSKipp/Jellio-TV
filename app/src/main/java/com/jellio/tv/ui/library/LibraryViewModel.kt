@@ -151,7 +151,7 @@ class LibraryViewModel @Inject constructor(
         }
 
         val excludeIds = excludeIdsDeferred.await()
-        val coverflowItems = coverflowItemsDeferred.await()
+        val coverflowItems = coverflowItemsDeferred.await().filterNot { excludeIds.contains(it.Id) }
         val mainItems = mainItemsDeferred.await().filterNot { excludeIds.contains(it.Id) }
 
         // Real port of screens/library.js's own buildRow(...,
