@@ -47,10 +47,11 @@ fun LandscapeRow(
     rawImageUrl: (String, String?, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
+    onTitleClick: (() -> Unit)? = null,
 ) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
-        RowTitle(text = section.title)
+        RowTitle(text = section.title, onClick = onTitleClick)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

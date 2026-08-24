@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -21,7 +24,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
+import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
@@ -39,6 +44,7 @@ fun LibraryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
+    var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
 
     // Keyed on both real Id and Name: getLibraryNavEntries()'s own
     // synthetic Anime stand-in shares the plain Shows library's exact
@@ -85,9 +91,24 @@ fun LibraryScreen(
                     )
                 }
                 items(uiState.sections, key = { it.title }) { section ->
-                    PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
+                    PosterRow(
+                        section = section,
+                        imageUrl = imageUrl,
+                        onItemClick = onItemClick,
+                        onTitleClick = { rowListTarget = section },
+                    )
                 }
             }
+        }
+
+        rowListTarget?.let { section ->
+            RowListModal(
+                title = section.title,
+                items = section.items,
+                imageUrl = imageUrl,
+                onItemClick = onItemClick,
+                onDismiss = { rowListTarget = null },
+            )
         }
     }
 }
