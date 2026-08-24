@@ -149,15 +149,33 @@ class JellioRepository @Inject constructor(
         return listOfNotNull(moviesView, tvView, animeEntry)
     }
 
-    suspend fun getCollections(userId: String): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            includeItemTypes = "BoxSet",
-            recursive = true,
-            limit = 200,
-            sortBy = "SortName",
-            fields = "ProviderIds,ChildCount",
-        ).Items
+    // Real bug runtime/api.js's own getAllCollections() documents and
+    // fixes, ported the same way rather than left in the single-page
+    // form this used to take: a single Limit: 200 page silently drops
+    // every collection past it, alphabetically, no error, an entire
+    // real service missing from the hub strip and catalog rows both
+    // with nothing wrong server side. Pages through the real
+    // TotalRecordCount instead.
+    suspend fun getCollections(userId: String): List<BaseItemDto> {
+        val pageSize = 100
+        val collected = mutableListOf<BaseItemDto>()
+        var startIndex = 0
+        while (true) {
+            val result = api.getItems(
+                userId = userId,
+                includeItemTypes = "BoxSet",
+                recursive = true,
+                sortBy = "SortName",
+                limit = pageSize,
+                startIndex = startIndex,
+                fields = "ProviderIds,ChildCount",
+            )
+            collected.addAll(result.Items)
+            if (result.Items.size < pageSize || collected.size >= result.TotalRecordCount) break
+            startIndex += pageSize
+        }
+        return collected
+    }
 
     // Gelato's own GetOrCreateBoxSetAsync writes a collection's
     // ProviderIds.Stremio as "{catalogType}.{catalogId}", catalogType
@@ -165,13 +183,39 @@ class JellioRepository @Inject constructor(
     // AIOStreams: "movie", "series", or "anime". A real signal
     // straight from Gelato, not a guess off a name a reader can
     // rename freely.
-    private fun isAnimeCollection(collection: BaseItemDto): Boolean {
+    fun isAnimeCollection(collection: BaseItemDto): Boolean {
         val stremio = collection.ProviderIds?.get("Stremio") ?: collection.ProviderIds?.get("stremio")
         if (!stremio.isNullOrEmpty()) {
             return stremio.substringBefore('.').lowercase() == "anime"
         }
         return ANIME_COLLECTION_NAME.containsMatchIn(collection.Name ?: "")
     }
+
+    // Mirrors runtime/api.js's own collectionKind() exactly: anime
+    // always reads as the tvshows kind (the anime library stands in
+    // for it, same real reasoning getLibraryNavEntries() above already
+    // documents), otherwise the real Stremio catalogType decides,
+    // movies kind the real fallback for anything with no provider id
+    // to read at all.
+    fun collectionKind(collection: BaseItemDto): String {
+        if (isAnimeCollection(collection)) return "tvshows"
+        val stremio = collection.ProviderIds?.get("Stremio") ?: collection.ProviderIds?.get("stremio")
+        if (!stremio.isNullOrEmpty()) {
+            return if (stremio.substringBefore('.').lowercase() == "movie") "movies" else "tvshows"
+        }
+        return "movies"
+    }
+
+    suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            parentId = collectionId,
+            includeItemTypes = if (kind == "movies") "Movie" else "Series",
+            recursive = true,
+            limit = limit,
+            sortBy = "SortName",
+            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres",
+        ).Items
 
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
         api.getResumeItems(userId, fields = ITEM_FIELDS).Items

@@ -138,6 +138,12 @@ data class BaseItemDto(
     val RunTimeTicks: Long? = null,
     val ProviderIds: Map<String, String>? = null,
     val MediaSources: List<MediaSourceDto>? = null,
+    // Not part of a BoxSet's own default field set, real bug
+    // runtime/api.js's own getAllCollections() comment documents:
+    // without asking for this explicitly every collection reads back
+    // as 0 children, dropping every real catalog row and hub tile
+    // both silently.
+    val ChildCount: Int? = null,
 )
 
 @JsonClass(generateAdapter = true)

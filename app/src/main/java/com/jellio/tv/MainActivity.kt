@@ -116,8 +116,10 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
             JellioRoute.Home -> HomeScreen(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                rawImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 contentFocusRequester = homeContentFocusRequester,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
+                onComingSoonClick = onNavigateToDetail,
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Search -> SearchScreen(
