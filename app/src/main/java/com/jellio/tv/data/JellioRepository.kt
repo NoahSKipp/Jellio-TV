@@ -38,9 +38,12 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -104,6 +107,49 @@ private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "fl
 // source's own real resolution.
 private const val FALLBACK_VIDEO_BITRATE = 20000000L
 
+// Real port of runtime/api.js's own cached()/invalidateCache(): a
+// small in-memory cache keyed by request identity, TTL'd rather than
+// invalidated by hand for the same real reason that file's own header
+// gives, nothing here persists past a process restart anyway, same
+// as the rest of this app's own in-memory state. A real Mutex per
+// key, not just a plain map read/write, so two callers landing
+// within the same real tick (JellioRepository is a real @Singleton,
+// shared by every screen's own ViewModel) share one real in-flight
+// fetch instead of firing two, same real guarantee that file's own
+// header calls out caching the in-flight promise itself, not just
+// the resolved value, for.
+private const val CACHE_TTL_MS = 60_000L
+// Real SHORT_CACHE_TTL_MS: long enough to collapse the real near-
+// simultaneous duplicate requests the detail screen, the player and
+// the player's own episode panel make for the same series' own
+// seasons/episodes, and what a watchlist/filmography screen asks for
+// on repeat visits, short enough that a mark watched/unwatched or a
+// watchlist toggle reads correctly again well within the time it
+// takes to navigate back and look.
+private const val SHORT_CACHE_TTL_MS = 8_000L
+
+private class TtlCache {
+    private data class Entry(val value: Any?, val expiresAt: Long)
+    private val entries = ConcurrentHashMap<String, Entry>()
+    private val locks = ConcurrentHashMap<String, Mutex>()
+
+    @Suppress("UNCHECKED_CAST")
+    suspend fun <T> get(key: String, ttlMs: Long, fetcher: suspend () -> T): T {
+        entries[key]?.let { entry -> if (System.currentTimeMillis() < entry.expiresAt) return entry.value as T }
+        val lock = locks.getOrPut(key) { Mutex() }
+        return lock.withLock {
+            entries[key]?.let { entry -> if (System.currentTimeMillis() < entry.expiresAt) return@withLock entry.value as T }
+            val value = fetcher()
+            entries[key] = Entry(value, System.currentTimeMillis() + ttlMs)
+            value
+        }
+    }
+
+    fun invalidate(key: String) {
+        entries.remove(key)
+    }
+}
+
 // The one real place both auth and every other Jellyfin call go
 // through, mirroring runtime/auth.js and runtime/api.js's own
 // combined real job on the web side.
@@ -114,6 +160,7 @@ class JellioRepository @Inject constructor(
     private val rememberedUsersStore: RememberedUsersStore,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
+    private val cache = TtlCache()
 
     // The one real server address a fresh install has never asked for
     // yet: null only before the very first successful connectAndLogin()
@@ -248,7 +295,8 @@ class JellioRepository @Inject constructor(
 
     suspend fun logout() = sessionManager.clearSession()
 
-    suspend fun getLibraries(userId: String): List<BaseItemDto> = api.getUserViews(userId).Items
+    suspend fun getLibraries(userId: String): List<BaseItemDto> =
+        cache.get("views:$userId", CACHE_TTL_MS) { api.getUserViews(userId).Items }
 
     // Mirrors components/navShared.js's own real getPrimaryNavLinks():
     // Anime has no real Jellyfin library of its own (Gelato resolves
@@ -293,7 +341,7 @@ class JellioRepository @Inject constructor(
     // real service missing from the hub strip and catalog rows both
     // with nothing wrong server side. Pages through the real
     // TotalRecordCount instead.
-    suspend fun getCollections(userId: String): List<BaseItemDto> {
+    suspend fun getCollections(userId: String): List<BaseItemDto> = cache.get("collections:$userId", CACHE_TTL_MS) {
         val pageSize = 100
         val collected = mutableListOf<BaseItemDto>()
         var startIndex = 0
@@ -311,7 +359,7 @@ class JellioRepository @Inject constructor(
             if (result.Items.size < pageSize || collected.size >= result.TotalRecordCount) break
             startIndex += pageSize
         }
-        return collected
+        collected
     }
 
     // Gelato's own GetOrCreateBoxSetAsync writes a collection's
@@ -516,19 +564,22 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            includeItemTypes = "Movie,Series",
-            recursive = true,
-            limit = limit,
-            filters = "IsFavorite",
-            fields = ITEM_FIELDS,
-        ).Items
+        cache.get("watchlist:$userId:$limit", SHORT_CACHE_TTL_MS) {
+            api.getItems(
+                userId = userId,
+                includeItemTypes = "Movie,Series",
+                recursive = true,
+                limit = limit,
+                filters = "IsFavorite",
+                fields = ITEM_FIELDS,
+            ).Items
+        }
 
     suspend fun getItemDetails(userId: String, itemId: String): BaseItemDto =
         api.getItem(userId, itemId, fields = DETAIL_FIELDS)
 
-    suspend fun getItem(userId: String, itemId: String): BaseItemDto = api.getItem(userId, itemId)
+    suspend fun getItem(userId: String, itemId: String): BaseItemDto =
+        cache.get("item:$itemId", CACHE_TTL_MS) { api.getItem(userId, itemId) }
 
     // screens/person.js's own real getPerson(): a plain item lookup,
     // real Jellyfin Person items share the same BaseItemDto shape as
@@ -540,19 +591,21 @@ class JellioRepository @Inject constructor(
     // getPersonFilmography() before porting this): every real Movie/
     // Series this person is credited on.
     suspend fun getPersonFilmography(userId: String, personId: String, limit: Int = 50): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            includeItemTypes = "Movie,Series",
-            recursive = true,
-            limit = limit,
-            sortBy = "PremiereDate",
-            sortOrder = "Descending",
-            fields = "PrimaryImageAspectRatio,ProductionYear",
-            personIds = personId,
-        ).Items
+        cache.get("filmography:$personId:$limit", CACHE_TTL_MS) {
+            api.getItems(
+                userId = userId,
+                includeItemTypes = "Movie,Series",
+                recursive = true,
+                limit = limit,
+                sortBy = "PremiereDate",
+                sortOrder = "Descending",
+                fields = "PrimaryImageAspectRatio,ProductionYear",
+                personIds = personId,
+            ).Items
+        }
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
-        api.getSeasons(seriesId, userId).Items
+        cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { api.getSeasons(seriesId, userId).Items }
 
     // Real endpoint, runtime/recommend.js's own real seed history:
     // real Jellyfin Filters=IsPlayed, sorted by DatePlayed, real real
@@ -634,7 +687,9 @@ class JellioRepository @Inject constructor(
         ).Items
 
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
-        api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+        cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
+            api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+        }
 
     // Real port of runtime/api.js's own getNextEpisode(): the next real
     // episode in this same season if this one is not the season's own
@@ -775,7 +830,8 @@ class JellioRepository @Inject constructor(
 
     suspend fun getSleepTimerStatus(): SleepTimerStatusDto? = runCatching { api.getSleepTimerStatus() }.getOrNull()
 
-    suspend fun getUser(userId: String): UserDto = api.getUser(userId)
+    suspend fun getUser(userId: String): UserDto =
+        cache.get("user:$userId", CACHE_TTL_MS) { api.getUser(userId) }
 
     // Mirrors runtime/api.js's own updateLanguagePreferences() exactly:
     // starts from the signed in user's own current Configuration and
@@ -790,6 +846,7 @@ class JellioRepository @Inject constructor(
             SubtitleLanguagePreference = subtitleLanguage.orEmpty(),
         )
         api.updateUserConfiguration(userId, configuration)
+        cache.invalidate("user:$userId")
     }
 
     suspend fun updatePassword(userId: String, currentPassword: String, newPassword: String) {
@@ -850,6 +907,12 @@ class JellioRepository @Inject constructor(
             base64.toRequestBody(contentType.toMediaTypeOrNull())
         }
         api.uploadUserAvatar(userId, body)
+        // Mirrors runtime/api.js's own setUserAvatar() calling its own
+        // invalidateCurrentUser() right after: the one real place a
+        // cached user can go visibly stale sooner than CACHE_TTL_MS,
+        // an avatar the reader just picked should show up on the very
+        // next real getUser() call, not up to a minute later.
+        cache.invalidate("user:$userId")
     }
 
     // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
