@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +36,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.JellioTrending
 import kotlinx.coroutines.delay
 
 private val CoverflowHeight = 460.dp
@@ -65,6 +67,7 @@ fun LibraryCoverflow(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onViewDetails: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
+    badgeText: String? = null,
 ) {
     if (items.size < COVERFLOW_MIN_SLIDES) return
     var index by remember(items) { mutableIntStateOf(0) }
@@ -108,6 +111,18 @@ fun LibraryCoverflow(
                     ),
                 ),
         )
+        // Task #45's own real fix carried over: only the icon reads as
+        // trending orange, the label stays plain text same as every
+        // other real row title on this page.
+        if (badgeText != null) {
+            Row(
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 48.dp, top = 32.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(imageVector = Icons.Filled.TrendingUp, contentDescription = null, tint = JellioTrending, modifier = Modifier.size(18.dp))
+                Text(text = badgeText, color = JellioText, modifier = Modifier.padding(start = 6.dp))
+            }
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
