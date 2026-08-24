@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.greetingText
 import com.jellio.tv.data.model.groupByService
 import com.jellio.tv.data.model.serviceOf
 import com.jellio.tv.data.recommend.RecommendationDataSource
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 data class HomeSection(val title: String, val items: List<BaseItemDto>)
@@ -26,6 +28,11 @@ data class HomeSection(val title: String, val items: List<BaseItemDto>)
 data class HomeUiState(
     val isLoading: Boolean = true,
     val heroItem: BaseItemDto? = null,
+    // Real screens/home.js's own greetingText(): local device clock,
+    // the reader's own real name when it resolves, "Welcome back"
+    // real feedback found always wrong the moment it was actually
+    // ever anything else.
+    val greeting: String = "",
     // Continue Watching then Up Next, kept separate from `sections`
     // below only so ComingSoonRow can render between the two groups,
     // the real order screens/home.js's own buildHomeSections() uses.
@@ -120,14 +127,17 @@ class HomeViewModel @Inject constructor(
                     val heroCandidatesDeferred = async { runCatching { repository.getHeroCandidates(session.userId) }.getOrDefault(emptyList()) }
                     val comingSoonDeferred = async { runCatching { repository.getCalendarEntries().take(COMING_SOON_LIMIT) }.getOrDefault(emptyList()) }
                     val collectionsDeferred = async { runCatching { repository.getCollections(session.userId) }.getOrDefault(emptyList()) }
+                    val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
 
                     val continueWatching = continueWatchingDeferred.await()
                     val upNext = upNextDeferred.await()
                     val heroCandidates = heroCandidatesDeferred.await()
                     val comingSoon = comingSoonDeferred.await()
                     val collections = collectionsDeferred.await()
+                    val user = userDeferred.await()
 
                     val studioHubs = groupByService(collections).keys.sorted()
+                    val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
 
                     val recommendationSource = RecommendationDataSource(
                         getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
@@ -178,6 +188,7 @@ class HomeViewModel @Inject constructor(
                     _uiState.value = HomeUiState(
                         isLoading = false,
                         heroItem = hero,
+                        greeting = greeting,
                         leadingSections = leadingSections,
                         comingSoon = comingSoon,
                         studioHubs = studioHubs,
