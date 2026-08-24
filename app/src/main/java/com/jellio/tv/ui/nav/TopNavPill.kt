@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -168,8 +169,20 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, isCompact: Bool
         ),
         modifier = Modifier.fillMaxHeight().widthIn(min = PillItemMinWidth),
     ) {
+        // Real bug found live testing on device: this Column only ever
+        // filled its own real height, never its own real width, so a
+        // short label (Home) left the Surface's own real
+        // widthIn(min = PillItemMinWidth) highlight wider than this
+        // Column's own real content, and horizontalAlignment only ever
+        // centers a Column's own children within itself, not the
+        // Column within a wider real parent it never spans. Read live
+        // as the selected pill's own real highlight sitting visibly
+        // off center from its own icon and label. fillMaxSize instead
+        // of fillMaxHeight is the one real change that fixes it: this
+        // Column now spans the Surface's own full real width too, so
+        // horizontalAlignment has a real full width to center within.
         Column(
-            modifier = Modifier.fillMaxHeight().padding(horizontal = 10.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {

@@ -301,6 +301,7 @@ private fun JellioTvApp(
             NowPlayingButton(
                 sessionCount = nowPlayingSessions.size,
                 onClick = { showNowPlayingPanel = !showNowPlayingPanel },
+                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 32.dp),
             )
             if (showNowPlayingPanel) {
@@ -317,6 +318,7 @@ private fun JellioTvApp(
             // this app has none of.
             GroupWatchButton(
                 onClick = { showGroupWatch = true },
+                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 96.dp),
             )
             if (showGroupWatch) {
