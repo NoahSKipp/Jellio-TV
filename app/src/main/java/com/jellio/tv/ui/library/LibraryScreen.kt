@@ -41,12 +41,21 @@ fun LibraryScreen(
             uiState.sections.all { it.items.isEmpty() } -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp)) {
+            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
+                    item {
+                        LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                    }
+                }
                 item {
                     Text(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
+                        modifier = Modifier.padding(
+                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 32.dp else 140.dp,
+                            start = 48.dp,
+                            bottom = 12.dp,
+                        ),
                     )
                 }
                 items(uiState.sections, key = { it.title }) { section ->

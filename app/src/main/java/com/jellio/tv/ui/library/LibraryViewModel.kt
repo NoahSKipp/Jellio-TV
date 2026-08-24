@@ -16,15 +16,17 @@ import javax.inject.Inject
 data class LibraryUiState(
     val isLoading: Boolean = true,
     val title: String = "",
+    val coverflowItems: List<BaseItemDto> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
 )
 
-// Reduced real port of screens/library.js: a main "Recently added" row
-// plus one row per real genre the library actually has enough of
+// Real port of screens/library.js: a coverflow carousel (real random
+// Movie/Series candidates scoped to this library, same real
+// getHeroCandidates() call, below its own real MIN_SLIDES floor the
+// carousel just does not mount) over a main "Recently added" row plus
+// one row per real genre the library actually has enough of
 // (discoverGenres, the same sampled-and-counted approach that file's
-// own runtime/api.js sibling uses), skipping that file's own coverflow
-// carousel for now, a real but separate visual flourish, not the
-// underlying real browse content itself.
+// own runtime/api.js sibling uses).
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -43,6 +45,10 @@ class LibraryViewModel @Inject constructor(
             _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
             val itemType = if (library.CollectionType == "movies") "Movie" else "Series"
 
+            val coverflowItems = runCatching {
+                repository.getHeroCandidates(session.userId, limit = 8, parentId = library.Id)
+            }.getOrDefault(emptyList())
+
             val mainItems = runCatching {
                 repository.getLibraryItems(session.userId, library.Id, limit = 20, includeItemTypes = itemType, sortBy = "DateCreated", sortOrder = "Descending")
             }.getOrDefault(emptyList())
@@ -55,7 +61,12 @@ class LibraryViewModel @Inject constructor(
                 if (items.isNotEmpty()) sections.add(HomeSection(genre, items))
             }
 
-            _uiState.value = LibraryUiState(isLoading = false, title = library.Name ?: "Library", sections = sections)
+            _uiState.value = LibraryUiState(
+                isLoading = false,
+                title = library.Name ?: "Library",
+                coverflowItems = coverflowItems,
+                sections = sections,
+            )
         }
     }
 }
