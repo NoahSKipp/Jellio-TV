@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.library
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,6 +12,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.MaterialTheme
@@ -26,6 +29,7 @@ fun LibraryScreen(
     library: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
+    contentFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -48,7 +52,15 @@ fun LibraryScreen(
             uiState.sections.all { it.items.isEmpty() } && uiState.coverflowItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+            // Real bug found live: D-pad Down from TopNavPill only ever
+            // worked on Home, same real fix TopNavPill's own comment
+            // documents.
+            else -> LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusGroup()
+                    .focusRequester(contentFocusRequester),
+            ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
                         LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge)

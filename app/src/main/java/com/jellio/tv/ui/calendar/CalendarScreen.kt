@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.calendar
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,6 +84,7 @@ private fun kindLabel(entry: CalendarEntryDto): String =
 fun CalendarScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onItemClick: (String) -> Unit,
+    contentFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -109,7 +113,16 @@ fun CalendarScreen(
                     .groupBy { Calendar.getInstance().apply { time = it.first }.let(::dayKey) }
                     .toSortedMap()
 
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp)) {
+                // Real bug found live: D-pad Down from TopNavPill only
+                // ever worked on Home, same real fix TopNavPill's own
+                // comment documents.
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusGroup()
+                        .focusRequester(contentFocusRequester)
+                        .padding(top = 140.dp),
+                ) {
                     item {
                         Text(
                             text = "Calendar",

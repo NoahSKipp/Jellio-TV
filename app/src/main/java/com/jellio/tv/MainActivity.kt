@@ -86,9 +86,11 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
     // Shared with TopNavPill below: the one real D-pad Down landing
-    // spot Home's own content attaches itself to, so the pill has
-    // somewhere real to send focus instead of trapping it.
-    val homeContentFocusRequester = remember { FocusRequester() }
+    // spot every non-immersive screen's own top scrollable container
+    // attaches itself to (only one is ever actually composed at a
+    // time), so the pill has somewhere real to send focus instead of
+    // trapping it, regardless of which one of them is on real screen.
+    val contentFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
 
     fun switchTab(target: JellioRoute) {
@@ -119,7 +121,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 rawImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 serviceLogoUrl = { name -> appViewModel.serviceLogoUrl(session, name) },
-                contentFocusRequester = homeContentFocusRequester,
+                contentFocusRequester = contentFocusRequester,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
@@ -129,17 +131,20 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
+                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Watchlist -> WatchlistScreen(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
+                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Calendar -> CalendarScreen(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onItemClick = onNavigateToDetail,
+                contentFocusRequester = contentFocusRequester,
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Library -> {
@@ -150,6 +155,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                         library = library,
                         imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
+                        contentFocusRequester = contentFocusRequester,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -198,7 +204,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
             TopNavPill(
                 items = JellioNavItems,
                 selected = route,
-                contentFocusRequester = homeContentFocusRequester,
+                contentFocusRequester = contentFocusRequester,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
                     // button: a tap opens the picker rather than
