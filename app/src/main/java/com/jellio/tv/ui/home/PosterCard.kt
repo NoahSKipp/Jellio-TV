@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -153,12 +155,14 @@ fun CardOptionsMenu(
     item: BaseItemDto,
     continueWatching: Boolean = false,
     upNext: Boolean = false,
+    canDelete: Boolean = false,
     onGoToDetails: (() -> Unit)? = null,
     onPlayManually: (() -> Unit)? = null,
     onStartOver: (() -> Unit)? = null,
     onRemoveFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
+    onDeleteItem: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -211,6 +215,78 @@ fun CardOptionsMenu(
                     if (onToggleWatched != null) {
                         CardOptionsMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
                     }
+                    // Real gate components/cardOptionsMenu.js's own
+                    // header documents: canDelete is decided by the
+                    // caller from the signed in user's own real
+                    // Policy.IsAdministrator/EnableContentDeletion,
+                    // fetched once for the whole screen rather than
+                    // per card. Real Remove from Library confirmation
+                    // itself is the caller's own job too
+                    // (RemoveFromLibraryConfirm below), same real two
+                    // step flow that file's own window.confirm() gate
+                    // gives before ever calling deleteItem().
+                    if (canDelete && onDeleteItem != null) {
+                        CardOptionsMenuRow(label = "Remove from Library", onClick = { onDeleteItem(); onDismiss() }, danger = true)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Real port of components/cardOptionsMenu.js's own window.confirm()
+// gate before deleteItem() ever fires: this app has no real
+// blocking confirm dialog to lean on, same shape as CardOptionsMenu
+// itself above (a scrim behind a rounded JellioBgElevated surface)
+// rather than a platform Dialog window, the same real reason that
+// composable's own header gives for rendering at the caller's own
+// screen root instead of a separate window a D-pad has to refocus
+// into.
+@Composable
+fun RemoveFromLibraryConfirm(
+    item: BaseItemDto,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    BackHandler(onBack = onCancel)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onCancel,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 320.dp, max = 420.dp)
+                .background(JellioBgElevated, RoundedCornerShape(16.dp))
+                .padding(24.dp),
+        ) {
+            Text(text = "Remove from Library", color = JellioText)
+            Text(
+                text = "Remove \"${item.Name.orEmpty()}\" from your library? This cannot be undone.",
+                color = JellioText,
+                modifier = Modifier.padding(top = 12.dp, bottom = 20.dp),
+            )
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    onClick = onCancel,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+                ) {
+                    Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                }
+                Surface(
+                    onClick = onConfirm,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioDanger, contentColor = JellioText),
+                    modifier = Modifier.padding(start = 12.dp),
+                ) {
+                    Text(text = "Remove", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         }
