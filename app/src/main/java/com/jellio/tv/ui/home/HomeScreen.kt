@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -69,6 +70,14 @@ fun HomeScreen(
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
     onCompactChange: (Boolean) -> Unit,
+    // Real feedback live: TopNavPill's own tabs stayed reachable while
+    // Customize mode was active, so a reader mid-reorder could jump
+    // straight off this screen (and off the reorder state with it)
+    // with no equivalent to the modal's own scrim BackHandler standing
+    // in the way. MainActivity threads this straight to the pill's own
+    // enabled state, same real reasoning a modal overlay would trap
+    // focus if this screen mounted one instead of toggling in place.
+    onEditModeChange: (Boolean) -> Unit = {},
     onPlayDirect: (String, String?) -> Unit,
     // Real port of components/cardOptionsMenu.js's own "Play manually"
     // (openStreamPicker(item, { forceChoice: true })): built at
@@ -111,6 +120,8 @@ fun HomeScreen(
         viewModel.load(session)
     }
     LaunchedEffect(compact) { onCompactChange(compact) }
+    LaunchedEffect(editMode) { onEditModeChange(editMode) }
+    DisposableEffect(Unit) { onDispose { onEditModeChange(false) } }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {

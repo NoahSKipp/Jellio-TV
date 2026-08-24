@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.nav
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -93,13 +94,28 @@ fun TopNavPill(
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
     isCompact: Boolean = false,
+    // Real feedback live: Home's own Customize mode left every one of
+    // these tabs reachable, so a reader mid-reorder could jump off the
+    // screen (and the reorder state with it) with nothing standing in
+    // the way the same way a modal's own scrim would. MainActivity
+    // threads HomeScreen's own editMode straight through to this.
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     // Real components/mobileNav.js's own scroll-driven compact state,
     // ported the same real 140/160ms pairing that file's own header
     // documents real feedback settling on (a longer duration read as
-    // the whole pill feeling slow again).
-    val pillHeight by animateDpAsState(targetValue = if (isCompact) PillHeightCompact else PillHeight, animationSpec = tween(160), label = "pillHeight")
+    // the whole pill feeling slow again). Real feedback live called
+    // that same 160ms linear tween ugly once seen on an actual TV
+    // panel rather than a phone screen: FastOutSlowInEasing eases in
+    // and out of the shrink instead of snapping through it at a
+    // constant rate, and a longer 240ms window gives that easing
+    // curve room to actually read as smooth rather than rushed.
+    val pillHeight by animateDpAsState(
+        targetValue = if (isCompact) PillHeightCompact else PillHeight,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        label = "pillHeight",
+    )
     // Real bug found live testing on device: cold app start left focus
     // nowhere at all, so the very first D-pad press in any direction
     // fell through to Compose's own generic "pick something" default
@@ -129,6 +145,7 @@ fun TopNavPill(
                     route = route,
                     isSelected = route == selected,
                     isCompact = isCompact,
+                    enabled = enabled,
                     onClick = { onSelect(route) },
                     focusRequester = if (route == selected) initialFocusRequester else null,
                 )
@@ -150,12 +167,18 @@ private fun NavPillItem(
     isSelected: Boolean,
     isCompact: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
 ) {
-    val labelHeight by animateDpAsState(targetValue = if (isCompact) 0.dp else PillLabelHeight, animationSpec = tween(160), label = "navLabelHeight")
+    val labelHeight by animateDpAsState(
+        targetValue = if (isCompact) 0.dp else PillLabelHeight,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        label = "navLabelHeight",
+    )
     Surface(
         selected = isSelected,
         onClick = onClick,
+        enabled = enabled,
         shape = SelectableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
         // Focus scale off: real feedback live was a hugely oversized
         // pill, and this is one of the few tv-material3 defaults that

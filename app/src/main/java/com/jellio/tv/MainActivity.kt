@@ -111,6 +111,12 @@ private fun JellioTvApp(
     // screen starts scrolled to its own top, so the pill should too.
     var navCompact by remember { mutableStateOf(false) }
     LaunchedEffect(route) { navCompact = false }
+    // Real feedback live: TopNavPill's own tabs (and the corner
+    // NowPlaying/GroupWatch buttons beside it) stayed reachable while
+    // HomeScreen's own Customize mode was active, so a reader
+    // mid-reorder could jump straight off with nothing standing in the
+    // way. Threaded down the same real way navCompact already is.
+    var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Real components/nowPlaying.js's own startNowPlaying(): begun once
@@ -168,6 +174,7 @@ private fun JellioTvApp(
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
                 onCompactChange = { navCompact = it },
+                onEditModeChange = { homeEditMode = it },
                 onPlayDirect = onPlayDirect,
                 // Real port of components/cardOptionsMenu.js's own
                 // "Play manually" (openStreamPicker(item,
@@ -265,6 +272,7 @@ private fun JellioTvApp(
                 items = JellioNavItems,
                 selected = route,
                 isCompact = navCompact,
+                enabled = !homeEditMode,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
                     // button: a tap opens the picker rather than
@@ -288,6 +296,7 @@ private fun JellioTvApp(
             NowPlayingButton(
                 sessionCount = nowPlayingSessions.size,
                 onClick = { showNowPlayingPanel = !showNowPlayingPanel },
+                enabled = !homeEditMode,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 32.dp),
             )
             if (showNowPlayingPanel) {
@@ -304,6 +313,7 @@ private fun JellioTvApp(
             // this app has none of.
             GroupWatchButton(
                 onClick = { showGroupWatch = true },
+                enabled = !homeEditMode,
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 96.dp),
             )
             if (showGroupWatch) {
