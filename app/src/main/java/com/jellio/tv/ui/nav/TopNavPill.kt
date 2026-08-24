@@ -17,11 +17,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -96,6 +100,18 @@ fun TopNavPill(
     // documents real feedback settling on (a longer duration read as
     // the whole pill feeling slow again).
     val pillHeight by animateDpAsState(targetValue = if (isCompact) PillHeightCompact else PillHeight, animationSpec = tween(160), label = "pillHeight")
+    // Real bug found live testing on device: cold app start left focus
+    // nowhere at all, so the very first D-pad press in any direction
+    // fell through to Compose's own generic "pick something" default
+    // rather than landing on the already-visually-selected Home entry,
+    // reported live as every first press jumping straight to Profile
+    // regardless of direction. This pill only ever mounts once and
+    // survives every tab switch (MainActivity's own persistent Box),
+    // so a plain LaunchedEffect(Unit) here really does fire exactly
+    // once for this pill's own real lifetime, claiming initial focus
+    // onto whichever entry is already selected on that one real launch.
+    val initialFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { initialFocusRequester.requestFocus() }
     Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -114,6 +130,7 @@ fun TopNavPill(
                     isSelected = route == selected,
                     isCompact = isCompact,
                     onClick = { onSelect(route) },
+                    focusRequester = if (route == selected) initialFocusRequester else null,
                 )
             }
         }
@@ -128,7 +145,13 @@ fun TopNavPill(
 // mirrors that file's own real 3.4em floor, so a short label (Home)
 // gets the same real pill footprint a long one (Watchlist) does.
 @Composable
-private fun NavPillItem(route: JellioRoute, isSelected: Boolean, isCompact: Boolean, onClick: () -> Unit) {
+private fun NavPillItem(
+    route: JellioRoute,
+    isSelected: Boolean,
+    isCompact: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+) {
     val labelHeight by animateDpAsState(targetValue = if (isCompact) 0.dp else PillLabelHeight, animationSpec = tween(160), label = "navLabelHeight")
     Surface(
         selected = isSelected,
@@ -148,7 +171,9 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, isCompact: Bool
             focusedSelectedContainerColor = Color.White.copy(alpha = 0.18f),
             focusedSelectedContentColor = JellioText,
         ),
-        modifier = Modifier.fillMaxHeight(),
+        modifier = Modifier.fillMaxHeight().let {
+            if (focusRequester != null) it.focusRequester(focusRequester) else it
+        },
     ) {
         // Real bug found live testing on device, and the first fix
         // attempted here (Column fillMaxSize instead of fillMaxHeight)

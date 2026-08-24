@@ -13,10 +13,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -31,6 +36,16 @@ import com.jellio.tv.ui.theme.JellioBorder
 // real library. A full screen dismiss scrim plus BackHandler stand in
 // for that file's own outside click/Escape dismissal, the real D-pad
 // equivalent.
+//
+// Real bug found live testing on device: nothing here ever requested
+// initial D-pad focus when this overlay opened, so focus stayed
+// wherever it already was on the screen underneath, still focusable
+// behind this real scrim, every D-pad press moving that underlying
+// screen around instead of this overlay's own three entries. Same
+// real fix GroupWatchOverlay's own header comment already documents:
+// request focus onto the first entry on open, and trap exit so focus
+// can't wander back out into the screen behind the scrim.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryPickerOverlay(
     libraries: List<BaseItemDto>,
@@ -40,7 +55,14 @@ fun LibraryPickerOverlay(
 ) {
     BackHandler(onBack = onDismiss)
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val firstEntryFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(libraries) { firstEntryFocusRequester.requestFocus() }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .focusProperties { exit = { FocusRequester.Cancel } },
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -64,12 +86,14 @@ fun LibraryPickerOverlay(
             if (libraries.isEmpty()) {
                 Text(text = "No libraries yet.", modifier = Modifier.padding(16.dp))
             }
-            libraries.forEach { library ->
+            libraries.forEachIndexed { index, library ->
                 Surface(
                     onClick = { onSelect(library) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().let {
+                        if (index == 0) it.focusRequester(firstEntryFocusRequester) else it
+                    },
                 ) {
                     Text(
                         text = library.Name ?: "Library",

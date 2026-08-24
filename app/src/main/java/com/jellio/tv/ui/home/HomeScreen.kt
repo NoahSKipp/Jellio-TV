@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -150,9 +151,14 @@ fun HomeScreen(
             // nowhere valid to search into here even with a working
             // default entry point waiting on the other side. The same
             // real top clearance every other screen already carries
-            // fixes it, at the real cost of HeroSection no longer
-            // rendering directly behind the pill's own translucent
-            // background.
+            // fixes it.
+            //
+            // Real feedback live called the resulting gap above
+            // HeroSection ugly, cutting the hero off from the pill it
+            // used to render directly behind. See this LazyColumn's own
+            // real graphicsLayer modifier below for the fix that
+            // restores the full-bleed look without giving the clearance
+            // fix back up.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -174,7 +180,22 @@ fun HomeScreen(
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRestorer(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 140.dp)
+                        .focusRestorer()
+                        // Real layout position (what focus search
+                        // actually checks) stays below the pill exactly
+                        // where the padding above put it; this only
+                        // ever shifts where every pixel gets painted,
+                        // back up into that padding's own real space,
+                        // so HeroSection reads full-bleed behind the
+                        // pill again without moving this LazyColumn's
+                        // own real bounds an inch. The one real cost
+                        // lands at the opposite, far less noticeable
+                        // end: an equal real gap at the very bottom of
+                        // this list once scrolled all the way down.
+                        .graphicsLayer { translationY = -140.dp.toPx() },
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real

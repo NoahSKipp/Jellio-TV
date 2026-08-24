@@ -22,6 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -65,8 +68,16 @@ fun ServiceScreen(
     val uiState by viewModel.uiState.collectAsState()
     var filter by remember { mutableStateOf(ALL_FILTER) }
     var rowListTarget by remember { mutableStateOf<ServiceRow?>(null) }
+    // Same real immersive-screen gap DetailScreen's own header comment
+    // documents: no TopNavPill mounts here for a D-pad press to search
+    // Down from, so nothing ever requests focus into this screen
+    // without this.
+    val contentFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(serviceName) { viewModel.load(session, serviceName) }
+    LaunchedEffect(uiState.rows) {
+        if (uiState.rows.isNotEmpty()) contentFocusRequester.requestFocus()
+    }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
@@ -96,7 +107,7 @@ fun ServiceScreen(
                     val filtered = filteredItems(row, filter)
                     if (filtered.isEmpty()) null else row to filtered
                 }
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
                     item { ServiceHero(name = uiState.serviceName, heroItem = uiState.heroItem, imageUrl = imageUrl) }
                     item {
                         ServiceFilterChips(

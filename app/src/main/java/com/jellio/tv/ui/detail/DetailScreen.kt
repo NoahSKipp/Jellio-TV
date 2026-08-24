@@ -43,6 +43,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -142,8 +145,26 @@ fun DetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
-
+    // Real bug found live testing on device: this screen is immersive
+    // (MainActivity's own !route.isImmersive() gate never mounts
+    // TopNavPill here), so there is no existing focus anywhere on the
+    // pill for a D-pad press to search Down from the way every other
+    // screen's own focusRestorer() fix relies on. Nothing had ever
+    // requested focus into this screen at all, so a reader pushing
+    // into a title from a card had no possible interaction once here,
+    // same real root cause class the pill screens already hit.
+    // requestFocus() explicitly on first composition, same real
+    // pattern GroupWatchOverlay's own initialFocusRequester already
+    // uses for the same real "own this screen's own initial focus"
+    // reasoning.
+    val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
+    // Fires once the item actually loads and the LazyColumn below is
+    // really composed, not in the load effect above: requesting focus
+    // before that node exists would silently do nothing.
+    LaunchedEffect(uiState.item) {
+        if (uiState.item != null) contentFocusRequester.requestFocus()
+    }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
@@ -165,7 +186,7 @@ fun DetailScreen(
             }
             uiState.item != null -> {
                 val item = uiState.item!!
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
                     item {
                         DetailHero(
                             session = session,

@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -88,13 +89,34 @@ fun LibraryScreen(
             // own real bounds overlap the currently focused node rather
             // than sitting cleanly below it, so Down from the pill had
             // nowhere valid to search into here regardless of
-            // focusRestorer() waiting on the other side. The coverflow
-            // no longer renders directly behind the pill's own
-            // translucent background as a result, the same real cost
-            // HomeScreen's own hero took for the same real fix.
+            // focusRestorer() waiting on the other side.
+            //
+            // Real feedback live called the resulting gap above the
+            // coverflow ugly, cutting it off from the pill it used to
+            // render directly behind. The graphicsLayer below only ever
+            // applies when a real coverflow is actually the first item
+            // (matching HomeScreen's own real hero fix): it shifts
+            // every pixel this LazyColumn paints back up into the
+            // padding's own real space without moving this LazyColumn's
+            // own real layout bounds (what focus search actually
+            // checks) an inch, so the coverflow reads full-bleed behind
+            // the pill again. The plain title-only case skips this: no
+            // full-bleed content sits behind the pill there to restore,
+            // so shifting would only trade the same real gap for one at
+            // the opposite end for no real visual gain.
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRestorer(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 140.dp)
+                    .focusRestorer()
+                    .let {
+                        if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
+                            it.graphicsLayer { translationY = -140.dp.toPx() }
+                        } else {
+                            it
+                        }
+                    },
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
