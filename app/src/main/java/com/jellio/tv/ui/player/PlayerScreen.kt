@@ -84,6 +84,20 @@ private const val TICKS_PER_MS = 10_000L
 private const val UPNEXT_FALLBACK_TRIGGER_SECONDS = 120
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
+// Real screens/player.js's own PLAYBACK_SPEEDS: the exact same six
+// real options its own speed popover offers, not a guessed range.
+private val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
+
+// Real port of that file's own `speed + 'x'` label: JS number-to-
+// string already drops a whole speed's own trailing .0 for free
+// (1 + 'x' === '1x'), Kotlin's own Float.toString() does not (1f
+// stringifies as "1.0"), so a whole speed is special cased here to
+// match that exact same real label instead.
+private fun formatSpeed(speed: Float): String {
+    val whole = speed.toInt()
+    return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
+}
+
 // Real port of screens/player.js's own shouldShowUpNextNow(), ported
 // from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
 // Credits segment starts the outro, so showing the card there reads as
@@ -220,12 +234,29 @@ private fun PlayerSurface(
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
     var showSubtitleMenu by remember { mutableStateOf(false) }
+    // Not keyed on streamUrl, unlike showResumePrompt/upNextShown
+    // above: a subtitle switch or Start Over rebuilds the real player
+    // (see the player remember(streamUrl) block above), but the reader's
+    // own chosen speed should carry over into it, same real persistence
+    // an HTML5 video element's own playbackRate already gets for free
+    // across a real src reassignment on the web side.
+    var playbackSpeed by remember { mutableStateOf(1f) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
     var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
+
+    // Real port of that file's own persistence: applied to every real
+    // player instance this screen creates, not only the first, so a
+    // subtitle switch or Start Over rebuilding it (the player remember(
+    // streamUrl) block above) keeps the reader's own chosen speed
+    // instead of quietly resetting to 1x.
+    LaunchedEffect(player, playbackSpeed) {
+        player.setPlaybackSpeed(playbackSpeed)
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -327,8 +358,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -345,6 +376,13 @@ private fun PlayerSurface(
                 if (showSubtitleMenu) {
                     if (event.key == Key.Back) {
                         showSubtitleMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (showSpeedMenu) {
+                    if (event.key == Key.Back) {
+                        showSpeedMenu = false
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -421,8 +459,21 @@ private fun PlayerSurface(
                 positionMs = positionMs,
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
+                speedLabel = formatSpeed(playbackSpeed),
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
+                onOpenSpeedMenu = { showSpeedMenu = true },
+            )
+        }
+
+        if (showSpeedMenu) {
+            SpeedMenu(
+                selectedSpeed = playbackSpeed,
+                onSelect = { speed ->
+                    showSpeedMenu = false
+                    playbackSpeed = speed
+                },
+                onDismiss = { showSpeedMenu = false },
             )
         }
 
@@ -489,8 +540,10 @@ private fun PlayerControls(
     positionMs: Long,
     durationMs: Long,
     hasSubtitleTracks: Boolean,
+    speedLabel: String,
     onPlayPause: () -> Unit,
     onOpenSubtitleMenu: () -> Unit,
+    onOpenSpeedMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -500,15 +553,37 @@ private fun PlayerControls(
             }
         }
 
-        if (hasSubtitleTracks) {
+        // Real port of the floating pill's own Speed and Subtitles
+        // buttons: the pill itself lives at the bottom on the web side
+        // (css/app.css's own .jellio-player-pill), but this screen
+        // already established its own top-right corner for the
+        // subtitle button before Speed existed, so Speed joins it there
+        // instead of standing up a second, differently placed real
+        // button just for itself.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp),
+        ) {
             Surface(
-                onClick = onOpenSubtitleMenu,
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp).size(56.dp),
+                onClick = onOpenSpeedMenu,
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f), contentColor = JellioText),
+                modifier = Modifier.height(56.dp),
             ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
+                Box(Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(text = speedLabel)
+                }
+            }
+            if (hasSubtitleTracks) {
+                Surface(
+                    onClick = onOpenSubtitleMenu,
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
+                    }
                 }
             }
         }
@@ -713,6 +788,50 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
                 ) {
                     Text(text = "Start Over", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own speed popover: a real small
+// anchored popover (that file's own .jellio-player-popover, distinct
+// from the subtitle drawer's own full-height panel shape), the exact
+// same six real PLAYBACK_SPEEDS options, the active one highlighted.
+@Composable
+private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 104.dp, end = 48.dp)
+                .width(160.dp)
+                .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                .padding(vertical = 8.dp),
+        ) {
+            PLAYBACK_SPEEDS.forEach { speed ->
+                Surface(
+                    onClick = { onSelect(speed) },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = if (speed == selectedSpeed) Color.White.copy(alpha = 0.18f) else Color.Transparent,
+                        contentColor = JellioText,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = formatSpeed(speed),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                    )
                 }
             }
         }
