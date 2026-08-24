@@ -51,9 +51,10 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // equivalent of that file's own sidebar-anchored button), the real
 // active-session count as a badge rather than a bare icon.
 @Composable
-fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = JellioBgElevated.copy(alpha = 0.96f),
