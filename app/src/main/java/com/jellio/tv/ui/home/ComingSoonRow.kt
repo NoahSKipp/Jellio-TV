@@ -90,11 +90,7 @@ fun ComingSoonRow(
 ) {
     if (entries.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
-        Text(
-            text = "Coming Soon",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
-        )
+        RowTitle(text = "Coming Soon")
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
