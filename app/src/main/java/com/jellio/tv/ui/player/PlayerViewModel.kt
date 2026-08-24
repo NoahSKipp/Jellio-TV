@@ -43,6 +43,18 @@ data class PauseOverlayInfo(
     val overview: String?,
 )
 
+// Real port of screens/player.js's own buildUpNextOverlay() data
+// needs. thumbnailUrl always requested as a real Primary image
+// (getImageUrl(episode.Id, 'Primary', ...) in that file, unconditional
+// even when the tag it carries actually came from ParentThumbImageTag
+// rather than the episode's own ImageTags.Primary), not "fixed" to
+// match the tag's own real source.
+data class UpNextInfo(
+    val itemId: String,
+    val thumbnailUrl: String?,
+    val title: String,
+)
+
 data class PlayerUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
@@ -56,6 +68,7 @@ data class PlayerUiState(
     val selectedSubtitleIndex: Int? = null,
     val isSwitchingSubtitle: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
+    val upNextInfo: UpNextInfo? = null,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -109,10 +122,36 @@ class PlayerViewModel @Inject constructor(
                     subtitleTracks = subtitleTracks,
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
+
+                // Real port of screens/player.js's own real fire-and-
+                // forget getNextEpisode(item).then(...): resolved
+                // alongside real playback rather than blocking it, the
+                // overlay itself only actually shown once
+                // shouldShowUpNextNow's own real timing condition is
+                // met, far later than this.
+                if (item.Type == "Episode") {
+                    viewModelScope.launch {
+                        val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
+                        if (next != null) {
+                            _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
+                        }
+                    }
+                }
             } catch (err: Exception) {
                 _uiState.value = PlayerUiState(isLoading = false, error = err.message ?: "Could not start playback")
             }
         }
+    }
+
+    private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {
+        val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
+        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400) }
+        val title = if (episode.IndexNumber != null && episode.ParentIndexNumber != null) {
+            "S${episode.ParentIndexNumber} E${episode.IndexNumber} · ${episode.Name.orEmpty()}"
+        } else {
+            episode.Name.orEmpty()
+        }
+        return UpNextInfo(itemId = episode.Id, thumbnailUrl = thumbnailUrl, title = title)
     }
 
     // Real port of screens/player.js's own seriesAwareArtworkUrl(): an

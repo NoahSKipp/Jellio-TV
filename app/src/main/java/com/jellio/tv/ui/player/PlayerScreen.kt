@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -75,6 +76,14 @@ private const val SEEK_STEP_MS = 10_000L
 private const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
 private const val CONTROLS_HIDE_DELAY_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
+// Real screens/player.js's own UPNEXT_FALLBACK_TRIGGER_SECONDS/
+// UPNEXT_COUNTDOWN_SECONDS: the fixed-seconds-left fallback rule that
+// file's own shouldShowUpNextNow() runs when Intro Skipper has no real
+// Credits segment for this episode, the only rule this player has any
+// data for yet (that file's own Credits-segment-aware timing needs a
+// real Intro Skipper API call this app has not ported).
+private const val UPNEXT_FALLBACK_TRIGGER_SECONDS = 120
+private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
 // No native jellyfin-web playbackManager to lean on here (screens/
 // player.js's own header explains why the web build needed none
@@ -88,6 +97,7 @@ fun PlayerScreen(
     itemId: String,
     mediaSourceId: String?,
     onBack: () -> Unit,
+    onPlayNext: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
@@ -114,6 +124,7 @@ fun PlayerScreen(
                 subtitleTracks = uiState.subtitleTracks,
                 selectedSubtitleIndex = uiState.selectedSubtitleIndex,
                 pauseInfo = uiState.pauseInfo,
+                upNextInfo = uiState.upNextInfo,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
@@ -126,6 +137,7 @@ fun PlayerScreen(
                     }
                 },
                 onRestart = { viewModel.restart(session) },
+                onPlayNext = onPlayNext,
             )
         }
     }
@@ -141,12 +153,14 @@ private fun PlayerSurface(
     subtitleTracks: List<SubtitleTrackUiState>,
     selectedSubtitleIndex: Int?,
     pauseInfo: PauseOverlayInfo?,
+    upNextInfo: UpNextInfo?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
     onRestart: () -> Unit,
+    onPlayNext: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -193,6 +207,9 @@ private fun PlayerSurface(
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
+    var upNextShown by remember(streamUrl) { mutableStateOf(false) }
+    var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
+    var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -256,8 +273,36 @@ private fun PlayerSurface(
                 }
             }
             positionMs = player.currentPosition
+            // Real port of screens/player.js's own timeupdate-driven
+            // shouldShowUpNextNow() check: the fixed-seconds-left
+            // fallback rule only (see UPNEXT_FALLBACK_TRIGGER_SECONDS's
+            // own comment above), fired at most once per real title,
+            // same real showUpNext() guard that file's own
+            // upNextShown/upNextDismissed pair already enforces.
+            if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
+                val remainingSeconds = (durationMs - positionMs) / 1000.0
+                if (remainingSeconds <= UPNEXT_FALLBACK_TRIGGER_SECONDS) {
+                    upNextShown = true
+                }
+            }
             delay(500)
         }
+    }
+
+    // Real port of screens/player.js's own showUpNext()/
+    // updateUpNextCountdown(): a real 15 second countdown, playing the
+    // next real episode itself once it reaches zero, cancelled by this
+    // LaunchedEffect's own key changing (upNextShown flips back to
+    // false only via a fresh streamUrl, matching that file's own
+    // window.clearInterval calls on playNextEpisode/hideUpNext).
+    LaunchedEffect(upNextShown) {
+        if (!upNextShown) return@LaunchedEffect
+        upNextCountdown = UPNEXT_COUNTDOWN_SECONDS
+        while (upNextCountdown > 0) {
+            delay(1000)
+            upNextCountdown -= 1
+        }
+        upNextInfo?.let { onPlayNext(it.itemId) }
     }
 
     LaunchedEffect(player) {
@@ -365,6 +410,16 @@ private fun PlayerSurface(
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
+            )
+        }
+
+        if (upNextInfo != null && upNextShown && !upNextDismissed) {
+            UpNextOverlay(
+                info = upNextInfo,
+                secondsRemaining = upNextCountdown,
+                onPlayNow = { onPlayNext(upNextInfo.itemId) },
+                onDismiss = { upNextDismissed = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
             )
         }
 
@@ -513,6 +568,63 @@ private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) 
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp),
                 )
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own buildUpNextOverlay(): a real
+// thumbnail and episode label over a real Play now/Dismiss pair, the
+// countdown baked directly into the Play now label the same way that
+// file's own updateUpNextCountdown() rewrites its button's own
+// textContent every second instead of a separate counter element.
+@Composable
+private fun UpNextOverlay(
+    info: UpNextInfo,
+    secondsRemaining: Int,
+    onPlayNow: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .widthIn(max = 420.dp)
+            .background(JellioBgElevated, RoundedCornerShape(16.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (info.thumbnailUrl != null) {
+            AsyncImage(
+                model = info.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.width(112.dp).height(63.dp).clip(RoundedCornerShape(8.dp)),
+            )
+        }
+        Column(modifier = Modifier.padding(start = 16.dp)) {
+            Text(text = "Next Episode", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
+            Text(
+                text = info.title,
+                color = JellioText,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    onClick = onPlayNow,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioText),
+                ) {
+                    Text(text = "Play now ($secondsRemaining)", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                }
+                Surface(
+                    onClick = onDismiss,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+                ) {
+                    Text(text = "Dismiss", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                }
             }
         }
     }

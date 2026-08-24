@@ -210,6 +210,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 itemId = current.itemId,
                 mediaSourceId = current.mediaSourceId,
                 onBack = { routeStack = routeStack.dropLast(1) },
+                onPlayNext = { nextItemId -> onPlayDirect(nextItemId, null) },
                 modifier = Modifier.fillMaxSize(),
             )
         }

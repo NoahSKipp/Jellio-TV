@@ -503,6 +503,27 @@ class JellioRepository @Inject constructor(
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
 
+    // Real port of runtime/api.js's own getNextEpisode(): the next real
+    // episode in this same season if this one is not the season's own
+    // last, otherwise season one's own first episode of the next real
+    // season, null past the series finale, same real fallback that
+    // file's own comment documents.
+    suspend fun getNextEpisode(userId: String, item: BaseItemDto): BaseItemDto? {
+        if (item.Type != "Episode") return null
+        val seriesId = item.SeriesId ?: return null
+        val seasonId = item.SeasonId
+        if (seasonId != null) {
+            val episodes = getEpisodes(seriesId, userId, seasonId)
+            val index = episodes.indexOfFirst { it.Id == item.Id }
+            if (index != -1 && index + 1 < episodes.size) return episodes[index + 1]
+        }
+        val seasons = getSeasons(seriesId, userId)
+        val seasonIndex = seasons.indexOfFirst { it.Id == seasonId }
+        val nextSeason = if (seasonIndex != -1) seasons.getOrNull(seasonIndex + 1) else null
+        nextSeason ?: return null
+        return getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull()
+    }
+
     // A series' own hero Play button (screens/detail.js's own
     // resolveSeriesPlayTarget()): the next real unfinished episode if
     // one exists, otherwise season one's own first episode, a real
