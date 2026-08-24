@@ -48,6 +48,7 @@ fun HomeScreen(
     val listState = rememberLazyListState()
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     var cardMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
+    var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
 
     LaunchedEffect(session.userId) {
         viewModel.load(session)
@@ -96,7 +97,12 @@ fun HomeScreen(
                     }
                 }
                 items(uiState.leadingSections, key = { it.title }) { section ->
-                    LandscapeRow(section = section, rawImageUrl = rawImageUrl, onItemClick = onItemClick)
+                    LandscapeRow(
+                        section = section,
+                        rawImageUrl = rawImageUrl,
+                        onItemClick = onItemClick,
+                        onTitleClick = { rowListTarget = section },
+                    )
                 }
                 item {
                     ComingSoonRow(entries = uiState.comingSoon, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
@@ -110,6 +116,7 @@ fun HomeScreen(
                         imageUrl = imageUrl,
                         onItemClick = onItemClick,
                         onItemOptions = { cardMenuTarget = it },
+                        onTitleClick = { rowListTarget = section },
                     )
                 }
             }
@@ -125,6 +132,16 @@ fun HomeScreen(
                 onToggleWatchlist = { viewModel.toggleWatchlist(session, target) },
                 onToggleWatched = { viewModel.toggleWatched(session, target) },
                 onDismiss = { cardMenuTarget = null },
+            )
+        }
+
+        rowListTarget?.let { section ->
+            RowListModal(
+                title = section.title,
+                items = section.items,
+                imageUrl = imageUrl,
+                onItemClick = onItemClick,
+                onDismiss = { rowListTarget = null },
             )
         }
     }
