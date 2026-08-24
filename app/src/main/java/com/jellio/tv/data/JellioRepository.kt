@@ -192,14 +192,15 @@ class JellioRepository @Inject constructor(
     // the first place, same real reasoning as the fix itself rather
     // than a patch bolted onto whatever a Continue Watching item
     // happened to be.
-    suspend fun getHeroCandidates(userId: String, limit: Int = 8): List<BaseItemDto> =
+    suspend fun getHeroCandidates(userId: String, limit: Int = 8, parentId: String? = null): List<BaseItemDto> =
         api.getItems(
             userId = userId,
+            parentId = parentId,
             includeItemTypes = "Movie,Series",
             recursive = true,
             limit = limit,
             sortBy = "Random",
-            fields = ITEM_FIELDS,
+            fields = "$ITEM_FIELDS,Genres",
         ).Items
 
     suspend fun getLibraryItems(
