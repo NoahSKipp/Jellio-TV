@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -91,32 +90,23 @@ fun LibraryScreen(
             // nowhere valid to search into here regardless of
             // focusRestorer() waiting on the other side.
             //
-            // Real feedback live called the resulting gap above the
-            // coverflow ugly, cutting it off from the pill it used to
-            // render directly behind. The graphicsLayer below only ever
-            // applies when a real coverflow is actually the first item
-            // (matching HomeScreen's own real hero fix): it shifts
-            // every pixel this LazyColumn paints back up into the
-            // padding's own real space without moving this LazyColumn's
-            // own real layout bounds (what focus search actually
-            // checks) an inch, so the coverflow reads full-bleed behind
-            // the pill again. The plain title-only case skips this: no
-            // full-bleed content sits behind the pill there to restore,
-            // so shifting would only trade the same real gap for one at
-            // the opposite end for no real visual gain.
+            // Real feedback live: a graphicsLayer offset was tried
+            // here to draw the coverflow back up into that same
+            // clearance without moving this LazyColumn's own real
+            // layout bounds, on the theory that focus search only
+            // checks layout, not paint position. Real bug found live
+            // testing on device: wrong theory, confirmed by two real
+            // regressions landing together (Down dead again, and real
+            // content clipped off at the bottom) the moment that
+            // shift shipped. Reverted; the clearance's own real gap
+            // stays as a known, accepted cost until a real fix is
+            // found that does not regress Down again.
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 140.dp)
-                    .focusRestorer()
-                    .let {
-                        if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
-                            it.graphicsLayer { translationY = -140.dp.toPx() }
-                        } else {
-                            it
-                        }
-                    },
+                    .focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
