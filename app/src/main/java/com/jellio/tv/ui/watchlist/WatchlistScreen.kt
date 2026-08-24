@@ -1,6 +1,5 @@
 package com.jellio.tv.ui.watchlist
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -60,7 +59,6 @@ fun WatchlistScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .focusGroup()
                     .padding(top = 140.dp),
             ) {
                 item {

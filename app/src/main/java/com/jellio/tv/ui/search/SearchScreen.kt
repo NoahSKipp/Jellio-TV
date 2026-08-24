@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -58,7 +57,6 @@ fun SearchScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .focusGroup()
             .padding(top = 140.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Search", style = MaterialTheme.typography.titleLarge)
