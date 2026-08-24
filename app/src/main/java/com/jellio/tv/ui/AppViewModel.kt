@@ -99,4 +99,12 @@ class AppViewModel @Inject constructor(
     suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
         if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
     }
+
+    // StreamPickerOverlay's own real Resume button, streamPicker.js's
+    // own resumeTicks handler: picks this exact real remembered source
+    // when the picker still offers it, the same real readRememberedSources()
+    // lookup that function makes, regardless of whether the "remember
+    // my stream" preference is even still on (a remembered choice
+    // already made stays honoured here even if turned off since).
+    suspend fun rememberedMediaSourceId(itemId: String): String? = streamPreferences.rememberedMediaSourceId(itemId)
 }
