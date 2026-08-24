@@ -9,6 +9,8 @@ import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
+import com.jellio.tv.data.model.UserConfigurationDto
+import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -31,6 +33,18 @@ interface JellyfinApi {
         @Header("X-Emby-Authorization") authHeader: String,
         @Body body: AuthenticateByNameRequest,
     ): AuthenticationResultDto
+
+    @GET("Users/{userId}")
+    suspend fun getUser(@Path("userId") userId: String): UserDto
+
+    // Real endpoint, POST /Users/{id}/Configuration (UserController.cs's
+    // own UpdateUserConfiguration): replaces the whole real
+    // UserConfiguration object, not a single field patch.
+    @POST("Users/{userId}/Configuration")
+    suspend fun updateUserConfiguration(
+        @Path("userId") userId: String,
+        @Body body: UserConfigurationDto,
+    )
 
     @GET("Users/{userId}/Views")
     suspend fun getUserViews(@Path("userId") userId: String): ItemsResultDto
