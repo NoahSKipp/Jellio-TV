@@ -3,6 +3,7 @@ package com.jellio.tv.ui.home
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -14,7 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
@@ -75,6 +78,19 @@ fun HomeScreen(
                     .focusRequester(contentFocusRequester),
             ) {
                 item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
+                // Real screens/home.js's own jellio-home-greeting: real
+                // feedback found "Welcome back" read as a placeholder
+                // the moment it was ever anything else, a real
+                // time-of-day/name greeting instead.
+                if (uiState.greeting.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = uiState.greeting,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 8.dp),
+                        )
+                    }
+                }
                 items(uiState.leadingSections, key = { it.title }) { section ->
                     PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
                 }
