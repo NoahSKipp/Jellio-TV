@@ -21,6 +21,7 @@ data class SearchUiState(
     val isSearching: Boolean = false,
     val results: List<BaseItemDto> = emptyList(),
     val hasSearched: Boolean = false,
+    val error: String? = null,
 )
 
 // Mirrors runtime/api.js's own searchItems(): the real /Users/{id}/Items
@@ -41,15 +42,32 @@ class SearchViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(query = query)
         searchJob?.cancel()
         if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false)
+            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null)
             return
         }
         searchJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true)
+            _uiState.value = _uiState.value.copy(isSearching = true, error = null)
             delay(DEBOUNCE_MS)
-            val results = runCatching { repository.searchItems(session.userId, query) }.getOrDefault(emptyList())
-            if (_uiState.value.query == query) {
-                _uiState.value = _uiState.value.copy(results = results, isSearching = false, hasSearched = true)
+            // screens/search.js's own header comment documents the real
+            // bug this fixes: a failed request must not "look identical
+            // to search doing nothing", real feedback reported live
+            // against exactly that. A caught failure now surfaces its
+            // own distinct real message rather than folding into the
+            // same "No results" state a genuine empty search leaves.
+            try {
+                val results = repository.searchItems(session.userId, query)
+                if (_uiState.value.query == query) {
+                    _uiState.value = _uiState.value.copy(results = results, isSearching = false, hasSearched = true, error = null)
+                }
+            } catch (err: Exception) {
+                if (_uiState.value.query == query) {
+                    _uiState.value = _uiState.value.copy(
+                        results = emptyList(),
+                        isSearching = false,
+                        hasSearched = true,
+                        error = "Could not load search results. Check your connection and try again.",
+                    )
+                }
             }
         }
     }
