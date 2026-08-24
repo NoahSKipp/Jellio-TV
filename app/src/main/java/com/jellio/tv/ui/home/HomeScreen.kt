@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,13 +125,18 @@ fun HomeScreen(
                     Text(text = "Nothing here yet.", color = JellioTextSecondary)
                 }
             }
-            // Explicit down escape from TopNavPill lands here
-            // (TopNavPill's own focusProperties override), same real
-            // gap real feedback caught live: plain Compose Foundation
-            // LazyColumn/LazyRow, unlike tv-foundation's own
-            // TvLazyColumn/TvLazyRow, advertise no default D-pad entry
-            // point of their own for a system that has never yet
-            // focused anything inside them.
+            // Real gap real feedback caught live across several rounds:
+            // plain Compose Foundation LazyColumn/LazyRow, unlike
+            // tv-foundation's own TvLazyColumn/TvLazyRow, advertise no
+            // default D-pad entry point of their own for a system that
+            // has never yet focused anything inside them, so pressing
+            // Down from TopNavPill (a plain, non-lazy layout, which
+            // Compose's own default focus search enters without
+            // trouble) had nothing to land on here. focusRestorer()
+            // below is Compose's own real fix for exactly this gap:
+            // finds a sensible default child to enter on first arrival,
+            // then remembers and restores the last focused child on
+            // every return trip after that.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -152,7 +158,7 @@ fun HomeScreen(
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().focusRestorer(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real
