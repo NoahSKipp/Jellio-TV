@@ -142,6 +142,7 @@ fun HomeScreen(
                 imageUrl = imageUrl,
                 onItemClick = onItemClick,
                 onDismiss = { rowListTarget = null },
+                fetchAll = section.fetchAll,
             )
         }
     }

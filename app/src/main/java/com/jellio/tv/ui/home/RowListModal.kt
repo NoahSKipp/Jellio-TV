@@ -22,7 +22,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,11 +55,16 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // the calling screen at its own root the same real reason
 // CardOptionsMenu/EpisodeOptionsMenu already are.
 //
-// Real web's own fetchAll (a second, unbounded real network request
-// swapping in a row's own full depth past its ROW_LIMIT once it lands)
-// is not ported here yet: this shows exactly what the row itself
-// already has loaded, real value on its own for every row already
-// pulling 24 real items, deferred rather than guessed at.
+// fetchAll mirrors that file's own options.fetchAll: a second,
+// unbounded real request for this exact same row, swapped in only once
+// it lands and only if it actually turned up more than the row's own
+// already-loaded depth, same real guard that file's own
+// `if (fullItems && fullItems.length > items.length) renderList(fullItems)`
+// applies. Real web's own stale-reopen guard (a bumped openToken) has
+// no Kotlin equivalent needed here: this composable's own
+// LaunchedEffect is keyed on items, so Compose's own structured
+// concurrency already cancels a still-resolving fetchAll from the
+// previous row the instant a different row's own items replace it.
 @Composable
 fun RowListModal(
     title: String,
@@ -63,8 +72,19 @@ fun RowListModal(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     onDismiss: () -> Unit,
+    fetchAll: (suspend () -> List<BaseItemDto>)? = null,
 ) {
     BackHandler(onBack = onDismiss)
+    var displayedItems by remember(items) { mutableStateOf(items) }
+    var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null) }
+    LaunchedEffect(items, fetchAll) {
+        if (fetchAll == null) return@LaunchedEffect
+        val fullItems = runCatching { fetchAll() }.getOrNull()
+        isLoadingRest = false
+        if (fullItems != null && fullItems.size > items.size) {
+            displayedItems = fullItems
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -107,7 +127,7 @@ fun RowListModal(
                 }
             }
             LazyColumn(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                items(items, key = { it.Id }) { item ->
+                items(displayedItems, key = { it.Id }) { item ->
                     RowListItem(
                         item = item,
                         imageUrl = imageUrl,
@@ -117,6 +137,14 @@ fun RowListModal(
                         },
                     )
                 }
+            }
+            if (isLoadingRest) {
+                Text(
+                    text = "Loading the rest…",
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
+                )
             }
         }
     }
