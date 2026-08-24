@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,8 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -34,6 +37,9 @@ import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.TopNavPill
 import com.jellio.tv.ui.nav.isImmersive
+import com.jellio.tv.ui.nowplaying.NowPlayingButton
+import com.jellio.tv.ui.nowplaying.NowPlayingPanel
+import com.jellio.tv.ui.nowplaying.NowPlayingViewModel
 import com.jellio.tv.ui.person.PersonScreen
 import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
@@ -74,7 +80,11 @@ private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
+private fun JellioTvApp(
+    session: Session,
+    appViewModel: AppViewModel,
+    nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
+) {
     // A plain real back stack rather than Navigation Compose: the
     // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
     // switching tabs does not stack), Detail/Player push onto it
@@ -101,6 +111,16 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     var navCompact by remember { mutableStateOf(false) }
     LaunchedEffect(route) { navCompact = false }
     val scope = rememberCoroutineScope()
+
+    // Real components/nowPlaying.js's own startNowPlaying(): begun once
+    // a real session is confirmed signed in (JellioTvApp is only ever
+    // composed once AuthState.LoggedIn, matching that file's own real
+    // "called from app.js's own sync() once authenticated" reasoning),
+    // NowPlayingViewModel's own start() guarding against a second real
+    // poll loop if this composable recomposes.
+    LaunchedEffect(Unit) { nowPlayingViewModel.start() }
+    val nowPlayingSessions by nowPlayingViewModel.sessions.collectAsState()
+    var showNowPlayingPanel by remember { mutableStateOf(false) }
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -234,6 +254,26 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            // Real components/nowPlaying.js's own trigger button: this
+            // app's own TopNavPill has no sidebar of its own to anchor
+            // it to (mirrors mobileNav.js's floating pill instead, see
+            // JellioRoute.kt's own header comment), so it sits as its
+            // own real corner button alongside the pill instead,
+            // reachable from every same non-immersive screen the real
+            // sidebar version would have been.
+            NowPlayingButton(
+                sessionCount = nowPlayingSessions.size,
+                onClick = { showNowPlayingPanel = !showNowPlayingPanel },
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 32.dp),
+            )
+            if (showNowPlayingPanel) {
+                NowPlayingPanel(
+                    sessions = nowPlayingSessions,
+                    imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                    onDismiss = { showNowPlayingPanel = false },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (showLibraryPicker) {
                 LibraryPickerOverlay(
                     // Already the real curated nav set (Movies/Shows/Anime,

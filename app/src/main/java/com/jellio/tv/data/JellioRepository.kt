@@ -5,6 +5,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -582,6 +583,12 @@ class JellioRepository @Inject constructor(
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+
+    // Real port of runtime/api.js's own getNowPlayingSessions(): a
+    // plain passthrough, same as getCalendarEntries above, the polling
+    // loop's own caller decides what a failed request means rather
+    // than this method swallowing it.
+    suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto> = api.getNowPlayingSessions()
 
     suspend fun getUser(userId: String): UserDto = api.getUser(userId)
 
