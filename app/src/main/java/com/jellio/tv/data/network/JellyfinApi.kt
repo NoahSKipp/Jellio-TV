@@ -6,6 +6,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.ItemsResultDto
+import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -151,6 +152,13 @@ interface JellyfinApi {
 
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
+
+    // Real Controllers/NowPlayingController.cs endpoint: every real
+    // active session on the server with a real NowPlayingItem, backed
+    // by ISessionManager server side rather than a cron plus static
+    // file the way a plugin-less community script would need.
+    @GET("Jellio/now-playing")
+    suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto>
 
     // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
     // }, confirmed against jellyfin-apiclient-javascript's own
