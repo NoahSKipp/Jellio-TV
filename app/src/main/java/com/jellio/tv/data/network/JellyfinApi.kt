@@ -186,6 +186,15 @@ interface JellyfinApi {
     @DELETE("Users/{userId}/Items/{itemId}/Rating")
     suspend fun clearRating(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
+    // Real ItemsController.cs own DeleteItem, the same one
+    // runtime/api.js's own deleteItem() calls: removes the item's own
+    // record outright, not a per-user hide, gated server side on the
+    // real signed in user's own Policy.IsAdministrator/
+    // EnableContentDeletion, not something this app duplicates client
+    // side beyond deciding whether to even show the option.
+    @DELETE("Items/{itemId}")
+    suspend fun deleteItem(@Path("itemId") itemId: String)
+
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
 

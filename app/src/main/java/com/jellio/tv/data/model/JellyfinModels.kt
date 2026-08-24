@@ -38,10 +38,14 @@ data class UserDto(
 // Real Jellyfin UserDto.Policy shape: IsAdministrator is the one real
 // gate every native admin link already uses, confirmed against
 // screens/settings.js's own real user.Policy.IsAdministrator check
-// before porting this.
+// before porting this. EnableContentDeletion alongside it, the same
+// real second half of the gate components/cardOptionsMenu.js's own
+// Remove from Library option checks: a non-admin user can still carry
+// this real permission on their own account.
 @JsonClass(generateAdapter = true)
 data class UserPolicyDto(
     val IsAdministrator: Boolean = false,
+    val EnableContentDeletion: Boolean = false,
 )
 
 // Real fields screens/settings.js's own Language section reads/writes,
