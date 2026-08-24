@@ -18,8 +18,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,7 +84,6 @@ private fun kindLabel(entry: CalendarEntryDto): String =
 fun CalendarScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onItemClick: (String) -> Unit,
-    contentFocusRequester: FocusRequester,
     onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
@@ -119,15 +116,11 @@ fun CalendarScreen(
                     .groupBy { Calendar.getInstance().apply { time = it.first }.let(::dayKey) }
                     .toSortedMap()
 
-                // Real bug found live: D-pad Down from TopNavPill only
-                // ever worked on Home, same real fix TopNavPill's own
-                // comment documents.
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .focusGroup()
-                        .focusRequester(contentFocusRequester)
                         .padding(top = 140.dp),
                 ) {
                     item {

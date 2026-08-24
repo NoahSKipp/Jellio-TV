@@ -30,8 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,7 +65,6 @@ fun HomeScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     rawImageUrl: (String, String?, String, Int) -> String,
     serviceLogoUrl: (String) -> String,
-    contentFocusRequester: FocusRequester,
     onItemClick: (BaseItemDto) -> Unit,
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
@@ -158,8 +155,7 @@ fun HomeScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .focusGroup()
-                        .focusRequester(contentFocusRequester),
+                        .focusGroup(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real

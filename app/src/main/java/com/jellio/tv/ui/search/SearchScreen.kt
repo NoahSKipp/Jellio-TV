@@ -19,8 +19,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.MaterialTheme
@@ -41,7 +39,6 @@ fun SearchScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
-    contentFocusRequester: FocusRequester,
     onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = hiltViewModel(),
@@ -58,15 +55,10 @@ fun SearchScreen(
         onDeleteItem = { viewModel.deleteItem(it) },
     )
 
-    // Real bug found live: D-pad Down from TopNavPill only ever worked
-    // on Home, since only Home's own content attached itself to the
-    // pill's shared real focus target, same real fix TopNavPill's own
-    // comment documents.
     Column(
         modifier = modifier
             .fillMaxSize()
             .focusGroup()
-            .focusRequester(contentFocusRequester)
             .padding(top = 140.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Search", style = MaterialTheme.typography.titleLarge)

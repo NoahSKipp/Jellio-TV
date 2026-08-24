@@ -22,8 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -90,7 +88,6 @@ fun TopNavPill(
     items: List<JellioRoute>,
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
-    contentFocusRequester: FocusRequester,
     isCompact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -109,22 +106,7 @@ fun TopNavPill(
                 .widthIn(max = PillMaxWidth)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
-                // Real feedback live: D-pad Down from here went nowhere,
-                // the system saw nothing focusable below to land on.
-                // Real bug found live a second time: this only ever
-                // applied for Home, since only HomeScreen's own
-                // LazyColumn attached itself to contentFocusRequester,
-                // so Down went nowhere on every other non-immersive
-                // screen (Search/Watchlist/Calendar/Library) instead,
-                // reported live as "scrolling only works on Home".
-                // Unconditional now: exactly one non-immersive screen is
-                // ever composed at a time (this pill itself only renders
-                // for those, see MainActivity's own !route.isImmersive()
-                // gate), and every one of them now attaches its own top
-                // scrollable container to this exact same shared
-                // requester, same real pattern HomeScreen already used.
-                .focusProperties { down = contentFocusRequester },
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp)),
         ) {
             lazyItems(items, key = { it::class.simpleName ?: it.toString() }) { route ->
                 NavPillItem(

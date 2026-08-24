@@ -12,8 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.MaterialTheme
@@ -33,7 +31,6 @@ fun WatchlistScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
-    contentFocusRequester: FocusRequester,
     onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WatchlistViewModel = hiltViewModel(),
@@ -59,15 +56,11 @@ fun WatchlistScreen(
             uiState.movies.isEmpty() && uiState.series.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing on your Watchlist yet.", color = JellioTextSecondary)
             }
-            // Real bug found live: D-pad Down from TopNavPill only ever
-            // worked on Home, same real fix TopNavPill's own comment
-            // documents.
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .focusGroup()
-                    .focusRequester(contentFocusRequester)
                     .padding(top = 140.dp),
             ) {
                 item {

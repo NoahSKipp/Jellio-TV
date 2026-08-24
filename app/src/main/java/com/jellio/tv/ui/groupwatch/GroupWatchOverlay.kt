@@ -61,13 +61,8 @@ private fun groupSubtitle(group: SyncPlayGroupDto): String =
 // same real corner-button substitution, see MainActivity.kt's own
 // header comment above where this is placed), same real "groups"
 // Material icon that button uses.
-//
-// contentFocusRequester: same real fix NowPlayingButton's own header
-// documents, this button sat in its own separate top-right corner
-// outside TopNavPill's own LazyRow, so it never inherited that fix
-// either.
 @Composable
-fun GroupWatchButton(onClick: () -> Unit, contentFocusRequester: FocusRequester, modifier: Modifier = Modifier) {
+fun GroupWatchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
@@ -75,7 +70,7 @@ fun GroupWatchButton(onClick: () -> Unit, contentFocusRequester: FocusRequester,
             containerColor = JellioBgElevated.copy(alpha = 0.96f),
             contentColor = JellioText,
         ),
-        modifier = modifier.size(52.dp).focusProperties { down = contentFocusRequester },
+        modifier = modifier.size(52.dp),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(imageVector = Icons.Filled.Groups, contentDescription = "Group Watch", modifier = Modifier.size(22.dp))
