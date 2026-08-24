@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.nav
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,9 +17,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
@@ -43,6 +47,18 @@ private val PillItemMinWidth = 76.dp
 // is the one change guaranteed to hold regardless of which of those
 // was actually responsible.
 private val PillHeight = 88.dp
+
+// Real css/app.css's own real comment on .jellio-mobile-nav-label:
+// collapsing the label's own height is what actually reshapes the
+// real pill, no separate rule on the pill itself needed there since
+// each real link lays out icon over label in a column and the pill is
+// only ever as tall as its own tallest child. This app's own pill
+// height is a real fixed clamp instead (PillHeight's own header
+// explains the real bug that forced that), so the compact height
+// below is a second real fixed value animated to rather than left to
+// reflow on its own.
+private val PillHeightCompact = 68.dp
+private val PillLabelHeight = 20.dp
 
 // css/app.css's own real max-width: calc(100vw - 2 * safe gutter) on
 // .jellio-mobile-nav, ported as a real fixed clamp: a TV screen is
@@ -75,15 +91,21 @@ fun TopNavPill(
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
     contentFocusRequester: FocusRequester,
+    isCompact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    // Real components/mobileNav.js's own scroll-driven compact state,
+    // ported the same real 140/160ms pairing that file's own header
+    // documents real feedback settling on (a longer duration read as
+    // the whole pill feeling slow again).
+    val pillHeight by animateDpAsState(targetValue = if (isCompact) PillHeightCompact else PillHeight, animationSpec = tween(160), label = "pillHeight")
     Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             contentPadding = PaddingValues(horizontal = 10.dp),
             modifier = Modifier
                 .padding(top = 32.dp)
-                .height(PillHeight)
+                .height(pillHeight)
                 .widthIn(max = PillMaxWidth)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
@@ -108,6 +130,7 @@ fun TopNavPill(
                 NavPillItem(
                     route = route,
                     isSelected = route == selected,
+                    isCompact = isCompact,
                     onClick = { onSelect(route) },
                 )
             }
@@ -123,7 +146,8 @@ fun TopNavPill(
 // mirrors that file's own real 3.4em floor, so a short label (Home)
 // gets the same real pill footprint a long one (Watchlist) does.
 @Composable
-private fun NavPillItem(route: JellioRoute, isSelected: Boolean, onClick: () -> Unit) {
+private fun NavPillItem(route: JellioRoute, isSelected: Boolean, isCompact: Boolean, onClick: () -> Unit) {
+    val labelHeight by animateDpAsState(targetValue = if (isCompact) 0.dp else PillLabelHeight, animationSpec = tween(160), label = "navLabelHeight")
     Surface(
         selected = isSelected,
         onClick = onClick,
@@ -155,12 +179,14 @@ private fun NavPillItem(route: JellioRoute, isSelected: Boolean, onClick: () -> 
                 tint = LocalContentColor.current,
                 modifier = Modifier.size(PillIconSize),
             )
-            Text(
-                text = route.label(),
-                color = LocalContentColor.current,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            Box(modifier = Modifier.height(labelHeight).clipToBounds()) {
+                Text(
+                    text = route.label(),
+                    color = LocalContentColor.current,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }

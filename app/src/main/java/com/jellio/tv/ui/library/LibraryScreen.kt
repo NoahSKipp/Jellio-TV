@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,6 +22,7 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.PosterRow
+import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 @Composable
@@ -30,16 +32,20 @@ fun LibraryScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     contentFocusRequester: FocusRequester,
+    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
 
     // Keyed on both real Id and Name: getLibraryNavEntries()'s own
     // synthetic Anime stand-in shares the plain Shows library's exact
     // real Id (Anime has no library of its own), Id alone would never
     // notice a picker tap swapping between the two.
     LaunchedEffect(library.Id, library.Name) { viewModel.load(session, library) }
+    LaunchedEffect(compact) { onCompactChange(compact) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -56,6 +62,7 @@ fun LibraryScreen(
             // worked on Home, same real fix TopNavPill's own comment
             // documents.
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .focusGroup()

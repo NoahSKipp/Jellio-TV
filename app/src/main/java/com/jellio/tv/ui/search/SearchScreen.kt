@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -27,6 +29,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.PosterCard
 import com.jellio.tv.ui.common.JellioTextField
+import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors screens/search.js's own real live-search shape: a query box
@@ -38,10 +41,14 @@ fun SearchScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     contentFocusRequester: FocusRequester,
+    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val gridState = rememberLazyGridState()
+    val compact = rememberNavCompact(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+    LaunchedEffect(compact) { onCompactChange(compact) }
 
     // Real bug found live: D-pad Down from TopNavPill only ever worked
     // on Home, since only Home's own content attached itself to the
@@ -73,6 +80,7 @@ fun SearchScreen(
                 Text(text = "No results for \"${uiState.query}\"", color = JellioTextSecondary)
             }
             uiState.results.isNotEmpty() -> LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Adaptive(minSize = 170.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
