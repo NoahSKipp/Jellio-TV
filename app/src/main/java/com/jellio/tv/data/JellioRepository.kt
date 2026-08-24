@@ -279,8 +279,12 @@ class JellioRepository @Inject constructor(
     // mirrors runtime/api.js's own discoverGenres(): counted off a
     // random sample of the library, not every genre Jellyfin has ever
     // heard of, dropped below a real minimum count so a genre row is
-    // never built with nothing worth scrolling behind it.
-    suspend fun discoverGenres(userId: String, parentId: String, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
+    // never built with nothing worth scrolling behind it, the real
+    // remaining ones led by real count rather than left in whatever
+    // order a Kotlin Map happens to iterate (a real bug found rereading
+    // that file directly: the count itself was never actually sorted
+    // on before this).
+    suspend fun discoverGenres(userId: String, parentId: String?, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
         val sample = api.getItems(
             userId = userId,
             parentId = parentId,
@@ -294,7 +298,10 @@ class JellioRepository @Inject constructor(
         sample.forEach { item ->
             item.Genres?.forEach { genre -> counts[genre] = (counts[genre] ?: 0) + 1 }
         }
-        return counts.filterValues { it >= minCount }.keys.take(limit).toList()
+        return counts.filterValues { it >= minCount }
+            .entries.sortedByDescending { it.value }
+            .map { it.key }
+            .take(limit)
     }
 
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =

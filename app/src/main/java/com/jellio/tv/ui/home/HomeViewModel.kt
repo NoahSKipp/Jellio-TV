@@ -45,6 +45,9 @@ private const val MIN_CATALOG_ITEMS = 3
 // page again in the wrong place.
 private const val MAX_ANIME_CATALOG_ROWS = 1
 
+private const val GENRE_ROWS = 4
+private const val GENRE_ROW_LIMIT = 24
+
 // Catalogs worth leading with, in this order. Anything unlisted keeps
 // its own alphabetical order behind them.
 private val LEAD = listOf("trending", "popular", "top rated", "new releases")
@@ -64,20 +67,23 @@ private fun titleFor(name: String?, kind: String): String {
     return if (kind == "tvshows") "$name Series" else "$name Movies"
 }
 
-// Real per-library rows plus Continue Watching/Up Next/Coming Soon/
-// Studio Hubs/recommendation/catalog rows, mirroring screens/home.js's
-// own buildHomeSections() at a reduced but real scale: Continue
-// Watching, Up Next, Coming Soon (real CalendarController answer, same
-// GET Jellio/calendar endpoint screens/calendar.js's own full page
-// already uses), the Studio Hub strip (real service tiles, one per
-// real service groupByService(collections) actually found, each
-// opening its own real ServiceScreen), RecommendationEngine's own real
-// rows next, then real Gelato catalog rows (Trending/Popular/Top
-// Rated/..., a service's own collection filtered out since it already
-// has a hub tile, ChildCount>=3, capped at MAX_CATALOG_ROWS with at
-// most MAX_ANIME_CATALOG_ROWS from the anime library), per-library
-// rows last, this app's own stand in for screens/home.js's own real
-// genre rows until those earn their own real row here.
+// Real port of screens/home.js's own buildHomeSections(), the same
+// real order: Continue Watching, Up Next, Coming Soon (real
+// CalendarController answer, same GET Jellio/calendar endpoint
+// screens/calendar.js's own full page already uses), the Studio Hub
+// strip (real service tiles, one per real service
+// groupByService(collections) actually found, each opening its own
+// real ServiceScreen), RecommendationEngine's own real rows,
+// real Gelato catalog rows (Trending/Popular/Top Rated/..., a
+// service's own collection filtered out since it already has a hub
+// tile, ChildCount>=3, capped at MAX_CATALOG_ROWS with at most
+// MAX_ANIME_CATALOG_ROWS from the anime library), then real genre rows
+// (discoverGenres()/getGenreItems() scanning the whole real library,
+// no per-library scope). No per-library "Recently Added" row anywhere
+// on this screen, same real reason this whole file's own header
+// comment gives: DateCreated means nothing on a Gelato server, every
+// import lands at once, so real native home's own per-library row
+// says nothing worth showing here either.
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -94,9 +100,6 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = HomeUiState(isLoading = true)
             try {
-                val libraries = repository.getLibraries(session.userId)
-                    .filter { it.CollectionType == "movies" || it.CollectionType == "tvshows" }
-
                 val continueWatching = repository.getContinueWatching(session.userId)
                 val upNext = try {
                     repository.getNextUp(session.userId)
@@ -152,10 +155,10 @@ class HomeViewModel @Inject constructor(
                     emptyList()
                 }
 
-                val libraryRows = libraries.map { library ->
-                    val items = repository.getLibraryItems(session.userId, library.Id)
-                        .filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
-                    HomeSection(title = library.Name ?: "Library", items = items)
+                val genreRows = try {
+                    buildGenreRows(session.userId, exclude)
+                } catch (err: Exception) {
+                    emptyList()
                 }
 
                 val leadingSections = buildList {
@@ -170,7 +173,7 @@ class HomeViewModel @Inject constructor(
                 val sections = buildList {
                     addAll(recommendationRows)
                     addAll(catalogRows)
-                    addAll(libraryRows.filter { it.items.isNotEmpty() })
+                    addAll(genreRows)
                 }
 
                 val hero = heroCandidates.firstOrNull()
@@ -230,6 +233,33 @@ class HomeViewModel @Inject constructor(
             }
             if (deduped.isNotEmpty()) {
                 sections.add(HomeSection(title = titleFor(collection.Name, kind), items = deduped))
+            }
+        }
+        return sections
+    }
+
+    // Mirrors screens/home.js's own fetchGenreRows()/buildGenreRows():
+    // real genres discoverGenres() finds enough of across the whole
+    // real library (no parentId, unlike LibraryScreen's own per-library
+    // call), last in line for the shared exclude set, same real
+    // priority order screens/home.js's own comment documents
+    // (recommendation rows first pick, then catalog, genre rows last).
+    private suspend fun buildGenreRows(userId: String, exclude: MutableSet<String>): List<HomeSection> {
+        val genres = repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
+        val sections = mutableListOf<HomeSection>()
+        genres.forEach { genre ->
+            val items = try {
+                repository.getGenreItems(userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT)
+            } catch (err: Exception) {
+                emptyList()
+            }
+            val deduped = items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+            deduped.forEach { item ->
+                exclude.add(item.Id)
+                exclude.add(titleKey(item))
+            }
+            if (deduped.isNotEmpty()) {
+                sections.add(HomeSection(title = genre, items = deduped))
             }
         }
         return sections
