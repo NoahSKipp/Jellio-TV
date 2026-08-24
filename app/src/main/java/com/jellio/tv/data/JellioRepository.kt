@@ -7,6 +7,7 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
+import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
@@ -460,6 +461,14 @@ class JellioRepository @Inject constructor(
         )
         api.updateUserConfiguration(userId, configuration)
     }
+
+    suspend fun updatePassword(userId: String, currentPassword: String, newPassword: String) {
+        api.updatePassword(userId, UpdatePasswordRequest(CurrentPw = currentPassword, NewPw = newPassword))
+    }
+
+    suspend fun isQuickConnectEnabled(): Boolean = runCatching { api.isQuickConnectEnabled() }.getOrDefault(false)
+
+    suspend fun authorizeQuickConnect(code: String): Boolean = api.authorizeQuickConnect(code)
 
     // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
     // buildStreamUrl(): POST /Items/{id}/PlaybackInfo negotiates a real

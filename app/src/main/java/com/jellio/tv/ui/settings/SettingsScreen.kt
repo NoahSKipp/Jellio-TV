@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +40,7 @@ import com.jellio.tv.data.model.LanguageOption
 import com.jellio.tv.data.model.LANGUAGE_OPTIONS
 import com.jellio.tv.data.model.languageName
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -46,13 +49,13 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 
 private enum class LanguageField { AUDIO, SUBTITLE }
 
-// A reduced real port of screens/settings.js: this app's own real
+// A real port of screens/settings.js: this app's own real
 // server/account facts, the same real remember-stream-choice
-// preference components/streamPicker.js's own picker reads, and the
-// real default audio/subtitle language preference section, not yet
-// that file's own password change or Quick Connect sections, each a
-// real further screen of its own worth building out, not guessed at
-// here.
+// preference components/streamPicker.js's own picker reads, the real
+// default audio/subtitle language preference section, real password
+// change (POST Users/{id}/Password) and, only when the server admin
+// has not turned the whole real feature off, real Quick Connect
+// approval.
 @Composable
 fun SettingsScreen(
     session: Session,
@@ -96,6 +99,17 @@ fun SettingsScreen(
                 value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
                 onClick = { openField = LanguageField.SUBTITLE },
             )
+        }
+
+        SettingsSection(title = "Change Password") {
+            PasswordSection(session = session, viewModel = viewModel)
+        }
+
+        val quickConnectEnabled by viewModel.quickConnectEnabled.collectAsState()
+        if (quickConnectEnabled) {
+            SettingsSection(title = "Quick Connect") {
+                QuickConnectSection(viewModel = viewModel)
+            }
         }
 
         SettingsSection(title = "About") {
@@ -210,6 +224,78 @@ private fun LanguagePickerRow(label: String, isSelected: Boolean, onClick: () ->
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
         )
+    }
+}
+
+// Mirrors screens/settings.js's own buildPasswordSection(): POST
+// Users/{id}/Password, same real CurrentPw/NewPw body shape, clearing
+// its own three fields only on a real successful update rather than
+// after every submit attempt.
+@Composable
+private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
+    var current by remember { mutableStateOf("") }
+    var next by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    val isUpdating by viewModel.isUpdatingPassword.collectAsState()
+    val status by viewModel.passwordStatus.collectAsState()
+    val tick by viewModel.passwordUpdateTick.collectAsState()
+
+    LaunchedEffect(tick) {
+        if (tick > 0) {
+            current = ""
+            next = ""
+            confirm = ""
+        }
+    }
+
+    Column {
+        JellioTextField(value = current, onValueChange = { current = it }, label = "Current password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(12.dp))
+        JellioTextField(value = next, onValueChange = { next = it }, label = "New password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(12.dp))
+        JellioTextField(value = confirm, onValueChange = { confirm = it }, label = "Confirm new password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp)) }
+        Surface(
+            onClick = { viewModel.updatePassword(session, current, next, confirm) },
+            enabled = !isUpdating,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            modifier = Modifier.padding(top = 16.dp),
+        ) {
+            Text(text = if (isUpdating) "Updating..." else "Update password", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        }
+    }
+}
+
+// Mirrors screens/settings.js's own buildQuickConnectSection(): only
+// ever shown when GET QuickConnect/Enabled says the server admin has
+// not turned the whole real feature off, POST QuickConnect/Authorize
+// approving a real pending request another device started.
+@Composable
+private fun QuickConnectSection(viewModel: SettingsViewModel) {
+    var code by remember { mutableStateOf("") }
+    val isAuthorizing by viewModel.isAuthorizingQuickConnect.collectAsState()
+    val status by viewModel.quickConnectStatus.collectAsState()
+    val tick by viewModel.quickConnectApproveTick.collectAsState()
+
+    LaunchedEffect(tick) {
+        if (tick > 0) code = ""
+    }
+
+    Column {
+        Text(text = "Approve a sign in on another device using its own real code.", color = JellioTextSecondary)
+        Spacer(modifier = Modifier.height(12.dp))
+        JellioTextField(value = code, onValueChange = { code = it }, label = "Code shown on the other device", modifier = Modifier.fillMaxWidth())
+        status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp)) }
+        Surface(
+            onClick = { viewModel.authorizeQuickConnect(code) },
+            enabled = !isAuthorizing,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            modifier = Modifier.padding(top = 16.dp),
+        ) {
+            Text(text = if (isAuthorizing) "Approving..." else "Approve", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        }
     }
 }
 
