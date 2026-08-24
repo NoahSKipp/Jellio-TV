@@ -17,7 +17,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
@@ -41,11 +40,7 @@ fun StudioHubRow(
 ) {
     if (services.isEmpty()) return
     Column {
-        Text(
-            text = "Studio Hubs",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
-        )
+        RowTitle(text = "Studio Hubs")
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
