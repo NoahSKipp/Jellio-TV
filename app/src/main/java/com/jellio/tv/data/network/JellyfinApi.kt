@@ -4,6 +4,7 @@ import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AuthenticationResultDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.ItemsResultDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
@@ -103,6 +104,13 @@ interface JellyfinApi {
         @Query("seasonId") seasonId: String,
         @Query("Fields") fields: String? = null,
     ): ItemsResultDto
+
+    // Soft dependency on the community Intro Skipper plugin
+    // (github.com/intro-skipper/intro-skipper): real route confirmed
+    // against its own SkipIntroController.cs, works for both Episode
+    // and Movie items despite the route name.
+    @GET("Episode/{itemId}/Timestamps")
+    suspend fun getIntroSkipperSegments(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
 
     @POST("Items/{itemId}/PlaybackInfo")
     suspend fun getPlaybackInfo(

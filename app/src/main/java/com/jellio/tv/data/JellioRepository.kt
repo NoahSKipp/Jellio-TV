@@ -3,6 +3,7 @@ package com.jellio.tv.data
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
@@ -523,6 +524,14 @@ class JellioRepository @Inject constructor(
         nextSeason ?: return null
         return getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull()
     }
+
+    // Real port of runtime/api.js's own getIntroSkipperSegments(): any
+    // failure (plugin not installed, unknown item) resolves to null
+    // rather than throwing, same real soft-dependency reasoning that
+    // file's own try/catch already documents (no segments is a normal
+    // outcome, not an error worth surfacing).
+    suspend fun getIntroSkipperSegments(itemId: String): IntroSkipperSegmentsDto? =
+        runCatching { api.getIntroSkipperSegments(itemId) }.getOrNull()
 
     // A series' own hero Play button (screens/detail.js's own
     // resolveSeriesPlayTarget()): the next real unfinished episode if
