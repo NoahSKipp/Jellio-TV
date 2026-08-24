@@ -1,6 +1,9 @@
 package com.jellio.tv.ui.detail
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +27,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -33,7 +37,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +66,10 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 private val HeroHeight = 620.dp
 
@@ -93,6 +104,27 @@ private fun formatRuntime(ticks: Long?): String {
     return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
 }
 
+private val PREMIERE_DATE_FORMATS = listOf(
+    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+    "yyyy-MM-dd",
+)
+
+// Mirrors screens/detail.js's own meta row exactly: an Episode with a
+// real PremiereDate shows that (new Date(...).toLocaleDateString()),
+// everything else, including an Episode with none, falls back to
+// ProductionYear.
+private fun formatPremiereDate(raw: String?): String? {
+    if (raw == null) return null
+    for (pattern in PREMIERE_DATE_FORMATS) {
+        val parser = SimpleDateFormat(pattern, Locale.US)
+        parser.timeZone = TimeZone.getTimeZone("UTC")
+        val date = runCatching { parser.parse(raw) }.getOrNull() ?: continue
+        return DateFormat.getDateInstance(DateFormat.SHORT).format(date)
+    }
+    return null
+}
+
 @Composable
 fun DetailScreen(
     session: Session,
@@ -109,6 +141,7 @@ fun DetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
 
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
 
@@ -118,7 +151,17 @@ fun DetailScreen(
                 Text(text = "Loading...", color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "Could not load this title", color = JellioTextSecondary)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = uiState.error ?: "Could not load this title", color = JellioTextSecondary)
+                    Surface(
+                        onClick = { viewModel.retry(session, itemId) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+                        modifier = Modifier.padding(top = 20.dp),
+                    ) {
+                        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+                    }
+                }
             }
             uiState.item != null -> {
                 val item = uiState.item!!
@@ -131,21 +174,30 @@ fun DetailScreen(
                             imageUrl = imageUrl,
                             onSeriesClick = onNavigateToDetail,
                             onPlay = {
-                                val target = viewModel.resolvePlayTarget()
-                                if (target != null) {
-                                    scope.launch {
-                                        when (val action = viewModel.resolvePlayAction(session, target)) {
-                                            is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
-                                            is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
+                                // screens/detail.js's own real playButton.disabled
+                                // = true while its own targetPromise is still
+                                // resolving, re-enabled once it settles either
+                                // way (its own .finally()).
+                                scope.launch {
+                                    viewModel.setResolvingPlay(true)
+                                    try {
+                                        val target = viewModel.resolvePlayTarget()
+                                        if (target != null) {
+                                            when (val action = viewModel.resolvePlayAction(session, target)) {
+                                                is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
+                                                is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
+                                            }
                                         }
+                                    } finally {
+                                        viewModel.setResolvingPlay(false)
                                     }
                                 }
                             },
                             onChangeStream = if (item.Type != "Series") {
                                 {
-                                    val target = viewModel.resolvePlayTarget()
-                                    if (target != null) {
-                                        scope.launch {
+                                    scope.launch {
+                                        val target = viewModel.resolvePlayTarget()
+                                        if (target != null) {
                                             when (val action = viewModel.resolvePlayAction(session, target, forceChoice = true)) {
                                                 is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
                                                 is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
@@ -171,6 +223,7 @@ fun DetailScreen(
                                 imageUrl = imageUrl,
                                 onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.Id, seasonId) },
                                 onEpisodeClick = onNavigateToDetail,
+                                onEpisodeOptions = { episode -> episodeMenuTarget = episode },
                             )
                         }
                     }
@@ -202,6 +255,74 @@ fun DetailScreen(
                 Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back", tint = JellioText)
             }
         }
+
+        val menuTarget = episodeMenuTarget
+        if (menuTarget != null) {
+            val index = uiState.selectedSeasonEpisodes.indexOfFirst { it.Id == menuTarget.Id }
+            EpisodeOptionsMenu(
+                episode = menuTarget,
+                hasPrevious = index > 0,
+                onToggleWatched = { viewModel.toggleEpisodeWatched(session, menuTarget) },
+                onMarkPreviousWatched = { viewModel.markPreviousWatched(session, menuTarget) },
+                onMarkSeasonWatched = { viewModel.markSeasonWatched(session) },
+                onDismiss = { episodeMenuTarget = null },
+            )
+        }
+    }
+}
+
+// Real port of screens/detail.js's own openEpisodeOptionsMenu(): the
+// same real three actions (no Play Manually here, that only ever made
+// sense for a Continue Watching card with a resume position to skip
+// past), reached through this screen's own options button rather than
+// that file's own hold/right-click (no direct D-pad equivalent for a
+// hold gesture worth trusting untested).
+@Composable
+private fun EpisodeOptionsMenu(
+    episode: BaseItemDto,
+    hasPrevious: Boolean,
+    onToggleWatched: () -> Unit,
+    onMarkPreviousWatched: () -> Unit,
+    onMarkSeasonWatched: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    val isPlayed = episode.UserData?.Played == true
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 280.dp)
+                .background(JellioBgElevated, RoundedCornerShape(16.dp))
+                .padding(vertical = 12.dp),
+        ) {
+            EpisodeMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
+            if (hasPrevious) {
+                EpisodeMenuRow(label = "Mark previous as watched", onClick = { onMarkPreviousWatched(); onDismiss() })
+            }
+            EpisodeMenuRow(label = "Mark season as watched", onClick = { onMarkSeasonWatched(); onDismiss() })
+        }
+    }
+}
+
+@Composable
+private fun EpisodeMenuRow(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))
     }
 }
 
@@ -262,7 +383,11 @@ private fun DetailHero(
             Text(text = titleText, style = MaterialTheme.typography.titleLarge, color = JellioText, maxLines = 2, overflow = TextOverflow.Ellipsis)
 
             Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                val year = if (item.Type == "Episode") null else item.ProductionYear?.toString()
+                val year = if (item.Type == "Episode") {
+                    formatPremiereDate(item.PremiereDate) ?: item.ProductionYear?.toString()
+                } else {
+                    item.ProductionYear?.toString()
+                }
                 year?.let { Text(text = it, color = JellioTextSecondary) }
                 formatRuntime(item.RunTimeTicks).takeIf { it.isNotEmpty() }?.let { Text(text = it, color = JellioTextSecondary) }
                 item.OfficialRating?.let { Text(text = it, color = JellioTextSecondary) }
@@ -287,6 +412,7 @@ private fun DetailHero(
             Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     onClick = onPlay,
+                    enabled = !state.resolvingPlay,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
                 ) {
@@ -362,6 +488,7 @@ private fun SeasonsSection(
     imageUrl: (String, String?, String, Int) -> String,
     onSelectSeason: (String) -> Unit,
     onEpisodeClick: (String) -> Unit,
+    onEpisodeOptions: (BaseItemDto) -> Unit,
 ) {
     if (state.seasons.isEmpty()) return
     Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -386,49 +513,77 @@ private fun SeasonsSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(state.selectedSeasonEpisodes, key = { it.Id }) { episode ->
-                EpisodeCard(episode = episode, imageUrl = imageUrl, onClick = { onEpisodeClick(episode.Id) })
+                EpisodeCard(
+                    episode = episode,
+                    imageUrl = imageUrl,
+                    onClick = { onEpisodeClick(episode.Id) },
+                    onOptionsClick = { onEpisodeOptions(episode) },
+                )
             }
         }
     }
 }
 
+// The options button is a separate, independently focusable Surface
+// sibling to the main clickable card rather than nested inside it
+// (Compose's own clickable-inside-clickable is ambiguous, real click
+// dispatch there is not something to trust without a device to test
+// on): a real D-pad-navigable stand in for screens/detail.js's own
+// hold/right-click trigger on this same card.
 @Composable
-private fun EpisodeCard(episode: BaseItemDto, imageUrl: (String, String?, String, Int) -> String, onClick: () -> Unit) {
+private fun EpisodeCard(
+    episode: BaseItemDto,
+    imageUrl: (String, String?, String, Int) -> String,
+    onClick: () -> Unit,
+    onOptionsClick: () -> Unit,
+) {
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-        modifier = Modifier.width(320.dp),
-    ) {
-        Column {
-            Box(modifier = Modifier.width(320.dp).aspectRatio(16f / 9f)) {
-                if (thumbUrl != null) {
-                    AsyncImage(model = thumbUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    Box(modifier = Modifier.width(320.dp)) {
+        Surface(
+            onClick = onClick,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            modifier = Modifier.width(320.dp),
+        ) {
+            Column {
+                Box(modifier = Modifier.width(320.dp).aspectRatio(16f / 9f)) {
+                    if (thumbUrl != null) {
+                        AsyncImage(model = thumbUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
+                    episode.IndexNumber?.let {
+                        Text(
+                            text = "E$it",
+                            color = JellioText,
+                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                    if (episode.UserData?.Played == true) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = JellioText,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                        )
+                    }
                 }
-                episode.IndexNumber?.let {
-                    Text(
-                        text = "E$it",
-                        color = JellioText,
-                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
-                if (episode.UserData?.Played == true) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = JellioText,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                    )
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = episode.Name.orEmpty(), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    episode.Overview?.let {
+                        Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    }
                 }
             }
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(text = episode.Name.orEmpty(), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                episode.Overview?.let {
-                    Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-                }
+        }
+        Surface(
+            onClick = onOptionsClick,
+            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.55f), contentColor = JellioText),
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(32.dp),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Episode options", modifier = Modifier.size(18.dp))
             }
         }
     }

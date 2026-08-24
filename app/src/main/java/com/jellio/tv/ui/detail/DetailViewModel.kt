@@ -5,9 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,11 +64,33 @@ class DetailViewModel @Inject constructor(
 
     private var loadedItemId: String? = null
     private var ratingTargetId: String? = null
-    private var seriesPlayEpisode: BaseItemDto? = null
+    // A series' own Play button (screens/detail.js's own real
+    // targetPromise) awaits this exact real deferred rather than
+    // reading a plain field synchronously: a tap that lands before
+    // resolveSeriesPlayTarget() has actually resolved yet still plays
+    // once it does, real behavior a synchronous null-if-not-ready-yet
+    // read silently dropped before.
+    private var seriesPlayDeferred: Deferred<BaseItemDto?>? = null
 
     fun load(session: Session, itemId: String) {
         if (loadedItemId == itemId) return
         loadedItemId = itemId
+        loadInternal(session, itemId)
+    }
+
+    // screens/detail.js's own real Retry (components/networkState.js's
+    // own renderRetry(), reached from renderDetailError()): a bad
+    // connection just needs asking the same real lookup again, not a
+    // trip back to a whole different screen first, the same real
+    // resetting of load()'s own dedupe guard so this actually re-fetches
+    // rather than a no-op against whatever itemId already "loaded".
+    fun retry(session: Session, itemId: String) {
+        loadedItemId = itemId
+        loadInternal(session, itemId)
+    }
+
+    private fun loadInternal(session: Session, itemId: String) {
+        seriesPlayDeferred = null
         viewModelScope.launch {
             _uiState.value = DetailUiState(isLoading = true)
             try {
@@ -90,7 +116,12 @@ class DetailViewModel @Inject constructor(
 
                 if (item.Type == "Series") {
                     loadSeasons(session, item.Id)
-                    resolveSeriesPlay(session, item.Id)
+                    // screens/detail.js's own real targetPromise: started
+                    // once here, not per click, a tap on Play before this
+                    // resolves still awaits this exact same real deferred
+                    // in resolvePlayTarget() below rather than reading a
+                    // plain field that might still be null.
+                    seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
                 _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
@@ -98,14 +129,14 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun resolveSeriesPlay(session: Session, seriesId: String) {
-        val target = runCatching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return
-        seriesPlayEpisode = target.episode
+    private suspend fun resolveSeriesPlay(session: Session, seriesId: String): BaseItemDto? {
+        val target = runCatching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return null
         if (target.resume) {
             _uiState.value = _uiState.value.copy(
                 playLabel = "Resume S${target.episode.ParentIndexNumber} E${target.episode.IndexNumber}",
             )
         }
+        return target.episode
     }
 
     private fun loadSeasons(session: Session, seriesId: String) {
@@ -130,10 +161,16 @@ class DetailViewModel @Inject constructor(
     // The one real item this screen's own Play button should hand off
     // to a stream picker/player for: itself for a movie or an episode,
     // whichever real episode resolveSeriesPlay above already resolved
-    // for a series (a series has no video of its own).
-    fun resolvePlayTarget(): BaseItemDto? {
+    // for a series (a series has no video of its own). Suspends on the
+    // real deferred rather than reading a plain field synchronously,
+    // same real reason seriesPlayDeferred's own comment gives.
+    suspend fun resolvePlayTarget(): BaseItemDto? {
         val item = _uiState.value.item ?: return null
-        return if (item.Type == "Series") seriesPlayEpisode else item
+        return if (item.Type == "Series") seriesPlayDeferred?.await() else item
+    }
+
+    fun setResolvingPlay(resolving: Boolean) {
+        _uiState.value = _uiState.value.copy(resolvingPlay = resolving)
     }
 
     fun toggleWatchlist(session: Session) {
@@ -183,5 +220,57 @@ class DetailViewModel @Inject constructor(
 
     suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
         if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
+    }
+
+    // Real port of screens/detail.js's own openEpisodeOptionsMenu(): a
+    // hold/right-click there, a real options button here (no direct
+    // Compose equivalent for a hold gesture worth trusting untested),
+    // same three real actions against the exact season track already
+    // in state rather than a second real fetch, context.episodes/
+    // context.onChanged's own real job here.
+    fun toggleEpisodeWatched(session: Session, episode: BaseItemDto) {
+        val next = !(episode.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, episode.Id, next) }.getOrNull()
+            applyEpisodeUpdate(episode.Id, updated)
+        }
+    }
+
+    fun markPreviousWatched(session: Session, episode: BaseItemDto) {
+        val episodes = _uiState.value.selectedSeasonEpisodes
+        val index = episodes.indexOfFirst { it.Id == episode.Id }
+        if (index <= 0) return
+        val previous = episodes.subList(0, index)
+        viewModelScope.launch {
+            val updates = previous.map { prev ->
+                async { prev.Id to runCatching { repository.setPlayed(session.userId, prev.Id, true) }.getOrNull() }
+            }.awaitAll()
+            applyEpisodeUpdates(updates)
+        }
+    }
+
+    fun markSeasonWatched(session: Session) {
+        val episodes = _uiState.value.selectedSeasonEpisodes
+        viewModelScope.launch {
+            val updates = episodes.map { ep ->
+                async { ep.Id to runCatching { repository.setPlayed(session.userId, ep.Id, true) }.getOrNull() }
+            }.awaitAll()
+            applyEpisodeUpdates(updates)
+        }
+    }
+
+    private fun applyEpisodeUpdate(episodeId: String, userData: UserItemDataDto?) {
+        if (userData == null) return
+        applyEpisodeUpdates(listOf(episodeId to userData))
+    }
+
+    private fun applyEpisodeUpdates(updates: List<Pair<String, UserItemDataDto?>>) {
+        val byId = updates.mapNotNull { (id, data) -> data?.let { id to it } }.toMap()
+        if (byId.isEmpty()) return
+        _uiState.value = _uiState.value.copy(
+            selectedSeasonEpisodes = _uiState.value.selectedSeasonEpisodes.map { episode ->
+                byId[episode.Id]?.let { episode.copy(UserData = it) } ?: episode
+            },
+        )
     }
 }
