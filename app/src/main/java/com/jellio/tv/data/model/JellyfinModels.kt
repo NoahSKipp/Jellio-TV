@@ -195,3 +195,20 @@ data class CalendarEntryDto(
     val Detail: String? = null,
     val Date: String? = null,
 )
+
+// Real shape the community Intro Skipper plugin's own
+// SkipIntroController.cs returns (github.com/intro-skipper/intro-
+// skipper): a segment with no real detection comes back as
+// Start: 0, End: 0, that plugin's own Segment.Valid rule is End > 0,
+// not something invented client side.
+@JsonClass(generateAdapter = true)
+data class SkipSegmentDto(
+    val Start: Double = 0.0,
+    val End: Double = 0.0,
+)
+
+@JsonClass(generateAdapter = true)
+data class IntroSkipperSegmentsDto(
+    val Introduction: SkipSegmentDto? = null,
+    val Credits: SkipSegmentDto? = null,
+)

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,6 +56,32 @@ data class UpNextInfo(
     val title: String,
 )
 
+// Real port of screens/player.js's own activeSkipSegment() return
+// shape: targetSeconds is the segment's own End, seekToAbsoluteSeconds'
+// own real target once the reader presses the button this label is for.
+data class SkipSegment(
+    val label: String,
+    val targetSeconds: Double,
+)
+
+// Real port of screens/player.js's own activeSkipSegment(): Skip Intro
+// wins over Skip Credits at the same instant, same real order that
+// file's own if/else chain checks them in (a title's own Introduction
+// and Credits segments never actually overlap in practice, but this
+// keeps the exact same real precedence regardless).
+fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double): SkipSegment? {
+    segments ?: return null
+    val intro = segments.Introduction
+    if (intro != null && intro.End > 0 && currentSeconds >= intro.Start && currentSeconds < intro.End) {
+        return SkipSegment("Skip Intro", intro.End)
+    }
+    val credits = segments.Credits
+    if (credits != null && credits.End > 0 && currentSeconds >= credits.Start && currentSeconds < credits.End) {
+        return SkipSegment("Skip Credits", credits.End)
+    }
+    return null
+}
+
 data class PlayerUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
@@ -69,6 +96,7 @@ data class PlayerUiState(
     val isSwitchingSubtitle: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
+    val skipSegments: IntroSkipperSegmentsDto? = null,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -135,6 +163,20 @@ class PlayerViewModel @Inject constructor(
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
                         }
+                    }
+                }
+
+                // Real port of screens/player.js's own real fire-and-
+                // forget getIntroSkipperSegments(itemId).then(...): not
+                // gated on item.Type, that file's own real endpoint
+                // works for a Movie too despite its own "/Episode/"
+                // route name. Only assigned when at least one real
+                // segment key actually came back, same real truthy
+                // check that file's own .then() callback runs.
+                viewModelScope.launch {
+                    val segments = repository.getIntroSkipperSegments(itemId)
+                    if (segments != null && (segments.Introduction != null || segments.Credits != null)) {
+                        _uiState.value = _uiState.value.copy(skipSegments = segments)
                     }
                 }
             } catch (err: Exception) {

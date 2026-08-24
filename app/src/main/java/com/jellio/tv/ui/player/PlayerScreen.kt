@@ -63,6 +63,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -77,13 +78,26 @@ private const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
 private const val CONTROLS_HIDE_DELAY_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
 // Real screens/player.js's own UPNEXT_FALLBACK_TRIGGER_SECONDS/
-// UPNEXT_COUNTDOWN_SECONDS: the fixed-seconds-left fallback rule that
-// file's own shouldShowUpNextNow() runs when Intro Skipper has no real
-// Credits segment for this episode, the only rule this player has any
-// data for yet (that file's own Credits-segment-aware timing needs a
-// real Intro Skipper API call this app has not ported).
+// UPNEXT_COUNTDOWN_SECONDS: shouldShowUpNextNow()'s own fixed
+// seconds-left fallback, used only when skipSegments carries no real
+// Credits segment for this title (see shouldShowUpNextNow() below).
 private const val UPNEXT_FALLBACK_TRIGGER_SECONDS = 120
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
+
+// Real port of screens/player.js's own shouldShowUpNextNow(), ported
+// from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
+// Credits segment starts the outro, so showing the card there reads as
+// timed to the episode rather than to an arbitrary count of seconds
+// left; the fixed-seconds rule is only the fallback for a title Intro
+// Skipper has no Credits segment for at all.
+private fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSeconds: Double, durationSeconds: Double): Boolean {
+    if (durationSeconds <= 0) return false
+    val credits = segments?.Credits
+    if (credits != null && credits.End > 0 && credits.Start >= 0) {
+        return currentSeconds >= credits.Start
+    }
+    return durationSeconds - currentSeconds <= UPNEXT_FALLBACK_TRIGGER_SECONDS
+}
 
 // No native jellyfin-web playbackManager to lean on here (screens/
 // player.js's own header explains why the web build needed none
@@ -125,6 +139,7 @@ fun PlayerScreen(
                 selectedSubtitleIndex = uiState.selectedSubtitleIndex,
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
+                skipSegments = uiState.skipSegments,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
@@ -154,6 +169,7 @@ private fun PlayerSurface(
     selectedSubtitleIndex: Int?,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
+    skipSegments: IntroSkipperSegmentsDto?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
@@ -274,14 +290,11 @@ private fun PlayerSurface(
             }
             positionMs = player.currentPosition
             // Real port of screens/player.js's own timeupdate-driven
-            // shouldShowUpNextNow() check: the fixed-seconds-left
-            // fallback rule only (see UPNEXT_FALLBACK_TRIGGER_SECONDS's
-            // own comment above), fired at most once per real title,
-            // same real showUpNext() guard that file's own
+            // shouldShowUpNextNow() check, fired at most once per real
+            // title, same real showUpNext() guard that file's own
             // upNextShown/upNextDismissed pair already enforces.
             if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
-                val remainingSeconds = (durationMs - positionMs) / 1000.0
-                if (remainingSeconds <= UPNEXT_FALLBACK_TRIGGER_SECONDS) {
+                if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
                 }
             }
@@ -410,6 +423,23 @@ private fun PlayerSurface(
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
+            )
+        }
+
+        // Real port of screens/player.js's own timeupdate-driven
+        // activeSkipSegment() check: a plain derived value off the same
+        // positionMs this screen already polls every 500ms, no separate
+        // effect needed. Suppressed while the Up Next card already
+        // occupies this same real bottom-right corner (real CSS puts
+        // both there too, but that file never actually has to render
+        // both onscreen at once the way this app's own fixed 120 second
+        // Up Next fallback now can against a real Credits segment).
+        val activeSkip = activeSkipSegment(skipSegments, positionMs / 1000.0)
+        if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
+            SkipSegmentButton(
+                label = activeSkip.label,
+                onClick = { player.seekTo((activeSkip.targetSeconds * 1000).toLong()) },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
             )
         }
 
@@ -627,6 +657,21 @@ private fun UpNextOverlay(
                 }
             }
         }
+    }
+}
+
+// Real port of screens/player.js's own skip button: label switches
+// between Skip Intro/Skip Credits off activeSkipSegment's own real
+// label, one real Surface either way rather than two separate buttons.
+@Composable
+private fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+        modifier = modifier,
+    ) {
+        Text(text = label, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
     }
 }
 
