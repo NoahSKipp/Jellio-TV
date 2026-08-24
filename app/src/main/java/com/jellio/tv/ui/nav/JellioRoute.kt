@@ -6,8 +6,8 @@ import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // Mirrors components/mobileNav.js's own real link set and its own
@@ -56,7 +56,13 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Search -> Icons.Filled.Search
     JellioRoute.Watchlist -> Icons.Filled.BookmarkAdded
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
-    JellioRoute.Library -> Icons.Filled.VideoLibrary
+    // Real components/navShared.js's own SVG_ICONS.library: a generic
+    // media-box shape, not a play-button-on-a-shelf the way Material's
+    // own VideoLibrary reads, real feedback live called that one out
+    // as a mismatch from the web build's own icon. PermMedia's own
+    // folder-plus-media glyph is the closest real Material equivalent
+    // to that generic real shape.
+    JellioRoute.Library -> Icons.Filled.PermMedia
     JellioRoute.Settings -> Icons.Filled.Settings
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
 }
