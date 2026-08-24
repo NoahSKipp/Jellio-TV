@@ -12,8 +12,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.WbCloudy
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Weekend
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +39,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.ShowsEditorial
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -54,6 +61,14 @@ private fun metaLine(item: BaseItemDto): String {
     return parts.joinToString(" · ")
 }
 
+private fun editorialIcon(icon: String): ImageVector = when (icon) {
+    "wb_sunny" -> Icons.Filled.WbSunny
+    "wb_cloudy" -> Icons.Filled.WbCloudy
+    "weekend" -> Icons.Filled.Weekend
+    "bedtime" -> Icons.Filled.Bedtime
+    else -> Icons.Filled.Schedule
+}
+
 // A reduced real port of components/libraryCoverflow.js: this app's
 // own D-pad has no hover to pause on and Compose TV draws one slide
 // at a time rather than that file's own three-wide overlapping
@@ -68,6 +83,7 @@ fun LibraryCoverflow(
     onViewDetails: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
     badgeText: String? = null,
+    editorial: ShowsEditorial? = null,
 ) {
     if (items.size < COVERFLOW_MIN_SLIDES) return
     var index by remember(items) { mutableIntStateOf(0) }
@@ -111,10 +127,27 @@ fun LibraryCoverflow(
                     ),
                 ),
         )
-        // Task #45's own real fix carried over: only the icon reads as
-        // trending orange, the label stays plain text same as every
-        // other real row title on this page.
-        if (badgeText != null) {
+        // Real port of components/libraryCoverflow.js's own
+        // buildEditorial()/buildCoverflowBadge(): rendered as this
+        // coverflow's own first child, literally above the stage, the
+        // Shows library's own real editorial header and the Anime
+        // page's own Trending on AniList badge mutually exclusive same
+        // as that file's own real if/else.
+        if (editorial != null) {
+            Column(
+                modifier = Modifier.align(Alignment.TopStart).widthIn(max = 520.dp).padding(start = 48.dp, top = 32.dp, end = 24.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = editorialIcon(editorial.icon), contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(18.dp))
+                    Text(text = editorial.label, color = JellioTextSecondary, modifier = Modifier.padding(start = 6.dp))
+                }
+                Text(text = editorial.tagline, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 6.dp))
+                Text(text = editorial.description, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+            }
+        } else if (badgeText != null) {
+            // Task #45's own real fix carried over: only the icon reads
+            // as trending orange, the label stays plain text same as
+            // every other real row title on this page.
             Row(
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 48.dp, top = 32.dp),
                 verticalAlignment = Alignment.CenterVertically,
