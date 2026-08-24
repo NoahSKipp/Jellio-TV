@@ -32,6 +32,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
@@ -61,6 +62,92 @@ private fun sourceAudioLabel(source: MediaSourceDto): String {
     audio.Codec?.let { parts.add(it.uppercase()) }
     audio.Channels?.let { parts.add("${it}ch") }
     return parts.joinToString(" ")
+}
+
+// Real MediaStream.BitRate, per stream video track, left blank rather
+// than estimated when a source carries none, same real reasoning
+// streamPicker.js's own sourceBitrateLabel() documents: an invented
+// figure here would read as more real data than Gelato actually
+// reported for this one source.
+private fun sourceBitrateLabel(source: MediaSourceDto): String {
+    val bitRate = source.MediaStreams?.firstOrNull { it.Type == "Video" }?.BitRate ?: return ""
+    return "%.1f Mbps".format(bitRate / 1_000_000.0)
+}
+
+private fun sourceDescription(source: MediaSourceDto): String =
+    (source.Name ?: "").split("\n").drop(1).joinToString(" ").trim()
+
+private const val REGIONAL_INDICATOR_BASE = 0x1F1E6
+
+// One flag per major real source country for each language
+// LANGUAGE_OPTIONS already covers, not every real ISO 3166 territory
+// that happens to speak it, ported verbatim from streamPicker.js's
+// own FLAG_COUNTRY_TO_LANGUAGE.
+private val FLAG_COUNTRY_TO_LANGUAGE = mapOf(
+    "DE" to "ger", "AT" to "ger", "CH" to "ger",
+    "GB" to "eng", "US" to "eng", "CA" to "eng", "AU" to "eng", "IE" to "eng",
+    "FR" to "fre",
+    "ES" to "spa", "MX" to "spa", "AR" to "spa",
+    "IT" to "ita",
+    "JP" to "jpn",
+    "KR" to "kor",
+    "CN" to "chi", "TW" to "chi", "HK" to "chi",
+    "RU" to "rus",
+    "PT" to "por", "BR" to "por",
+    "NL" to "dut",
+    "SA" to "ara", "AE" to "ara",
+    "PL" to "pol",
+    "SE" to "swe",
+    "TR" to "tur",
+)
+
+// AIOStreams' own real stream titles carry a flag emoji per embedded
+// audio language right in source.Name, real signal every source
+// actually has unlike MediaStreams, which streamPicker.js's own real
+// bug report found only fully populated for whichever one source had
+// already been played before. Walks by real Unicode code point, not a
+// plain string index: a flag emoji is a surrogate pair per regional
+// indicator on the JVM same as in JS.
+private fun flagLanguages(text: String?): List<String> {
+    if (text.isNullOrEmpty()) return emptyList()
+    val codes = mutableListOf<String>()
+    val points = text.codePoints().toArray()
+    var i = 0
+    while (i < points.size - 1) {
+        val a = points[i]
+        val b = points[i + 1]
+        if (a < REGIONAL_INDICATOR_BASE || a > REGIONAL_INDICATOR_BASE + 25) {
+            i++
+            continue
+        }
+        if (b < REGIONAL_INDICATOR_BASE || b > REGIONAL_INDICATOR_BASE + 25) {
+            i++
+            continue
+        }
+        val country = "" + ('A' + (a - REGIONAL_INDICATOR_BASE)) + ('A' + (b - REGIONAL_INDICATOR_BASE))
+        val code = FLAG_COUNTRY_TO_LANGUAGE[country]
+        if (code != null && !codes.contains(code)) codes.add(code)
+        i += 2
+    }
+    return codes
+}
+
+// Reads both real MediaStreams.Language and the flag-emoji codes
+// above and keeps whichever either one finds, same real fix
+// streamPicker.js's own sourceAudioLanguages() documents: most of a
+// real 38+ result set from Gelato comes back with no MediaStreams
+// audio entries at all, only the flag emoji in source.Name still
+// tells the two languages apart.
+private fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
+    val codes = mutableListOf<String>()
+    source.MediaStreams?.forEach { stream ->
+        if (stream.Type == "Audio" && !stream.Language.isNullOrEmpty()) {
+            val code = stream.Language.lowercase()
+            if (!codes.contains(code)) codes.add(code)
+        }
+    }
+    flagLanguages(source.Name).forEach { code -> if (!codes.contains(code)) codes.add(code) }
+    return codes
 }
 
 // Mirrors components/streamPicker.js's own openStreamPicker(): a real
@@ -188,14 +275,31 @@ private fun SourceCard(source: MediaSourceDto, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val description = sourceDescription(source)
+            if (description.isNotEmpty()) {
+                Text(text = description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            }
             val tags = listOfNotNull(
                 sourceResolutionLabel(source).ifEmpty { null },
+                sourceBitrateLabel(source).ifEmpty { null },
                 formatFileSize(source.Size).ifEmpty { null },
                 source.Container?.uppercase(),
                 sourceAudioLabel(source).ifEmpty { null },
             )
             if (tags.isNotEmpty()) {
                 Text(text = tags.joinToString(" · "), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+            }
+            // Real bug streamPicker.js's own buildSourceCard() documents
+            // and fixes: an embedded MediaStreams Language ("de", ISO
+            // 639-1) and a flag-emoji-derived code ("ger", ISO 639-2/T)
+            // can name the exact same real language under two different
+            // strings, so this dedupes again against languageName()'s
+            // own resolved display name rather than the raw code.
+            val languageNames = sourceAudioLanguages(source)
+                .mapNotNull { code -> languageName(code).takeIf { it != "Unknown" } }
+                .distinct()
+            if (languageNames.isNotEmpty()) {
+                Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
