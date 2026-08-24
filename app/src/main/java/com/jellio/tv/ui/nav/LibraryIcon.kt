@@ -1,11 +1,10 @@
 package com.jellio.tv.ui.nav
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.PathFillType
 import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.graphics.vector.addPath
 import androidx.compose.ui.unit.dp
 
 // The exact path data js/persistentSidebar.js's own SVG_ICONS.library
