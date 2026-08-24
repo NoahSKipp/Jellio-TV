@@ -28,6 +28,7 @@ fun PosterRow(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
+    onItemOptions: ((BaseItemDto) -> Unit)? = null,
 ) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
@@ -37,7 +38,12 @@ fun PosterRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(section.items, key = { it.Id }) { item ->
-                PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) })
+                PosterCard(
+                    item = item,
+                    imageUrl = imageUrl,
+                    onClick = { onItemClick(item) },
+                    onOptionsClick = onItemOptions?.let { { it(item) } },
+                )
             }
         }
     }
