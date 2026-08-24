@@ -16,6 +16,9 @@ import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -227,16 +230,21 @@ class JellioRepository @Inject constructor(
     // throwing, the Shows hub renders unfiltered same as before this
     // existed rather than breaking outright over a real best effort
     // feature.
-    suspend fun getAnimeItemIds(userId: String): Set<String> {
+    // A real perf bug found live testing on device, fixed the same way
+    // runtime/api.js's own getAnimeItemIds() already does
+    // (Promise.allSettled(animeCollections.map(...))): every real
+    // anime/anilist catalog collection's own item fetch now fires
+    // together instead of the second catalog waiting on the first
+    // one's own response, real seconds shaved off every Shows library
+    // load that used to await this one collection at a time.
+    suspend fun getAnimeItemIds(userId: String): Set<String> = coroutineScope {
         val animeCollections = runCatching { getCollections(userId) }.getOrDefault(emptyList()).filter { isAnimeCollection(it) }
-        if (animeCollections.isEmpty()) return emptySet()
-        val ids = mutableSetOf<String>()
-        animeCollections.forEach { collection ->
-            runCatching { getCollectionItems(userId, collection.Id, "tvshows", ANIME_ITEM_ID_LIMIT) }
-                .getOrDefault(emptyList())
-                .forEach { item -> ids.add(item.Id) }
-        }
-        return ids
+        if (animeCollections.isEmpty()) return@coroutineScope emptySet()
+        animeCollections.map { collection ->
+            async {
+                runCatching { getCollectionItems(userId, collection.Id, "tvshows", ANIME_ITEM_ID_LIMIT) }.getOrDefault(emptyList())
+            }
+        }.awaitAll().flatten().mapTo(mutableSetOf()) { it.Id }
     }
 
     suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24): List<BaseItemDto> =

@@ -2,6 +2,9 @@ package com.jellio.tv.data.recommend
 
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.home.HomeSection
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -188,15 +191,22 @@ class RecommendationDataSource(
     val getPersonItems: suspend (personId: String, limit: Int) -> List<BaseItemDto>,
 )
 
+// Fetching each seed's own candidates has no dependency on exclude at
+// all (only pick() below reads that), so every seed's own real
+// network round trip fires together here rather than the second seed
+// waiting on the first one's response before it even starts, real
+// port of runtime/recommend.js's own buildSeedRows() and its real
+// Promise.all: a real perf bug found live, SEED_LIMIT seeds awaited
+// one at a time here used to add seconds to every real Home load.
 private suspend fun buildSeedRows(
     source: RecommendationDataSource,
     seeds: List<BaseItemDto>,
     titleFor: (BaseItemDto) -> String,
     exclude: MutableSet<String>,
-): List<HomeSection> {
+): List<HomeSection> = coroutineScope {
     val entriesPerSeed = seeds.map { seed ->
-        runCatching { source.getRecommendationCandidates(seed, POOL_LIMIT) }.getOrNull()
-    }
+        async { runCatching { source.getRecommendationCandidates(seed, POOL_LIMIT) }.getOrNull() }
+    }.awaitAll()
 
     val rows = mutableListOf<HomeSection>()
     seeds.forEachIndexed { index, seed ->
@@ -206,7 +216,7 @@ private suspend fun buildSeedRows(
         items.forEach { markSeen(exclude, it) }
         rows.add(HomeSection(titleFor(seed), items))
     }
-    return rows
+    rows
 }
 
 private suspend fun buildTopGenreRows(source: RecommendationDataSource, history: List<BaseItemDto>, exclude: MutableSet<String>): List<HomeSection> {
@@ -243,9 +253,11 @@ private fun notDisliked(seed: BaseItemDto): Boolean = seed.UserData?.Likes != fa
 // established: per title rows first, the two aggregate rows after.
 // Real feedback: the genre aggregate row ("Top Picks for You") sits
 // first in the returned list, ahead of every per-title row.
-suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: MutableSet<String>): List<HomeSection> {
-    val history = runCatching { source.getRecentlyCompleted(HISTORY_SAMPLE_LIMIT) }.getOrDefault(emptyList())
-    val nextUp = runCatching { source.getNextUp(NEXTUP_SEED_LIMIT) }.getOrDefault(emptyList())
+suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: MutableSet<String>): List<HomeSection> = coroutineScope {
+    val historyDeferred = async { runCatching { source.getRecentlyCompleted(HISTORY_SAMPLE_LIMIT) }.getOrDefault(emptyList()) }
+    val nextUpDeferred = async { runCatching { source.getNextUp(NEXTUP_SEED_LIMIT) }.getOrDefault(emptyList()) }
+    val history = historyDeferred.await()
+    val nextUp = nextUpDeferred.await()
 
     val completedSeeds = history.filter(::notDisliked).take(SEED_LIMIT)
     val completedRows = buildSeedRows(source, completedSeeds, { seed -> "Because you watched ${seed.Name}" }, exclude)
@@ -255,5 +267,5 @@ suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: M
     val genreRows = buildTopGenreRows(source, history, exclude)
     val personRows = buildTopPersonRows(source, history, exclude)
 
-    return genreRows + completedRows + nextUpRows + personRows
+    genreRows + completedRows + nextUpRows + personRows
 }
