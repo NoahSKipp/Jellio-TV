@@ -140,7 +140,7 @@ fun LibraryCoverflow(
                 items.forEachIndexed { i, _ ->
                     Surface(
                         onClick = { index = i },
-                        shape = CircleShape,
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = if (i == index) JellioText else Color.White.copy(alpha = 0.3f),
                         ),

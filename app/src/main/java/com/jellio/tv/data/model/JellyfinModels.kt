@@ -174,6 +174,12 @@ data class PlaybackReportRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class UpdatePasswordRequest(
+    val CurrentPw: String,
+    val NewPw: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class CalendarEntryDto(
     val ItemId: String,
     val Name: String? = null,

@@ -9,6 +9,7 @@ import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
+import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
@@ -142,6 +143,26 @@ interface JellyfinApi {
 
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
+
+    // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
+    // }, confirmed against jellyfin-apiclient-javascript's own
+    // updateUserPassword rather than guessed field names, the same
+    // call the stock profile page's own password form uses.
+    @POST("Users/{userId}/Password")
+    suspend fun updatePassword(@Path("userId") userId: String, @Body body: UpdatePasswordRequest)
+
+    // Real endpoint, GET /QuickConnect/Enabled: a server admin can turn
+    // the whole real feature off, checked before this screen bothers
+    // offering a code field nobody could ever actually use.
+    @GET("QuickConnect/Enabled")
+    suspend fun isQuickConnectEnabled(): Boolean
+
+    // Real endpoint, POST /QuickConnect/Authorize?code=: the signed in
+    // session's own token approving a real pending request another
+    // device started, returns a real bool for whether the code
+    // actually matched a pending request.
+    @POST("QuickConnect/Authorize")
+    suspend fun authorizeQuickConnect(@Query("code") code: String): Boolean
 }
 
 // Real Jellyfin auth convention every client sends, confirmed against
