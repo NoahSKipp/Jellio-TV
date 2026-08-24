@@ -92,7 +92,7 @@ fun HomeScreen(
                     }
                 }
                 items(uiState.leadingSections, key = { it.title }) { section ->
-                    PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
+                    LandscapeRow(section = section, rawImageUrl = rawImageUrl, onItemClick = onItemClick)
                 }
                 item {
                     ComingSoonRow(entries = uiState.comingSoon, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
