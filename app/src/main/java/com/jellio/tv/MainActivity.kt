@@ -233,10 +233,17 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
         if (pickerItem != null) {
             StreamPickerOverlay(
                 item = pickerItem,
+                // streamPicker.js's own buildOverlayShell(): falls back
+                // to the item's own Primary poster when there is no
+                // real Backdrop tag, rather than leaving the picker
+                // background blank for a backdrop-less item.
                 backdropUrl = pickerItem.BackdropImageTags?.firstOrNull()?.let {
                     appViewModel.rawImageUrl(session, pickerItem.Id, it, "Backdrop", 1920)
+                } ?: pickerItem.ImageTags?.get("Primary")?.let {
+                    appViewModel.rawImageUrl(session, pickerItem.Id, it, "Primary", 1920)
                 },
                 loadSources = { appViewModel.getMediaSources(session, pickerItem.Id) },
+                rememberedSourceId = { appViewModel.rememberedMediaSourceId(pickerItem.Id) },
                 onSelect = { source ->
                     streamPickerItem = null
                     val mediaSourceId = source.Id

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -76,6 +80,20 @@ private fun sourceBitrateLabel(source: MediaSourceDto): String {
 
 private fun sourceDescription(source: MediaSourceDto): String =
     (source.Name ?: "").split("\n").drop(1).joinToString(" ").trim()
+
+private const val TICKS_PER_SECOND = 10_000_000L
+
+// mm:ss, or h:mm:ss past the first real hour, same real tick unit
+// (the .NET TimeSpan constant) streamPicker.js's own formatResumeLabel()
+// renders off of, not a second unit conversion invented here.
+private fun formatResumeLabel(ticks: Long): String {
+    val totalSeconds = ticks / TICKS_PER_SECOND
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    val ss = seconds.toString().padStart(2, '0')
+    return if (hours > 0) "$hours:${minutes.toString().padStart(2, '0')}:$ss" else "$minutes:$ss"
+}
 
 private const val REGIONAL_INDICATOR_BASE = 0x1F1E6
 
@@ -166,12 +184,14 @@ fun StreamPickerOverlay(
     item: BaseItemDto,
     backdropUrl: String?,
     loadSources: suspend () -> List<MediaSourceDto>,
+    rememberedSourceId: suspend () -> String?,
     onSelect: (MediaSourceDto) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var state by remember { mutableStateOf<SourcesState>(SourcesState.Loading) }
     var reloadKey by remember { mutableIntStateOf(0) }
+    var remembered by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -181,6 +201,7 @@ fun StreamPickerOverlay(
             SourcesState.Error(err.message ?: "Could not load streams")
         }
     }
+    LaunchedEffect(item.Id) { remembered = rememberedSourceId() }
     BackHandler(onBack = onDismiss)
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
@@ -222,6 +243,33 @@ fun StreamPickerOverlay(
                         RetryButton(onClick = { reloadKey++ })
                     }
                 } else {
+                    // Real Jellyfin field, the same one the player's own
+                    // resume logic already reads off item.UserData to
+                    // seek on real playback start: this is a fast path
+                    // onto that same real behaviour (streamPicker.js's
+                    // own resumeTicks button), not a second resume
+                    // mechanism, picking the remembered/first source and
+                    // letting the player itself do the actual seek.
+                    val resumeTicks = item.UserData?.PlaybackPositionTicks ?: 0
+                    if (resumeTicks > 0) {
+                        Surface(
+                            onClick = {
+                                val target = currentState.sources.find { it.Id == remembered } ?: currentState.sources.firstOrNull()
+                                target?.let { onSelect(it) }
+                            },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
+                            modifier = Modifier.padding(top = 24.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
+                                Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+                    }
                     Text(
                         text = "${currentState.sources.size} stream${if (currentState.sources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
