@@ -31,20 +31,27 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(library.Id) { viewModel.load(session, library) }
+    // Keyed on both real Id and Name: getLibraryNavEntries()'s own
+    // synthetic Anime stand-in shares the plain Shows library's exact
+    // real Id (Anime has no library of its own), Id alone would never
+    // notice a picker tap swapping between the two.
+    LaunchedEffect(library.Id, library.Name) { viewModel.load(session, library) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Loading...", color = JellioTextSecondary)
             }
-            uiState.sections.all { it.items.isEmpty() } -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            uiState.emptyMessage != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = uiState.emptyMessage ?: "", color = JellioTextSecondary)
+            }
+            uiState.sections.all { it.items.isEmpty() } && uiState.coverflowItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
-                        LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                        LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge)
                     }
                 }
                 item {

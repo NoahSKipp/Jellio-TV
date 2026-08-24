@@ -41,6 +41,7 @@ private const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTime
 // more loosely.
 private val ANIME_VIEW_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 private val ANIME_COLLECTION_NAME = Regex("anime|anilist|kitsu", RegexOption.IGNORE_CASE)
+private const val ANIME_ITEM_ID_LIMIT = 500
 
 sealed interface LoginResult {
     data object Success : LoginResult
@@ -204,6 +205,38 @@ class JellioRepository @Inject constructor(
             return if (stremio.substringBefore('.').lowercase() == "movie") "movies" else "tvshows"
         }
         return "movies"
+    }
+
+    // Real port of screens/library.js's own isAnime check
+    // (params.get('jellioKind') === 'anime'): both a real dedicated
+    // Anime view and getLibraryNavEntries()'s own synthetic
+    // tvView.copy(Name = "Anime") stand-in match this exact real
+    // regex against their own Name, the one real signal a caller
+    // needs to tell "this is the Anime page" apart from the plain
+    // Shows page without threading a second flag through the route.
+    fun isAnimeLibrary(library: BaseItemDto): Boolean = ANIME_VIEW_NAME.containsMatchIn(library.Name ?: "")
+
+    // Real port of screens/library.js's own getAnimeItemIds(): every
+    // real item id any real anime/anilist catalog collection
+    // currently claims, best effort same as that file's own real
+    // reasoning documents (no CollectionType tells a real anime
+    // Series apart from any other one sharing the same real TV
+    // library). The Shows hub's own main row and genre rows drop
+    // anything in this set, real feedback's own direct ask. Failure
+    // of any part of this resolves to an empty real Set rather than
+    // throwing, the Shows hub renders unfiltered same as before this
+    // existed rather than breaking outright over a real best effort
+    // feature.
+    suspend fun getAnimeItemIds(userId: String): Set<String> {
+        val animeCollections = runCatching { getCollections(userId) }.getOrDefault(emptyList()).filter { isAnimeCollection(it) }
+        if (animeCollections.isEmpty()) return emptySet()
+        val ids = mutableSetOf<String>()
+        animeCollections.forEach { collection ->
+            runCatching { getCollectionItems(userId, collection.Id, "tvshows", ANIME_ITEM_ID_LIMIT) }
+                .getOrDefault(emptyList())
+                .forEach { item -> ids.add(item.Id) }
+        }
+        return ids
     }
 
     suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24): List<BaseItemDto> =
