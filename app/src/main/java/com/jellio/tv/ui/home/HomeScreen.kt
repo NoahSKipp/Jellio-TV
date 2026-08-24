@@ -1,7 +1,6 @@
 package com.jellio.tv.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -153,9 +152,7 @@ fun HomeScreen(
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .focusGroup(),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real
