@@ -6,6 +6,8 @@ import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
+import com.jellio.tv.data.model.SleepTimerStartRequest
+import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -589,6 +591,18 @@ class JellioRepository @Inject constructor(
     // loop's own caller decides what a failed request means rather
     // than this method swallowing it.
     suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto> = api.getNowPlayingSessions()
+
+    suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
+
+    // Real screens/player.js's own cancelSleepTimer(): a real 404 when
+    // nothing was active is not an error worth surfacing there either
+    // (that file's own fetch() never even inspects response.ok before
+    // its .then() fires), same real reasoning for swallowing it here.
+    suspend fun cancelSleepTimer() {
+        runCatching { api.cancelSleepTimer() }
+    }
+
+    suspend fun getSleepTimerStatus(): SleepTimerStatusDto? = runCatching { api.getSleepTimerStatus() }.getOrNull()
 
     suspend fun getUser(userId: String): UserDto = api.getUser(userId)
 

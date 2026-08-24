@@ -239,3 +239,21 @@ data class NowPlayingSessionDto(
     val PositionTicks: Long? = null,
     val Item: NowPlayingItemDto? = null,
 )
+
+@JsonClass(generateAdapter = true)
+data class SleepTimerStartRequest(val Minutes: Int)
+
+// Real Controllers/SleepTimerController.cs shape. Server side, backed
+// by SleepTimerService's own background loop and a real
+// ISessionManager.SendPlaystateCommand(Stop) delivered over that
+// session's own WebSocket, real feedback confirmed there is no
+// equivalent connection open from this app at all (Retrofit/OkHttp
+// only, no session socket), so that real Stop command has nowhere to
+// land here; PlayerScreen's own local countdown is what actually
+// enforces it for this client, this status only what real cross-client
+// (a signed in web tab watching the same account) parity needs.
+@JsonClass(generateAdapter = true)
+data class SleepTimerStatusDto(
+    val Active: Boolean = false,
+    val EndTimeUtc: String? = null,
+)

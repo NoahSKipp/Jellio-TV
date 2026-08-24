@@ -11,6 +11,8 @@ import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
+import com.jellio.tv.data.model.SleepTimerStartRequest
+import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
@@ -159,6 +161,20 @@ interface JellyfinApi {
     // file the way a plugin-less community script would need.
     @GET("Jellio/now-playing")
     suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto>
+
+    // Real Controllers/SleepTimerController.cs endpoints: server side
+    // duration timer, one per user/device. See SleepTimerStatusDto's
+    // own header comment for why this app's own player also has to
+    // enforce this locally rather than trusting the real
+    // SendPlaystateCommand(Stop) that timer expiring server side sends.
+    @POST("Jellio/sleep-timer/start")
+    suspend fun startSleepTimer(@Body body: SleepTimerStartRequest): SleepTimerStatusDto
+
+    @POST("Jellio/sleep-timer/cancel")
+    suspend fun cancelSleepTimer()
+
+    @GET("Jellio/sleep-timer/status")
+    suspend fun getSleepTimerStatus(): SleepTimerStatusDto
 
     // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
     // }, confirmed against jellyfin-apiclient-javascript's own
