@@ -38,4 +38,13 @@ val JellioTypography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
     ),
+    // css/app.css's own .jellio-mobile-nav-label: 0.66em against that
+    // pill's own 22px base, the nav pill's own small icon-under label,
+    // real feedback found the taller labelMedium default too big
+    // there.
+    labelSmall = TextStyle(
+        fontFamily = JellioFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 13.sp,
+    ),
 )
