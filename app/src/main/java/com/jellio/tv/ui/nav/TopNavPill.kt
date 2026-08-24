@@ -64,18 +64,19 @@ fun TopNavPill(
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
                 // Real feedback live: D-pad Down from here went nowhere,
                 // the system saw nothing focusable below to land on.
-                // Gated on the real active screen rather than applied
-                // unconditionally: contentFocusRequester's own target
-                // only actually exists while Home is the one composed
-                // beneath this pill, same real screen HomeScreen itself
-                // attaches it to.
-                .then(
-                    if (selected == JellioRoute.Home) {
-                        Modifier.focusProperties { down = contentFocusRequester }
-                    } else {
-                        Modifier
-                    },
-                )
+                // Real bug found live a second time: this only ever
+                // applied for Home, since only HomeScreen's own
+                // LazyColumn attached itself to contentFocusRequester,
+                // so Down went nowhere on every other non-immersive
+                // screen (Search/Watchlist/Calendar/Library) instead,
+                // reported live as "scrolling only works on Home".
+                // Unconditional now: exactly one non-immersive screen is
+                // ever composed at a time (this pill itself only renders
+                // for those, see MainActivity's own !route.isImmersive()
+                // gate), and every one of them now attaches its own top
+                // scrollable container to this exact same shared
+                // requester, same real pattern HomeScreen already used.
+                .focusProperties { down = contentFocusRequester }
                 .padding(horizontal = 12.dp),
         ) {
             items.forEach { route ->
