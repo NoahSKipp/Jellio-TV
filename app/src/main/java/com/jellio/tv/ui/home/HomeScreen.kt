@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -153,12 +152,17 @@ fun HomeScreen(
             // real top clearance every other screen already carries
             // fixes it.
             //
-            // Real feedback live called the resulting gap above
-            // HeroSection ugly, cutting the hero off from the pill it
-            // used to render directly behind. See this LazyColumn's own
-            // real graphicsLayer modifier below for the fix that
-            // restores the full-bleed look without giving the clearance
-            // fix back up.
+            // Real feedback live: a graphicsLayer offset was tried
+            // here to draw HeroSection back up into that same
+            // clearance without moving this LazyColumn's own real
+            // layout bounds, on the theory that focus search only
+            // checks layout, not paint position. Real bug found live
+            // testing on device: wrong theory, confirmed by two real
+            // regressions landing together (Down dead again, and real
+            // content clipped off at the bottom) the moment that
+            // shift shipped. Reverted; the clearance's own real gap
+            // stays as a known, accepted cost until a real fix is
+            // found that does not regress Down again.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -183,19 +187,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = 140.dp)
-                        .focusRestorer()
-                        // Real layout position (what focus search
-                        // actually checks) stays below the pill exactly
-                        // where the padding above put it; this only
-                        // ever shifts where every pixel gets painted,
-                        // back up into that padding's own real space,
-                        // so HeroSection reads full-bleed behind the
-                        // pill again without moving this LazyColumn's
-                        // own real bounds an inch. The one real cost
-                        // lands at the opposite, far less noticeable
-                        // end: an equal real gap at the very bottom of
-                        // this list once scrolled all the way down.
-                        .graphicsLayer { translationY = -140.dp.toPx() },
+                        .focusRestorer(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real
