@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.ShowsEditorial
+import com.jellio.tv.data.model.showsEditorial
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import javax.inject.Inject
 
 private const val GENRE_ROWS = 6
@@ -34,6 +37,7 @@ data class LibraryUiState(
     val title: String = "",
     val coverflowItems: List<BaseItemDto> = emptyList(),
     val coverflowBadge: String? = null,
+    val editorial: ShowsEditorial? = null,
     val sections: List<HomeSection> = emptyList(),
     val emptyMessage: String? = null,
 )
@@ -118,10 +122,21 @@ class LibraryViewModel @Inject constructor(
             if (items.isNotEmpty()) sections.add(HomeSection(genre, items))
         }
 
+        // Real feedback pointed at Harbor's own Shows tab, a mood-led
+        // line above its carousel that changes with the reader's own
+        // time of day: only the Shows library carries one, Movies has
+        // no equivalent real reference screenshot behind it.
+        val editorial = if (library.CollectionType == "tvshows") {
+            showsEditorial(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+        } else {
+            null
+        }
+
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = library.Name ?: "Library",
             coverflowItems = coverflowItems,
+            editorial = editorial,
             sections = sections,
         )
     }
