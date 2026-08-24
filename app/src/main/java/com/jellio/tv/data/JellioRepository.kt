@@ -7,6 +7,8 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
+import com.jellio.tv.data.model.UserConfigurationDto
+import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
@@ -440,6 +442,23 @@ class JellioRepository @Inject constructor(
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+
+    suspend fun getUser(userId: String): UserDto = api.getUser(userId)
+
+    // Mirrors runtime/api.js's own updateLanguagePreferences() exactly:
+    // starts from the signed in user's own current Configuration and
+    // only overwrites the two real fields screens/settings.js's own
+    // Language section exposes, AudioLanguagePreference and
+    // SubtitleLanguagePreference, real ISO 639-2 codes Jellyfin's own
+    // PlaybackInfo negotiation already reads server side.
+    suspend fun updateLanguagePreferences(userId: String, audioLanguage: String?, subtitleLanguage: String?) {
+        val current = api.getUser(userId).Configuration ?: UserConfigurationDto()
+        val configuration = current.copy(
+            AudioLanguagePreference = audioLanguage.orEmpty(),
+            SubtitleLanguagePreference = subtitleLanguage.orEmpty(),
+        )
+        api.updateUserConfiguration(userId, configuration)
+    }
 
     // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
     // buildStreamUrl(): POST /Items/{id}/PlaybackInfo negotiates a real

@@ -25,6 +25,21 @@ data class UserDto(
     val Id: String,
     val Name: String,
     val PrimaryImageTag: String? = null,
+    val Configuration: UserConfigurationDto? = null,
+)
+
+// Real fields screens/settings.js's own Language section reads/writes,
+// UserConfiguration.cs confirmed before porting this: Jellyfin's own
+// PlaybackInfo negotiation already reads these server side to pick a
+// MediaSource's own real DefaultAudioStreamIndex/
+// DefaultSubtitleStreamIndex, no client side track selection needed
+// for a saved preference to take effect on the next stream negotiated.
+@JsonClass(generateAdapter = true)
+data class UserConfigurationDto(
+    val AudioLanguagePreference: String? = null,
+    val SubtitleLanguagePreference: String? = null,
+    val PlayDefaultAudioTrack: Boolean? = null,
+    val SubtitleMode: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

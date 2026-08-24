@@ -1,5 +1,9 @@
 package com.jellio.tv.ui.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,12 +12,21 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -21,6 +34,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.BuildConfig
+import com.jellio.tv.data.model.LanguageOption
+import com.jellio.tv.data.model.LANGUAGE_OPTIONS
+import com.jellio.tv.data.model.languageName
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -28,12 +44,15 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
+private enum class LanguageField { AUDIO, SUBTITLE }
+
 // A reduced real port of screens/settings.js: this app's own real
-// server/account facts and the same real remember-stream-choice
-// preference components/streamPicker.js's own picker reads, not yet
-// that file's own language preference, password change or Quick
-// Connect sections, each a real further screen of its own worth
-// building out, not guessed at here.
+// server/account facts, the same real remember-stream-choice
+// preference components/streamPicker.js's own picker reads, and the
+// real default audio/subtitle language preference section, not yet
+// that file's own password change or Quick Connect sections, each a
+// real further screen of its own worth building out, not guessed at
+// here.
 @Composable
 fun SettingsScreen(
     session: Session,
@@ -42,8 +61,14 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val rememberStream by viewModel.rememberStream.collectAsState()
+    val audioLanguage by viewModel.audioLanguage.collectAsState()
+    val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
+    var openField by remember { mutableStateOf<LanguageField?>(null) }
 
-    Column(modifier = modifier.fillMaxSize().padding(top = 140.dp, start = 48.dp, end = 48.dp)) {
+    LaunchedEffect(session.userId) { viewModel.load(session) }
+
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = 140.dp, start = 48.dp, end = 48.dp)) {
         Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
 
         SettingsSection(title = "Server") {
@@ -60,6 +85,19 @@ fun SettingsScreen(
             )
         }
 
+        SettingsSection(title = "Language") {
+            SettingsPickerRow(
+                label = "Default audio language",
+                value = audioLanguage?.let { languageName(it) } ?: "No preference",
+                onClick = { openField = LanguageField.AUDIO },
+            )
+            SettingsPickerRow(
+                label = "Default subtitle language",
+                value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
+                onClick = { openField = LanguageField.SUBTITLE },
+            )
+        }
+
         SettingsSection(title = "About") {
             SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
         }
@@ -72,6 +110,106 @@ fun SettingsScreen(
         ) {
             Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
+    }
+
+    val field = openField
+    if (field != null) {
+        val selectedCode = if (field == LanguageField.AUDIO) audioLanguage else subtitleLanguage
+        LanguagePickerOverlay(
+            title = if (field == LanguageField.AUDIO) "Default audio language" else "Default subtitle language",
+            selectedCode = selectedCode,
+            onSelect = { code ->
+                if (field == LanguageField.AUDIO) viewModel.setAudioLanguage(session, code) else viewModel.setSubtitleLanguage(session, code)
+                openField = null
+            },
+            onDismiss = { openField = null },
+        )
+    }
+    }
+}
+
+@Composable
+private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = label, color = JellioText)
+            Text(text = value, color = JellioTextSecondary)
+        }
+    }
+}
+
+// Mirrors screens/settings.js's own real language pickers, docked
+// right the same way the player's own subtitle popover already is:
+// "No preference" first, then every real LANGUAGE_OPTIONS entry,
+// saving on selection rather than needing a separate confirm step.
+@Composable
+private fun LanguagePickerOverlay(
+    title: String,
+    selectedCode: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(360.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(vertical = 48.dp),
+        ) {
+            Text(
+                text = title,
+                color = JellioText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                item { LanguagePickerRow(label = "No preference", isSelected = selectedCode == null, onClick = { onSelect(null) }) }
+                items(LANGUAGE_OPTIONS) { option: LanguageOption ->
+                    LanguagePickerRow(label = option.name, isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanguagePickerRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
+            contentColor = JellioText,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+        )
     }
 }
 
