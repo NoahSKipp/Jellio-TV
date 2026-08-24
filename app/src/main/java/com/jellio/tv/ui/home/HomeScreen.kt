@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
@@ -32,14 +34,18 @@ fun HomeScreen(
     onItemClick: (BaseItemDto) -> Unit,
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
+    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
 
     LaunchedEffect(session.userId) {
         viewModel.load(session)
     }
+    LaunchedEffect(compact) { onCompactChange(compact) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -62,6 +68,7 @@ fun HomeScreen(
             // point of their own for a system that has never yet
             // focused anything inside them.
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .focusGroup()

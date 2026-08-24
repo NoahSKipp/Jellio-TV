@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -21,6 +22,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
+import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors the real Watchlist split into Movies/Series sections, same
@@ -31,12 +33,16 @@ fun WatchlistScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     contentFocusRequester: FocusRequester,
+    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WatchlistViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
+    LaunchedEffect(compact) { onCompactChange(compact) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -50,6 +56,7 @@ fun WatchlistScreen(
             // worked on Home, same real fix TopNavPill's own comment
             // documents.
             else -> LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .focusGroup()

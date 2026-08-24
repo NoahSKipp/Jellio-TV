@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,14 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
     // time), so the pill has somewhere real to send focus instead of
     // trapping it, regardless of which one of them is on real screen.
     val contentFocusRequester = remember { FocusRequester() }
+    // Real components/mobileNav.js's own scroll-driven compact state,
+    // threaded up from whichever non-immersive screen is actually
+    // composed (each reports its own real scroll position via
+    // onCompactChange). Reset to expanded on every real tab switch,
+    // same real reasoning that file's own header documents: a fresh
+    // screen starts scrolled to its own top, so the pill should too.
+    var navCompact by remember { mutableStateOf(false) }
+    LaunchedEffect(route) { navCompact = false }
     val scope = rememberCoroutineScope()
 
     fun switchTab(target: JellioRoute) {
@@ -125,6 +134,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
+                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Search -> SearchScreen(
@@ -132,6 +142,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 contentFocusRequester = contentFocusRequester,
+                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Watchlist -> WatchlistScreen(
@@ -139,12 +150,14 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 contentFocusRequester = contentFocusRequester,
+                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Calendar -> CalendarScreen(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onItemClick = onNavigateToDetail,
                 contentFocusRequester = contentFocusRequester,
+                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Library -> {
@@ -156,6 +169,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                         imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
                         contentFocusRequester = contentFocusRequester,
+                        onCompactChange = { navCompact = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -205,6 +219,7 @@ private fun JellioTvApp(session: Session, appViewModel: AppViewModel) {
                 items = JellioNavItems,
                 selected = route,
                 contentFocusRequester = contentFocusRequester,
+                isCompact = navCompact,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
                     // button: a tap opens the picker rather than
