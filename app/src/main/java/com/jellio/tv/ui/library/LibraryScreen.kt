@@ -79,9 +79,22 @@ fun LibraryScreen(
             uiState.sections.all { it.items.isEmpty() } && (uiState.mainRow?.items?.isEmpty() != false) && uiState.coverflowItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
+            // Real bug found live testing on device: this LazyColumn's
+            // own real layout bounds ran from the literal top of the
+            // screen, directly underneath (overlapping) TopNavPill's
+            // own real bounds, unlike every other screen's own
+            // top=140.dp clearance below the pill. Compose's own real
+            // directional focus search rejects a candidate group whose
+            // own real bounds overlap the currently focused node rather
+            // than sitting cleanly below it, so Down from the pill had
+            // nowhere valid to search into here regardless of
+            // focusRestorer() waiting on the other side. The coverflow
+            // no longer renders directly behind the pill's own
+            // translucent background as a result, the same real cost
+            // HomeScreen's own hero took for the same real fix.
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().focusRestorer(),
+                modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
@@ -93,7 +106,7 @@ fun LibraryScreen(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(
-                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 32.dp else 140.dp,
+                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 12.dp else 0.dp,
                             start = 48.dp,
                             bottom = 12.dp,
                         ),

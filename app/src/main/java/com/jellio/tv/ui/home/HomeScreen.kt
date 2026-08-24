@@ -133,10 +133,26 @@ fun HomeScreen(
             // Down from TopNavPill (a plain, non-lazy layout, which
             // Compose's own default focus search enters without
             // trouble) had nothing to land on here. focusRestorer()
-            // below is Compose's own real fix for exactly this gap:
-            // finds a sensible default child to enter on first arrival,
-            // then remembers and restores the last focused child on
-            // every return trip after that.
+            // below is Compose's own real fix for that gap: finds a
+            // sensible default child to enter on first arrival, then
+            // remembers and restores the last focused child on every
+            // return trip after that.
+            //
+            // Real bug found live testing on device even with
+            // focusRestorer() applied: this LazyColumn's own real
+            // layout bounds ran from the literal top of the screen,
+            // directly underneath (overlapping) TopNavPill's own real
+            // bounds, unlike every other screen's own top=140.dp
+            // clearance below the pill. Compose's own real directional
+            // focus search rejects a candidate group whose own real
+            // bounds overlap the currently focused node rather than
+            // sitting cleanly below it, so Down from the pill had
+            // nowhere valid to search into here even with a working
+            // default entry point waiting on the other side. The same
+            // real top clearance every other screen already carries
+            // fixes it, at the real cost of HeroSection no longer
+            // rendering directly behind the pill's own translucent
+            // background.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -158,7 +174,7 @@ fun HomeScreen(
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().focusRestorer(),
+                    modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRestorer(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
                     // Real screens/home.js's own jellio-home-greeting: real
