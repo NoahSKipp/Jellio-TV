@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,6 +63,17 @@ private fun sourceAudioLabel(source: MediaSourceDto): String {
     return parts.joinToString(" ")
 }
 
+// Mirrors components/streamPicker.js's own openStreamPicker(): a real
+// try/catch around getMediaSources, a failure rendered as its own
+// distinct real state rather than an unhandled throw out of this
+// screen's own LaunchedEffect (a real crash risk this used to carry,
+// nothing here caught it before).
+private sealed interface SourcesState {
+    data object Loading : SourcesState
+    data class Loaded(val sources: List<MediaSourceDto>) : SourcesState
+    data class Error(val message: String) : SourcesState
+}
+
 @Composable
 fun StreamPickerOverlay(
     item: BaseItemDto,
@@ -71,9 +83,17 @@ fun StreamPickerOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var sources by remember { mutableStateOf<List<MediaSourceDto>?>(null) }
+    var state by remember { mutableStateOf<SourcesState>(SourcesState.Loading) }
+    var reloadKey by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(item.Id) { sources = loadSources() }
+    LaunchedEffect(item.Id, reloadKey) {
+        state = SourcesState.Loading
+        state = try {
+            SourcesState.Loaded(loadSources())
+        } catch (err: Exception) {
+            SourcesState.Error(err.message ?: "Could not load streams")
+        }
+    }
     BackHandler(onBack = onDismiss)
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
@@ -101,19 +121,22 @@ fun StreamPickerOverlay(
                 Text(text = code + item.Name.orEmpty(), color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
 
-            val currentSources = sources
-            when {
-                currentSources == null -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+            when (val currentState = state) {
+                is SourcesState.Loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                     Text(text = "Loading...", color = JellioTextSecondary)
                 }
-                currentSources.isEmpty() -> Text(
-                    text = "No streams found for this title.",
-                    color = JellioTextSecondary,
-                    modifier = Modifier.padding(top = 48.dp),
-                )
-                else -> {
+                is SourcesState.Error -> Column(modifier = Modifier.padding(top = 48.dp)) {
+                    Text(text = currentState.message, color = JellioTextSecondary)
+                    RetryButton(onClick = { reloadKey++ })
+                }
+                is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
+                    Column(modifier = Modifier.padding(top = 48.dp)) {
+                        Text(text = "No streams found for this title.", color = JellioTextSecondary)
+                        RetryButton(onClick = { reloadKey++ })
+                    }
+                } else {
                     Text(
-                        text = "${currentSources.size} stream${if (currentSources.size == 1) "" else "s"} found",
+                        text = "${currentState.sources.size} stream${if (currentState.sources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                     )
@@ -121,7 +144,7 @@ fun StreamPickerOverlay(
                         contentPadding = PaddingValues(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(currentSources) { source -> SourceCard(source = source, onClick = { onSelect(source) }) }
+                        items(currentState.sources) { source -> SourceCard(source = source, onClick = { onSelect(source) }) }
                     }
                 }
             }
@@ -135,6 +158,18 @@ fun StreamPickerOverlay(
         ) {
             Text(text = "Back", color = JellioText, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }
+    }
+}
+
+@Composable
+private fun RetryButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+        modifier = Modifier.padding(top = 20.dp),
+    ) {
+        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
     }
 }
 
