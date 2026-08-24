@@ -26,8 +26,10 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 fun HomeScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
+    rawImageUrl: (String, String?, String, Int) -> String,
     contentFocusRequester: FocusRequester,
     onItemClick: (BaseItemDto) -> Unit,
+    onComingSoonClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -45,8 +47,10 @@ fun HomeScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
             }
-            uiState.sections.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nothing here yet.", color = JellioTextSecondary)
+            uiState.sections.isEmpty() && uiState.leadingSections.isEmpty() && uiState.comingSoon.isEmpty() -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = "Nothing here yet.", color = JellioTextSecondary)
+                }
             }
             // Explicit down escape from TopNavPill lands here
             // (TopNavPill's own focusProperties override), same real
@@ -62,6 +66,12 @@ fun HomeScreen(
                     .focusRequester(contentFocusRequester),
             ) {
                 item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
+                items(uiState.leadingSections, key = { it.title }) { section ->
+                    PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
+                }
+                item {
+                    ComingSoonRow(entries = uiState.comingSoon, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
+                }
                 items(uiState.sections, key = { it.title }) { section ->
                     PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
                 }
