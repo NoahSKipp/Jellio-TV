@@ -24,7 +24,18 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
-data class HomeSection(val title: String, val items: List<BaseItemDto>)
+// fetchAll mirrors components/rowListModal.js's own options.fetchAll:
+// a real second, unbounded request for this exact same row, only ever
+// set for a catalog or genre row (a real Gelato collection or a real
+// discovered genre, either one worth a real "browse everything" beyond
+// its own real ROW_LIMIT), null for Continue Watching/Up Next and every
+// recommendation row, same real distinction buildRow()'s own callers
+// already draw.
+data class HomeSection(
+    val title: String,
+    val items: List<BaseItemDto>,
+    val fetchAll: (suspend () -> List<BaseItemDto>)? = null,
+)
 
 data class HomeUiState(
     val isLoading: Boolean = true,
@@ -49,6 +60,10 @@ data class HomeUiState(
 
 private const val COMING_SOON_LIMIT = 12
 private const val CATALOG_ROW_LIMIT = 24
+// Real screens/home.js's own ROW_LIST_LIMIT: components/rowListModal.js's
+// own real "browse everything" fetchAll, a catalog or genre row's own
+// full real depth rather than the row's own small ROW_LIMIT.
+private const val ROW_LIST_LIMIT = 500
 private const val MAX_CATALOG_ROWS = 8
 private const val MIN_CATALOG_ITEMS = 3
 // The anime library has a page of its own carrying every AniList
@@ -166,8 +181,8 @@ class HomeViewModel @Inject constructor(
                     val catalogData = catalogDataDeferred.await()
                     val genreData = genreDataDeferred.await()
 
-                    val catalogRows = buildCatalogRowsFromData(catalogData, exclude)
-                    val genreRows = buildGenreRowsFromData(genreData, exclude)
+                    val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
+                    val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
 
                     val leadingSections = buildList {
                         if (continueWatching.isNotEmpty()) {
@@ -237,7 +252,7 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>)
+    private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>, val collectionId: String, val kind: String)
 
     // Mirrors screens/home.js's own fetchCatalogRows(): the real fetch
     // phase only, no exclude touched here at all (real port of that
@@ -274,7 +289,7 @@ class HomeViewModel @Inject constructor(
             async {
                 val kind = repository.collectionKind(collection)
                 val items = runCatching { repository.getCollectionItems(userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.getOrDefault(emptyList())
-                CatalogRowEntry(title = titleFor(collection.Name, kind), items = items)
+                CatalogRowEntry(title = titleFor(collection.Name, kind), items = items, collectionId = collection.Id, kind = kind)
             }
         }.awaitAll()
     }
@@ -284,7 +299,7 @@ class HomeViewModel @Inject constructor(
     // real network phase above (and its sibling recommendation/genre
     // phases) have all already resolved, same real priority order that
     // file's own comment documents.
-    private fun buildCatalogRowsFromData(data: List<CatalogRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
+    private fun buildCatalogRowsFromData(userId: String, data: List<CatalogRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
         val sections = mutableListOf<HomeSection>()
         data.forEach { entry ->
             val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
@@ -293,7 +308,13 @@ class HomeViewModel @Inject constructor(
                 exclude.add(titleKey(item))
             }
             if (deduped.isNotEmpty()) {
-                sections.add(HomeSection(title = entry.title, items = deduped))
+                sections.add(
+                    HomeSection(
+                        title = entry.title,
+                        items = deduped,
+                        fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT) },
+                    ),
+                )
             }
         }
         return sections
@@ -322,7 +343,7 @@ class HomeViewModel @Inject constructor(
     // the shared exclude set, same real priority order that file's own
     // comment documents (recommendation rows first pick, then catalog,
     // genre rows last).
-    private fun buildGenreRowsFromData(data: List<GenreRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
+    private fun buildGenreRowsFromData(userId: String, data: List<GenreRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
         val sections = mutableListOf<HomeSection>()
         data.forEach { entry ->
             val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
@@ -331,7 +352,13 @@ class HomeViewModel @Inject constructor(
                 exclude.add(titleKey(item))
             }
             if (deduped.isNotEmpty()) {
-                sections.add(HomeSection(title = entry.genre, items = deduped))
+                sections.add(
+                    HomeSection(
+                        title = entry.genre,
+                        items = deduped,
+                        fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT) },
+                    ),
+                )
             }
         }
         return sections
