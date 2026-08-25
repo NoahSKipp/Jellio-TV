@@ -31,6 +31,19 @@ data class UpdateUiState(
     val downloading: Boolean = false,
 )
 
+// SettingsScreen's own "Check for Updates" button real result, this
+// app's own real equivalent of a mobile update check dialog reporting
+// back "you're up to date" as much as "here's a new version": the
+// unprompted UpdateToast above only ever surfaces itself on an actual
+// find, silent otherwise, real feedback asked for a real manual path
+// that always answers back.
+sealed interface ManualCheckResult {
+    data object Checking : ManualCheckResult
+    data object UpToDate : ManualCheckResult
+    data class UpdateFound(val version: String) : ManualCheckResult
+    data object Error : ManualCheckResult
+}
+
 // Real feedback live: no in-app way at all to learn a new real
 // version had shipped short of checking GitHub by hand. Checked once
 // per real app open (AppBootGate's own real callers below), never
@@ -47,6 +60,9 @@ class AppUpdateViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UpdateUiState())
     val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
 
+    private val _manualCheckResult = MutableStateFlow<ManualCheckResult?>(null)
+    val manualCheckResult: StateFlow<ManualCheckResult?> = _manualCheckResult.asStateFlow()
+
     private var downloadId: Long? = null
     private var receiverRegistered = false
 
@@ -60,16 +76,45 @@ class AppUpdateViewModel @Inject constructor(
 
     fun checkForUpdate() {
         viewModelScope.launch {
-            val release = runCatching { gitHubApi.getLatestRelease(GITHUB_OWNER, GITHUB_REPO) }.getOrNull() ?: return@launch
-            val latestVersion = release.tag_name.removePrefix("v")
+            val (latestVersion, apkUrl) = fetchLatestVersionAndApkUrl() ?: return@launch
             if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME)) return@launch
-            val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return@launch
-            _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkAsset.browser_download_url)
+            _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
         }
+    }
+
+    // SettingsScreen's own "Check for Updates" button: unlike
+    // checkForUpdate() above, this always reports something back
+    // (ManualCheckResult), a real caught fetch failure or "no newer
+    // release" included, not silent the way the unprompted toast's
+    // own check already is elsewhere.
+    fun checkForUpdateManually() {
+        viewModelScope.launch {
+            _manualCheckResult.value = ManualCheckResult.Checking
+            val fetched = fetchLatestVersionAndApkUrl()
+            if (fetched == null) {
+                _manualCheckResult.value = ManualCheckResult.Error
+                return@launch
+            }
+            val (latestVersion, apkUrl) = fetched
+            if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME)) {
+                _manualCheckResult.value = ManualCheckResult.UpToDate
+                return@launch
+            }
+            _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
+            _manualCheckResult.value = ManualCheckResult.UpdateFound(latestVersion)
+        }
+    }
+
+    private suspend fun fetchLatestVersionAndApkUrl(): Pair<String, String>? {
+        val release = runCatching { gitHubApi.getLatestRelease(GITHUB_OWNER, GITHUB_REPO) }.getOrNull() ?: return null
+        val latestVersion = release.tag_name.removePrefix("v")
+        val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return null
+        return latestVersion to apkAsset.browser_download_url
     }
 
     fun dismiss() {
         _uiState.value = UpdateUiState()
+        _manualCheckResult.value = null
     }
 
     fun download() {
@@ -109,6 +154,7 @@ class AppUpdateViewModel @Inject constructor(
         }
         context.startActivity(installIntent)
         _uiState.value = UpdateUiState()
+        _manualCheckResult.value = null
     }
 
     override fun onCleared() {
