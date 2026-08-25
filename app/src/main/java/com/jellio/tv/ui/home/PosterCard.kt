@@ -38,6 +38,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
+import com.jellio.tv.ui.theme.scaled
 
 private val PosterWidth = 170.dp
 
@@ -69,15 +70,19 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     onOptionsClick: (() -> Unit)? = null,
 ) {
-    Box(modifier = modifier.width(PosterWidth)) {
+    // Real reference dp values, scaled to the actual TV this composed
+    // on: PosterWidth.scaled()'s own header (ui/theme/TvScale.kt)
+    // explains why a fixed dp size alone was not real enough coverage.
+    val posterWidth = PosterWidth.scaled()
+    Box(modifier = modifier.width(posterWidth)) {
         Surface(
             onClick = onClick,
             onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-            modifier = Modifier.width(PosterWidth),
+            modifier = Modifier.width(posterWidth),
         ) {
-            Box(modifier = Modifier.width(PosterWidth).aspectRatio(2f / 3f)) {
+            Box(modifier = Modifier.width(posterWidth).aspectRatio(2f / 3f)) {
                 AsyncImage(
                     model = imageUrl(item, "Primary", 400),
                     contentDescription = item.Name,

@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
 
@@ -28,6 +29,7 @@ fun JellioTvTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = JellioColorScheme,
         typography = JellioTypography,
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalTvScale provides rememberTvScale(), content = content)
+    }
 }

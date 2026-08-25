@@ -35,6 +35,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 
 private val HeroHeight = 460.dp
@@ -82,18 +83,19 @@ fun HeroSection(
     }
 
     val item = items[index]
+    val heroHeight = HeroHeight.scaled()
 
-    Box(modifier = modifier.fillMaxWidth().height(HeroHeight)) {
+    Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
         AsyncImage(
             model = imageUrl(item, "Backdrop", 1280),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(HeroHeight),
+            modifier = Modifier.fillMaxWidth().height(heroHeight),
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(HeroHeight)
+                .height(heroHeight)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, JellioBg),
@@ -105,7 +107,7 @@ fun HeroSection(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(HeroHeight)
+                .height(heroHeight)
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(JellioBg.copy(alpha = 0.8f), Color.Transparent),

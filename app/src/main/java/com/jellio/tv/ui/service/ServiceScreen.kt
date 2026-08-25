@@ -46,6 +46,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 
 private val HeroHeight = 360.dp
 private const val ALL_FILTER = "all"
@@ -192,21 +193,22 @@ private fun ServiceHero(
     heroItem: BaseItemDto?,
     imageUrl: (BaseItemDto, String, Int) -> String,
 ) {
-    Box(modifier = Modifier.fillMaxWidth().height(HeroHeight)) {
+    val heroHeight = HeroHeight.scaled()
+    Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
         if (heroItem != null) {
             AsyncImage(
                 model = imageUrl(heroItem, "Backdrop", 1280),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(HeroHeight),
+                modifier = Modifier.fillMaxWidth().height(heroHeight),
             )
         } else {
-            Box(modifier = Modifier.fillMaxWidth().height(HeroHeight).background(JellioBg))
+            Box(modifier = Modifier.fillMaxWidth().height(heroHeight).background(JellioBg))
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(HeroHeight)
+                .height(heroHeight)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, JellioBg),

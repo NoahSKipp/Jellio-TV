@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -55,6 +56,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.JellioTrending
+import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
@@ -149,8 +151,10 @@ fun LibraryCoverflow(
             }
         }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(CoverflowStageHeight), contentAlignment = Alignment.Center) {
-            val slideWidthPx = with(LocalDensity.current) { SlideWidth.toPx() }
+        val slideWidth = SlideWidth.scaled()
+        val slideHeight = SlideHeight.scaled()
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(CoverflowStageHeight.scaled()), contentAlignment = Alignment.Center) {
+            val slideWidthPx = with(LocalDensity.current) { slideWidth.toPx() }
             items.forEachIndexed { i, item ->
                 val offset = shortestOffset(i, index, items.size)
                 if (abs(offset) <= 1) {
@@ -158,6 +162,8 @@ fun LibraryCoverflow(
                         item = item,
                         offset = offset,
                         slideWidthPx = slideWidthPx,
+                        slideWidth = slideWidth,
+                        slideHeight = slideHeight,
                         imageUrl = imageUrl,
                         onViewDetails = onViewDetails,
                     )
@@ -187,6 +193,8 @@ private fun CoverflowSlide(
     item: BaseItemDto,
     offset: Int,
     slideWidthPx: Float,
+    slideWidth: Dp,
+    slideHeight: Dp,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onViewDetails: (BaseItemDto) -> Unit,
 ) {
@@ -209,8 +217,8 @@ private fun CoverflowSlide(
 
     Box(
         modifier = Modifier
-            .width(SlideWidth)
-            .height(SlideHeight)
+            .width(slideWidth)
+            .height(slideHeight)
             .graphicsLayer {
                 translationX = translateX
                 scaleX = scale

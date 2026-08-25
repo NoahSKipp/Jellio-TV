@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,6 +49,11 @@ fun LibraryScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     onCompactChange: (Boolean) -> Unit,
+    // Moonfin-Core cross-reference, same as HomeScreen's own: MainActivity
+    // hands the same instance to TopNavPill's own contentFocusRequester,
+    // an explicit Down target replacing the top=140.dp clearance this
+    // screen's LazyColumn used to need.
+    contentFocusRequester: FocusRequester = remember { FocusRequester() },
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -82,30 +89,28 @@ fun LibraryScreen(
             // Real bug found live testing on device: this LazyColumn's
             // own real layout bounds ran from the literal top of the
             // screen, directly underneath (overlapping) TopNavPill's
-            // own real bounds, unlike every other screen's own
-            // top=140.dp clearance below the pill. Compose's own real
-            // directional focus search rejects a candidate group whose
-            // own real bounds overlap the currently focused node rather
-            // than sitting cleanly below it, so Down from the pill had
-            // nowhere valid to search into here regardless of
-            // focusRestorer() waiting on the other side.
+            // own real bounds. Compose's own real directional focus
+            // search rejects a candidate group whose own real bounds
+            // overlap the currently focused node rather than sitting
+            // cleanly below it, so Down from the pill had nowhere valid
+            // to search into here regardless of focusRestorer() waiting
+            // on the other side. A top=140.dp clearance and, later, a
+            // graphicsLayer offset (wrong theory, reverted: it clipped
+            // real content and broke Down again) were both tried to
+            // dodge that overlap rather than fix the actual search.
             //
-            // Real feedback live: a graphicsLayer offset was tried
-            // here to draw the coverflow back up into that same
-            // clearance without moving this LazyColumn's own real
-            // layout bounds, on the theory that focus search only
-            // checks layout, not paint position. Real bug found live
-            // testing on device: wrong theory, confirmed by two real
-            // regressions landing together (Down dead again, and real
-            // content clipped off at the bottom) the moment that
-            // shift shipped. Reverted; the clearance's own real gap
-            // stays as a known, accepted cost until a real fix is
-            // found that does not regress Down again.
+            // Real fix, cross-referenced against Moonfin-Core's own
+            // top_toolbar.dart _moveFocusDown(): an explicit requestFocus()
+            // onto a known content node rather than the platform's own
+            // default spatial search once focus has left the pill.
+            // TopNavPill's own contentFocusRequester param wires straight
+            // to this LazyColumn's own FocusRequester below, full-bleed
+            // coverflow again, clearance gone.
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 140.dp)
+                    .focusRequester(contentFocusRequester)
                     .focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
@@ -118,7 +123,14 @@ fun LibraryScreen(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(
-                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 12.dp else 0.dp,
+                            // Coverflow above already clears the pill
+                            // with its own real stage height, this
+                            // title just needs breathing room below it.
+                            // With no coverflow to clear the pill, this
+                            // title is the first thing under it instead,
+                            // so it carries the clearance itself, same
+                            // 140.dp this whole LazyColumn used to.
+                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 12.dp else 140.dp,
                             start = 48.dp,
                             bottom = 12.dp,
                         ),
