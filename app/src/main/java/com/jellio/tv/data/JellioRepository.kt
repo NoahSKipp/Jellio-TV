@@ -8,6 +8,7 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
+import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -38,7 +39,7 @@ private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
 // real metadata a plain row/grid fetch never asks for.
 private const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
-    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
+    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags,Trickplay"
 
 // Two distinct real patterns, same distinction navShared.js's own
 // getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
@@ -712,6 +713,29 @@ class JellioRepository @Inject constructor(
     // Real port of runtime/api.js's own getAudioStreams().
     fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =
         mediaSource.MediaStreams?.filter { it.Type == "Audio" } ?: emptyList()
+
+    // Real port of runtime/api.js's own pickTrickplayInfo(): the
+    // smallest real generated width for this MediaSourceId, same real
+    // reasoning that function's own comment documents (a scrub preview
+    // reads at a glance, not full detail, and a small real sheet is the
+    // cheaper real download on every seek). Width folded into the
+    // returned value the same way that function's own
+    // Object.assign({ Width: widths[0] }, ...) does, real key taking
+    // priority over whatever that sheet's own value already carried.
+    fun pickTrickplayInfo(item: BaseItemDto, mediaSourceId: String?): TrickplayInfoDto? {
+        val bySource = item.Trickplay?.get(mediaSourceId) ?: return null
+        val width = bySource.keys.mapNotNull { it.toIntOrNull() }.minOrNull() ?: return null
+        val info = bySource[width.toString()] ?: return null
+        return info.copy(Width = width)
+    }
+
+    // Real endpoint, GET /Videos/{itemId}/Trickplay/{width}/{index}.jpg
+    // (TrickplayController.cs's own GetTrickplayTileImage), confirmed
+    // against runtime/api.js's own getTrickplayTileUrl(): index is a
+    // real tile sheet's own position, several real thumbnails packed
+    // into one sheet, not a single thumbnail's own index.
+    fun trickplayTileUrl(serverAddress: String, accessToken: String, itemId: String, mediaSourceId: String?, width: Int, tileIndex: Int): String =
+        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?api_key=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
 
     private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
         val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
