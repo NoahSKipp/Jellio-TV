@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.greetingText
 import com.jellio.tv.data.model.groupByService
@@ -31,10 +30,18 @@ import javax.inject.Inject
 // its own real ROW_LIMIT), null for Continue Watching/Up Next and every
 // recommendation row, same real distinction buildRow()'s own callers
 // already draw.
+// key mirrors components/homeCustomizer.js's own real row key scheme
+// (wrapRowForCustomization's own second argument at every real call
+// site in screens/home.js): 'continue-watching', 'up-next',
+// 'catalog:<id>', 'genre:<name>', 'rec:<title>', stable across a
+// reload the same way that file's own real keys are, title alone
+// defaulting for a caller (Library, Service) that never sets one and
+// has no customization concept to key against.
 data class HomeSection(
     val title: String,
     val items: List<BaseItemDto>,
     val fetchAll: (suspend () -> List<BaseItemDto>)? = null,
+    val key: String = title,
 )
 
 data class HomeUiState(
@@ -45,16 +52,15 @@ data class HomeUiState(
     // real feedback found always wrong the moment it was actually
     // ever anything else.
     val greeting: String = "",
-    // Continue Watching then Up Next, kept separate from `sections`
-    // below only so ComingSoonRow can render between the two groups,
-    // the real order screens/home.js's own buildHomeSections() uses.
-    val leadingSections: List<HomeSection> = emptyList(),
-    val comingSoon: List<CalendarEntryDto> = emptyList(),
-    // Real service names groupByService(collections) actually found,
-    // sorted the same way components/services.js's own buildHubStrip()
-    // sorts its own tile strip.
-    val studioHubs: List<String> = emptyList(),
-    val sections: List<HomeSection> = emptyList(),
+    // Every real row this screen can show, in this file's own real
+    // build order (Continue Watching, Up Next, Coming Soon, Streaming
+    // Services, then recommendation/catalog/genre rows), the same real
+    // order screens/home.js's own wrapRowForCustomization() call sites
+    // wrap in. One flat list, not four separate typed ones, so
+    // HomeCustomization's reorder/hide below can work across all of
+    // them the same way that file's own single #rows container does.
+    val rows: List<HomeRow> = emptyList(),
+    val customization: HomeCustomizationDto = HomeCustomizationDto(),
     val error: String? = null,
 )
 
@@ -113,6 +119,7 @@ private fun titleFor(name: String?, kind: String): String {
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val customizationStore: HomeCustomizationStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -144,6 +151,7 @@ class HomeViewModel @Inject constructor(
                     val comingSoonDeferred = async { runCatching { repository.getCalendarEntries().take(COMING_SOON_LIMIT) }.getOrDefault(emptyList()) }
                     val collectionsDeferred = async { runCatching { repository.getCollections(session.userId) }.getOrDefault(emptyList()) }
                     val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
+                    val customizationDeferred = async { runCatching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
 
                     val continueWatching = continueWatchingDeferred.await()
                     val upNext = upNextDeferred.await()
@@ -151,6 +159,7 @@ class HomeViewModel @Inject constructor(
                     val comingSoon = comingSoonDeferred.await()
                     val collections = collectionsDeferred.await()
                     val user = userDeferred.await()
+                    val customization = customizationDeferred.await()
 
                     val studioHubs = groupByService(collections).keys.sorted()
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
@@ -184,19 +193,24 @@ class HomeViewModel @Inject constructor(
                     val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
                     val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
 
-                    val leadingSections = buildList {
+                    // Real port of screens/home.js's own real
+                    // wrapRowForCustomization() call order: Continue
+                    // Watching, Up Next, Coming Soon, Streaming
+                    // Services, then every recommendation/catalog/genre
+                    // row, same real sequence that file's own header
+                    // comments document at each real call site.
+                    val rows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
-                            add(HomeSection("Continue Watching", continueWatching))
+                            add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
                         }
                         if (upNext.isNotEmpty()) {
-                            add(HomeSection("Up Next", upNext))
+                            add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
                         }
-                    }
-
-                    val sections = buildList {
-                        addAll(recommendationRows)
-                        addAll(catalogRows)
-                        addAll(genreRows)
+                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
+                        if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
+                        recommendationRows.forEach { add(PosterHomeRow(it.copy(key = "rec:${it.title}"))) }
+                        catalogRows.forEach { add(PosterHomeRow(it)) }
+                        genreRows.forEach { add(PosterHomeRow(it)) }
                     }
 
                     val hero = heroCandidates.firstOrNull()
@@ -205,10 +219,8 @@ class HomeViewModel @Inject constructor(
                         isLoading = false,
                         heroItem = hero,
                         greeting = greeting,
-                        leadingSections = leadingSections,
-                        comingSoon = comingSoon,
-                        studioHubs = studioHubs,
-                        sections = sections,
+                        rows = rows,
+                        customization = customization,
                     )
                 }
             } catch (err: Exception) {
@@ -242,14 +254,38 @@ class HomeViewModel @Inject constructor(
     // rather than just the one the real options menu was opened from.
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
-        fun mapSections(sections: List<HomeSection>) = sections.map { section ->
-            if (section.items.none { it.Id == itemId }) section
-            else section.copy(items = section.items.map { if (it.Id == itemId) transform(it) else it })
+        val updatedRows = state.rows.map { row ->
+            if (row is PosterHomeRow && row.section.items.any { it.Id == itemId }) {
+                row.copy(section = row.section.copy(items = row.section.items.map { if (it.Id == itemId) transform(it) else it }))
+            } else {
+                row
+            }
         }
-        _uiState.value = state.copy(
-            leadingSections = mapSections(state.leadingSections),
-            sections = mapSections(state.sections),
-        )
+        _uiState.value = state.copy(rows = updatedRows)
+    }
+
+    // Real port of components/homeCustomizer.js's own real
+    // buildRowBar() button handlers: HomeCustomization's own pure
+    // effectiveOrder()/moveKey()/toggleHidden() do the actual work,
+    // this just persists the result the same real way that file's own
+    // saveHomeCustomization() does after every single call.
+    fun moveRow(key: String, delta: Int) {
+        val liveKeys = _uiState.value.rows.map { it.key }
+        val updated = HomeCustomization.moveKey(_uiState.value.customization, liveKeys, key, delta)
+        _uiState.value = _uiState.value.copy(customization = updated)
+        viewModelScope.launch { customizationStore.save(updated) }
+    }
+
+    fun toggleRowHidden(key: String) {
+        val updated = HomeCustomization.toggleHidden(_uiState.value.customization, key)
+        _uiState.value = _uiState.value.copy(customization = updated)
+        viewModelScope.launch { customizationStore.save(updated) }
+    }
+
+    fun resetCustomization() {
+        val updated = HomeCustomizationDto()
+        _uiState.value = _uiState.value.copy(customization = updated)
+        viewModelScope.launch { customizationStore.reset() }
     }
 
     private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>, val collectionId: String, val kind: String)
@@ -313,6 +349,7 @@ class HomeViewModel @Inject constructor(
                         title = entry.title,
                         items = deduped,
                         fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT) },
+                        key = "catalog:${entry.collectionId}",
                     ),
                 )
             }
@@ -357,6 +394,7 @@ class HomeViewModel @Inject constructor(
                         title = entry.genre,
                         items = deduped,
                         fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT) },
+                        key = "genre:${entry.genre}",
                     ),
                 )
             }
