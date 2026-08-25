@@ -46,6 +46,23 @@ class SettingsViewModel @Inject constructor(
     private val _passwordUpdateTick = MutableStateFlow(0)
     val passwordUpdateTick: StateFlow<Int> = _passwordUpdateTick.asStateFlow()
 
+    // Real port of screens/settings.js's own buildSleepTimerSection():
+    // real cross-client status (a timer started from the player on
+    // this same account/device pair) surfaced here too, for a reader
+    // not currently on the player screen. "No active playback
+    // session." is the same real placeholder that file's own status
+    // paragraph starts with before the real fetch below ever resolves,
+    // left in place on a failed fetch the same way that function's own
+    // empty catch block does, never overwritten with an error message.
+    private val _sleepTimerStatusText = MutableStateFlow("No active playback session.")
+    val sleepTimerStatusText: StateFlow<String> = _sleepTimerStatusText.asStateFlow()
+
+    private val _sleepTimerActive = MutableStateFlow(false)
+    val sleepTimerActive: StateFlow<Boolean> = _sleepTimerActive.asStateFlow()
+
+    private val _isCancellingSleepTimer = MutableStateFlow(false)
+    val isCancellingSleepTimer: StateFlow<Boolean> = _isCancellingSleepTimer.asStateFlow()
+
     private val _quickConnectEnabled = MutableStateFlow(false)
     val quickConnectEnabled: StateFlow<Boolean> = _quickConnectEnabled.asStateFlow()
 
@@ -63,6 +80,15 @@ class SettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch { _rememberStream.value = streamPreferences.isRememberEnabled() }
         viewModelScope.launch { _quickConnectEnabled.value = repository.isQuickConnectEnabled() }
+        // Real screens/settings.js's own Promise.all: neither this nor
+        // the Quick Connect check above depends on the signed in
+        // user's own data at all, so both fire alongside the user
+        // fetch load() below kicks off, not one after another.
+        viewModelScope.launch {
+            val result = repository.getSleepTimerStatus() ?: return@launch
+            _sleepTimerActive.value = result.Active
+            _sleepTimerStatusText.value = if (result.Active) "A sleep timer is running." else "No sleep timer is running."
+        }
     }
 
     fun setRememberStream(enabled: Boolean) {
@@ -122,6 +148,26 @@ class SettingsViewModel @Inject constructor(
                 _passwordStatus.value = "Could not update password. Check your current password."
             } finally {
                 _isUpdatingPassword.value = false
+            }
+        }
+    }
+
+    // Real port of that file's own Cancel timer click handler: on
+    // success the status line and button both react (Compose drops the
+    // button itself once sleepTimerActive flips false, the same real
+    // job that function's own cancel.remove() does); on failure only
+    // the button re-enables, the "A sleep timer is running." text and
+    // button both left in place for a retry, same real fallback that
+    // function's own catch block leaves too.
+    fun cancelSleepTimer() {
+        viewModelScope.launch {
+            _isCancellingSleepTimer.value = true
+            try {
+                repository.cancelSleepTimer()
+                _sleepTimerStatusText.value = "Sleep timer cancelled."
+                _sleepTimerActive.value = false
+            } finally {
+                _isCancellingSleepTimer.value = false
             }
         }
     }
