@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +69,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.session.Session
@@ -166,6 +169,10 @@ fun PlayerScreen(
                 defaultAudioStreamIndex = uiState.defaultAudioStreamIndex,
                 sourceOptions = uiState.sourceOptions,
                 currentMediaSourceId = uiState.mediaSourceId,
+                currentItemId = itemId,
+                seasons = uiState.seasons,
+                selectedSeasonId = uiState.selectedSeasonId,
+                episodes = uiState.episodes,
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
@@ -183,6 +190,10 @@ fun PlayerScreen(
                 },
                 onSelectAudioTrack = { streamIndex, positionTicks -> viewModel.switchAudioTrack(session, streamIndex, positionTicks) },
                 onSelectSource = { source, positionTicks -> viewModel.switchSource(session, source, positionTicks) },
+                onSelectSeason = { seasonId ->
+                    val seriesId = uiState.seriesId
+                    if (seriesId != null) viewModel.loadSeasonEpisodes(session, seriesId, seasonId)
+                },
                 onRestart = { viewModel.restart(session) },
                 onPlayNext = onPlayNext,
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
@@ -206,6 +217,10 @@ private fun PlayerSurface(
     defaultAudioStreamIndex: Int?,
     sourceOptions: List<MediaSourceDto>,
     currentMediaSourceId: String?,
+    currentItemId: String,
+    seasons: List<BaseItemDto>,
+    selectedSeasonId: String?,
+    episodes: List<EpisodePanelEntry>,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
@@ -217,6 +232,7 @@ private fun PlayerSurface(
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
     onSelectAudioTrack: (Int, Long) -> Unit,
     onSelectSource: (MediaSourceDto, Long) -> Unit,
+    onSelectSeason: (String) -> Unit,
     onRestart: () -> Unit,
     onPlayNext: (String) -> Unit,
     onStartSleepTimer: (Int) -> Unit,
@@ -275,6 +291,7 @@ private fun PlayerSurface(
     var showSleepMenu by remember { mutableStateOf(false) }
     var showAudioMenu by remember { mutableStateOf(false) }
     var showSourcePanel by remember { mutableStateOf(false) }
+    var showEpisodesPanel by remember { mutableStateOf(false) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
@@ -405,8 +422,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel, showEpisodesPanel) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel && !showEpisodesPanel) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -451,6 +468,13 @@ private fun PlayerSurface(
                 if (showSourcePanel) {
                     if (event.key == Key.Back) {
                         showSourcePanel = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (showEpisodesPanel) {
+                    if (event.key == Key.Back) {
+                        showEpisodesPanel = false
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -529,6 +553,7 @@ private fun PlayerSurface(
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 hasAudioTracks = audioTracks.size > 1,
                 hasSourceOptions = sourceOptions.size > 1,
+                hasEpisodes = seasons.isNotEmpty(),
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
@@ -536,7 +561,14 @@ private fun PlayerSurface(
                 onOpenSpeedMenu = { showSpeedMenu = true },
                 onOpenSleepMenu = { showSleepMenu = true },
                 onOpenAudioMenu = { showAudioMenu = true },
-                onOpenSourceMenu = { showSourcePanel = true },
+                onOpenSourceMenu = {
+                    showEpisodesPanel = false
+                    showSourcePanel = true
+                },
+                onOpenEpisodesMenu = {
+                    showSourcePanel = false
+                    showEpisodesPanel = true
+                },
             )
         }
 
@@ -570,6 +602,26 @@ private fun PlayerSurface(
                     onSelectSource(source, player.currentPosition * TICKS_PER_MS)
                 },
                 onDismiss = { showSourcePanel = false },
+            )
+        }
+
+        // Real port of screens/player.js's own episodesButton gating:
+        // episodesButton.disabled stays true until getSeasons(item.
+        // SeriesId) actually resolves a real season, same real
+        // condition seasons.isNotEmpty() already checks before this
+        // button even renders in PlayerControls above.
+        if (showEpisodesPanel && seasons.isNotEmpty()) {
+            EpisodesPanel(
+                seasons = seasons,
+                selectedSeasonId = selectedSeasonId,
+                episodes = episodes,
+                currentItemId = currentItemId,
+                onSelectSeason = onSelectSeason,
+                onSelectEpisode = { episodeId ->
+                    showEpisodesPanel = false
+                    if (episodeId != currentItemId) onPlayNext(episodeId)
+                },
+                onDismiss = { showEpisodesPanel = false },
             )
         }
 
@@ -663,6 +715,7 @@ private fun PlayerControls(
     hasSubtitleTracks: Boolean,
     hasAudioTracks: Boolean,
     hasSourceOptions: Boolean,
+    hasEpisodes: Boolean,
     speedLabel: String,
     sleepTimerActive: Boolean,
     onPlayPause: () -> Unit,
@@ -671,6 +724,7 @@ private fun PlayerControls(
     onOpenSleepMenu: () -> Unit,
     onOpenAudioMenu: () -> Unit,
     onOpenSourceMenu: () -> Unit,
+    onOpenEpisodesMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -744,6 +798,25 @@ private fun PlayerControls(
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.SwapHoriz, contentDescription = "Sources", tint = JellioText)
+                    }
+                }
+            }
+            // Real port of the pill's own episodesButton: disabled
+            // (episodesButton.disabled) until getSeasons(item.SeriesId)
+            // actually resolves a real season, same real condition
+            // hasEpisodes already checks before this button even
+            // renders. A Movie never gets here at all, same real gate
+            // this file's own isEpisodeItem && item.SeriesId check
+            // applies before that fetch ever fires.
+            if (hasEpisodes) {
+                Surface(
+                    onClick = onOpenEpisodesMenu,
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Filled.VideoLibrary, contentDescription = "Episodes", tint = JellioText)
                     }
                 }
             }
@@ -1172,6 +1245,123 @@ private fun SourcePanel(
                             if (source.Id != currentMediaSourceId) onSelect(source) else onDismiss()
                         },
                         isActive = source.Id == currentMediaSourceId,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own Episodes side panel: season
+// tabs (buildEpisodeRow's own Specials-last isSpecialsSeason() order,
+// applied once in PlayerViewModel rather than here) plus that season's
+// own episode list, only ever shown for a real Episode with a real
+// SeriesId behind it (a Movie's own episodesButton never leaves its
+// disabled state, see hasEpisodes above).
+@Composable
+private fun EpisodesPanel(
+    seasons: List<BaseItemDto>,
+    selectedSeasonId: String?,
+    episodes: List<EpisodePanelEntry>,
+    currentItemId: String,
+    onSelectSeason: (String) -> Unit,
+    onSelectEpisode: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 104.dp, end = 48.dp)
+                .widthIn(min = 380.dp, max = 480.dp)
+                .heightIn(max = 560.dp)
+                .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                .padding(16.dp),
+        ) {
+            Text(text = "Episodes", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                items(seasons, key = { it.Id }) { season ->
+                    val isActive = season.Id == selectedSeasonId
+                    Surface(
+                        onClick = { onSelectSeason(season.Id) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = if (isActive) JellioSecondary else Color.White.copy(alpha = 0.08f),
+                            contentColor = if (isActive) JellioBg else JellioText,
+                        ),
+                    ) {
+                        Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
+                }
+            }
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                items(episodes, key = { it.itemId }) { episode ->
+                    EpisodeRow(episode = episode, isActive = episode.itemId == currentItemId, onClick = { onSelectEpisode(episode.itemId) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeRow(episode: EpisodePanelEntry, isActive: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(modifier = Modifier.padding(10.dp)) {
+            Box(modifier = Modifier.width(120.dp).height(68.dp).background(Color.Black, RoundedCornerShape(8.dp))) {
+                if (episode.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = episode.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                    )
+                }
+                if (episode.rating != null) {
+                    Text(
+                        text = episode.rating,
+                        color = JellioText,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
+                    )
+                }
+                if (episode.episodeCode != null) {
+                    Text(
+                        text = episode.episodeCode,
+                        color = JellioText,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(text = episode.title, color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (episode.overview != null) {
+                    Text(
+                        text = episode.overview,
+                        color = JellioTextSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }

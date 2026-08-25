@@ -57,6 +57,20 @@ data class UpNextInfo(
     val title: String,
 )
 
+// Real port of screens/player.js's own buildEpisodeRow(): thumbnailUrl
+// always a real Primary image (ImageTags.Primary or, absent that, the
+// season/series own ParentThumbImageTag), same real fallback that
+// function's own thumbTag line documents; rating pre-formatted to one
+// decimal the same way that row's own CommunityRating.toFixed(1) is.
+data class EpisodePanelEntry(
+    val itemId: String,
+    val title: String,
+    val thumbnailUrl: String?,
+    val episodeCode: String?,
+    val rating: String?,
+    val overview: String?,
+)
+
 // Real port of screens/player.js's own audioStreamLabel(): a real
 // track's own Language (uppercased) or DisplayTitle when there is no
 // Language, Codec and ChannelLayout appended after a real "·" when
@@ -126,6 +140,15 @@ data class PlayerUiState(
     // switch to, so the Sources button stays hidden rather than opening
     // onto a list of one.
     val sourceOptions: List<MediaSourceDto> = emptyList(),
+    // Only ever populated for a real Episode with a real SeriesId, same
+    // real gating screens/player.js's own getSeasons(item.SeriesId)
+    // .then() applies to episodesButton.disabled: a Movie has nothing
+    // to browse to here.
+    val seriesId: String? = null,
+    val seasons: List<BaseItemDto> = emptyList(),
+    val selectedSeasonId: String? = null,
+    val episodes: List<EpisodePanelEntry> = emptyList(),
+    val isLoadingEpisodes: Boolean = false,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -238,6 +261,34 @@ class PlayerViewModel @Inject constructor(
                     val sources = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrNull()
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
+                    }
+                }
+
+                // Real port of screens/player.js's own real fire-and-
+                // forget getSeasons(item.SeriesId).then(...): only wired
+                // up for a real Episode with a real SeriesId, same real
+                // gating that file's own isEpisodeItem && item.SeriesId
+                // check applies before ever enabling episodesButton.
+                // Specials sorted last, same real isSpecialsSeason()
+                // convention screens/detail.js's own season tabs already
+                // settled on, then that file's own default season picked
+                // (this Episode's own SeasonId, or the first real one)
+                // loaded immediately, same real behaviour that function's
+                // own trailing if (!episodeList.children.length) block
+                // guarantees.
+                val seriesId = item.SeriesId
+                if (isEpisode && seriesId != null) {
+                    _uiState.value = _uiState.value.copy(seriesId = seriesId)
+                    viewModelScope.launch {
+                        val seasons = runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList())
+                        if (seasons.isNotEmpty()) {
+                            val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
+                            _uiState.value = _uiState.value.copy(seasons = ordered)
+                            val defaultSeason = ordered.firstOrNull { it.Id == item.SeasonId } ?: ordered.firstOrNull()
+                            if (defaultSeason != null) {
+                                loadSeasonEpisodes(session, seriesId, defaultSeason.Id)
+                            }
+                        }
                     }
                 }
             } catch (err: Exception) {
@@ -497,6 +548,47 @@ class PlayerViewModel @Inject constructor(
                 // gap restart()'s own catch block above already notes.
             }
         }
+    }
+
+    // Real port of screens/detail.js's own isSpecialsSeason(): real
+    // Jellyfin IndexNumber 0, or a name that just reads as Specials,
+    // the exact same real convention this app's own DetailScreen season
+    // tabs already use for that screen's own tab bar, duplicated here
+    // for this second, in-player one rather than shared, same real
+    // duplication screens/player.js's own copy of that function keeps
+    // against screens/detail.js's own original.
+    private fun isSpecialsSeason(season: BaseItemDto): Boolean {
+        if (season.IndexNumber == 0) return true
+        return season.Name?.contains("special", ignoreCase = true) == true
+    }
+
+    // Real port of screens/player.js's own loadSeasonEpisodes(): swaps
+    // in a new season's own episode list, called both for the real
+    // default season load()'s own real fire-and-forget above already
+    // triggers and for every later real season tab tap PlayerScreen
+    // sends here.
+    fun loadSeasonEpisodes(session: Session, seriesId: String, seasonId: String) {
+        _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId, isLoadingEpisodes = true)
+        viewModelScope.launch {
+            val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }
+                .getOrDefault(emptyList())
+                .map { buildEpisodePanelEntry(session, it) }
+            _uiState.value = _uiState.value.copy(episodes = episodes, isLoadingEpisodes = false)
+        }
+    }
+
+    private fun buildEpisodePanelEntry(session: Session, episode: BaseItemDto): EpisodePanelEntry {
+        val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
+        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400) }
+        val hasCode = episode.ParentIndexNumber != null && episode.IndexNumber != null
+        return EpisodePanelEntry(
+            itemId = episode.Id,
+            title = episode.Name.orEmpty(),
+            thumbnailUrl = thumbnailUrl,
+            episodeCode = if (hasCode) "S${episode.ParentIndexNumber}E${episode.IndexNumber}" else null,
+            rating = episode.CommunityRating?.let { "%.1f".format(it) },
+            overview = episode.Overview,
+        )
     }
 
     fun reportStart(positionTicks: Long) {
