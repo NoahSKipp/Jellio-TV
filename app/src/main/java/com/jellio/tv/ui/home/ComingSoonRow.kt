@@ -27,6 +27,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -108,11 +109,12 @@ private fun ComingSoonCard(
     imageUrl: (String, String?, String, Int) -> String,
     onClick: () -> Unit,
 ) {
+    val cardWidth = CardWidth.scaled()
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-        modifier = Modifier.width(CardWidth),
+        modifier = Modifier.width(cardWidth),
     ) {
         Column {
             Box {
@@ -120,7 +122,7 @@ private fun ComingSoonCard(
                     model = imageUrl(entry.ItemId, null, "Primary", 400),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.width(CardWidth).aspectRatio(2f / 3f),
+                    modifier = Modifier.width(cardWidth).aspectRatio(2f / 3f),
                 )
                 Box(
                     modifier = Modifier

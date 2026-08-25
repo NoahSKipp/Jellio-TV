@@ -73,6 +73,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -367,22 +368,23 @@ private fun DetailHero(
     onDislike: () -> Unit,
 ) {
     val backdropUrl = heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
-    Box(modifier = Modifier.fillMaxWidth().height(HeroHeight)) {
+    val heroHeight = HeroHeight.scaled()
+    Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
         if (backdropUrl != null) {
             AsyncImage(
                 model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(HeroHeight),
+                modifier = Modifier.fillMaxWidth().height(heroHeight),
             )
         }
         Box(
-            modifier = Modifier.fillMaxWidth().height(HeroHeight).background(
+            modifier = Modifier.fillMaxWidth().height(heroHeight).background(
                 Brush.verticalGradient(listOf(Color.Transparent, JellioBg), startY = 0f, endY = Float.POSITIVE_INFINITY),
             ),
         )
         Box(
-            modifier = Modifier.fillMaxWidth().height(HeroHeight).background(
+            modifier = Modifier.fillMaxWidth().height(heroHeight).background(
                 Brush.horizontalGradient(listOf(JellioBg.copy(alpha = 0.85f), Color.Transparent), endX = 1100f),
             ),
         )
@@ -585,16 +587,17 @@ private fun EpisodeCard(
 ) {
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
-    Box(modifier = Modifier.width(320.dp)) {
+    val cardWidth = 320.dp.scaled()
+    Box(modifier = Modifier.width(cardWidth)) {
         Surface(
             onClick = onClick,
             onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-            modifier = Modifier.width(320.dp),
+            modifier = Modifier.width(cardWidth),
         ) {
             Column {
-                Box(modifier = Modifier.width(320.dp).aspectRatio(16f / 9f)) {
+                Box(modifier = Modifier.width(cardWidth).aspectRatio(16f / 9f)) {
                     if (thumbUrl != null) {
                         AsyncImage(model = thumbUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     }
@@ -630,16 +633,17 @@ private fun EpisodeCard(
 private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, Int) -> String, onPersonClick: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = "Cast", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
+        val avatarWidth = 140.dp.scaled()
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(cast, key = { it.Id }) { person ->
                 Surface(
                     onClick = { onPersonClick(person.Id) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.width(140.dp),
+                    modifier = Modifier.width(avatarWidth),
                 ) {
                     Column {
-                        Box(modifier = Modifier.width(140.dp).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
+                        Box(modifier = Modifier.width(avatarWidth).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
                             val tag = person.PrimaryImageTag
                             if (tag != null) {
                                 AsyncImage(
@@ -671,6 +675,7 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp, bottom = 48.dp)) {
         Text(text = "Trailers", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
+        val trailerCardWidth = 280.dp.scaled()
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(trailers) { trailer ->
                 val url = trailer.Url ?: return@items
@@ -678,10 +683,10 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                     onClick = { onOpen(url) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-                    modifier = Modifier.width(280.dp),
+                    modifier = Modifier.width(trailerCardWidth),
                 ) {
                     Column {
-                        Box(modifier = Modifier.width(280.dp).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.width(trailerCardWidth).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                             Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
                         }
                         Text(
