@@ -2,6 +2,7 @@ package com.jellio.tv.ui.nav
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -130,6 +132,19 @@ fun TopNavPill(
         animationSpec = tween(240, easing = FastOutSlowInEasing),
         label = "pillHeight",
     )
+    // Real feedback live: icon-only/compact mode (scrolled past the
+    // top of a row, components/mobileNav.js's own scroll-driven state)
+    // read as solid and heavy sitting over content it should be
+    // getting out of the way of, full opacity really only earning its
+    // keep while the pill is still showing its own real labels. Same
+    // 240ms/FastOutSlowInEasing pairing as the height/label shrink
+    // above so all three read as one real motion rather than two out
+    // of sync with each other.
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (isCompact) 0.55f else 1f,
+        animationSpec = tween(240, easing = FastOutSlowInEasing),
+        label = "pillAlpha",
+    )
     // Real bug found live testing on device: cold app start left focus
     // nowhere at all, so the very first D-pad press in any direction
     // fell through to Compose's own generic "pick something" default
@@ -150,6 +165,7 @@ fun TopNavPill(
                 .padding(top = 32.dp)
                 .height(pillHeight)
                 .widthIn(max = PillMaxWidth)
+                .alpha(pillAlpha)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
