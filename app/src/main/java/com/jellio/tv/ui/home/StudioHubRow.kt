@@ -22,6 +22,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
+import com.jellio.tv.ui.theme.scaled
 
 private val TileWidth = 200.dp
 private val TileHeight = 110.dp
@@ -54,11 +55,13 @@ fun StudioHubRow(
 
 @Composable
 private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
+    val tileWidth = TileWidth.scaled()
+    val tileHeight = TileHeight.scaled()
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-        modifier = Modifier.width(TileWidth).height(TileHeight),
+        modifier = Modifier.width(tileWidth).height(tileHeight),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -68,7 +71,7 @@ private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
                 model = logoUrl,
                 contentDescription = name,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(width = TileWidth - 24.dp, height = TileHeight - 48.dp),
+                modifier = Modifier.size(width = tileWidth - 24.dp, height = tileHeight - 48.dp),
             )
             Text(
                 text = name,

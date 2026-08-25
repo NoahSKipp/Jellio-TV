@@ -36,6 +36,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 
 private val LandscapeCardWidth = 300.dp
 private const val TICKS_PER_SECOND = 10_000_000L
@@ -142,14 +143,15 @@ fun LandscapeCard(
     val remaining = remainingLabel(item)
     val percentage = item.UserData?.PlayedPercentage
 
-    Box(modifier = modifier.width(LandscapeCardWidth)) {
+    val landscapeCardWidth = LandscapeCardWidth.scaled()
+    Box(modifier = modifier.width(landscapeCardWidth)) {
     if (isRemoving) {
         val shatterUrl = landscapeImageUrl(item, imageUrl)
         if (shatterUrl != null) {
             CardShatterOverlay(
                 imageUrl = shatterUrl,
-                cardWidth = LandscapeCardWidth,
-                cardHeight = LandscapeCardWidth * 9f / 16f,
+                cardWidth = landscapeCardWidth,
+                cardHeight = landscapeCardWidth * 9f / 16f,
                 onFinished = onShatterFinished,
             )
         } else {
@@ -161,9 +163,9 @@ fun LandscapeCard(
         onLongClick = onOptionsClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-        modifier = Modifier.width(LandscapeCardWidth),
+        modifier = Modifier.width(landscapeCardWidth),
     ) {
-        Box(modifier = Modifier.width(LandscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
+        Box(modifier = Modifier.width(landscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
             val url = landscapeImageUrl(item, imageUrl)
             if (url != null) {
                 AsyncImage(
