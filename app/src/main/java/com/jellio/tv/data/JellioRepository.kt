@@ -641,10 +641,24 @@ class JellioRepository @Inject constructor(
         mediaSourceId: String?,
         startTimeTicks: Long,
         burnInSubtitleStreamIndex: Int? = null,
+        audioStreamIndex: Int? = null,
     ): PlaybackTarget {
         val response = api.getPlaybackInfo(
             itemId,
-            PlaybackInfoRequest(UserId = userId, StartTimeTicks = startTimeTicks, MediaSourceId = mediaSourceId),
+            PlaybackInfoRequest(
+                UserId = userId,
+                StartTimeTicks = startTimeTicks,
+                MediaSourceId = mediaSourceId,
+                // Real fields runtime/api.js's own getPlaybackInfo()
+                // also sends: a bare stream URL query param change alone
+                // (no fresh negotiation carrying these) never once
+                // produced a genuinely new transcode job server side,
+                // confirmed against a real server log before this
+                // existed, same real reasoning that file's own comment
+                // documents.
+                AudioStreamIndex = audioStreamIndex,
+                SubtitleStreamIndex = burnInSubtitleStreamIndex,
+            ),
         )
         val mediaSource = response.MediaSources.firstOrNull { it.Id == mediaSourceId }
             ?: response.MediaSources.firstOrNull()
@@ -654,8 +668,14 @@ class JellioRepository @Inject constructor(
         // this app's own /Videos/{id}/stream.{container} endpoint, never
         // MediaSourceInfo.TranscodingUrl (that file never once reads
         // that field either, a forced transcode is this same endpoint
-        // with VideoCodec/AudioCodec params instead of Static=true).
-        val directPlay = burnInSubtitleStreamIndex == null && canDirectPlay(mediaSource)
+        // with VideoCodec/AudioCodec params instead of Static=true). A
+        // non-default real audio track forces the same real transcode a
+        // burned in subtitle already does: Static=true (a direct
+        // playable file) serves every embedded track as is, no way to
+        // tell the server which one to actually decode.
+        val forceTranscode = burnInSubtitleStreamIndex != null ||
+            (audioStreamIndex != null && audioStreamIndex != mediaSource.DefaultAudioStreamIndex)
+        val directPlay = !forceTranscode && canDirectPlay(mediaSource)
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
@@ -677,6 +697,9 @@ class JellioRepository @Inject constructor(
                 append("&VideoBitRate=").append(estimateVideoBitrate(mediaSource))
                 append("&AudioBitRate=192000")
             }
+            if (audioStreamIndex != null) {
+                append("&AudioStreamIndex=").append(audioStreamIndex)
+            }
             if (burnInSubtitleStreamIndex != null) {
                 append("&SubtitleStreamIndex=").append(burnInSubtitleStreamIndex)
                 append("&SubtitleMethod=Encode")
@@ -685,6 +708,10 @@ class JellioRepository @Inject constructor(
 
         return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks)
     }
+
+    // Real port of runtime/api.js's own getAudioStreams().
+    fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =
+        mediaSource.MediaStreams?.filter { it.Type == "Audio" } ?: emptyList()
 
     private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
         val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }

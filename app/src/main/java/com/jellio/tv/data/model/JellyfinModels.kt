@@ -84,6 +84,10 @@ data class MediaStreamDto(
     val Height: Int? = null,
     val BitRate: Long? = null,
     val Channels: Int? = null,
+    // Real field screens/player.js's own audioStreamLabel() reads
+    // (e.g. "5.1", "stereo"), distinct from the plain Channels count
+    // above.
+    val ChannelLayout: String? = null,
     val Index: Int? = null,
     // Real fields screens/player.js's own subtitle track list reads:
     // an image based track (PGS, VobSub) has no WebVTT form, nothing
@@ -163,6 +167,14 @@ data class PlaybackInfoRequest(
     val EnableTranscoding: Boolean = true,
     val AutoOpenLiveStream: Boolean = true,
     val MediaSourceId: String? = null,
+    // Real fields on Jellyfin.Api's own PlaybackInfoDto, confirmed
+    // against runtime/api.js's own getPlaybackInfo() before writing
+    // this: a bare stream URL query param change alone (no fresh
+    // negotiation carrying these) was chased through a real server log
+    // and never once produced a genuinely new transcode job server
+    // side, real feedback that file's own comment already documents.
+    val AudioStreamIndex: Int? = null,
+    val SubtitleStreamIndex: Int? = null,
 )
 
 @JsonClass(generateAdapter = true)
