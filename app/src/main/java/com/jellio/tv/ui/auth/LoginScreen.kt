@@ -50,14 +50,14 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.JellioTrending
 
-// Real port of screens/login.js's own real login: a device with a
-// known server and at least one real remembered or public profile
-// opens onto that file's own real "Who's watching?" grid rather than
-// straight to a bare form, the exact same real profile-picker-first
-// behaviour that file's own renderLogin() gives every return visit.
+// Real port of native jellyfin-web's own #/login flow, LoginViewModel.kt's
+// own header comment covers why this app themes rather than replaces
+// it: server address first on a true first run (SERVER_ENTRY), then
+// straight onto "Who's watching?" (PROFILE_PICKER) once that server
+// answers back with at least one real remembered or public profile,
+// a bare username/password form (MANUAL) only ever the real fallback.
 // LoginViewModel.kt's own header comment covers the real state
-// machine (CHECKING/PROFILE_PICKER/MANUAL) driving which of the three
-// composables below is on screen.
+// machine driving which composable below is on screen.
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
@@ -69,6 +69,10 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
             // Left blank rather than flashing the manual form for the
             // one frame before the real server/profile check resolves.
             LoginMode.CHECKING -> Unit
+            LoginMode.SERVER_ENTRY -> ServerAddressForm(
+                uiState = uiState,
+                onContinue = { server -> viewModel.submitServerAddress(server) },
+            )
             LoginMode.PROFILE_PICKER -> ProfilePicker(
                 uiState = uiState,
                 onQuickSignIn = { viewModel.quickSignIn(it) },
@@ -93,6 +97,51 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
                 onSubmit = { pin, newPassword, confirmPassword -> viewModel.redeemPasswordReset(pin, newPassword, confirmPassword) },
                 onCancel = { viewModel.cancelForgotPassword() },
             )
+        }
+    }
+}
+
+// Real port of native jellyfin-web's own #/login server-address step,
+// LoginViewModel.kt's own header comment covers why this app themes
+// rather than replaces it: split out from ManualLoginForm below so a
+// true first run only ever asks for the one thing it actually needs
+// before it can even know whether a profile picker is possible,
+// rather than username/password fields sitting there with no server
+// yet to check them against.
+@Composable
+private fun ServerAddressForm(
+    uiState: LoginUiState,
+    onContinue: (String) -> Unit,
+) {
+    var serverAddress by remember(uiState.serverAddress) { mutableStateOf(uiState.serverAddress) }
+
+    Column(
+        modifier = Modifier.width(420.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(text = "Jellio TV", style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = "Enter your Jellio server address to get started",
+            style = MaterialTheme.typography.bodyLarge,
+            color = JellioTextSecondary,
+            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
+        )
+        JellioTextField(
+            value = serverAddress,
+            onValueChange = { serverAddress = it },
+            label = "Server address (https://...)",
+            modifier = Modifier.fillMaxWidth(),
+        )
+        uiState.error?.let { error ->
+            Text(text = error, color = JellioTrending, modifier = Modifier.padding(top = 16.dp))
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+        Surface(
+            onClick = { onContinue(serverAddress) },
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+        ) {
+            Text(text = "Continue", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
     }
 }

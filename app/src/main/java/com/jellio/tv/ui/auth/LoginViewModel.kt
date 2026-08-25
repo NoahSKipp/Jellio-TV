@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class LoginMode { CHECKING, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN }
+enum class LoginMode { CHECKING, SERVER_ENTRY, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN }
 
 data class RememberedProfile(val userId: String, val name: String, val primaryImageTag: String?)
 
@@ -36,13 +36,16 @@ data class LoginUiState(
     val resetStatus: String? = null,
 )
 
-// Real port of screens/login.js's own renderProfilePicker()/
-// showManual() state machine: a device with a known server and at
-// least one real remembered or public profile opens onto "Who's
-// watching?" (PROFILE_PICKER), the exact same real fallback to a bare
-// manual form that file's own header comment documents for a true
-// first run (no server known yet) or a server with neither kind of
-// profile to show.
+// Real port of native jellyfin-web's own #/login flow this plugin
+// only ever themes rather than replaces (Jellio-Plugin ships no
+// login.js of its own, loginTheme.js's own header confirms: a plain
+// class toggle for css/login.css to hook, nothing else): server
+// address first (SERVER_ENTRY), then "Who's watching?" once that
+// server answers back with at least one real remembered or public
+// profile (PROFILE_PICKER), a bare username/password form
+// (MANUAL) only as the real fallback for a true first run once a
+// server is known but has neither kind of profile to show, or for a
+// profile this device has no passwordless/remembered shortcut for.
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -69,7 +72,7 @@ class LoginViewModel @Inject constructor(
             _uiState.value = LoginUiState(mode = LoginMode.CHECKING)
             val serverAddress = knownServerAddress.ifEmpty { repository.knownServerAddress().orEmpty() }
             if (serverAddress.isEmpty()) {
-                _uiState.value = LoginUiState(mode = LoginMode.MANUAL, serverAddress = "")
+                _uiState.value = LoginUiState(mode = LoginMode.SERVER_ENTRY, serverAddress = "")
                 return@launch
             }
 
@@ -92,6 +95,19 @@ class LoginViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    // SERVER_ENTRY's own "Continue": loadProfiles() above already
+    // branches on whatever this server actually answers back with, the
+    // exact same real PROFILE_PICKER/MANUAL decision backToProfiles()
+    // makes on a device that already knew its server.
+    fun submitServerAddress(serverAddress: String) {
+        val normalized = serverAddress.trim().trimEnd('/')
+        if (normalized.isEmpty()) {
+            _uiState.value = _uiState.value.copy(error = "Enter your server address")
+            return
+        }
+        loadProfiles(normalized)
     }
 
     fun quickSignIn(userId: String) {
