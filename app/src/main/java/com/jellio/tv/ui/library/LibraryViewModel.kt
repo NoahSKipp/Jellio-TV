@@ -22,6 +22,11 @@ private const val GENRE_ROWS = 6
 private const val ROW_LIMIT = 20
 private const val MAX_ANIME_ROWS = 8
 private const val COVERFLOW_MIN_ITEMS = 3
+// Real screens/library.js's own ROW_LIST_LIMIT: components/
+// rowListModal.js's own "browse everything" cap, that file's own
+// independently redeclared constant, kept the same way here rather
+// than reusing HomeViewModel's or ServiceViewModel's own private copy.
+private const val ROW_LIST_LIMIT = 500
 
 // Only a real anime catalog collection whose own name actually says
 // "trending" earns the coverflow below: JellioRepository's own
@@ -116,10 +121,39 @@ class LibraryViewModel @Inject constructor(
         val coverflowItems = coverflowItemsDeferred.await()
         val mainItems = mainItemsDeferred.await().filterNot { excludeIds.contains(it.Id) }
 
-        val sections = mutableListOf(HomeSection("Recently Added", mainItems))
+        // Real port of screens/library.js's own buildRow(...,
+        // fetchAll) calls for the main row and each genre row: neither
+        // one re-applies the anime exclude set inside its own fetchAll
+        // closure there either (only the initial row fetch above does),
+        // same real (if perhaps unintended) behaviour kept here rather
+        // than "fixed" beyond what that file actually does.
+        val sections = mutableListOf(
+            HomeSection(
+                "Recently Added",
+                mainItems,
+                fetchAll = {
+                    repository.getLibraryItems(
+                        session.userId,
+                        library.Id,
+                        limit = ROW_LIST_LIMIT,
+                        includeItemTypes = itemType,
+                        sortBy = "DateCreated",
+                        sortOrder = "Descending",
+                    )
+                },
+            ),
+        )
         genreItemsDeferred.forEach { (genre, deferred) ->
             val items = deferred.await().filterNot { excludeIds.contains(it.Id) }
-            if (items.isNotEmpty()) sections.add(HomeSection(genre, items))
+            if (items.isNotEmpty()) {
+                sections.add(
+                    HomeSection(
+                        genre,
+                        items,
+                        fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT) },
+                    ),
+                )
+            }
         }
 
         // Real feedback pointed at Harbor's own Shows tab, a mood-led
@@ -195,8 +229,21 @@ class LibraryViewModel @Inject constructor(
             }
         }
 
+        // Real port of that file's own buildRow(collectionName, items,
+        // null, fetchAll) call for each anime catalog row: real
+        // getCollectionItems(collectionId, collectionType,
+        // ROW_LIST_LIMIT), collectionType fixed to "tvshows" the same
+        // way the initial per-catalog fetch above already is.
         val sections = itemLists.mapNotNull { (collection, items) ->
-            if (collection.Id == trendingId || items.isEmpty()) null else HomeSection(collection.Name ?: "", items)
+            if (collection.Id == trendingId || items.isEmpty()) {
+                null
+            } else {
+                HomeSection(
+                    collection.Name ?: "",
+                    items,
+                    fetchAll = { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIST_LIMIT) },
+                )
+            }
         }
 
         if (sections.isEmpty() && !coverflowIsTrending) {
