@@ -171,6 +171,15 @@ data class PlayerUiState(
     // own pickTrickplayInfo() != null already checks before that
     // file's own scrub preview ever gets built at all.
     val hasTrickplay: Boolean = false,
+    // Real port of screens/player.js's own showPlayerToast(): a short
+    // lived status/error line surfacing failures the four re-
+    // negotiating actions below already had no visible feedback for.
+    // toastId bumps on every call so PlayerScreen's own auto-dismiss
+    // effect restarts even when the exact same message fires twice in
+    // a row, same real behaviour that file's own clearTimeout + fresh
+    // setTimeout on every call already gets for free.
+    val toastMessage: String? = null,
+    val toastId: Long = 0L,
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -198,6 +207,22 @@ class PlayerViewModel @Inject constructor(
     private var trickplaySession: Session? = null
     private var trickplayInfo: TrickplayInfoDto? = null
     private var trickplayMediaSourceId: String? = null
+    private var toastSeq = 0L
+
+    private fun showToast(message: String) {
+        toastSeq++
+        _uiState.value = _uiState.value.copy(toastMessage = message, toastId = toastSeq)
+    }
+
+    // Called by PlayerScreen's own auto-dismiss effect once its delay
+    // elapses; the id guard means a toast that already got replaced by
+    // a newer one in the meantime does not get incorrectly cleared out
+    // from under it.
+    fun clearToast(id: Long) {
+        if (_uiState.value.toastId == id) {
+            _uiState.value = _uiState.value.copy(toastMessage = null)
+        }
+    }
 
     fun load(session: Session, itemId: String, mediaSourceId: String?) {
         val key = itemId + "|" + mediaSourceId
@@ -406,11 +431,24 @@ class PlayerViewModel @Inject constructor(
                     subtitleTracks = subtitleTracks,
                 )
             } catch (err: Exception) {
-                // Real feedback the web side already surfaces via a toast
-                // (showPlayerToast('Could not start over: ...')): this
-                // screen has none of that chrome ported yet, so the
-                // existing stream just keeps playing rather than losing
-                // playback entirely over a failed re-negotiation.
+                // Real port of screens/player.js's own Start Over catch
+                // block: that file's own real negotiated == null check
+                // ('Could not start over, that stream is no longer
+                // available.') has no separate branch here since
+                // resolvePlayback() already throws for exactly that
+                // case, IllegalStateException specifically for it; any
+                // other exception type is the real network/server
+                // failure that function's own generic message covers.
+                // The existing stream just keeps playing either way,
+                // same real fallback that file's own early return leaves
+                // in place too.
+                showToast(
+                    if (err is IllegalStateException) {
+                        "Could not start over, that stream is no longer available."
+                    } else {
+                        "Could not start over: ${err.message ?: err}"
+                    },
+                )
             }
         }
     }
@@ -464,6 +502,8 @@ class PlayerViewModel @Inject constructor(
     // the video, resuming from wherever real playback currently sits.
     fun selectBurnedInSubtitle(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
+        val requestedLabel = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == streamIndex }
+            ?.label?.removeSuffix(" (image)") ?: "subtitle"
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSwitchingSubtitle = true)
             try {
@@ -492,8 +532,16 @@ class PlayerViewModel @Inject constructor(
                     selectedSubtitleIndex = streamIndex,
                     subtitleTracks = subtitleTracks,
                 )
+                showToast("Requested $requestedLabel (burned in), reloading…")
             } catch (err: Exception) {
                 _uiState.value = _uiState.value.copy(isSwitchingSubtitle = false)
+                showToast(
+                    if (err is IllegalStateException) {
+                        "That subtitle track is no longer available."
+                    } else {
+                        "Subtitle switch failed: ${err.message ?: err}"
+                    },
+                )
             }
         }
     }
@@ -510,6 +558,15 @@ class PlayerViewModel @Inject constructor(
     // active on the old one.
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
+        val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
+        // Real port of that file's own audio menu click handler: a
+        // toast the instant the tap is received, before the real
+        // negotiation even starts, same real reasoning that handler's
+        // own comment documents (real feedback that a switch never
+        // seemed to reach the server at all turned "did the request
+        // even leave the browser" into something a reader could answer
+        // just by watching the screen).
+        showToast("Switching to $label…")
         viewModelScope.launch {
             try {
                 val target = repository.resolvePlayback(
@@ -531,11 +588,15 @@ class PlayerViewModel @Inject constructor(
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                 )
+                showToast("Requested $label, reloading…")
             } catch (err: Exception) {
-                // Real feedback the web side already surfaces via a toast
-                // (showPlayerToast('Audio switch failed: ...')): this
-                // screen has none of that chrome ported yet, same real
-                // gap restart()'s own catch block above already notes.
+                showToast(
+                    if (err is IllegalStateException) {
+                        "That audio track is no longer available."
+                    } else {
+                        "Audio switch failed: ${err.message ?: err}"
+                    },
+                )
             }
         }
     }
@@ -577,10 +638,18 @@ class PlayerViewModel @Inject constructor(
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                 )
             } catch (err: Exception) {
-                // Real feedback the web side already surfaces via a toast
-                // (showPlayerToast('Could not switch streams: ...')): this
-                // screen has none of that chrome ported yet, same real
-                // gap restart()'s own catch block above already notes.
+                // Real port of that file's own switchSource() catch
+                // chain: no success toast there either, only these two
+                // real failure messages, the second one a fixed generic
+                // string rather than err.message (that function's own
+                // real text, not this file's own invention).
+                showToast(
+                    if (err is IllegalStateException) {
+                        "That stream is no longer available."
+                    } else {
+                        "Could not switch streams. Check your connection and try again."
+                    },
+                )
             }
         }
     }

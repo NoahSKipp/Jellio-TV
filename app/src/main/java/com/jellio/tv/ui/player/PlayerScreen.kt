@@ -86,6 +86,9 @@ import kotlinx.coroutines.isActive
 private const val SEEK_STEP_MS = 10_000L
 private const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
 private const val CONTROLS_HIDE_DELAY_MS = 4_000L
+// Real port of screens/player.js's own showPlayerToast() 4000ms
+// setTimeout.
+private const val TOAST_DURATION_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
 // Real screens/player.js's own UPNEXT_FALLBACK_TRIGGER_SECONDS/
 // UPNEXT_COUNTDOWN_SECONDS: shouldShowUpNextNow()'s own fixed
@@ -176,6 +179,9 @@ fun PlayerScreen(
                 episodes = uiState.episodes,
                 hasTrickplay = uiState.hasTrickplay,
                 onComputeTrickplayFrame = { positionMs -> viewModel.trickplayFrame(positionMs) },
+                toastMessage = uiState.toastMessage,
+                toastId = uiState.toastId,
+                onDismissToast = { id -> viewModel.clearToast(id) },
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
@@ -226,6 +232,9 @@ private fun PlayerSurface(
     episodes: List<EpisodePanelEntry>,
     hasTrickplay: Boolean,
     onComputeTrickplayFrame: (Long) -> TrickplayFrame?,
+    toastMessage: String?,
+    toastId: Long,
+    onDismissToast: (Long) -> Unit,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
@@ -447,6 +456,17 @@ private fun PlayerSurface(
     }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // Real port of screens/player.js's own showPlayerToast(): that
+    // file's own clearTimeout + fresh setTimeout(4000) on every call,
+    // toastId as the key so a repeat of the exact same message still
+    // restarts this delay instead of being a no-op recomposition.
+    LaunchedEffect(toastId) {
+        if (toastMessage != null) {
+            delay(TOAST_DURATION_MS)
+            onDismissToast(toastId)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -738,6 +758,15 @@ private fun PlayerSurface(
                     onRestart()
                 },
             )
+        }
+
+        // Real port of screens/player.js's own .jellio-player-toast:
+        // rendered above everything else, independent of
+        // controlsVisible, the same real way that file's own toast
+        // element is a direct child of root rather than something the
+        // pill's own show/hide logic ever touches.
+        if (toastMessage != null) {
+            PlayerToast(message = toastMessage, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp))
         }
     }
 }
@@ -1142,6 +1171,20 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                 }
             }
         }
+    }
+}
+
+// Real port of screens/player.js's own .jellio-player-toast: bottom
+// center, elevated background, rounded, same real CSS treatment that
+// selector already carries.
+@Composable
+private fun PlayerToast(message: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(JellioBgElevated, RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        Text(text = message, color = JellioText)
     }
 }
 
