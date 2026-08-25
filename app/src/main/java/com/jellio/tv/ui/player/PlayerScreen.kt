@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
@@ -156,6 +157,9 @@ fun PlayerScreen(
                 subtitle = uiState.subtitle,
                 subtitleTracks = uiState.subtitleTracks,
                 selectedSubtitleIndex = uiState.selectedSubtitleIndex,
+                audioTracks = uiState.audioTracks,
+                selectedAudioStreamIndex = uiState.selectedAudioStreamIndex,
+                defaultAudioStreamIndex = uiState.defaultAudioStreamIndex,
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
@@ -171,6 +175,7 @@ fun PlayerScreen(
                         else -> viewModel.selectBurnedInSubtitle(session, track.streamIndex, positionTicks)
                     }
                 },
+                onSelectAudioTrack = { streamIndex, positionTicks -> viewModel.switchAudioTrack(session, streamIndex, positionTicks) },
                 onRestart = { viewModel.restart(session) },
                 onPlayNext = onPlayNext,
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
@@ -189,6 +194,9 @@ private fun PlayerSurface(
     subtitle: String,
     subtitleTracks: List<SubtitleTrackUiState>,
     selectedSubtitleIndex: Int?,
+    audioTracks: List<AudioTrackUiState>,
+    selectedAudioStreamIndex: Int?,
+    defaultAudioStreamIndex: Int?,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
@@ -198,6 +206,7 @@ private fun PlayerSurface(
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
+    onSelectAudioTrack: (Int, Long) -> Unit,
     onRestart: () -> Unit,
     onPlayNext: (String) -> Unit,
     onStartSleepTimer: (Int) -> Unit,
@@ -254,6 +263,7 @@ private fun PlayerSurface(
     var playbackSpeed by remember { mutableStateOf(1f) }
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepMenu by remember { mutableStateOf(false) }
+    var showAudioMenu by remember { mutableStateOf(false) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
@@ -384,8 +394,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -416,6 +426,13 @@ private fun PlayerSurface(
                 if (showSleepMenu) {
                     if (event.key == Key.Back) {
                         showSleepMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (showAudioMenu) {
+                    if (event.key == Key.Back) {
+                        showAudioMenu = false
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -492,12 +509,30 @@ private fun PlayerSurface(
                 positionMs = positionMs,
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
+                hasAudioTracks = audioTracks.size > 1,
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
                 onOpenSpeedMenu = { showSpeedMenu = true },
                 onOpenSleepMenu = { showSleepMenu = true },
+                onOpenAudioMenu = { showAudioMenu = true },
+            )
+        }
+
+        // Real port of that file's own rebuildAudioMenu() early return:
+        // audioButton.disabled = true whenever this source carries one
+        // real audio track or fewer, nothing worth a real menu for.
+        if (showAudioMenu && audioTracks.size > 1) {
+            AudioMenu(
+                tracks = audioTracks,
+                selectedStreamIndex = selectedAudioStreamIndex,
+                defaultStreamIndex = defaultAudioStreamIndex,
+                onSelect = { streamIndex ->
+                    showAudioMenu = false
+                    onSelectAudioTrack(streamIndex, player.currentPosition * TICKS_PER_MS)
+                },
+                onDismiss = { showAudioMenu = false },
             )
         }
 
@@ -589,12 +624,14 @@ private fun PlayerControls(
     positionMs: Long,
     durationMs: Long,
     hasSubtitleTracks: Boolean,
+    hasAudioTracks: Boolean,
     speedLabel: String,
     sleepTimerActive: Boolean,
     onPlayPause: () -> Unit,
     onOpenSubtitleMenu: () -> Unit,
     onOpenSpeedMenu: () -> Unit,
     onOpenSleepMenu: () -> Unit,
+    onOpenAudioMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -634,6 +671,23 @@ private fun PlayerControls(
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
+                    }
+                }
+            }
+            // Real port of the pill's own audioButton: disabled
+            // (rebuildAudioMenu()'s own early return) whenever this
+            // source carries one real audio track or fewer, same real
+            // condition hasAudioTracks already checks before this
+            // button even renders.
+            if (hasAudioTracks) {
+                Surface(
+                    onClick = onOpenAudioMenu,
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Filled.GraphicEq, contentDescription = "Audio", tint = JellioText)
                     }
                 }
             }
@@ -947,6 +1001,69 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(text = "$minutes min", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own rebuildAudioMenu(): every real
+// audio track this source carries, the active one highlighted off
+// selectedStreamIndex when set, otherwise off defaultStreamIndex, same
+// real fallback that function's own isActive check documents (a
+// reader who has never picked a track yet has the MediaSource's own
+// real default active, not nothing).
+@Composable
+private fun AudioMenu(
+    tracks: List<AudioTrackUiState>,
+    selectedStreamIndex: Int?,
+    defaultStreamIndex: Int?,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 104.dp, end = 48.dp)
+                .widthIn(min = 220.dp, max = 320.dp)
+                .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                .padding(vertical = 8.dp),
+        ) {
+            tracks.forEach { track ->
+                val isActive = if (selectedStreamIndex == null) {
+                    track.streamIndex == defaultStreamIndex
+                } else {
+                    track.streamIndex == selectedStreamIndex
+                }
+                Surface(
+                    // Real port of that file's own isActive early
+                    // return: picking the track already playing just
+                    // closes the popover there too, no real
+                    // re-negotiation worth firing over a no-op switch.
+                    onClick = { if (!isActive) onSelect(track.streamIndex) else onDismiss() },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = if (isActive) Color.White.copy(alpha = 0.18f) else Color.Transparent,
+                        contentColor = JellioText,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = track.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                    )
                 }
             }
         }
