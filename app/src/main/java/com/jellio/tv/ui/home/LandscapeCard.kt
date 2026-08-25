@@ -38,7 +38,10 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-private val LandscapeCardWidth = 300.dp
+// Visible to RowExpandButton (PosterRow.kt), same package: its own
+// button height matches a real landscape card's own 16:9 height,
+// nothing to duplicate the 300.dp itself for.
+internal val LandscapeCardWidth = 300.dp
 private const val TICKS_PER_SECOND = 10_000_000L
 
 // Mirrors PosterRow, real Continue Watching/Up Next shape instead of
@@ -63,11 +66,21 @@ fun LandscapeRow(
 ) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
-        RowTitle(text = section.title, onClick = onTitleClick)
+        RowTitle(text = section.title)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Same real reasoning PosterRow's own header carries: a
+            // focusable heading blocked ordinary Left/Right onto this
+            // row's own first card, and real feedback asked for it back
+            // to plain text. RowExpandButton at the row's own start
+            // instead, sized to this row's own real 16:9 card height.
+            if (onTitleClick != null) {
+                item {
+                    RowExpandButton(onClick = onTitleClick, height = LandscapeCardWidth.scaled() * 9f / 16f)
+                }
+            }
             items(section.items, key = { it.Id }) { item ->
                 LandscapeCard(
                     item = item,

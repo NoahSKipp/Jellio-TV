@@ -43,7 +43,10 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
 import java.util.Locale
 
-private val PosterWidth = 170.dp
+// Visible to RowExpandButton (PosterRow.kt), same package: its own
+// button height matches a real poster's own aspect-ratio height,
+// nothing to duplicate the 170.dp itself for.
+internal val PosterWidth = 170.dp
 
 // Mirrors components/card.js's own poster shape: a 2:3 poster, no
 // text underneath (the real title only shows up in the row's own
