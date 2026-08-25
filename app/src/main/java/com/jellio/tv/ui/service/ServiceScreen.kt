@@ -36,6 +36,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
+import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -62,6 +63,7 @@ fun ServiceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var filter by remember { mutableStateOf(ALL_FILTER) }
+    var rowListTarget by remember { mutableStateOf<ServiceRow?>(null) }
 
     LaunchedEffect(serviceName) { viewModel.load(session, serviceName) }
 
@@ -77,9 +79,15 @@ fun ServiceScreen(
                 Text(text = "Nothing imported for $serviceName yet.", color = JellioTextSecondary)
             }
             else -> {
+                // Real screens/service.js's own makeRowTitleClickable():
+                // that file's own call passes the row's full real
+                // items/fetchAll, never the currently filtered subset a
+                // genre chip narrowed the visible track down to, so the
+                // original ServiceRow (not the filtered HomeSection
+                // below) travels alongside its own filtered items here.
                 val visibleRows = uiState.rows.mapNotNull { row ->
                     val filtered = filteredItems(row, filter)
-                    if (filtered.isEmpty()) null else HomeSection(title = row.title, items = filtered)
+                    if (filtered.isEmpty()) null else row to filtered
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     item { ServiceHero(name = uiState.serviceName, heroItem = uiState.heroItem, imageUrl = imageUrl) }
@@ -90,11 +98,27 @@ fun ServiceScreen(
                             onSelect = { filter = it },
                         )
                     }
-                    items(visibleRows, key = { it.title }) { section ->
-                        PosterRow(section = section, imageUrl = imageUrl, onItemClick = onItemClick)
+                    items(visibleRows, key = { it.first.title }) { (row, filteredRowItems) ->
+                        PosterRow(
+                            section = HomeSection(title = row.title, items = filteredRowItems),
+                            imageUrl = imageUrl,
+                            onItemClick = onItemClick,
+                            onTitleClick = { rowListTarget = row },
+                        )
                     }
                 }
             }
+        }
+
+        rowListTarget?.let { row ->
+            RowListModal(
+                title = row.title,
+                items = row.items,
+                imageUrl = imageUrl,
+                onItemClick = onItemClick,
+                onDismiss = { rowListTarget = null },
+                fetchAll = { viewModel.fetchAllForRow(session, row) },
+            )
         }
     }
 }
