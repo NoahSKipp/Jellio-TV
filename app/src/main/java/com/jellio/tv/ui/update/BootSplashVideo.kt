@@ -16,10 +16,15 @@ import com.jellio.tv.R
 
 // AppBootGate's own real loading wait (usually ~8s for Home's own
 // prefetch to finish) used to just sit behind a plain ProgressSweep;
-// this real jellio_load.mp4 (res/raw, exactly 10s) plays instead,
-// muted (a splash is not the place for unprompted audio on a TV) and
-// looping past its own real end in case that prefetch runs long, so
-// the reveal never freezes on a static last frame.
+// this real jellio_load.webm (res/raw, ~10s, VP9/Opus re-encode of the
+// original clip, a quarter the size of the mp4 it replaced) plays
+// instead, muted (a splash is not the place for unprompted audio on a
+// TV) and looping past its own real end in case that prefetch runs
+// long, so the reveal never freezes on a static last frame. ExoPlayer's
+// own default extractors sniff the container regardless of the
+// android.resource:// URI's own lack of a real file extension, so no
+// separate mp4 fallback is needed here the way the web plugin's own
+// <video> element needs one for Safari's still-spotty VP9 support.
 @Composable
 fun BootSplashVideo(modifier: Modifier = Modifier) {
     val context = LocalContext.current
