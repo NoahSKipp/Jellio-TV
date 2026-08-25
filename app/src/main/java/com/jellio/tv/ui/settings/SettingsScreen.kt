@@ -49,6 +49,8 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.update.AppUpdateViewModel
+import com.jellio.tv.ui.update.ManualCheckResult
 
 private enum class LanguageField { AUDIO, SUBTITLE }
 
@@ -65,6 +67,10 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
+    // AppBootGate's own hiltViewModel() call already checks once per
+    // real app open; this resolves to that exact same Activity-scoped
+    // instance for the manual "Check for Updates" button below.
+    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     val rememberStream by viewModel.rememberStream.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
@@ -153,6 +159,7 @@ fun SettingsScreen(
 
         SettingsSection(title = "About") {
             SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
+            UpdateCheckRow(viewModel = appUpdateViewModel)
         }
 
         Surface(
@@ -396,6 +403,58 @@ private fun SettingsRow(label: String, value: String) {
         Column {
             Text(text = label, color = JellioTextSecondary)
             Text(text = value, color = JellioText, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+// AppUpdateViewModel's own manualCheckResult, real feedback asked for
+// alongside the unprompted UpdateToast that only ever appears on an
+// actual find: a real button here always answers back, up to date or
+// not, rather than leaving a reader who tapped it with no idea
+// whether the check even ran.
+@Composable
+private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
+    val result by viewModel.manualCheckResult.collectAsState()
+    val updateState by viewModel.uiState.collectAsState()
+
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Surface(
+            onClick = { viewModel.checkForUpdateManually() },
+            enabled = result != ManualCheckResult.Checking,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        ) {
+            Text(text = "Check for Updates", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        }
+        when (val current = result) {
+            null -> {}
+            ManualCheckResult.Checking -> {
+                Text(text = "Checking...", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+            }
+            ManualCheckResult.UpToDate -> {
+                Text(text = "You're on the latest version.", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+            }
+            ManualCheckResult.Error -> {
+                Text(text = "Couldn't check for updates.", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+            }
+            is ManualCheckResult.UpdateFound -> {
+                Text(
+                    text = "Update available: ${current.version}",
+                    color = JellioText,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+                )
+                Surface(
+                    onClick = { viewModel.download() },
+                    enabled = !updateState.downloading,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                ) {
+                    Text(
+                        text = if (updateState.downloading) "Downloading..." else "Install",
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    )
+                }
+            }
         }
     }
 }

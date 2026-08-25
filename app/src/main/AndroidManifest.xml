@@ -11,6 +11,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- AppUpdateViewModel's own real install step: DownloadManager
+         writes the fetched APK, this is the launch of the system
+         installer that actually installs it, not itself a real
+         dangerous/runtime permission on this SDK range but a real
+         device may still gate it behind its own "install unknown apps"
+         toggle for this app the first time. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".JellioTvApplication"
@@ -33,5 +40,20 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- AppUpdateViewModel's own real FileProvider.getUriForFile()
+             call: the downloaded APK sits in this app's own external
+             files dir, a real content:// Uri is the only way to hand
+             a file there to the system installer without a legacy
+             file:// Uri's own StrictMode/FileUriExposedException. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

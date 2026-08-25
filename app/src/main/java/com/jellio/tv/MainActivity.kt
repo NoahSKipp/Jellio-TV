@@ -60,6 +60,8 @@ import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioTvTheme
+import com.jellio.tv.ui.update.AppUpdateViewModel
+import com.jellio.tv.ui.update.UpdateToast
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -109,10 +111,16 @@ private fun AppBootGate(
     appViewModel: AppViewModel,
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
+    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
     LaunchedEffect(session.userId) { homeViewModel.load(session) }
+    // Checked here rather than inside JellioTvApp: this fires exactly
+    // once per real app open the same way this whole gate does, not
+    // once per LaunchedEffect(session.userId) key change were it any
+    // deeper in a tree that recomposes across tab switches.
+    LaunchedEffect(session.userId) { appUpdateViewModel.checkForUpdate() }
     // Real speculative value, not a real parity port: which library a
     // reader opens first is real screen state no server or web source
     // predicts ahead of the real tap, this just warms the same real
@@ -141,6 +149,10 @@ private fun JellioTvApp(
     nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
+    // AppBootGate's own hiltViewModel() call already kicked off
+    // checkForUpdate(); this call resolves to that exact same
+    // Activity-scoped instance, just to render whatever it found.
+    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     // A plain real back stack rather than Navigation Compose: the
     // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
@@ -437,6 +449,17 @@ private fun JellioTvApp(
                     onPlayDirect(pickerItem.Id, mediaSourceId)
                 },
                 onDismiss = { streamPickerItem = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        val updateState by appUpdateViewModel.uiState.collectAsState()
+        updateState.availableVersion?.let { version ->
+            UpdateToast(
+                version = version,
+                downloading = updateState.downloading,
+                onDownload = { appUpdateViewModel.download() },
+                onDismiss = { appUpdateViewModel.dismiss() },
                 modifier = Modifier.fillMaxSize(),
             )
         }
