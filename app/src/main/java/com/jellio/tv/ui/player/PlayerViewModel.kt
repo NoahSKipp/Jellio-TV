@@ -120,6 +120,12 @@ data class PlayerUiState(
     // SleepTimerStatusDto's own header comment for why that has to
     // exist) never has to parse a timestamp itself.
     val sleepTimerEndTimeMs: Long? = null,
+    // Only ever populated with more than one entry, same real gating
+    // screens/player.js's own getMediaSources(itemId).then() applies to
+    // sourceButton.disabled: a single-source title has nothing to
+    // switch to, so the Sources button stays hidden rather than opening
+    // onto a list of one.
+    val sourceOptions: List<MediaSourceDto> = emptyList(),
 )
 
 // The real mechanism runtime/api.js's own getPlaybackInfo()/
@@ -220,6 +226,18 @@ class PlayerViewModel @Inject constructor(
                         if (endMs != null) {
                             _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = endMs)
                         }
+                    }
+                }
+
+                // Real port of screens/player.js's own real fire-and-
+                // forget getMediaSources(itemId).then(...): only wired
+                // up once there is a genuine choice behind it, same real
+                // gating that file's own sources.length > 1 check
+                // applies before ever enabling sourceButton.
+                viewModelScope.launch {
+                    val sources = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrNull()
+                    if (sources != null && sources.size > 1) {
+                        _uiState.value = _uiState.value.copy(sourceOptions = sources)
                     }
                 }
             } catch (err: Exception) {
@@ -430,6 +448,51 @@ class PlayerViewModel @Inject constructor(
             } catch (err: Exception) {
                 // Real feedback the web side already surfaces via a toast
                 // (showPlayerToast('Audio switch failed: ...')): this
+                // screen has none of that chrome ported yet, same real
+                // gap restart()'s own catch block above already notes.
+            }
+        }
+    }
+
+    // Real port of screens/player.js's own switchSource(source): a
+    // fresh real PlaybackInfo negotiation against the picked source's
+    // own Id, with NO real AudioStreamIndex/SubtitleStreamIndex carried
+    // over, same real reasoning that function's own comment documents
+    // (currentAudioStreamIndex = null; activeSubtitleStreamIndex =
+    // null right there): a different source's own real track layout has
+    // no guaranteed relationship to whichever indices were active on
+    // the one it replaces. Also updates mediaSourceIdParam itself so
+    // every later re-negotiation (restart, a subsequent audio or
+    // subtitle switch) targets this newly picked source rather than the
+    // one playback actually opened on, mirroring that file's own single
+    // shared `mediaSource` variable every later call already reads.
+    fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
+        val id = itemId ?: return
+        if (source.Id == _uiState.value.mediaSourceId) return
+        viewModelScope.launch {
+            try {
+                val target = repository.resolvePlayback(
+                    session.userId,
+                    id,
+                    source.Id,
+                    currentPositionTicks,
+                )
+                mediaSourceIdParam = target.mediaSource.Id
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                val audioTracks = buildAudioTracks(target.mediaSource)
+                _uiState.value = _uiState.value.copy(
+                    streamUrl = target.streamUrl,
+                    mediaSourceId = target.mediaSource.Id,
+                    startPositionTicks = target.startPositionTicks,
+                    selectedSubtitleIndex = null,
+                    subtitleTracks = subtitleTracks,
+                    selectedAudioStreamIndex = null,
+                    audioTracks = audioTracks,
+                    defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
+                )
+            } catch (err: Exception) {
+                // Real feedback the web side already surfaces via a toast
+                // (showPlayerToast('Could not switch streams: ...')): this
                 // screen has none of that chrome ported yet, same real
                 // gap restart()'s own catch block above already notes.
             }
