@@ -1,6 +1,11 @@
 package com.jellio.tv.ui.detail
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,6 +32,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -429,6 +435,16 @@ private fun DetailHero(
                 )
             }
 
+            // Real port of js/detailButtonsExpand.js's own real
+            // collapse/expand: Play and the "..." trigger sit alone at
+            // rest, the same real Watchlist/Mark watched/Like/Dislike/
+            // Change Stream buttons that file's own real
+            // jellio-buttons-expanded class reveals only render into
+            // this composition (and so only ever become real focus
+            // targets) once expanded here, no separate real
+            // tabindex-sync concept needed the way that file's own
+            // header explains plain CSS visibility forced there.
+            var actionsExpanded by remember { mutableStateOf(false) }
             Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     onClick = onPlay,
@@ -441,38 +457,48 @@ private fun DetailHero(
                         Text(text = state.playLabel, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
-                IconActionButton(
-                    icon = if (state.isWatchlisted) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd,
-                    active = state.isWatchlisted,
-                    contentDescription = "Watchlist",
-                    onClick = onToggleWatchlist,
-                )
-                IconActionButton(
-                    icon = Icons.Filled.Check,
-                    active = state.isWatched,
-                    contentDescription = "Mark watched",
-                    onClick = onToggleWatched,
-                )
-                IconActionButton(
-                    icon = Icons.Filled.ThumbUp,
-                    active = state.likes == true,
-                    contentDescription = "Like",
-                    onClick = onLike,
-                )
-                IconActionButton(
-                    icon = Icons.Filled.ThumbDown,
-                    active = state.likes == false,
-                    contentDescription = "Dislike",
-                    onClick = onDislike,
-                )
-                if (onChangeStream != null) {
-                    IconActionButton(
-                        icon = Icons.Filled.SwapHoriz,
-                        active = false,
-                        contentDescription = "Change Stream",
-                        onClick = onChangeStream,
-                    )
+                AnimatedVisibility(visible = actionsExpanded, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconActionButton(
+                            icon = if (state.isWatchlisted) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd,
+                            active = state.isWatchlisted,
+                            contentDescription = "Watchlist",
+                            onClick = onToggleWatchlist,
+                        )
+                        IconActionButton(
+                            icon = Icons.Filled.Check,
+                            active = state.isWatched,
+                            contentDescription = "Mark watched",
+                            onClick = onToggleWatched,
+                        )
+                        IconActionButton(
+                            icon = Icons.Filled.ThumbUp,
+                            active = state.likes == true,
+                            contentDescription = "Like",
+                            onClick = onLike,
+                        )
+                        IconActionButton(
+                            icon = Icons.Filled.ThumbDown,
+                            active = state.likes == false,
+                            contentDescription = "Dislike",
+                            onClick = onDislike,
+                        )
+                        if (onChangeStream != null) {
+                            IconActionButton(
+                                icon = Icons.Filled.SwapHoriz,
+                                active = false,
+                                contentDescription = "Change Stream",
+                                onClick = onChangeStream,
+                            )
+                        }
+                    }
                 }
+                IconActionButton(
+                    icon = Icons.Filled.MoreVert,
+                    active = actionsExpanded,
+                    contentDescription = if (actionsExpanded) "Fewer actions" else "More actions",
+                    onClick = { actionsExpanded = !actionsExpanded },
+                )
             }
         }
     }
