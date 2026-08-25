@@ -5,7 +5,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -52,7 +51,10 @@ val JellioNavItems: List<JellioRoute> = listOf(
 fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Profile -> Icons.Filled.AccountCircle
     JellioRoute.Home -> Icons.Filled.Home
-    JellioRoute.Search -> Icons.Filled.Search
+    // js/persistentSidebar.js's own SVG_ICONS.search, ported path data
+    // the same real way Library's own icon already is: the Material
+    // glyph was close in silhouette but not the real shape drawn here.
+    JellioRoute.Search -> SearchIconVector
     JellioRoute.Watchlist -> Icons.Filled.BookmarkAdded
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
     // js/persistentSidebar.js's own SVG_ICONS.library, ported path
