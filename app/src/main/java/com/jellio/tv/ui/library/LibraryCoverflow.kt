@@ -53,9 +53,9 @@ import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.ShowsEditorial
 import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import com.jellio.tv.ui.theme.JellioTrending
 import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -139,14 +139,16 @@ fun LibraryCoverflow(
                 Text(text = editorial.description, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
             }
         } else if (badgeText != null) {
-            // Task #45's own real fix carried over: only the icon reads
-            // as trending orange, the label stays plain text same as
-            // every other real row title on this page.
+            // Checked against NuvioWeb's own css/base.css: no accent
+            // hue exists there at all, this badge's own icon tinting
+            // orange was invented on this app's own side with no real
+            // source on either end. JellioSecondary is the one real
+            // bright tone that palette actually has.
             Row(
                 modifier = Modifier.padding(start = 48.dp, top = 32.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(imageVector = Icons.Filled.TrendingUp, contentDescription = null, tint = JellioTrending, modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Filled.TrendingUp, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(18.dp))
                 Text(text = badgeText, color = JellioText, modifier = Modifier.padding(start = 6.dp))
             }
         }
