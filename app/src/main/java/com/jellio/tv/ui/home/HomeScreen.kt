@@ -1,5 +1,8 @@
 package com.jellio.tv.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +37,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +50,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ProgressSweep
 import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -133,8 +139,12 @@ fun HomeScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+            uiState.isLoading -> Box(Modifier.fillMaxSize()) {
+                // Real port of css/progress.css's own real sweep, that
+                // file's own header calls out real work with nothing on
+                // screen to say so as the exact case this covers.
+                ProgressSweep(modifier = Modifier.align(Alignment.TopCenter))
+                Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.align(Alignment.Center))
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
@@ -402,7 +412,33 @@ private fun HomeRowEditor(
                 onToggleHidden = onToggleHidden,
             )
         }
-        if (!hidden) content()
+        if (!hidden) RowEntrance(content = content)
+    }
+}
+
+// Real port of css/library-browse.css's own real jellio-row-enter
+// keyframe (opacity 0 to 1, translateY 12px to 0, 420ms ease-out),
+// css/streaming-hub.css's own jellio-hub-enter reusing the identical
+// animation for hub rows: this LazyColumn item's own real first
+// composition (remember here is scoped to it, the same as every other
+// row's own real key) is close enough to that file's own real
+// scroll-into-view trigger for the same real fade-and-rise read.
+@Composable
+private fun RowEntrance(content: @Composable () -> Unit) {
+    val startOffsetPx = with(LocalDensity.current) { 12.dp.toPx() }
+    val alpha = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(startOffsetPx) }
+    LaunchedEffect(Unit) {
+        launch { alpha.animateTo(1f, animationSpec = tween(420, easing = LinearOutSlowInEasing)) }
+        launch { offsetY.animateTo(0f, animationSpec = tween(420, easing = LinearOutSlowInEasing)) }
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            this.alpha = alpha.value
+            translationY = offsetY.value
+        },
+    ) {
+        content()
     }
 }
 

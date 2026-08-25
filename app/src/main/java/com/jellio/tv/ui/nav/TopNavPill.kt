@@ -28,6 +28,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -166,6 +167,12 @@ fun TopNavPill(
                 .height(pillHeight)
                 .widthIn(max = PillMaxWidth)
                 .alpha(pillAlpha)
+                // Real port of css/persistent-sidebar.css's own real
+                // box-shadow: 0 0.6em 2em rgb(0 0 0/0.4): the web pill's
+                // own visual separation from content behind it, missing
+                // here even though its own no-live-blur choice above
+                // stays deliberate.
+                .shadow(elevation = 16.dp, shape = RoundedCornerShape(999.dp), ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
@@ -220,7 +227,16 @@ private fun NavPillItem(
         // Focus scale off: real feedback live was a hugely oversized
         // pill, and this is one of the few tv-material3 defaults that
         // grows a component past its own laid out bounds on focus.
-        scale = SelectableSurfaceDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
+        // pressedScale on, real port of css/persistent-sidebar.css's
+        // own .jellio-sidebar-link:active { transform: scale(0.92) }:
+        // an OK press with zero visual squash read as less responsive
+        // than the web original's own instant compress-on-tap.
+        scale = SelectableSurfaceDefaults.scale(
+            focusedScale = 1f,
+            focusedSelectedScale = 1f,
+            pressedScale = 0.92f,
+            pressedSelectedScale = 0.92f,
+        ),
         colors = SelectableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = JellioTextSecondary,

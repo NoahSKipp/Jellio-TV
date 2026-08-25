@@ -204,6 +204,23 @@ fun LandscapeCard(
                     )
                 }
             }
+            // Real port of js/libraryBrowse.js's own rating span, same
+            // real reasoning PosterCard's own header carries: top
+            // corner opposite this card's own busier bottom, the
+            // remaining-time badge above already owns the other top
+            // corner.
+            item.CommunityRating?.let { rating ->
+                Text(
+                    text = String.format(java.util.Locale.US, "%.1f", rating),
+                    color = JellioText,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
             Column(modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, bottom = 10.dp)) {
                 if (eyebrow.isNotEmpty()) {
                     Text(

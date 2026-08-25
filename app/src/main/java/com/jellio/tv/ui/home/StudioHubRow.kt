@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,10 +58,19 @@ fun StudioHubRow(
 private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
     val tileWidth = TileWidth.scaled()
     val tileHeight = TileHeight.scaled()
+    // Real port of css/streaming-hub.css's own real
+    // .jellio-hub-tile:hover { transform: translateY(-2px); background:
+    // var(--jellio-card-bg); }: the lift itself is this Surface's own
+    // real default focus scale (already on, never overridden the way
+    // TopNavPill's own header explains that pill turning off), the
+    // background swap on focus was the one real piece missing.
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            focusedContainerColor = Color.White.copy(alpha = 0.12f),
+        ),
         modifier = Modifier.width(tileWidth).height(tileHeight),
     ) {
         Column(
