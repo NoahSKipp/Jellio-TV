@@ -114,6 +114,20 @@ data class MediaSourceDto(
     val MediaStreams: List<MediaStreamDto>? = null,
 )
 
+// Real BaseItemDto.Trickplay shape, confirmed against
+// TrickplayController.cs before porting this: width keyed (a source
+// can carry more than one real generated resolution), each entry one
+// real sheet's own layout, several packed thumbnails per sheet rather
+// than one image per thumbnail.
+@JsonClass(generateAdapter = true)
+data class TrickplayInfoDto(
+    val Width: Int = 0,
+    val Height: Int = 0,
+    val TileWidth: Int = 0,
+    val TileHeight: Int = 0,
+    val Interval: Int = 0,
+)
+
 @JsonClass(generateAdapter = true)
 data class BaseItemDto(
     val Id: String,
@@ -144,6 +158,14 @@ data class BaseItemDto(
     val RunTimeTicks: Long? = null,
     val ProviderIds: Map<String, String>? = null,
     val MediaSources: List<MediaSourceDto>? = null,
+    // Width keyed within each real MediaSourceId key, real runtime/
+    // api.js's own pickTrickplayInfo() shape: only ever real for a
+    // title Jellyfin's own background task already generated one for,
+    // a real local ffmpeg pass over the whole file, so this stays
+    // quietly null on most titles this runtime plays (every one a live
+    // Gelato proxy in front of a debrid/usenet host, never a local
+    // file), no broken preview shown.
+    val Trickplay: Map<String, Map<String, TrickplayInfoDto>>? = null,
     // Not part of a BoxSet's own default field set, real bug
     // runtime/api.js's own getAllCollections() comment documents:
     // without asking for this explicitly every collection reads back

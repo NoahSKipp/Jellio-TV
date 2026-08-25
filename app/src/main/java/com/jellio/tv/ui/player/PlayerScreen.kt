@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -173,6 +174,8 @@ fun PlayerScreen(
                 seasons = uiState.seasons,
                 selectedSeasonId = uiState.selectedSeasonId,
                 episodes = uiState.episodes,
+                hasTrickplay = uiState.hasTrickplay,
+                onComputeTrickplayFrame = { positionMs -> viewModel.trickplayFrame(positionMs) },
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
@@ -221,6 +224,8 @@ private fun PlayerSurface(
     seasons: List<BaseItemDto>,
     selectedSeasonId: String?,
     episodes: List<EpisodePanelEntry>,
+    hasTrickplay: Boolean,
+    onComputeTrickplayFrame: (Long) -> TrickplayFrame?,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
@@ -292,6 +297,8 @@ private fun PlayerSurface(
     var showAudioMenu by remember { mutableStateOf(false) }
     var showSourcePanel by remember { mutableStateOf(false) }
     var showEpisodesPanel by remember { mutableStateOf(false) }
+    var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
+    var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
@@ -429,6 +436,16 @@ private fun PlayerSurface(
         }
     }
 
+    // Real port of screens/player.js's own mouseleave handler clearing
+    // scrubPreview: controls hiding is this remote's own closest real
+    // equivalent to a mouse actually leaving the seek bar.
+    LaunchedEffect(controlsVisible) {
+        if (!controlsVisible) {
+            scrubFrame = null
+            scrubPositionMs = null
+        }
+    }
+
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Box(
@@ -499,12 +516,28 @@ private fun PlayerSurface(
                     }
                     Key.DirectionLeft, Key.MediaRewind -> {
                         controlsVisible = true
-                        player.seekTo((player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0))
+                        val newPos = (player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0)
+                        player.seekTo(newPos)
+                        // Real port of screens/player.js's own
+                        // showScrubPreview(): that file's own mousemove
+                        // listener has no equivalent input on a D-pad
+                        // remote, so a preview of the seek's own real
+                        // landing spot is shown here instead, right
+                        // after each seek this key already commits.
+                        if (hasTrickplay) {
+                            scrubPositionMs = newPos
+                            scrubFrame = onComputeTrickplayFrame(newPos)
+                        }
                         true
                     }
                     Key.DirectionRight, Key.MediaFastForward -> {
                         controlsVisible = true
-                        player.seekTo((player.currentPosition + SEEK_STEP_MS).coerceAtMost(player.duration.coerceAtLeast(0)))
+                        val newPos = (player.currentPosition + SEEK_STEP_MS).coerceAtMost(player.duration.coerceAtLeast(0))
+                        player.seekTo(newPos)
+                        if (hasTrickplay) {
+                            scrubPositionMs = newPos
+                            scrubFrame = onComputeTrickplayFrame(newPos)
+                        }
                         true
                     }
                     Key.DirectionCenter, Key.Enter, Key.MediaPlayPause -> {
@@ -512,6 +545,8 @@ private fun PlayerSurface(
                             if (player.isPlaying) player.pause() else player.play()
                         }
                         controlsVisible = true
+                        scrubFrame = null
+                        scrubPositionMs = null
                         true
                     }
                     Key.DirectionUp, Key.DirectionDown -> {
@@ -554,6 +589,8 @@ private fun PlayerSurface(
                 hasAudioTracks = audioTracks.size > 1,
                 hasSourceOptions = sourceOptions.size > 1,
                 hasEpisodes = seasons.isNotEmpty(),
+                scrubFrame = scrubFrame,
+                scrubPositionMs = scrubPositionMs,
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
@@ -716,6 +753,8 @@ private fun PlayerControls(
     hasAudioTracks: Boolean,
     hasSourceOptions: Boolean,
     hasEpisodes: Boolean,
+    scrubFrame: TrickplayFrame?,
+    scrubPositionMs: Long?,
     speedLabel: String,
     sleepTimerActive: Boolean,
     onPlayPause: () -> Unit,
@@ -857,6 +896,23 @@ private fun PlayerControls(
                 Brush.verticalGradient(listOf(Color.Transparent, JellioBg)),
             ).padding(horizontal = 48.dp, vertical = 32.dp),
         ) {
+            // Real port of screens/player.js's own scrubPreview: this
+            // Android TV remote has no real mousemove to hover the bar
+            // with, so the preview tracks the seek's own real landing
+            // spot instead (scrubPositionMs, set right after every
+            // D-pad seek above), positioned the same real way that
+            // file's own ratio * rect.width math does, just against
+            // this fraction-of-width trick instead of a pixel rect.
+            if (scrubFrame != null && scrubPositionMs != null && durationMs > 0) {
+                val scrubProgress = (scrubPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                Box(modifier = Modifier.fillMaxWidth(scrubProgress), contentAlignment = Alignment.CenterEnd) {
+                    TrickplayPreview(
+                        frame = scrubFrame,
+                        timeLabel = formatMs(scrubPositionMs),
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
+            }
             val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
             Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp))) {
                 Box(
@@ -868,6 +924,49 @@ private fun PlayerControls(
                 Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
             }
         }
+    }
+}
+
+// Real port of screens/player.js's own scrub preview image: one real
+// cell of the tile sheet cropped out via an oversized AsyncImage offset
+// against a clipped frame-sized Box, the same real crop
+// backgroundSize/backgroundPosition does in CSS, raw Trickplay pixel
+// counts read directly as dp the same real way that file's own CSS
+// reads them as px, no per-device density lookup either side bothers
+// with for a scrub thumbnail this rough.
+private const val TRICKPLAY_DISPLAY_WIDTH_DP = 180f
+
+@Composable
+private fun TrickplayPreview(frame: TrickplayFrame, timeLabel: String, modifier: Modifier = Modifier) {
+    if (frame.frameWidth <= 0 || frame.frameHeight <= 0) return
+    val scale = TRICKPLAY_DISPLAY_WIDTH_DP / frame.frameWidth
+    val frameHeightDp = frame.frameHeight * scale
+    val sheetWidthDp = frame.sheetWidth * scale
+    val sheetHeightDp = frame.sheetHeight * scale
+    val offsetXDp = -(frame.col * frame.frameWidth * scale)
+    val offsetYDp = -(frame.row * frame.frameHeight * scale)
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .size(TRICKPLAY_DISPLAY_WIDTH_DP.dp, frameHeightDp.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black),
+        ) {
+            AsyncImage(
+                model = frame.tileUrl,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .size(sheetWidthDp.dp, sheetHeightDp.dp)
+                    .offset(offsetXDp.dp, offsetYDp.dp),
+            )
+        }
+        Text(
+            text = timeLabel,
+            color = JellioText,
+            modifier = Modifier.padding(top = 4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 
