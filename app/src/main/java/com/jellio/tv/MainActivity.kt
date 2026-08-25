@@ -22,9 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.AppViewModel
@@ -32,7 +30,6 @@ import com.jellio.tv.ui.AuthState
 import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
-import com.jellio.tv.ui.common.ProgressSweep
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.groupwatch.GroupWatchButton
@@ -61,9 +58,11 @@ import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioTvTheme
 import com.jellio.tv.ui.update.AppUpdateViewModel
+import com.jellio.tv.ui.update.BootSplashVideo
 import com.jellio.tv.ui.update.UpdateToast
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -115,6 +114,16 @@ private fun AppBootGate(
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
+    // jellio_load.mp4 (res/raw) runs exactly 10s, the ~8s this prefetch
+    // usually takes plus the 2s of real room asked for: the splash
+    // stays up for at least that long even on a fast/cached load,
+    // rather than cutting the animation off mid-play the moment
+    // homeState.isLoading flips.
+    var minSplashTimeElapsed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(10_000)
+        minSplashTimeElapsed = true
+    }
     LaunchedEffect(session.userId) { homeViewModel.load(session) }
     // Checked here rather than inside JellioTvApp: this fires exactly
     // once per real app open the same way this whole gate does, not
@@ -132,10 +141,9 @@ private fun AppBootGate(
     LaunchedEffect(libraries) {
         libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
     }
-    if (homeState.isLoading) {
-        Box(modifier = Modifier.fillMaxSize().background(JellioBg), contentAlignment = Alignment.Center) {
-            ProgressSweep(modifier = Modifier.align(Alignment.TopCenter))
-            Text(text = "Jellio TV", style = MaterialTheme.typography.titleLarge)
+    if (homeState.isLoading || !minSplashTimeElapsed) {
+        Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
+            BootSplashVideo(modifier = Modifier.fillMaxSize())
         }
     } else {
         JellioTvApp(session = session, appViewModel = appViewModel)
