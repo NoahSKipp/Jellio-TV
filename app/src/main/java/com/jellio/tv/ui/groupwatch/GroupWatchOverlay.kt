@@ -62,9 +62,10 @@ private fun groupSubtitle(group: SyncPlayGroupDto): String =
 // header comment above where this is placed), same real "groups"
 // Material icon that button uses.
 @Composable
-fun GroupWatchButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun GroupWatchButton(onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = JellioBgElevated.copy(alpha = 0.96f),
