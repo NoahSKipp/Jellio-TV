@@ -28,8 +28,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +70,16 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // LaunchedEffect is keyed on items, so Compose's own structured
 // concurrency already cancels a still-resolving fetchAll from the
 // previous row the instant a different row's own items replace it.
+//
+// Real bug found live testing on device: nothing here ever requested
+// initial D-pad focus when this modal opened, and its own list had no
+// default D-pad entry point of its own either (the same real
+// LazyColumn gap the pill screens already hit), so a reader clicking
+// a row's own title into this modal had no way to navigate its own
+// list at all. Same real fix GroupWatchOverlay/LibraryPickerOverlay
+// already use: claim focus on open, trap exit, and focusRestorer() on
+// the list itself so a directional search always finds something.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun RowListModal(
     title: String,
@@ -77,6 +92,7 @@ fun RowListModal(
     BackHandler(onBack = onDismiss)
     var displayedItems by remember(items) { mutableStateOf(items) }
     var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null) }
+    val listFocusRequester = remember { FocusRequester() }
     LaunchedEffect(items, fetchAll) {
         if (fetchAll == null) return@LaunchedEffect
         val fullItems = runCatching { fetchAll() }.getOrNull()
@@ -84,6 +100,9 @@ fun RowListModal(
         if (fullItems != null && fullItems.size > items.size) {
             displayedItems = fullItems
         }
+    }
+    LaunchedEffect(displayedItems) {
+        if (displayedItems.isNotEmpty()) listFocusRequester.requestFocus()
     }
     Box(
         modifier = Modifier
@@ -93,7 +112,8 @@ fun RowListModal(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = onDismiss,
-            ),
+            )
+            .focusProperties { exit = { FocusRequester.Cancel } },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -126,7 +146,12 @@ fun RowListModal(
                     }
                 }
             }
-            LazyColumn(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .focusRequester(listFocusRequester)
+                    .focusRestorer(),
+            ) {
                 items(displayedItems, key = { it.Id }) { item ->
                     RowListItem(
                         item = item,
