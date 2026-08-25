@@ -33,8 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -86,12 +84,6 @@ fun HomeScreen(
     // enabled state, same real reasoning a modal overlay would trap
     // focus if this screen mounted one instead of toggling in place.
     onEditModeChange: (Boolean) -> Unit = {},
-    // Moonfin-Core cross-reference: MainActivity owns this and hands
-    // the same instance to TopNavPill's own contentFocusRequester, an
-    // explicit Down target replacing the top=140.dp clearance this
-    // screen's LazyColumn used to need to stay reachable by Compose's
-    // own default spatial search.
-    contentFocusRequester: FocusRequester = remember { FocusRequester() },
     onPlayDirect: (String, String?) -> Unit,
     // Real port of components/cardOptionsMenu.js's own "Play manually"
     // (openStreamPicker(item, { forceChoice: true })): built at
@@ -171,20 +163,17 @@ fun HomeScreen(
             // rejects a candidate group whose own real bounds overlap
             // the currently focused node rather than sitting cleanly
             // below it, so Down from the pill had nowhere valid to
-            // search into here. A top=140.dp clearance and, later, a
-            // graphicsLayer offset (wrong theory, reverted: it clipped
-            // real content and broke Down again) were both tried to
-            // dodge that overlap rather than fix the actual search.
+            // search into here.
             //
-            // Real fix, cross-referenced against Moonfin-Core's own
-            // top_toolbar.dart: its own _moveFocusDown() never leans on
-            // the platform's default spatial search once focus has left
-            // the toolbar, an explicit requestFocus() onto a known
-            // content node instead. TopNavPill's own contentFocusRequester
-            // param does the same here, wired to this LazyColumn's own
-            // FocusRequester below, an explicit Down target instead of
-            // one Compose has to go searching for. Full-bleed again,
-            // clearance gone.
+            // An explicit requestFocus() bridge (TopNavPill's own
+            // contentFocusRequester param, wired to this LazyColumn)
+            // was tried in place of clearance to keep the hero
+            // full-bleed under the pill. Broken on live testing twice
+            // now, in two different sessions (94ca99d first pulled the
+            // same mechanism for the same real reason): back to the
+            // plain top=140.dp clearance below instead, matching every
+            // other real screen in this app that never needed anything
+            // more elaborate than that to stay reachable.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -208,7 +197,7 @@ fun HomeScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .focusRequester(contentFocusRequester)
+                        .padding(top = 140.dp)
                         .focusRestorer(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
@@ -223,14 +212,14 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.titleLarge,
                                 modifier = Modifier.padding(
                                     start = 48.dp,
-                                    // HeroSection above composes nothing
-                                    // at all for a heroItems-empty
-                                    // session, this greeting becomes the
-                                    // real first thing under the pill
-                                    // instead and needs its own
-                                    // clearance the same LibraryScreen's
-                                    // own coverflow-less title carries.
-                                    top = if (uiState.heroItems.isEmpty()) 140.dp else 24.dp,
+                                    // The LazyColumn's own top=140.dp
+                                    // clearance now covers the pill for
+                                    // every real case, HeroSection
+                                    // composing nothing for a
+                                    // heroItems-empty session included:
+                                    // no separate real top value needed
+                                    // here any more.
+                                    top = 24.dp,
                                     bottom = 8.dp,
                                 ),
                             )

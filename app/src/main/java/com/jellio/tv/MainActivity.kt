@@ -19,7 +19,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
@@ -188,15 +187,6 @@ private fun JellioTvApp(
     // way. Threaded down the same real way navCompact already is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    // Moonfin-Core cross-reference (top_toolbar.dart's own
-    // _moveFocusDown()): Home and Library are the two screens whose own
-    // content sits full-bleed under the pill rather than cleared below
-    // it, so TopNavPill needs an explicit Down target for them instead
-    // of leaning on Compose's own default spatial search, which fails
-    // once bounds overlap the way a top=140.dp clearance used to paper
-    // over. Fresh per route so switching away and back always restarts
-    // clean rather than reusing a requester bound to a disposed screen.
-    val contentFocusRequester = remember(route) { FocusRequester() }
 
     // Real components/nowPlaying.js's own startNowPlaying(): begun once
     // a real session is confirmed signed in (JellioTvApp is only ever
@@ -254,7 +244,6 @@ private fun JellioTvApp(
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
                 onCompactChange = { navCompact = it },
                 onEditModeChange = { homeEditMode = it },
-                contentFocusRequester = contentFocusRequester,
                 onPlayDirect = onPlayDirect,
                 // Real port of components/cardOptionsMenu.js's own
                 // "Play manually" (openStreamPicker(item,
@@ -302,7 +291,6 @@ private fun JellioTvApp(
                         imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
                         onCompactChange = { navCompact = it },
-                        contentFocusRequester = contentFocusRequester,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -354,7 +342,6 @@ private fun JellioTvApp(
                 selected = route,
                 isCompact = navCompact,
                 enabled = !homeEditMode,
-                contentFocusRequester = if (route == JellioRoute.Home || route == JellioRoute.Library) contentFocusRequester else null,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
                     // button: a tap opens the picker rather than
