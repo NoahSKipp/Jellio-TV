@@ -30,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -106,17 +105,6 @@ fun TopNavPill(
     // the way the same way a modal's own scrim would. MainActivity
     // threads HomeScreen's own editMode straight through to this.
     enabled: Boolean = true,
-    // Moonfin-Core's own top_toolbar.dart cross-referenced live: their
-    // pill sits over a full-bleed carousel the same way this one wants
-    // to, and _moveFocusDown() there never leans on Flutter's own
-    // default spatial search once it has left the toolbar, an explicit
-    // requestFocus() onto a known content node instead. Compose's own
-    // default 2D search already proved unreliable the same way here
-    // (the top=140.dp clearance below was carrying that failure) once
-    // bounds overlap, so Home/Library thread their own LazyColumn's
-    // FocusRequester in here the same explicit way, letting this stay
-    // full-bleed under the pill instead of clearing space for it.
-    contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     // Real components/mobileNav.js's own scroll-driven compact state,
@@ -175,14 +163,7 @@ fun TopNavPill(
                 .shadow(elevation = 16.dp, shape = RoundedCornerShape(999.dp), ambientColor = Color.Black.copy(alpha = 0.4f), spotColor = Color.Black.copy(alpha = 0.4f))
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
-                .let {
-                    if (contentFocusRequester != null) {
-                        it.focusProperties { down = contentFocusRequester }
-                    } else {
-                        it
-                    }
-                },
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp)),
         ) {
             lazyItems(items, key = { it::class.simpleName ?: it.toString() }) { route ->
                 NavPillItem(

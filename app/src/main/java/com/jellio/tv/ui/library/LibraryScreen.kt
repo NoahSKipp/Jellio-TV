@@ -20,8 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,11 +48,6 @@ fun LibraryScreen(
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     onCompactChange: (Boolean) -> Unit,
-    // Moonfin-Core cross-reference, same as HomeScreen's own: MainActivity
-    // hands the same instance to TopNavPill's own contentFocusRequester,
-    // an explicit Down target replacing the top=140.dp clearance this
-    // screen's LazyColumn used to need.
-    contentFocusRequester: FocusRequester = remember { FocusRequester() },
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -96,23 +89,22 @@ fun LibraryScreen(
             // overlap the currently focused node rather than sitting
             // cleanly below it, so Down from the pill had nowhere valid
             // to search into here regardless of focusRestorer() waiting
-            // on the other side. A top=140.dp clearance and, later, a
-            // graphicsLayer offset (wrong theory, reverted: it clipped
-            // real content and broke Down again) were both tried to
-            // dodge that overlap rather than fix the actual search.
+            // on the other side.
             //
-            // Real fix, cross-referenced against Moonfin-Core's own
-            // top_toolbar.dart _moveFocusDown(): an explicit requestFocus()
-            // onto a known content node rather than the platform's own
-            // default spatial search once focus has left the pill.
-            // TopNavPill's own contentFocusRequester param wires straight
-            // to this LazyColumn's own FocusRequester below, full-bleed
-            // coverflow again, clearance gone.
+            // An explicit requestFocus() bridge (TopNavPill's own
+            // contentFocusRequester param, wired to this LazyColumn) was
+            // tried in place of clearance to keep the coverflow
+            // full-bleed under the pill. Broken on live testing twice
+            // now, in two different sessions (94ca99d first pulled the
+            // same mechanism for the same real reason): back to the
+            // plain top=140.dp clearance below instead, matching every
+            // other real screen in this app that never needed anything
+            // more elaborate than that to stay reachable.
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .focusRequester(contentFocusRequester)
+                    .padding(top = 140.dp)
                     .focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
@@ -125,14 +117,12 @@ fun LibraryScreen(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(
-                            // Coverflow above already clears the pill
-                            // with its own real stage height, this
-                            // title just needs breathing room below it.
-                            // With no coverflow to clear the pill, this
-                            // title is the first thing under it instead,
-                            // so it carries the clearance itself, same
-                            // 140.dp this whole LazyColumn used to.
-                            top = if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) 12.dp else 140.dp,
+                            // The LazyColumn's own top=140.dp clearance
+                            // now covers the pill for every real case,
+                            // coverflow-less libraries included: this
+                            // just needs breathing room below whatever
+                            // came before it, same real value either way.
+                            top = 12.dp,
                             start = 48.dp,
                             bottom = 12.dp,
                         ),
