@@ -114,7 +114,7 @@ private fun AppBootGate(
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
-    // jellio_load.mp4 (res/raw) runs exactly 10s, the ~8s this prefetch
+    // jellio_load.webm (res/raw) runs ~10s, the ~8s this prefetch
     // usually takes plus the 2s of real room asked for: the splash
     // stays up for at least that long even on a fast/cached load,
     // rather than cutting the animation off mid-play the moment
