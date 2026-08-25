@@ -105,6 +105,10 @@ fun SettingsScreen(
             PasswordSection(session = session, viewModel = viewModel)
         }
 
+        SettingsSection(title = "Sleep Timer") {
+            SleepTimerSection(viewModel = viewModel)
+        }
+
         val quickConnectEnabled by viewModel.quickConnectEnabled.collectAsState()
         if (quickConnectEnabled) {
             SettingsSection(title = "Quick Connect") {
@@ -295,6 +299,34 @@ private fun QuickConnectSection(viewModel: SettingsViewModel) {
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Text(text = if (isAuthorizing) "Approving..." else "Approve", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        }
+    }
+}
+
+// Mirrors screens/settings.js's own buildSleepTimerSection(): real
+// cross-client status for a timer started from the player on this
+// same account/device pair, surfaced here for a reader not currently
+// on the player screen. Only the status line shows while no timer is
+// running; the Cancel timer button only ever renders alongside it,
+// same real condition that file's own real.Active check gates both on.
+@Composable
+private fun SleepTimerSection(viewModel: SettingsViewModel) {
+    val statusText by viewModel.sleepTimerStatusText.collectAsState()
+    val active by viewModel.sleepTimerActive.collectAsState()
+    val isCancelling by viewModel.isCancellingSleepTimer.collectAsState()
+
+    Column {
+        Text(text = statusText, color = JellioTextSecondary)
+        if (active) {
+            Surface(
+                onClick = { viewModel.cancelSleepTimer() },
+                enabled = !isCancelling,
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                modifier = Modifier.padding(top = 16.dp),
+            ) {
+                Text(text = if (isCancelling) "Cancelling..." else "Cancel timer", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            }
         }
     }
 }
