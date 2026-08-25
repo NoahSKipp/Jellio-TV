@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
+import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.AppViewModel
@@ -29,13 +32,16 @@ import com.jellio.tv.ui.AuthState
 import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
+import com.jellio.tv.ui.common.ProgressSweep
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.groupwatch.GroupWatchButton
 import com.jellio.tv.ui.groupwatch.GroupWatchOverlay
 import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
 import com.jellio.tv.ui.home.HomeScreen
+import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
+import com.jellio.tv.ui.library.LibraryViewModel
 import com.jellio.tv.ui.nav.JellioNavItems
 import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
@@ -52,6 +58,7 @@ import com.jellio.tv.ui.seasonal.SeasonalEffectsOverlay
 import com.jellio.tv.ui.seasonal.SeasonalEffectsViewModel
 import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
+import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioTvTheme
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -81,7 +88,49 @@ private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
         // screen for a reader who is actually already signed in.
         AuthState.Loading -> Box(Modifier.fillMaxSize()) {}
         AuthState.LoggedOut -> LoginScreen(modifier = Modifier.fillMaxSize())
-        is AuthState.LoggedIn -> JellioTvApp(session = state.session, appViewModel = appViewModel)
+        is AuthState.LoggedIn -> AppBootGate(session = state.session, appViewModel = appViewModel)
+    }
+}
+
+// Real feedback live: "Loading takes forever" on Home and every first
+// real Library visit, reported the same way a mobile app's own splash
+// screen is what actually covers that wait rather than a reader
+// staring at an empty, already-mounted screen while its own fetch
+// runs. HomeScreen's own hiltViewModel() call below resolves to this
+// exact same instance (both sit under the same real Activity-scoped
+// ViewModelStoreOwner, no Navigation Compose backstack entry between
+// them to change that), so kicking its real load() off here and
+// gating JellioTvApp's own reveal on it finishing means Home is
+// already populated the moment it first appears, not loading again in
+// front of the reader.
+@Composable
+private fun AppBootGate(
+    session: Session,
+    appViewModel: AppViewModel,
+    homeViewModel: HomeViewModel = hiltViewModel(),
+    libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
+) {
+    val homeState by homeViewModel.uiState.collectAsState()
+    val libraries by appViewModel.libraries.collectAsState()
+    LaunchedEffect(session.userId) { homeViewModel.load(session) }
+    // Real speculative value, not a real parity port: which library a
+    // reader opens first is real screen state no server or web source
+    // predicts ahead of the real tap, this just warms the same real
+    // first entry LibraryPickerOverlay lists first, on the same real
+    // Activity-scoped instance LibraryScreen's own hiltViewModel()
+    // call later resolves to. A miss (a different library gets opened
+    // first) costs nothing beyond this app's own real pre-fix load
+    // time; a hit skips it entirely.
+    LaunchedEffect(libraries) {
+        libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
+    }
+    if (homeState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize().background(JellioBg), contentAlignment = Alignment.Center) {
+            ProgressSweep(modifier = Modifier.align(Alignment.TopCenter))
+            Text(text = "Jellio TV", style = MaterialTheme.typography.titleLarge)
+        }
+    } else {
+        JellioTvApp(session = session, appViewModel = appViewModel)
     }
 }
 
