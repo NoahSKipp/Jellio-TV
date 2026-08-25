@@ -18,11 +18,23 @@ private const val SERVICE_ROW_LIMIT = 24
 private const val TOP_GENRES_LIMIT = 10
 private const val MIN_GENRE_COUNT = 3
 
+// Real screens/service.js's own ROW_LIST_LIMIT: components/
+// rowListModal.js's own "browse everything" cap, that file's own
+// independently redeclared constant (not shared with screens/home.js's
+// own copy of the same real value), kept the same way here rather
+// than reusing HomeViewModel's own private one.
+private const val ROW_LIST_LIMIT = 500
+
 // A row's own real kind (movies/tvshows) travels with it now, not
 // just its title/items: screens/service.js's own applyFilter() reads
 // a row's real kind to decide whether the Movies/TV Shows chip
 // matches it at all, real state HomeSection alone has no room for.
-data class ServiceRow(val title: String, val kind: String, val items: List<BaseItemDto>)
+// collectionId is this row's own real backing BoxSet, real
+// screens/service.js's own makeRowTitleClickable() fetchAll needs it
+// (getCollectionItems(row.collection.Id, row.kind, ROW_LIST_LIMIT)) to
+// browse this row's full real catalog past whatever SERVICE_ROW_LIMIT
+// already trimmed it to.
+data class ServiceRow(val title: String, val kind: String, val items: List<BaseItemDto>, val collectionId: String)
 
 data class ServiceUiState(
     val isLoading: Boolean = true,
@@ -71,7 +83,7 @@ class ServiceViewModel @Inject constructor(
                         emptyList()
                     }
                     if (items.isEmpty()) return@forEach
-                    rows.add(ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items))
+                    rows.add(ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items, collectionId = collection.Id))
                     // Real screens/service.js's own pickHeroItem(): whichever
                     // real item across every matched collection carries a
                     // real backdrop and rates highest, not always row
@@ -98,6 +110,12 @@ class ServiceViewModel @Inject constructor(
             }
         }
     }
+
+    // Real port of screens/service.js's own makeRowTitleClickable()
+    // fetchAll callback: this row's own full real collection, past
+    // whatever SERVICE_ROW_LIMIT already trimmed the row itself to.
+    suspend fun fetchAllForRow(session: Session, row: ServiceRow): List<BaseItemDto> =
+        repository.getCollectionItems(session.userId, row.collectionId, row.kind, ROW_LIST_LIMIT)
 
     private fun topGenres(rows: List<ServiceRow>): List<String> {
         val counts = linkedMapOf<String, Int>()
