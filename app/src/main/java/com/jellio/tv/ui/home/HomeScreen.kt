@@ -1,12 +1,25 @@
 package com.jellio.tv.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,13 +31,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.nav.rememberNavCompact
+import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioSecondary
+import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
@@ -49,6 +71,14 @@ fun HomeScreen(
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     var cardMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
+    // Real components/homeCustomizer.js's own header: editMode lives
+    // only in this real local closure, reset to off on every fresh
+    // visit to this screen the same way that file's own real editMode
+    // local variable already resets on every real remount, not
+    // something worth persisting across navigations. Only order/hidden
+    // itself is real persisted state, through HomeViewModel's own
+    // HomeCustomizationStore.
+    var editMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(session.userId) {
         viewModel.load(session)
@@ -63,7 +93,7 @@ fun HomeScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
             }
-            uiState.sections.isEmpty() && uiState.leadingSections.isEmpty() && uiState.comingSoon.isEmpty() && uiState.studioHubs.isEmpty() -> {
+            uiState.rows.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = "Nothing here yet.", color = JellioTextSecondary)
                 }
@@ -75,49 +105,89 @@ fun HomeScreen(
             // TvLazyColumn/TvLazyRow, advertise no default D-pad entry
             // point of their own for a system that has never yet
             // focused anything inside them.
-            else -> LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusGroup()
-                    .focusRequester(contentFocusRequester),
-            ) {
-                item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
-                // Real screens/home.js's own jellio-home-greeting: real
-                // feedback found "Welcome back" read as a placeholder
-                // the moment it was ever anything else, a real
-                // time-of-day/name greeting instead.
-                if (uiState.greeting.isNotEmpty()) {
+            else -> {
+                // Real port of components/homeCustomizer.js's own
+                // applyHomeCustomization(): recomputed fresh off
+                // whatever this session's own real rows and saved
+                // customization currently are, same real "no DOM
+                // mutation to go stale" reasoning that file's own real
+                // bug-fix header documents, for free here since this is
+                // a plain derived value off uiState rather than
+                // anything mutated in place.
+                val liveKeys = uiState.rows.map { it.key }
+                val order = HomeCustomization.effectiveOrder(liveKeys, uiState.customization)
+                val byKey = uiState.rows.associateBy { it.key }
+                val orderedRows = order.mapNotNull { byKey[it] }
+                val visibleRows = if (editMode) {
+                    orderedRows
+                } else {
+                    orderedRows.filter { !uiState.customization.hidden.contains(it.key) }
+                }
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusGroup()
+                        .focusRequester(contentFocusRequester),
+                ) {
+                    item { HeroSection(item = uiState.heroItem, imageUrl = imageUrl, onViewDetails = onItemClick) }
+                    // Real screens/home.js's own jellio-home-greeting: real
+                    // feedback found "Welcome back" read as a placeholder
+                    // the moment it was ever anything else, a real
+                    // time-of-day/name greeting instead.
+                    if (uiState.greeting.isNotEmpty()) {
+                        item {
+                            Text(
+                                text = uiState.greeting,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 8.dp),
+                            )
+                        }
+                    }
                     item {
-                        Text(
-                            text = uiState.greeting,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 8.dp),
+                        HomeCustomizeBar(
+                            editMode = editMode,
+                            onToggleEdit = { editMode = !editMode },
+                            onReset = { viewModel.resetCustomization() },
+                            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp),
                         )
                     }
-                }
-                items(uiState.leadingSections, key = { it.title }) { section ->
-                    LandscapeRow(
-                        section = section,
-                        rawImageUrl = rawImageUrl,
-                        onItemClick = onItemClick,
-                        onTitleClick = { rowListTarget = section },
-                    )
-                }
-                item {
-                    ComingSoonRow(entries = uiState.comingSoon, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
-                }
-                item {
-                    StudioHubRow(services = uiState.studioHubs, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
-                }
-                items(uiState.sections, key = { it.title }) { section ->
-                    PosterRow(
-                        section = section,
-                        imageUrl = imageUrl,
-                        onItemClick = onItemClick,
-                        onItemOptions = { cardMenuTarget = it },
-                        onTitleClick = { rowListTarget = section },
-                    )
+                    items(visibleRows, key = { it.key }) { row ->
+                        val hidden = uiState.customization.hidden.contains(row.key)
+                        val index = order.indexOf(row.key)
+                        HomeRowEditor(
+                            editMode = editMode,
+                            displayName = row.displayName,
+                            hidden = hidden,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < order.size - 1,
+                            onMoveUp = { viewModel.moveRow(row.key, -1) },
+                            onMoveDown = { viewModel.moveRow(row.key, 1) },
+                            onToggleHidden = { viewModel.toggleRowHidden(row.key) },
+                        ) {
+                            when (row) {
+                                is PosterHomeRow -> if (row.landscape) {
+                                    LandscapeRow(
+                                        section = row.section,
+                                        rawImageUrl = rawImageUrl,
+                                        onItemClick = onItemClick,
+                                        onTitleClick = { rowListTarget = row.section },
+                                    )
+                                } else {
+                                    PosterRow(
+                                        section = row.section,
+                                        imageUrl = imageUrl,
+                                        onItemClick = onItemClick,
+                                        onItemOptions = { cardMenuTarget = it },
+                                        onTitleClick = { rowListTarget = row.section },
+                                    )
+                                }
+                                is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
+                                is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -144,6 +214,142 @@ fun HomeScreen(
                 onDismiss = { rowListTarget = null },
                 fetchAll = section.fetchAll,
             )
+        }
+    }
+}
+
+// Real port of components/homeCustomizer.js's own
+// buildHomeCustomizeBar()/updateHomeCustomizeBar(): a Reset button only
+// ever shown while editing, and the toggle itself relabelled Done/
+// tinted active the same way that file's own real
+// jellio-home-customize-toggle-active class is.
+@Composable
+private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier) {
+        if (editMode) {
+            Surface(
+                onClick = onReset,
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                    Icon(imageVector = Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                    Text(text = "Reset")
+                }
+            }
+        }
+        Surface(
+            onClick = onToggleEdit,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = if (editMode) JellioSecondary else Color.White.copy(alpha = 0.08f),
+                contentColor = if (editMode) JellioBg else JellioText,
+            ),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+                Icon(imageVector = Icons.Filled.Tune, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+                Text(text = if (editMode) "Done" else "Customize")
+            }
+        }
+    }
+}
+
+// Real port of components/homeCustomizer.js's own wrapRowForCustomization()
+// plus buildRowBar()/applyHomeCustomization()'s own real
+// data-hidden/jellio-home-editing CSS rules (css/app.css's own
+// .jellio-row-editor[data-hidden='true'] .jellio-row-editor-content):
+// a hidden row's own content never renders at all, editing or not,
+// only its own bar (name plus a Show toggle) does, and only while
+// editing; a visible row's own bar only ever shows while editing too.
+@Composable
+private fun HomeRowEditor(
+    editMode: Boolean,
+    displayName: String,
+    hidden: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onToggleHidden: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        if (editMode) {
+            HomeRowEditorBar(
+                displayName = displayName,
+                hidden = hidden,
+                canMoveUp = canMoveUp,
+                canMoveDown = canMoveDown,
+                onMoveUp = onMoveUp,
+                onMoveDown = onMoveDown,
+                onToggleHidden = onToggleHidden,
+            )
+        }
+        if (!hidden) content()
+    }
+}
+
+@Composable
+private fun HomeRowEditorBar(
+    displayName: String,
+    hidden: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onToggleHidden: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 48.dp)
+            .padding(top = 8.dp, bottom = 4.dp)
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = displayName,
+            color = JellioTextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            HomeRowEditorButton(icon = Icons.Filled.ArrowUpward, enabled = canMoveUp, onClick = onMoveUp, contentDescription = "Move row up")
+            HomeRowEditorButton(icon = Icons.Filled.ArrowDownward, enabled = canMoveDown, onClick = onMoveDown, contentDescription = "Move row down")
+            HomeRowEditorButton(
+                icon = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                enabled = true,
+                active = hidden,
+                onClick = onToggleHidden,
+                contentDescription = if (hidden) "Show row" else "Hide row",
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeRowEditorButton(
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    contentDescription: String,
+    active: Boolean = false,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = if (active) JellioSecondary else JellioTextSecondary,
+        ),
+        modifier = Modifier.padding(2.dp),
+    ) {
+        Box(modifier = Modifier.padding(6.dp)) {
+            Icon(imageVector = icon, contentDescription = contentDescription, tint = if (active) JellioSecondary else JellioTextSecondary)
         }
     }
 }
