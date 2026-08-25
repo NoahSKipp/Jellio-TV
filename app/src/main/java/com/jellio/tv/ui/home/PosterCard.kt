@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -49,17 +48,19 @@ private val PosterWidth = 170.dp
 //
 // onOptionsClick mirrors components/card.js's own buildCardActions():
 // real Watchlist/Mark Watched actions reachable without leaving the
-// grid, hover/focus-revealed there, reached through a real options
-// button here instead (same real reasoning DetailScreen's own
-// EpisodeCard options button already documents: no D-pad equivalent
-// for a hold/right-click gesture worth trusting untested). The menu
-// itself (CardOptionsMenu below) is the caller's own job to render at
-// its own screen root, same real reason DetailScreen's own
+// grid, hover/focus-revealed there. Reached through a long D-pad
+// press on the card itself now, not a second focusable button sharing
+// its own bounds: real feedback live found that second Surface was
+// exactly what blocked ordinary Left/Right between cards in the same
+// row, the nearest focusable candidate in either direction being the
+// current card's own options button rather than its neighbour. The
+// menu itself (CardOptionsMenu below) is the caller's own job to
+// render at its own screen root, same real reason DetailScreen's own
 // EpisodeOptionsMenu is not owned by EpisodeCard either: a real
 // full-screen overlay rendered from inside a LazyRow item would only
 // ever fill that row's own bounds, not the real screen. null (the
-// default) renders no options button at all, same real card shape
-// this had before it existed.
+// default) wires no long press at all, same real card shape this had
+// before options existed.
 @Composable
 fun PosterCard(
     item: BaseItemDto,
@@ -71,6 +72,7 @@ fun PosterCard(
     Box(modifier = modifier.width(PosterWidth)) {
         Surface(
             onClick = onClick,
+            onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
             modifier = Modifier.width(PosterWidth),
@@ -120,18 +122,6 @@ fun PosterCard(
                             )
                         }
                     }
-                }
-            }
-        }
-        if (onOptionsClick != null) {
-            Surface(
-                onClick = onOptionsClick,
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.55f), contentColor = JellioText),
-                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(28.dp),
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Options", modifier = Modifier.size(16.dp))
                 }
             }
         }

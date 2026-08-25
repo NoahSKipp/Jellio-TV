@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -563,6 +562,7 @@ private fun EpisodeCard(
     Box(modifier = Modifier.width(320.dp)) {
         Surface(
             onClick = onClick,
+            onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
             modifier = Modifier.width(320.dp),
@@ -595,16 +595,6 @@ private fun EpisodeCard(
                         Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
-            }
-        }
-        Surface(
-            onClick = onOptionsClick,
-            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.55f), contentColor = JellioText),
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(32.dp),
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Episode options", modifier = Modifier.size(18.dp))
             }
         }
     }
