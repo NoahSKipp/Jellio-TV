@@ -38,13 +38,22 @@ sealed interface JellioRoute {
     data class Player(val itemId: String, val mediaSourceId: String?) : JellioRoute
 }
 
+// Real css/persistent-sidebar.css's own mobile breakpoint (its own
+// comment: "Real screenshot order: Home, Search, Libraries, Profile,
+// matching Nuvio's own four-item mobile nav exactly") sets that exact
+// order via CSS `order`, not DOM order, on those four survivors of the
+// pill's own real Settings/Favorites/back/bottom-group cull. This
+// pill has no cull of its own (Watchlist/Calendar/Settings all stay
+// reachable, no other affordance reaches them the way the phone's own
+// profile button and home tabs do), so those three sit appended after
+// the same shared four, in that same shared order.
 val JellioNavItems: List<JellioRoute> = listOf(
-    JellioRoute.Profile,
     JellioRoute.Home,
     JellioRoute.Search,
+    JellioRoute.Library,
+    JellioRoute.Profile,
     JellioRoute.Watchlist,
     JellioRoute.Calendar,
-    JellioRoute.Library,
     JellioRoute.Settings,
 )
 
