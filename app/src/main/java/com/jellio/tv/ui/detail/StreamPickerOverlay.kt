@@ -49,12 +49,12 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // MediaSourceInfo), skipping that file's own remember-my-stream/
 // language-filter chrome for now: a real but secondary layer over the
 // same real core job, picking one of Gelato's own resolved sources.
-private fun sourceResolutionLabel(source: MediaSourceDto): String {
+internal fun sourceResolutionLabel(source: MediaSourceDto): String {
     val height = source.MediaStreams?.firstOrNull { it.Type == "Video" }?.Height ?: return ""
     return if (height >= 2000) "4K" else "${height}p"
 }
 
-private fun formatFileSize(bytes: Long?): String {
+internal fun formatFileSize(bytes: Long?): String {
     if (bytes == null || bytes <= 0) return ""
     val gb = bytes / (1024.0 * 1024.0 * 1024.0)
     if (gb >= 1) return "%.1f GB".format(gb)
@@ -62,7 +62,7 @@ private fun formatFileSize(bytes: Long?): String {
     return if (mb > 0) "$mb MB" else ""
 }
 
-private fun sourceAudioLabel(source: MediaSourceDto): String {
+internal fun sourceAudioLabel(source: MediaSourceDto): String {
     val audio = source.MediaStreams?.firstOrNull { it.Type == "Audio" } ?: return ""
     val parts = mutableListOf<String>()
     audio.Codec?.let { parts.add(it.uppercase()) }
@@ -80,7 +80,7 @@ private fun sourceBitrateLabel(source: MediaSourceDto): String {
     return "%.1f Mbps".format(bitRate / 1_000_000.0)
 }
 
-private fun sourceDescription(source: MediaSourceDto): String =
+internal fun sourceDescription(source: MediaSourceDto): String =
     (source.Name ?: "").split("\n").drop(1).joinToString(" ").trim()
 
 private const val TICKS_PER_SECOND = 10_000_000L
@@ -158,7 +158,7 @@ private fun flagLanguages(text: String?): List<String> {
 // real 38+ result set from Gelato comes back with no MediaStreams
 // audio entries at all, only the flag emoji in source.Name still
 // tells the two languages apart.
-private fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
+internal fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
     val codes = mutableListOf<String>()
     source.MediaStreams?.forEach { stream ->
         if (stream.Type == "Audio" && !stream.Language.isNullOrEmpty()) {
@@ -361,11 +361,18 @@ private fun RetryButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun SourceCard(source: MediaSourceDto, onClick: () -> Unit) {
+internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false) {
+    // Real .jellio-stream-picker-card-active treatment: a
+    // JellioSecondary border plus a slightly brighter fill, ported as a
+    // plain color swap here rather than a real border stroke, the same
+    // simplification the rest of this app's own selected-state cards
+    // (DetailScreen's own season tabs) already use.
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else JellioBgElevated,
+        ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

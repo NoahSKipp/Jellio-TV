@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,7 +68,9 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
+import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.detail.SourceCard
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -160,6 +164,8 @@ fun PlayerScreen(
                 audioTracks = uiState.audioTracks,
                 selectedAudioStreamIndex = uiState.selectedAudioStreamIndex,
                 defaultAudioStreamIndex = uiState.defaultAudioStreamIndex,
+                sourceOptions = uiState.sourceOptions,
+                currentMediaSourceId = uiState.mediaSourceId,
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
@@ -176,6 +182,7 @@ fun PlayerScreen(
                     }
                 },
                 onSelectAudioTrack = { streamIndex, positionTicks -> viewModel.switchAudioTrack(session, streamIndex, positionTicks) },
+                onSelectSource = { source, positionTicks -> viewModel.switchSource(session, source, positionTicks) },
                 onRestart = { viewModel.restart(session) },
                 onPlayNext = onPlayNext,
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
@@ -197,6 +204,8 @@ private fun PlayerSurface(
     audioTracks: List<AudioTrackUiState>,
     selectedAudioStreamIndex: Int?,
     defaultAudioStreamIndex: Int?,
+    sourceOptions: List<MediaSourceDto>,
+    currentMediaSourceId: String?,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
     skipSegments: IntroSkipperSegmentsDto?,
@@ -207,6 +216,7 @@ private fun PlayerSurface(
     onReportStopped: (Long) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
     onSelectAudioTrack: (Int, Long) -> Unit,
+    onSelectSource: (MediaSourceDto, Long) -> Unit,
     onRestart: () -> Unit,
     onPlayNext: (String) -> Unit,
     onStartSleepTimer: (Int) -> Unit,
@@ -264,6 +274,7 @@ private fun PlayerSurface(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepMenu by remember { mutableStateOf(false) }
     var showAudioMenu by remember { mutableStateOf(false) }
+    var showSourcePanel by remember { mutableStateOf(false) }
     var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
     var hasReportedStart by remember { mutableStateOf(false) }
     var seekedToResume by remember { mutableStateOf(false) }
@@ -394,8 +405,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu) {
+    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -433,6 +444,13 @@ private fun PlayerSurface(
                 if (showAudioMenu) {
                     if (event.key == Key.Back) {
                         showAudioMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (showSourcePanel) {
+                    if (event.key == Key.Back) {
+                        showSourcePanel = false
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -510,6 +528,7 @@ private fun PlayerSurface(
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 hasAudioTracks = audioTracks.size > 1,
+                hasSourceOptions = sourceOptions.size > 1,
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
@@ -517,6 +536,7 @@ private fun PlayerSurface(
                 onOpenSpeedMenu = { showSpeedMenu = true },
                 onOpenSleepMenu = { showSleepMenu = true },
                 onOpenAudioMenu = { showAudioMenu = true },
+                onOpenSourceMenu = { showSourcePanel = true },
             )
         }
 
@@ -533,6 +553,23 @@ private fun PlayerSurface(
                     onSelectAudioTrack(streamIndex, player.currentPosition * TICKS_PER_MS)
                 },
                 onDismiss = { showAudioMenu = false },
+            )
+        }
+
+        // Real port of screens/player.js's own sourceButton gating:
+        // sourceButton.disabled stays true until getMediaSources(itemId)
+        // actually resolves more than one real option, same real
+        // condition sourceOptions.size > 1 already checks before this
+        // button even renders in PlayerControls above.
+        if (showSourcePanel && sourceOptions.size > 1) {
+            SourcePanel(
+                sources = sourceOptions,
+                currentMediaSourceId = currentMediaSourceId,
+                onSelect = { source ->
+                    showSourcePanel = false
+                    onSelectSource(source, player.currentPosition * TICKS_PER_MS)
+                },
+                onDismiss = { showSourcePanel = false },
             )
         }
 
@@ -625,6 +662,7 @@ private fun PlayerControls(
     durationMs: Long,
     hasSubtitleTracks: Boolean,
     hasAudioTracks: Boolean,
+    hasSourceOptions: Boolean,
     speedLabel: String,
     sleepTimerActive: Boolean,
     onPlayPause: () -> Unit,
@@ -632,6 +670,7 @@ private fun PlayerControls(
     onOpenSpeedMenu: () -> Unit,
     onOpenSleepMenu: () -> Unit,
     onOpenAudioMenu: () -> Unit,
+    onOpenSourceMenu: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -688,6 +727,23 @@ private fun PlayerControls(
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.GraphicEq, contentDescription = "Audio", tint = JellioText)
+                    }
+                }
+            }
+            // Real port of the pill's own sourceButton: disabled
+            // (sourceButton.disabled) until getMediaSources(itemId)
+            // actually resolves more than one real option, same real
+            // condition hasSourceOptions already checks before this
+            // button even renders.
+            if (hasSourceOptions) {
+                Surface(
+                    onClick = onOpenSourceMenu,
+                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Filled.SwapHoriz, contentDescription = "Sources", tint = JellioText)
                     }
                 }
             }
@@ -1063,6 +1119,59 @@ private fun AudioMenu(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own Sources side panel
+// (rebuildSourceMenu()): the exact same real SourceCard this app's own
+// pre-playback StreamPickerOverlow already renders (that file's own
+// comment documents reusing components/streamPicker.js's own
+// buildSourceCard() here rather than a second, plainer list), leaner
+// than that full overlay itself, no resume button or language filter,
+// same real leaner shape that file's own mid-player sourcePanel has
+// against the fuller pre-playback picker.
+@Composable
+private fun SourcePanel(
+    sources: List<MediaSourceDto>,
+    currentMediaSourceId: String?,
+    onSelect: (MediaSourceDto) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(top = 104.dp, end = 48.dp)
+                .widthIn(min = 320.dp, max = 420.dp)
+                .heightIn(max = 520.dp)
+                .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                .padding(16.dp),
+        ) {
+            Text(text = "Sources", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                items(sources, key = { it.Id ?: it.hashCode() }) { source ->
+                    SourceCard(
+                        source = source,
+                        onClick = {
+                            if (source.Id != currentMediaSourceId) onSelect(source) else onDismiss()
+                        },
+                        isActive = source.Id == currentMediaSourceId,
                     )
                 }
             }
