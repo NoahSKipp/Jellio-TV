@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.home
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,12 +88,24 @@ fun HeroSection(
     val heroHeight = HeroHeight.scaled()
 
     Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
-        AsyncImage(
-            model = imageUrl(item, "Backdrop", 1280),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(heroHeight),
-        )
+        // Real port of css/hero-carousel.css's own real backdrop-layer
+        // crossfade (heroCarousel.js's own crossfadeBackdrop(), 800ms):
+        // a plain AsyncImage model swap here read as an instant hard
+        // cut on every real rotation, this app's own most prominent
+        // real screen. Crossfade keyed on the item's own Id gives the
+        // outgoing/incoming backdrop the same real overlapping fade.
+        Crossfade(
+            targetState = item,
+            animationSpec = tween(800),
+            label = "heroBackdropCrossfade",
+        ) { crossfadeItem ->
+            AsyncImage(
+                model = imageUrl(crossfadeItem, "Backdrop", 1280),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(heroHeight),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()

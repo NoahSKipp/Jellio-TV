@@ -31,6 +31,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ProgressSweep
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
@@ -77,8 +78,9 @@ fun LibraryScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+            uiState.isLoading -> Box(Modifier.fillMaxSize()) {
+                ProgressSweep(modifier = Modifier.align(Alignment.TopCenter))
+                Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.align(Alignment.Center))
             }
             uiState.emptyMessage != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.emptyMessage ?: "", color = JellioTextSecondary)

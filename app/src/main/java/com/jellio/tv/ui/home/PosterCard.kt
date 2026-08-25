@@ -30,15 +30,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
+import java.util.Locale
 
 private val PosterWidth = 170.dp
 
@@ -89,6 +92,23 @@ fun PosterCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
                 )
+                // Real port of js/libraryBrowse.js's own rating span
+                // (item.CommunityRating.toFixed(1)), css/library-browse.css's
+                // own .jellio-card-rating: top corner rather than that
+                // file's own bottom-right, the watched checkmark/progress
+                // bar below already own the bottom of this card.
+                item.CommunityRating?.let { rating ->
+                    Text(
+                        text = String.format(Locale.US, "%.1f", rating),
+                        color = JellioText,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .background(JellioBg.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
                 // Real port of components/card.js's own paintCardState():
                 // a watched checkmark badge wins outright over a progress
                 // bar, the same real Played-before-PlayedPercentage order
