@@ -45,10 +45,10 @@ import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import com.jellio.tv.ui.theme.JellioTrending
 
 // Real port of native jellyfin-web's own #/login flow, LoginViewModel.kt's
 // own header comment covers why this app themes rather than replaces
@@ -133,7 +133,7 @@ private fun ServerAddressForm(
             modifier = Modifier.fillMaxWidth(),
         )
         uiState.error?.let { error ->
-            Text(text = error, color = JellioTrending, modifier = Modifier.padding(top = 16.dp))
+            Text(text = error, color = JellioDanger, modifier = Modifier.padding(top = 16.dp))
         }
         Spacer(modifier = Modifier.height(24.dp))
         Surface(
@@ -161,7 +161,7 @@ private fun ProfilePicker(
     ) {
         Text(text = "Who’s watching?", style = MaterialTheme.typography.titleLarge)
         uiState.error?.let { error ->
-            Text(text = error, color = JellioTrending, modifier = Modifier.padding(top = 12.dp))
+            Text(text = error, color = JellioDanger, modifier = Modifier.padding(top = 12.dp))
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 140.dp),
@@ -299,7 +299,7 @@ private fun ManualLoginForm(
         uiState.error?.let { error ->
             Text(
                 text = error,
-                color = JellioTrending,
+                color = JellioDanger,
                 modifier = Modifier.padding(top = 16.dp),
             )
         }

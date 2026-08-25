@@ -18,7 +18,14 @@ private val JellioColorScheme = darkColorScheme(
     onSurfaceVariant = JellioTextSecondary,
     primary = JellioSecondary,
     onPrimary = JellioBg,
-    secondary = JellioTrending,
+    // Real feedback checked against NuvioWeb's own css/base.css: no
+    // separate accent hue exists there at all, every bright tone in
+    // its own real palette traces back to the one #f5f5f5/#e0e0e0
+    // pair. secondary was bound to an invented orange with no real
+    // source on either side; the variant tone that pair's own second
+    // half already is fits this role without introducing a color
+    // neither real source ever had an opinion on.
+    secondary = JellioSecondaryVariant,
     onSecondary = JellioBg,
     border = JellioBorder,
     borderVariant = JellioBorder,
