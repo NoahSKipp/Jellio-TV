@@ -23,9 +23,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -88,6 +90,7 @@ private val PillMaxWidth = 640.dp
 // real libraries); ported the same way, a LazyRow rather than a
 // scrollable Row so D-pad focus moving onto an off-screen item still
 // brings it into view the way TV navigation actually needs.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TopNavPill(
     items: List<JellioRoute>,
@@ -100,6 +103,17 @@ fun TopNavPill(
     // the way the same way a modal's own scrim would. MainActivity
     // threads HomeScreen's own editMode straight through to this.
     enabled: Boolean = true,
+    // Moonfin-Core's own top_toolbar.dart cross-referenced live: their
+    // pill sits over a full-bleed carousel the same way this one wants
+    // to, and _moveFocusDown() there never leans on Flutter's own
+    // default spatial search once it has left the toolbar, an explicit
+    // requestFocus() onto a known content node instead. Compose's own
+    // default 2D search already proved unreliable the same way here
+    // (the top=140.dp clearance below was carrying that failure) once
+    // bounds overlap, so Home/Library thread their own LazyColumn's
+    // FocusRequester in here the same explicit way, letting this stay
+    // full-bleed under the pill instead of clearing space for it.
+    contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     // Real components/mobileNav.js's own scroll-driven compact state,
@@ -138,7 +152,14 @@ fun TopNavPill(
                 .widthIn(max = PillMaxWidth)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.96f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp)),
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
+                .let {
+                    if (contentFocusRequester != null) {
+                        it.focusProperties { down = contentFocusRequester }
+                    } else {
+                        it
+                    }
+                },
         ) {
             lazyItems(items, key = { it::class.simpleName ?: it.toString() }) { route ->
                 NavPillItem(
