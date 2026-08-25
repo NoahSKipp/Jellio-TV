@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +31,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,7 +86,20 @@ fun SettingsScreen(
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
     Box(modifier = modifier.fillMaxSize()) {
-    Column(modifier = Modifier.fillMaxSize().padding(top = 140.dp, start = 48.dp, end = 48.dp)) {
+    // Real bug found live testing on device: this Column carried no
+    // scroll of its own at all, so once Change Password/Sleep
+    // Timer/Quick Connect/About (the Check for Updates button among
+    // them) pushed the real content taller than one screen, everything
+    // past that point was simply unreachable, nothing to bring it into
+    // view. verticalScroll() is Compose's own real fix, the same real
+    // bring-into-view behaviour a LazyColumn gets for free already
+    // covering a plain Column here too.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 140.dp, start = 48.dp, end = 48.dp),
+    ) {
         Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
 
         SettingsSection(title = "Server") {
@@ -170,6 +187,7 @@ fun SettingsScreen(
         ) {
             Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
+        Spacer(modifier = Modifier.height(64.dp))
     }
 
     val field = openField
@@ -235,6 +253,16 @@ private fun LanguagePickerOverlay(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    // Real bug found live testing on device: nothing here ever claimed
+    // focus on open (this LazyColumn carried no focusRestorer() either,
+    // the same real gap HomeScreen's own header already documents for
+    // a plain Compose Foundation list), so the very first D-pad press
+    // after opening this had no defined target at all. Same real
+    // pattern LibraryPickerOverlay.kt's own firstEntryFocusRequester
+    // already uses: a requester on the first real row, claimed the
+    // moment this composes.
+    val firstRowFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -251,7 +279,14 @@ private fun LanguagePickerOverlay(
                 .width(360.dp)
                 .fillMaxSize()
                 .background(JellioBgElevated)
-                .padding(vertical = 48.dp),
+                // Real bug found live testing on device: this panel's
+                // own title rendered directly underneath TopNavPill's
+                // own real floating pill (top=32.dp, ~88.dp tall),
+                // unreadable behind it. Same real top=140.dp clearance
+                // every other real screen already carries below the
+                // pill, ported here instead of the plain vertical=48.dp
+                // this used to open with.
+                .padding(top = 140.dp, start = 0.dp, end = 0.dp, bottom = 48.dp),
         ) {
             Text(
                 text = title,
@@ -260,7 +295,14 @@ private fun LanguagePickerOverlay(
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
             )
             LazyColumn {
-                item { LanguagePickerRow(label = "No preference", isSelected = selectedCode == null, onClick = { onSelect(null) }) }
+                item {
+                    LanguagePickerRow(
+                        label = "No preference",
+                        isSelected = selectedCode == null,
+                        onClick = { onSelect(null) },
+                        focusRequester = firstRowFocusRequester,
+                    )
+                }
                 items(LANGUAGE_OPTIONS) { option: LanguageOption ->
                     LanguagePickerRow(label = option.name, isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
                 }
@@ -270,7 +312,12 @@ private fun LanguagePickerOverlay(
 }
 
 @Composable
-private fun LanguagePickerRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+private fun LanguagePickerRow(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
@@ -278,7 +325,9 @@ private fun LanguagePickerRow(label: String, isSelected: Boolean, onClick: () ->
             containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
             contentColor = JellioText,
         ),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).let {
+            if (focusRequester != null) it.focusRequester(focusRequester) else it
+        },
     ) {
         Text(
             text = label,
