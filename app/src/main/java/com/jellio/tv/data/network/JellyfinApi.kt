@@ -51,6 +51,27 @@ interface JellyfinApi {
     @GET("Users/{userId}")
     suspend fun getUser(@Path("userId") userId: String): UserDto
 
+    // Real endpoint, GET /Users/Public (Jellyfin's own UserController.cs
+    // GetPublicUsers), confirmed against runtime/auth.js's own
+    // getPublicUsers() before porting this: unauthenticated, a real
+    // admin's own per-user "Display this user on the login screen"
+    // toggle already enforced server side.
+    @GET("Users/Public")
+    suspend fun getPublicUsers(): List<UserDto>
+
+    // Same real GET /Users/{userId} getUser() above already calls, a
+    // second real Retrofit method only because this one carries an
+    // explicit candidate token rather than trusting NetworkModule's own
+    // auth interceptor (which has nothing to attach yet on the login
+    // screen this is called from): the same real verification
+    // runtime/auth.js's own quickSignIn() does before trusting a
+    // remembered token at all.
+    @GET("Users/{userId}")
+    suspend fun getUserWithToken(
+        @Header("X-Emby-Token") token: String,
+        @Path("userId") userId: String,
+    ): UserDto
+
     // Real endpoint, POST /Users/{id}/Configuration (UserController.cs's
     // own UpdateUserConfiguration): replaces the whole real
     // UserConfiguration object, not a single field patch.

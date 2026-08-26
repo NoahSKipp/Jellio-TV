@@ -25,6 +25,8 @@ import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.recommend.CandidateEntry
+import com.jellio.tv.data.session.RememberedUserEntry
+import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
 import kotlinx.coroutines.Dispatchers
@@ -105,8 +107,19 @@ private const val FALLBACK_VIDEO_BITRATE = 20000000L
 class JellioRepository @Inject constructor(
     private val api: JellyfinApi,
     private val sessionManager: SessionManager,
+    private val rememberedUsersStore: RememberedUsersStore,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
+
+    // The one real server address a fresh install has never asked for
+    // yet: null only before the very first successful connectAndLogin()
+    // this device ever makes, since SessionManager.clearSession() keeps
+    // it across a sign out the same real way runtime/auth.js's own
+    // clearSession() leaves SERVER_ADDRESS_KEY alone. LoginViewModel's
+    // own start() reads this to decide whether there is a real server
+    // to show a profile picker for at all, or whether this is a true
+    // first run.
+    suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
 
     suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
         val normalized = serverAddress.trim().trimEnd('/')
@@ -122,10 +135,71 @@ class JellioRepository @Inject constructor(
             val authHeader = buildEmbyAuthorizationHeader(deviceId, APP_VERSION)
             val result = api.authenticateByName(authHeader, AuthenticateByNameRequest(username, password))
             sessionManager.saveSession(normalized, result.AccessToken, result.User.Id, result.User.Name)
+            rememberUser(normalized, result.User.Id, result.AccessToken, result.User.Name, result.User.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
             LoginResult.Failure(err.message ?: "Could not reach that server")
         }
+    }
+
+    // Real port of runtime/auth.js's own {userId: entry} store: written
+    // on every real successful sign in (setSession()'s own real
+    // rememberUser() call), read back by LoginScreen.kt's own "Who's
+    // watching?" grid the next time this device opens the login screen
+    // for the same real server.
+    suspend fun getRememberedUsers(serverAddress: String): Map<String, RememberedUserEntry> =
+        rememberedUsersStore.getRememberedUsers(serverAddress)
+
+    suspend fun forgetRememberedUser(serverAddress: String, userId: String) {
+        rememberedUsersStore.forgetUser(serverAddress, userId)
+    }
+
+    private suspend fun rememberUser(serverAddress: String, userId: String, accessToken: String, name: String, primaryImageTag: String?) {
+        rememberedUsersStore.rememberUser(
+            serverAddress,
+            userId,
+            RememberedUserEntry(accessToken, name, primaryImageTag, System.currentTimeMillis()),
+        )
+    }
+
+    // Real port of runtime/auth.js's own getPublicUsers(): unauthenticated,
+    // a real admin's own "Display this user on the login screen" toggle
+    // already enforced server side, an unreachable server or a real
+    // failure both just come back empty rather than surfaced as an
+    // error the reader would have to dismiss before ever seeing the
+    // manual form underneath.
+    suspend fun getPublicUsers(serverAddress: String): List<UserDto> {
+        sessionManager.saveServerAddress(serverAddress)
+        return try {
+            api.getPublicUsers()
+        } catch (err: Exception) {
+            emptyList()
+        }
+    }
+
+    // Real port of runtime/auth.js's own quickSignIn(): spends one real
+    // GET on the remembered token before ever trusting it, dropping
+    // that remembered entry the same real way on a real 401/expired
+    // token rather than silently committing a session the very next
+    // request would fail.
+    suspend fun quickSignIn(serverAddress: String, userId: String): LoginResult {
+        val entry = rememberedUsersStore.getRememberedUsers(serverAddress)[userId]
+            ?: return LoginResult.Failure("No remembered sign-in for this profile")
+        sessionManager.saveServerAddress(serverAddress)
+        return try {
+            val user = api.getUserWithToken(entry.accessToken, userId)
+            sessionManager.saveSession(serverAddress, entry.accessToken, user.Id, user.Name)
+            rememberUser(serverAddress, user.Id, entry.accessToken, user.Name, user.PrimaryImageTag)
+            LoginResult.Success
+        } catch (err: Exception) {
+            rememberedUsersStore.forgetUser(serverAddress, userId)
+            LoginResult.Failure("That saved sign-in no longer works. Sign in again.")
+        }
+    }
+
+    fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300): String {
+        val base = "$serverAddress/Users/$userId/Images/Primary?maxWidth=$maxWidth"
+        return if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
     }
 
     suspend fun logout() = sessionManager.clearSession()

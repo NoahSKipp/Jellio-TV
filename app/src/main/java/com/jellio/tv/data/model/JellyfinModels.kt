@@ -27,6 +27,12 @@ data class UserDto(
     val PrimaryImageTag: String? = null,
     val Configuration: UserConfigurationDto? = null,
     val Policy: UserPolicyDto? = null,
+    // Real fields runtime/auth.js's own buildPublicUserTile() checks
+    // (a formally obsolete pair Jellyfin's own stock login page still
+    // reads the same way) before deciding whether a public user's own
+    // tile can sign in passwordless or has to ask first.
+    val HasPassword: Boolean? = null,
+    val HasConfiguredPassword: Boolean? = null,
 )
 
 // Real Jellyfin UserDto.Policy shape: IsAdministrator is the one real
