@@ -31,6 +31,9 @@ import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
+import com.jellio.tv.ui.groupwatch.GroupWatchButton
+import com.jellio.tv.ui.groupwatch.GroupWatchOverlay
+import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
 import com.jellio.tv.ui.home.HomeScreen
 import com.jellio.tv.ui.library.LibraryScreen
 import com.jellio.tv.ui.nav.JellioNavItems
@@ -85,6 +88,7 @@ private fun JellioTvApp(
     session: Session,
     appViewModel: AppViewModel,
     nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
+    groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
 ) {
     // A plain real back stack rather than Navigation Compose: the
     // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
@@ -122,6 +126,8 @@ private fun JellioTvApp(
     LaunchedEffect(Unit) { nowPlayingViewModel.start() }
     val nowPlayingSessions by nowPlayingViewModel.sessions.collectAsState()
     var showNowPlayingPanel by remember { mutableStateOf(false) }
+    var showGroupWatch by remember { mutableStateOf(false) }
+    val groupWatchState by groupWatchViewModel.uiState.collectAsState()
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -289,6 +295,32 @@ private fun JellioTvApp(
                     imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                     onDismiss = { showNowPlayingPanel = false },
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+            // Real components/groupWatch.js's own trigger button: same
+            // real reasoning NowPlayingButton's own header above
+            // documents, its own corner spot instead of a sidebar link
+            // this app has none of.
+            GroupWatchButton(
+                onClick = { showGroupWatch = true },
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 96.dp),
+            )
+            if (showGroupWatch) {
+                GroupWatchOverlay(
+                    state = groupWatchState,
+                    currentUserName = session.userName,
+                    currentUserId = session.userId,
+                    onRefresh = { groupWatchViewModel.refresh() },
+                    onCreateGroup = { name -> groupWatchViewModel.createGroup(name) },
+                    onJoinGroup = { groupId -> groupWatchViewModel.joinGroup(groupId) },
+                    onLeaveGroup = { groupId -> groupWatchViewModel.leaveGroup(groupId) },
+                    onOpenChat = { group -> groupWatchViewModel.openChat(group) },
+                    onCloseChat = { groupWatchViewModel.closeChat() },
+                    onSendMessage = { text -> groupWatchViewModel.sendMessage(text) },
+                    onDismiss = {
+                        groupWatchViewModel.closeChat()
+                        showGroupWatch = false
+                    },
                 )
             }
             if (showLibraryPicker) {

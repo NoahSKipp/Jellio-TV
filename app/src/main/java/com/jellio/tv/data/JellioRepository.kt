@@ -4,11 +4,16 @@ import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
+import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
+import com.jellio.tv.data.model.JoinSyncPlayGroupRequest
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
+import com.jellio.tv.data.model.SendGroupWatchMessageRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
+import com.jellio.tv.data.model.SyncPlayGroupDto
 import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
@@ -597,6 +602,26 @@ class JellioRepository @Inject constructor(
     // loop's own caller decides what a failed request means rather
     // than this method swallowing it.
     suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto> = api.getNowPlayingSessions()
+
+    suspend fun getSyncPlayGroups(): List<SyncPlayGroupDto> = api.getSyncPlayGroups()
+
+    suspend fun createSyncPlayGroup(groupName: String) {
+        api.createSyncPlayGroup(CreateSyncPlayGroupRequest(groupName))
+    }
+
+    suspend fun joinSyncPlayGroup(groupId: String) {
+        api.joinSyncPlayGroup(JoinSyncPlayGroupRequest(groupId))
+    }
+
+    suspend fun leaveSyncPlayGroup() {
+        api.leaveSyncPlayGroup()
+    }
+
+    suspend fun getGroupWatchMessages(groupId: String, after: Long): List<GroupWatchMessageDto> =
+        api.getGroupWatchMessages(groupId, after)
+
+    suspend fun sendGroupWatchMessage(groupId: String, text: String): GroupWatchMessageDto =
+        api.sendGroupWatchMessage(groupId, SendGroupWatchMessageRequest(text))
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
