@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,6 +48,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -64,7 +66,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
@@ -73,6 +77,11 @@ import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
+import com.jellio.tv.data.model.SUBTITLE_SIZES
+import com.jellio.tv.data.model.SubtitleStyle
+import com.jellio.tv.data.model.subtitleBackgroundOption
+import com.jellio.tv.data.model.subtitleSizeOption
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.detail.SourceCard
 import com.jellio.tv.ui.theme.JellioBg
@@ -147,6 +156,7 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val subtitleStyle by viewModel.subtitleStyle.collectAsState()
 
     LaunchedEffect(itemId, mediaSourceId) { viewModel.load(session, itemId, mediaSourceId) }
 
@@ -197,6 +207,9 @@ fun PlayerScreen(
                         else -> viewModel.selectBurnedInSubtitle(session, track.streamIndex, positionTicks)
                     }
                 },
+                subtitleStyle = subtitleStyle,
+                onSetSubtitleSize = { viewModel.setSubtitleSize(it) },
+                onSetSubtitleBackground = { viewModel.setSubtitleBackground(it) },
                 onSelectAudioTrack = { streamIndex, positionTicks -> viewModel.switchAudioTrack(session, streamIndex, positionTicks) },
                 onSelectSource = { source, positionTicks -> viewModel.switchSource(session, source, positionTicks) },
                 onSelectSeason = { seasonId ->
@@ -244,6 +257,9 @@ private fun PlayerSurface(
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
+    subtitleStyle: SubtitleStyle,
+    onSetSubtitleSize: (String) -> Unit,
+    onSetSubtitleBackground: (String) -> Unit,
     onSelectAudioTrack: (Int, Long) -> Unit,
     onSelectSource: (MediaSourceDto, Long) -> Unit,
     onSelectSeason: (String) -> Unit,
@@ -584,6 +600,21 @@ private fun PlayerSurface(
                     useController = false
                 }
             },
+            // Real port of screens/player.js's own applySubtitleStyle():
+            // that function drives two ::cue custom properties a
+            // browser's own WebVTT renderer reads directly; Media3's own
+            // SubtitleView is this app's real equivalent renderer, its
+            // own setStyle()/setFractionalTextSize() the real settable
+            // surface for the same two style axes (subtitleCaptionStyle()/
+            // subtitleFractionalTextSize() below). update rather than
+            // factory alone so a style change already in flight applies
+            // without recreating the PlayerView mid playback.
+            update = { view ->
+                view.subtitleView?.let { subtitleView ->
+                    subtitleView.setStyle(subtitleCaptionStyle(subtitleStyle))
+                    subtitleView.setFractionalTextSize(subtitleFractionalTextSize(subtitleStyle))
+                }
+            },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -742,6 +773,9 @@ private fun PlayerSurface(
                     showSubtitleMenu = false
                     onSelectSubtitle(track, player.currentPosition * TICKS_PER_MS)
                 },
+                subtitleStyle = subtitleStyle,
+                onSetSubtitleSize = onSetSubtitleSize,
+                onSetSubtitleBackground = onSetSubtitleBackground,
                 onDismiss = { showSubtitleMenu = false },
             )
         }
@@ -1521,6 +1555,9 @@ private fun SubtitleMenu(
     tracks: List<SubtitleTrackUiState>,
     selectedIndex: Int?,
     onSelect: (SubtitleTrackUiState?) -> Unit,
+    subtitleStyle: SubtitleStyle,
+    onSetSubtitleSize: (String) -> Unit,
+    onSetSubtitleBackground: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -1553,9 +1590,96 @@ private fun SubtitleMenu(
                 items(tracks) { track ->
                     SubtitleMenuRow(label = track.label, isSelected = selectedIndex == track.streamIndex, onClick = { onSelect(track) })
                 }
+                // Real port of screens/player.js's own styleSection,
+                // appended below that same real popover's own track
+                // list rather than a separate menu: that file's own
+                // buildStyleGroup() twice over, Size then Background.
+                item {
+                    SubtitleStyleGroup(
+                        label = "Size",
+                        options = SUBTITLE_SIZES.map { it.value to it.label },
+                        selected = subtitleStyle.size,
+                        onSelect = onSetSubtitleSize,
+                    )
+                }
+                item {
+                    SubtitleStyleGroup(
+                        label = "Background",
+                        options = SUBTITLE_BACKGROUNDS.map { it.value to it.label },
+                        selected = subtitleStyle.background,
+                        onSelect = onSetSubtitleBackground,
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SubtitleStyleGroup(label: String, options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+        Text(
+            text = label,
+            color = JellioTextSecondary,
+            style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(bottom = 6.dp),
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (value, optionLabel) ->
+                Surface(
+                    onClick = { onSelect(value) },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = if (value == selected) Color.White.copy(alpha = 0.18f) else JellioBg,
+                        contentColor = JellioText,
+                    ),
+                ) {
+                    Text(
+                        text = optionLabel,
+                        style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Real port of screens/player.js's own applySubtitleStyle(): that
+// function sets a real --jellio-subtitle-bg custom property, this
+// app's own CaptionStyleCompat.backgroundColor equivalent read by
+// Media3's own SubtitleView. Foreground stays plain white and edge
+// type stays NONE either way, the same two axes screens/player.js's
+// own real style leaves alone too (only size and background are real
+// reader controlled there).
+private fun subtitleCaptionStyle(style: SubtitleStyle): CaptionStyleCompat {
+    val backgroundColor = when (subtitleBackgroundOption(style.background).value) {
+        "none" -> Color.Transparent.toArgb()
+        "solid" -> android.graphics.Color.argb(230, 0, 0, 0)
+        else -> android.graphics.Color.argb(128, 0, 0, 0)
+    }
+    return CaptionStyleCompat(
+        Color.White.toArgb(),
+        backgroundColor,
+        Color.Transparent.toArgb(),
+        CaptionStyleCompat.EDGE_TYPE_NONE,
+        Color.Transparent.toArgb(),
+        null,
+    )
+}
+
+// Real port of screens/player.js's own --jellio-subtitle-size: that
+// property is a real rem value a browser's own font-size cascade
+// reads directly. SubtitleView has no rem equivalent, only a fraction
+// of the video view's own height (DEFAULT_TEXT_SIZE_FRACTION when
+// never set), so this scales that same real default by each real size
+// option's own rem relative to medium's own real 1.3rem baseline
+// rather than trying to reproduce an absolute rem value that has no
+// real meaning here.
+private fun subtitleFractionalTextSize(style: SubtitleStyle): Float {
+    val option = subtitleSizeOption(style.size)
+    val medium = SUBTITLE_SIZES.first { it.value == "medium" }
+    return SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * (option.rem / medium.rem)
 }
 
 @Composable
