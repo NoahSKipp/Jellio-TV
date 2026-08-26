@@ -5,6 +5,7 @@ import com.jellio.tv.data.model.AuthenticationResultDto
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.ClientConfigDto
 import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
@@ -187,6 +188,13 @@ interface JellyfinApi {
 
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
+
+    // Real Controllers/ConfigController.cs endpoint: one real server
+    // side, admin controlled source components/seasonalEffects.js's
+    // own real overlay reads, confirmed against that controller's own
+    // real ClientConfig shape before porting this.
+    @GET("Jellio/config")
+    suspend fun getJellioConfig(): ClientConfigDto
 
     // Real Controllers/NowPlayingController.cs endpoint: every real
     // active session on the server with a real NowPlayingItem, backed

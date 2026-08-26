@@ -4,6 +4,7 @@ import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
+import com.jellio.tv.data.model.ClientConfigDto
 import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
@@ -713,6 +714,8 @@ class JellioRepository @Inject constructor(
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+
+    suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
 
     // Real port of runtime/api.js's own getNowPlayingSessions(): a
     // plain passthrough, same as getCalendarEntries above, the polling
