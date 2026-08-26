@@ -41,7 +41,8 @@ import com.jellio.tv.ui.library.LibraryViewModel
 import com.jellio.tv.ui.nav.JellioNavItems
 import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
-import com.jellio.tv.ui.nav.TopNavPill
+import com.jellio.tv.ui.nav.SidebarNav
+import com.jellio.tv.ui.nav.SidebarReservedWidth
 import com.jellio.tv.ui.nav.isImmersive
 import com.jellio.tv.ui.nowplaying.NowPlayingButton
 import com.jellio.tv.ui.nowplaying.NowPlayingPanel
@@ -56,6 +57,7 @@ import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioTvTheme
+import com.jellio.tv.ui.theme.scaled
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.BootSplashVideo
 import com.jellio.tv.ui.update.UpdateToast
@@ -172,19 +174,11 @@ private fun JellioTvApp(
     var showLibraryPicker by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    // Real components/mobileNav.js's own scroll-driven compact state,
-    // threaded up from whichever non-immersive screen is actually
-    // composed (each reports its own real scroll position via
-    // onCompactChange). Reset to expanded on every real tab switch,
-    // same real reasoning that file's own header documents: a fresh
-    // screen starts scrolled to its own top, so the pill should too.
-    var navCompact by remember { mutableStateOf(false) }
-    LaunchedEffect(route) { navCompact = false }
-    // Real feedback live: TopNavPill's own tabs (and the corner
+    // Real feedback live: SidebarNav's own items (and the corner
     // NowPlaying/GroupWatch buttons beside it) stayed reachable while
     // HomeScreen's own Customize mode was active, so a reader
     // mid-reorder could jump straight off with nothing standing in the
-    // way. Threaded down the same real way navCompact already is.
+    // way. Threaded down the same real way SidebarNav's own enabled is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -228,6 +222,17 @@ private fun JellioTvApp(
         if (!route.isImmersive()) {
             SeasonalEffectsOverlay(themeKey = seasonalTheme, modifier = Modifier.fillMaxSize())
         }
+        // SidebarNav sits fixed at x = 0 and always reserves this much
+        // real space, collapsed or not (its own header explains why);
+        // every non-immersive screen's own content starts clear of it
+        // here rather than each one padding around it individually, the
+        // same real reason MainActivity itself is the one root
+        // threading it down for the corner buttons below.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .let { if (!route.isImmersive()) it.padding(start = SidebarReservedWidth.scaled()) else it },
+        ) {
         when (val current = route) {
             JellioRoute.Profile -> ProfileScreen(
                 session = session,
@@ -242,7 +247,6 @@ private fun JellioTvApp(
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
-                onCompactChange = { navCompact = it },
                 onEditModeChange = { homeEditMode = it },
                 onPlayDirect = onPlayDirect,
                 // Real port of components/cardOptionsMenu.js's own
@@ -266,20 +270,17 @@ private fun JellioTvApp(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
-                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Watchlist -> WatchlistScreen(
                 session = session,
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
-                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Calendar -> CalendarScreen(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onItemClick = onNavigateToDetail,
-                onCompactChange = { navCompact = it },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Library -> {
@@ -290,7 +291,6 @@ private fun JellioTvApp(
                         library = library,
                         imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
-                        onCompactChange = { navCompact = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -335,12 +335,12 @@ private fun JellioTvApp(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        }
 
         if (!route.isImmersive()) {
-            TopNavPill(
+            SidebarNav(
                 items = JellioNavItems,
                 selected = route,
-                isCompact = navCompact,
                 enabled = !homeEditMode,
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
@@ -353,15 +353,11 @@ private fun JellioTvApp(
                         switchTab(clicked)
                     }
                 },
-                modifier = Modifier.fillMaxSize(),
             )
-            // Real components/nowPlaying.js's own trigger button: this
-            // app's own TopNavPill has no sidebar of its own to anchor
-            // it to (mirrors mobileNav.js's floating pill instead, see
-            // JellioRoute.kt's own header comment), so it sits as its
-            // own real corner button alongside the pill instead,
-            // reachable from every same non-immersive screen the real
-            // sidebar version would have been.
+            // Real components/nowPlaying.js's own trigger button: its
+            // own real corner spot alongside SidebarNav rather than a
+            // link inside the rail itself, reachable from every same
+            // non-immersive screen the rail is.
             NowPlayingButton(
                 sessionCount = nowPlayingSessions.size,
                 onClick = { showNowPlayingPanel = !showNowPlayingPanel },

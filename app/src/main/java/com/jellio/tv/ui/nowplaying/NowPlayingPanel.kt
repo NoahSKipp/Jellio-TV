@@ -47,7 +47,7 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Real port of components/nowPlaying.js's own trigger button: same
 // real place a reader can always reach it from (rendered alongside
-// TopNavPill on every non-immersive screen, this app's own real
+// SidebarNav on every non-immersive screen, this app's own real
 // equivalent of that file's own sidebar-anchored button), the real
 // active-session count as a badge rather than a bare icon.
 @Composable

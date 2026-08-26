@@ -28,7 +28,6 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.PosterCard
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.common.JellioTextField
-import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors screens/search.js's own real live-search shape: a query box
@@ -39,14 +38,11 @@ fun SearchScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
-    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
-    val compact = rememberNavCompact(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
-    LaunchedEffect(compact) { onCompactChange(compact) }
     LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
@@ -58,7 +54,7 @@ fun SearchScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(top = 140.dp, start = 48.dp, end = 48.dp),
+            .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Search", style = MaterialTheme.typography.titleLarge)
         JellioTextField(

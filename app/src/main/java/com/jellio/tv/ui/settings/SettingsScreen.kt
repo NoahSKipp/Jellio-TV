@@ -98,7 +98,7 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 140.dp, start = 48.dp, end = 48.dp),
+            .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
 
@@ -279,14 +279,7 @@ private fun LanguagePickerOverlay(
                 .width(360.dp)
                 .fillMaxSize()
                 .background(JellioBgElevated)
-                // Real bug found live testing on device: this panel's
-                // own title rendered directly underneath TopNavPill's
-                // own real floating pill (top=32.dp, ~88.dp tall),
-                // unreadable behind it. Same real top=140.dp clearance
-                // every other real screen already carries below the
-                // pill, ported here instead of the plain vertical=48.dp
-                // this used to open with.
-                .padding(top = 140.dp, start = 0.dp, end = 0.dp, bottom = 48.dp),
+                .padding(top = 48.dp, start = 0.dp, end = 0.dp, bottom = 48.dp),
         ) {
             Text(
                 text = title,
