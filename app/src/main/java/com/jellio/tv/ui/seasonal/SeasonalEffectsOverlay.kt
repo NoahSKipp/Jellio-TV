@@ -65,6 +65,7 @@ fun SeasonalEffectsOverlay(themeKey: String?, modifier: Modifier = Modifier) {
     when {
         themeKey == null -> Unit
         themeKey == "friday13" -> Friday13Overlay(modifier)
+        themeKey == "frost" -> FrostOverlay(modifier)
         DRIFT_THEMES.containsKey(themeKey) -> DriftOverlay(themeKey, modifier)
     }
 }
