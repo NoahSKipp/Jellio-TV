@@ -56,6 +56,19 @@ private fun buildParticles(spec: DriftThemeSpec): List<SeasonalParticle> = List(
     )
 }
 
+// Real port of components/seasonalEffects.js's own applyTheme()
+// dispatch: most real keys share buildDrift() below, a few (Friday
+// the 13th so far, more to follow) are each their own bespoke real
+// builder, ported to their own composable rather than folded in here.
+@Composable
+fun SeasonalEffectsOverlay(themeKey: String?, modifier: Modifier = Modifier) {
+    when {
+        themeKey == null -> Unit
+        themeKey == "friday13" -> Friday13Overlay(modifier)
+        DRIFT_THEMES.containsKey(themeKey) -> DriftOverlay(themeKey, modifier)
+    }
+}
+
 // Real port of css/app.css's own jellio-seasonal-fall/-rise keyframes:
 // y runs linearly from -5vh to 115vh (or the mirrored 110vh to -10vh
 // for a rising theme) over one real cycle, x sways out to
@@ -64,8 +77,8 @@ private fun buildParticles(spec: DriftThemeSpec): List<SeasonalParticle> = List(
 // exactly, used here directly rather than a piecewise match to those
 // same four keyframe stops.
 @Composable
-fun SeasonalEffectsOverlay(themeKey: String?, modifier: Modifier = Modifier) {
-    val spec = themeKey?.let { DRIFT_THEMES[it] } ?: return
+private fun DriftOverlay(themeKey: String, modifier: Modifier = Modifier) {
+    val spec = DRIFT_THEMES[themeKey] ?: return
     val particles = remember(themeKey) { buildParticles(spec) }
     var elapsedSec by remember(themeKey) { mutableFloatStateOf(0f) }
 

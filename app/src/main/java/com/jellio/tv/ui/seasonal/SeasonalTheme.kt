@@ -85,6 +85,15 @@ fun inRange(month: Int, day: Int, range: SeasonalRangeDto?): Boolean {
 fun isFriday13(calendar: Calendar): Boolean =
     calendar.get(Calendar.DAY_OF_MONTH) == 13 && calendar.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
 
+// Every real theme key this app actually knows how to draw: the 17
+// real DRIFT_THEMES entries plus each bespoke per-theme builder ported
+// separately (SeasonalEffectsOverlay.kt's own Friday13Overlay so far).
+// activeSeasonalTheme() below skips any other real key the same way
+// it skips a disabled one, so priority among the themes this app does
+// support stays exactly real without drawing the wrong substitute for
+// one it does not.
+val SUPPORTED_SEASONAL_THEMES: Set<String> = DRIFT_THEMES.keys + setOf("friday13")
+
 // Real port of that file's own real, singular activeSeasonalTheme():
 // "what's active right now" against ConfigController.cs's own real
 // response shape.
@@ -94,7 +103,7 @@ fun activeSeasonalTheme(calendar: Calendar, config: ClientConfigDto?): String? {
     val day = calendar.get(Calendar.DAY_OF_MONTH)
 
     for (key in THEME_ORDER) {
-        if (key !in DRIFT_THEMES) continue
+        if (key !in SUPPORTED_SEASONAL_THEMES) continue
         val effect = config.SeasonalEffects[key] ?: continue
         if (!effect.Enabled) continue
         val active = if (key == "friday13") isFriday13(calendar) else inRange(month, day, effect.Range)
