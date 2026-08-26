@@ -365,3 +365,29 @@ data class GroupWatchMessageDto(
 
 @JsonClass(generateAdapter = true)
 data class SendGroupWatchMessageRequest(val Text: String)
+
+// Real Controllers/ConfigController.cs shape: one real server side,
+// admin controlled source components/seasonalEffects.js's own real
+// overlay reads (not a client only localStorage toggle), starting
+// with SeasonalEffectsEnabled/SeasonalEffects, confirmed against that
+// controller's own real ClientConfig/SeasonalEffectConfig/
+// SeasonalRange records before porting this.
+@JsonClass(generateAdapter = true)
+data class SeasonalRangeDto(
+    val StartMonth: Int = 1,
+    val StartDay: Int = 1,
+    val EndMonth: Int = 1,
+    val EndDay: Int = 1,
+)
+
+@JsonClass(generateAdapter = true)
+data class SeasonalEffectConfigDto(
+    val Enabled: Boolean = false,
+    val Range: SeasonalRangeDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ClientConfigDto(
+    val SeasonalEffectsEnabled: Boolean = false,
+    val SeasonalEffects: Map<String, SeasonalEffectConfigDto> = emptyMap(),
+)

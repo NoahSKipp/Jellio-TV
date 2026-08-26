@@ -48,6 +48,8 @@ import com.jellio.tv.ui.person.PersonScreen
 import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
 import com.jellio.tv.ui.search.SearchScreen
+import com.jellio.tv.ui.seasonal.SeasonalEffectsOverlay
+import com.jellio.tv.ui.seasonal.SeasonalEffectsViewModel
 import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
 import com.jellio.tv.ui.theme.JellioTvTheme
@@ -89,6 +91,7 @@ private fun JellioTvApp(
     appViewModel: AppViewModel,
     nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
+    seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
 ) {
     // A plain real back stack rather than Navigation Compose: the
     // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
@@ -125,6 +128,8 @@ private fun JellioTvApp(
     // poll loop if this composable recomposes.
     LaunchedEffect(Unit) { nowPlayingViewModel.start() }
     val nowPlayingSessions by nowPlayingViewModel.sessions.collectAsState()
+    LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
+    val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
     var showNowPlayingPanel by remember { mutableStateOf(false) }
     var showGroupWatch by remember { mutableStateOf(false) }
     val groupWatchState by groupWatchViewModel.uiState.collectAsState()
@@ -146,6 +151,15 @@ private fun JellioTvApp(
     val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> push(JellioRoute.Player(itemId, mediaSourceId)) }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Real components/seasonalEffects.js's own real z-index: 5,
+        // pointer-events: none layer, mounted first (bottommost) so
+        // every real screen still draws over it, hidden during this
+        // route's own real fullscreen player the same real way that
+        // file's own .jellio-root-fullscreen rule already does for the
+        // sidebar/mobile nav mounts.
+        if (!route.isImmersive()) {
+            SeasonalEffectsOverlay(themeKey = seasonalTheme, modifier = Modifier.fillMaxSize())
+        }
         when (val current = route) {
             JellioRoute.Profile -> ProfileScreen(
                 session = session,
