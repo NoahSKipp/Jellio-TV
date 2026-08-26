@@ -49,7 +49,6 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ProgressSweep
-import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -75,12 +74,11 @@ fun HomeScreen(
     onItemClick: (BaseItemDto) -> Unit,
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
-    onCompactChange: (Boolean) -> Unit,
-    // Real feedback live: TopNavPill's own tabs stayed reachable while
+    // Real feedback live: SidebarNav's own items stayed reachable while
     // Customize mode was active, so a reader mid-reorder could jump
     // straight off this screen (and off the reorder state with it)
     // with no equivalent to the modal's own scrim BackHandler standing
-    // in the way. MainActivity threads this straight to the pill's own
+    // in the way. MainActivity threads this straight to the rail's own
     // enabled state, same real reasoning a modal overlay would trap
     // focus if this screen mounted one instead of toggling in place.
     onEditModeChange: (Boolean) -> Unit = {},
@@ -97,7 +95,6 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     val scope = rememberCoroutineScope()
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
@@ -125,7 +122,6 @@ fun HomeScreen(
     LaunchedEffect(session.userId) {
         viewModel.load(session)
     }
-    LaunchedEffect(compact) { onCompactChange(compact) }
     LaunchedEffect(editMode) { onEditModeChange(editMode) }
     DisposableEffect(Unit) { onDispose { onEditModeChange(false) } }
 
@@ -154,26 +150,6 @@ fun HomeScreen(
             // below is Compose's own real fix for that: finds a sensible
             // default child to enter on first arrival, then remembers
             // and restores the last focused child on every return trip.
-            //
-            // Real bug found live testing on device even with
-            // focusRestorer() applied: this LazyColumn's own real
-            // layout bounds ran from the literal top of the screen,
-            // directly underneath (overlapping) TopNavPill's own real
-            // bounds. Compose's own real directional focus search
-            // rejects a candidate group whose own real bounds overlap
-            // the currently focused node rather than sitting cleanly
-            // below it, so Down from the pill had nowhere valid to
-            // search into here.
-            //
-            // An explicit requestFocus() bridge (TopNavPill's own
-            // contentFocusRequester param, wired to this LazyColumn)
-            // was tried in place of clearance to keep the hero
-            // full-bleed under the pill. Broken on live testing twice
-            // now, in two different sessions (94ca99d first pulled the
-            // same mechanism for the same real reason): back to the
-            // plain top=140.dp clearance below instead, matching every
-            // other real screen in this app that never needed anything
-            // more elaborate than that to stay reachable.
             else -> {
                 // Real port of components/homeCustomizer.js's own
                 // applyHomeCustomization(): recomputed fresh off
@@ -197,7 +173,7 @@ fun HomeScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 140.dp)
+                        .padding(top = 32.dp)
                         .focusRestorer(),
                 ) {
                     item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
@@ -212,13 +188,6 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.titleLarge,
                                 modifier = Modifier.padding(
                                     start = 48.dp,
-                                    // The LazyColumn's own top=140.dp
-                                    // clearance now covers the pill for
-                                    // every real case, HeroSection
-                                    // composing nothing for a
-                                    // heroItems-empty session included:
-                                    // no separate real top value needed
-                                    // here any more.
                                     top = 24.dp,
                                     bottom = 8.dp,
                                 ),

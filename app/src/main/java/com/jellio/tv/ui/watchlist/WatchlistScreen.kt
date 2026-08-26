@@ -21,7 +21,6 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.rememberCardOptionsHost
-import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
 // Mirrors the real Watchlist split into Movies/Series sections, same
@@ -31,16 +30,13 @@ fun WatchlistScreen(
     session: Session,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
-    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WatchlistViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
-    LaunchedEffect(compact) { onCompactChange(compact) }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
@@ -60,7 +56,7 @@ fun WatchlistScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 140.dp)
+                    .padding(top = 32.dp)
                     .focusRestorer(),
             ) {
                 item {

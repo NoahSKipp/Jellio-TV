@@ -28,7 +28,6 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.CalendarEntryDto
-import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -84,16 +83,13 @@ private fun kindLabel(entry: CalendarEntryDto): String =
 fun CalendarScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onItemClick: (String) -> Unit,
-    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
 
     LaunchedEffect(Unit) { viewModel.load() }
-    LaunchedEffect(compact) { onCompactChange(compact) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -120,7 +116,7 @@ fun CalendarScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 140.dp)
+                        .padding(top = 32.dp)
                         .focusRestorer(),
                 ) {
                     item {

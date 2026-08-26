@@ -153,12 +153,12 @@ fun DetailScreen(
     var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
     // Real bug found live testing on device: this screen is immersive
     // (MainActivity's own !route.isImmersive() gate never mounts
-    // TopNavPill here), so there is no existing focus anywhere on the
-    // pill for a D-pad press to search Down from the way every other
+    // SidebarNav here), so there is no existing focus anywhere on the
+    // rail for a D-pad press to search Down from the way every other
     // screen's own focusRestorer() fix relies on. Nothing had ever
     // requested focus into this screen at all, so a reader pushing
     // into a title from a card had no possible interaction once here,
-    // same real root cause class the pill screens already hit.
+    // same real root cause class the rail screens already hit.
     // requestFocus() explicitly on first composition, same real
     // pattern GroupWatchOverlay's own initialFocusRequester already
     // uses for the same real "own this screen's own initial focus"

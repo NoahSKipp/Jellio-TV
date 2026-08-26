@@ -34,7 +34,6 @@ import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
-import com.jellio.tv.ui.nav.rememberNavCompact
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -47,13 +46,11 @@ fun LibraryScreen(
     library: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
-    onCompactChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
-    val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
@@ -67,7 +64,6 @@ fun LibraryScreen(
     // real Id (Anime has no library of its own), Id alone would never
     // notice a picker tap swapping between the two.
     LaunchedEffect(library.Id, library.Name) { viewModel.load(session, library) }
-    LaunchedEffect(compact) { onCompactChange(compact) }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -81,30 +77,11 @@ fun LibraryScreen(
             uiState.sections.all { it.items.isEmpty() } && (uiState.mainRow?.items?.isEmpty() != false) && uiState.coverflowItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
-            // Real bug found live testing on device: this LazyColumn's
-            // own real layout bounds ran from the literal top of the
-            // screen, directly underneath (overlapping) TopNavPill's
-            // own real bounds. Compose's own real directional focus
-            // search rejects a candidate group whose own real bounds
-            // overlap the currently focused node rather than sitting
-            // cleanly below it, so Down from the pill had nowhere valid
-            // to search into here regardless of focusRestorer() waiting
-            // on the other side.
-            //
-            // An explicit requestFocus() bridge (TopNavPill's own
-            // contentFocusRequester param, wired to this LazyColumn) was
-            // tried in place of clearance to keep the coverflow
-            // full-bleed under the pill. Broken on live testing twice
-            // now, in two different sessions (94ca99d first pulled the
-            // same mechanism for the same real reason): back to the
-            // plain top=140.dp clearance below instead, matching every
-            // other real screen in this app that never needed anything
-            // more elaborate than that to stay reachable.
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 140.dp)
+                    .padding(top = 32.dp)
                     .focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
@@ -117,11 +94,6 @@ fun LibraryScreen(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(
-                            // The LazyColumn's own top=140.dp clearance
-                            // now covers the pill for every real case,
-                            // coverflow-less libraries included: this
-                            // just needs breathing room below whatever
-                            // came before it, same real value either way.
                             top = 12.dp,
                             start = 48.dp,
                             bottom = 12.dp,

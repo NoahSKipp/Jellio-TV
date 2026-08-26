@@ -70,7 +70,7 @@ fun ServiceScreen(
     var filter by remember { mutableStateOf(ALL_FILTER) }
     var rowListTarget by remember { mutableStateOf<ServiceRow?>(null) }
     // Same real immersive-screen gap DetailScreen's own header comment
-    // documents: no TopNavPill mounts here for a D-pad press to search
+    // documents: no SidebarNav mounts here for a D-pad press to search
     // Down from, so nothing ever requests focus into this screen
     // without this.
     val contentFocusRequester = remember { FocusRequester() }
