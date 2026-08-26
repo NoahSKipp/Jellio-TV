@@ -34,6 +34,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 
@@ -135,19 +136,29 @@ fun PosterCard(
     }
 }
 
-// Real port of components/card.js's own buildCardActions(): the same
-// two real actions (Watchlist, Mark Watched), reached through a
-// card's own options button (PosterCard's onOptionsClick above)
-// rather than a hover/focus-revealed pair of buttons, same real
-// EpisodeOptionsMenu shape DetailScreen already established for the
-// exact same real D-pad constraint. Rendered by the caller at its own
-// screen root, not by PosterCard itself: see that composable's own
-// header comment for why.
+// Real port of components/cardOptionsMenu.js's own real content
+// split: a Continue Watching card offers Go to details/Play manually/
+// Start from beginning/Remove, an Up Next card offers Go to details/
+// Remove from Up Next, every other card offers Watchlist/Mark Watched,
+// matched here rather than one generic list either real context has
+// to squint past. Reached through a card's own options button
+// (PosterCard/LandscapeCard's onOptionsClick) rather than that file's
+// own held-remote-button gesture, same real EpisodeOptionsMenu shape
+// DetailScreen already established for the exact same real D-pad
+// constraint. Rendered by the caller at its own screen root, not by
+// PosterCard/LandscapeCard themselves: see PosterCard's own header
+// comment for why.
 @Composable
 fun CardOptionsMenu(
     item: BaseItemDto,
-    onToggleWatchlist: (() -> Unit)?,
-    onToggleWatched: (() -> Unit)?,
+    continueWatching: Boolean = false,
+    upNext: Boolean = false,
+    onGoToDetails: (() -> Unit)? = null,
+    onPlayManually: (() -> Unit)? = null,
+    onStartOver: (() -> Unit)? = null,
+    onRemoveFromRow: (() -> Unit)? = null,
+    onToggleWatchlist: (() -> Unit)? = null,
+    onToggleWatched: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -177,22 +188,41 @@ fun CardOptionsMenu(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
-            if (onToggleWatchlist != null) {
-                CardOptionsMenuRow(label = if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", onClick = { onToggleWatchlist(); onDismiss() })
-            }
-            if (onToggleWatched != null) {
-                CardOptionsMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
+            when {
+                continueWatching -> {
+                    onGoToDetails?.let { CardOptionsMenuRow(label = "Go to details", onClick = { it(); onDismiss() }) }
+                    onPlayManually?.let { CardOptionsMenuRow(label = "Play manually", onClick = { it(); onDismiss() }) }
+                    onStartOver?.let { CardOptionsMenuRow(label = "Start from beginning", onClick = { it(); onDismiss() }) }
+                    onRemoveFromRow?.let { CardOptionsMenuRow(label = "Remove from Continue Watching", onClick = { it(); onDismiss() }, danger = true) }
+                }
+                upNext -> {
+                    onGoToDetails?.let { CardOptionsMenuRow(label = "Go to details", onClick = { it(); onDismiss() }) }
+                    // Real gap components/cardOptionsMenu.js's own
+                    // toggleWatched() header documents: Jellyfin has no
+                    // endpoint that just hides one title from NextUp on
+                    // its own, marking the episode played is the only
+                    // real call that also drops it off this row.
+                    onRemoveFromRow?.let { CardOptionsMenuRow(label = "Remove from Up Next", onClick = { it(); onDismiss() }, danger = true) }
+                }
+                else -> {
+                    if (onToggleWatchlist != null) {
+                        CardOptionsMenuRow(label = if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", onClick = { onToggleWatchlist(); onDismiss() })
+                    }
+                    if (onToggleWatched != null) {
+                        CardOptionsMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CardOptionsMenuRow(label: String, onClick: () -> Unit) {
+private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, danger: Boolean = false) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = if (danger) JellioDanger else JellioText),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))

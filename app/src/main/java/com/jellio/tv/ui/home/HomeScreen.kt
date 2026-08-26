@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,14 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.launch
+
+// Which row a card's own options menu was opened from, real
+// components/cardOptionsMenu.js's own real continueWatching/upNext
+// options carried alongside the item itself: CardOptionsMenu's own
+// real content (and which of the callbacks below even apply) depends
+// on it.
+private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
 // real rows, fetched from the real Jellio-Plugin backend rather than
@@ -63,13 +72,22 @@ fun HomeScreen(
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
     onCompactChange: (Boolean) -> Unit,
+    onPlayDirect: (String, String?) -> Unit,
+    // Real port of components/cardOptionsMenu.js's own "Play manually"
+    // (openStreamPicker(item, { forceChoice: true })): built at
+    // MainActivity's own root the same way DetailScreen's own Change
+    // Stream button already reaches AppViewModel.resolvePlayAction and
+    // the app-wide StreamPickerOverlay, not something this screen (or
+    // HomeViewModel) reaches into on its own.
+    onPlayManually: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val compact = rememberNavCompact(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset)
-    var cardMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
+    val scope = rememberCoroutineScope()
+    var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real components/homeCustomizer.js's own header: editMode lives
     // only in this real local closure, reset to off on every fresh
@@ -173,13 +191,14 @@ fun HomeScreen(
                                         rawImageUrl = rawImageUrl,
                                         onItemClick = onItemClick,
                                         onTitleClick = { rowListTarget = row.section },
+                                        onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
                                     )
                                 } else {
                                     PosterRow(
                                         section = row.section,
                                         imageUrl = imageUrl,
                                         onItemClick = onItemClick,
-                                        onItemOptions = { cardMenuTarget = it },
+                                        onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
                                         onTitleClick = { rowListTarget = row.section },
                                     )
                                 }
@@ -197,10 +216,27 @@ fun HomeScreen(
         // own header comment for why a full-screen menu has to live
         // here rather than inside a LazyRow item.
         cardMenuTarget?.let { target ->
+            val item = target.item
+            val continueWatching = target.row.section.key == "continue-watching"
+            val upNext = target.row.section.key == "up-next"
             CardOptionsMenu(
-                item = target,
-                onToggleWatchlist = { viewModel.toggleWatchlist(session, target) },
-                onToggleWatched = { viewModel.toggleWatched(session, target) },
+                item = item,
+                continueWatching = continueWatching,
+                upNext = upNext,
+                onGoToDetails = if (continueWatching || upNext) { { onItemClick(item) } } else null,
+                onPlayManually = if (continueWatching) { { onPlayManually(item) } } else null,
+                onStartOver = if (continueWatching) {
+                    {
+                        scope.launch {
+                            if (viewModel.restartFromBeginning(session, item)) onPlayDirect(item.Id, null)
+                        }
+                    }
+                } else {
+                    null
+                },
+                onRemoveFromRow = if (continueWatching || upNext) { { viewModel.removeFromRow(session, item) } } else null,
+                onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
+                onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
                 onDismiss = { cardMenuTarget = null },
             )
         }

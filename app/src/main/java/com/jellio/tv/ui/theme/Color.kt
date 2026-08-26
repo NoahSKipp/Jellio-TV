@@ -15,3 +15,5 @@ val JellioTextSecondary = Color(0xFFB3B3B3)
 val JellioTextTertiary = Color(0xFF808080)
 val JellioBorder = Color(0xFF333333)
 val JellioTrending = Color(0xFFFF9800)
+// css/app.css's own .jellio-card-options-item-danger: #ff6b81.
+val JellioDanger = Color(0xFFFF6B81)
