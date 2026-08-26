@@ -2,6 +2,7 @@ package com.jellio.tv.data.network
 
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AuthenticationResultDto
+import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
@@ -17,6 +18,8 @@ import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -24,6 +27,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 // Every call here is a relative path against the Jellyfin server
 // NetworkModule's own base-url interceptor swaps in per request: the
@@ -195,6 +199,28 @@ interface JellyfinApi {
     // actually matched a pending request.
     @POST("QuickConnect/Authorize")
     suspend fun authorizeQuickConnect(@Query("code") code: String): Boolean
+
+    // Real Controllers/AvatarsController.cs endpoints: real preset
+    // images an admin dropped into Jellio's own plugin data directory,
+    // confirmed against components/avatarPicker.js's own real
+    // getAvatarPresets()/getAvatarPresetUrl() before porting this.
+    @GET("Jellio/avatars")
+    suspend fun getAvatarPresets(): List<AvatarPresetDto>
+
+    @Streaming
+    @GET("Jellio/avatars/{id}")
+    suspend fun getAvatarPresetImage(@Path("id") id: String): ResponseBody
+
+    // Real endpoint, POST /Users/{id}/Images/Primary, confirmed against
+    // runtime/api.js's own uploadUserAvatarBlob(): body is the image's
+    // own real bytes base64 encoded as plain text, Content-Type set to
+    // the image's own real mime type rather than application/json, the
+    // same real shape jellyfin-apiclient-javascript's own
+    // uploadUserImage already sends. body is built as a raw RequestBody
+    // here specifically so Retrofit's own Moshi converter never touches
+    // it.
+    @POST("Users/{userId}/Images/Primary")
+    suspend fun uploadUserAvatar(@Path("userId") userId: String, @Body body: RequestBody)
 }
 
 // Real Jellyfin auth convention every client sends, confirmed against

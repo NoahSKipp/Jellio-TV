@@ -291,3 +291,9 @@ data class SleepTimerStatusDto(
     val Active: Boolean = false,
     val EndTimeUtc: String? = null,
 )
+
+// Real Controllers/AvatarsController.cs shape: Id is a real filename
+// ("preset.png"), whatever an admin dropped into Jellio's own plugin
+// data directory, not a synthetic id this app invents.
+@JsonClass(generateAdapter = true)
+data class AvatarPresetDto(val Id: String)

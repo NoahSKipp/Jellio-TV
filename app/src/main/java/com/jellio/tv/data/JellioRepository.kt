@@ -1,6 +1,7 @@
 package com.jellio.tv.data
 
 import com.jellio.tv.data.model.AuthenticateByNameRequest
+import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
@@ -21,10 +22,14 @@ import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -629,6 +634,48 @@ class JellioRepository @Inject constructor(
     suspend fun isQuickConnectEnabled(): Boolean = runCatching { api.isQuickConnectEnabled() }.getOrDefault(false)
 
     suspend fun authorizeQuickConnect(code: String): Boolean = api.authorizeQuickConnect(code)
+
+    suspend fun getAvatarPresets(): List<AvatarPresetDto> = api.getAvatarPresets()
+
+    fun avatarPresetUrl(serverAddress: String, id: String): String =
+        "$serverAddress/Jellio/avatars/${java.net.URLEncoder.encode(id, "UTF-8")}"
+
+    // Real port of runtime/api.js's own setUserAvatar(presetId): fetch
+    // that preset's own real bytes off Jellio's own AvatarsController,
+    // hand them to the same real upload path a device file already
+    // goes through below (setUserAvatarFromBytes).
+    suspend fun setUserAvatarFromPreset(userId: String, presetId: String) {
+        val response = api.getAvatarPresetImage(presetId)
+        // Reading a real ResponseBody's own bytes is blocking I/O
+        // (@Streaming keeps it off the main network dispatcher's own
+        // buffering), off the main thread here for the same real
+        // reason the file picker's own ContentResolver read is too.
+        val (bytes, contentType) = withContext(Dispatchers.IO) {
+            response.bytes() to (response.contentType()?.toString() ?: "image/png")
+        }
+        uploadUserAvatarBlob(userId, bytes, contentType)
+    }
+
+    // Real port of runtime/api.js's own setUserAvatarFromFile(file):
+    // a real file the reader picked off their own device, real
+    // Jellyfin already accepts this natively (an animated gif
+    // included) for a user's own avatar.
+    suspend fun setUserAvatarFromBytes(userId: String, bytes: ByteArray, contentType: String) {
+        uploadUserAvatarBlob(userId, bytes, contentType)
+    }
+
+    // Real port of runtime/api.js's own uploadUserAvatarBlob(): base64
+    // encode whatever real image bytes the caller already has, POST to
+    // the same real endpoint the stock profile page's own file upload
+    // already uses, body the base64 payload itself with Content-Type
+    // set to the image's own real mime type, not JSON.
+    private suspend fun uploadUserAvatarBlob(userId: String, bytes: ByteArray, contentType: String) {
+        val body = withContext(Dispatchers.Default) {
+            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            base64.toRequestBody(contentType.toMediaTypeOrNull())
+        }
+        api.uploadUserAvatar(userId, body)
+    }
 
     // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
     // buildStreamUrl(): POST /Items/{id}/PlaybackInfo negotiates a real
