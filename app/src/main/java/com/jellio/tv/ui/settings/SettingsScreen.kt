@@ -77,6 +77,14 @@ fun SettingsScreen(
         SettingsSection(title = "Server") {
             SettingsRow(label = "Address", value = session.serverAddress)
             SettingsRow(label = "Signed in as", value = session.userName)
+            Surface(
+                onClick = { viewModel.openAvatarPicker() },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            }
         }
 
         SettingsSection(title = "Playback") {
@@ -141,6 +149,22 @@ fun SettingsScreen(
                 openField = null
             },
             onDismiss = { openField = null },
+        )
+    }
+
+    val showAvatarPicker by viewModel.showAvatarPicker.collectAsState()
+    if (showAvatarPicker) {
+        val avatarPresets by viewModel.avatarPresets.collectAsState()
+        val avatarStatus by viewModel.avatarPickerStatus.collectAsState()
+        val avatarBusyKey by viewModel.avatarBusyKey.collectAsState()
+        AvatarPickerOverlay(
+            presets = avatarPresets,
+            status = avatarStatus,
+            busyKey = avatarBusyKey,
+            presetImageUrl = { id -> viewModel.avatarPresetUrl(session, id) },
+            onSelectPreset = { id -> viewModel.selectAvatarPreset(session, id) },
+            onUpload = { bytes, contentType -> viewModel.uploadAvatar(session, bytes, contentType) },
+            onDismiss = { viewModel.closeAvatarPicker() },
         )
     }
     }

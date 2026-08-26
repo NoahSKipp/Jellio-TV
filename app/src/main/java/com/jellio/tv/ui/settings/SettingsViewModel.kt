@@ -3,6 +3,7 @@ package com.jellio.tv.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.matchLanguageOption
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
@@ -74,6 +75,30 @@ class SettingsViewModel @Inject constructor(
 
     private val _quickConnectApproveTick = MutableStateFlow(0)
     val quickConnectApproveTick: StateFlow<Int> = _quickConnectApproveTick.asStateFlow()
+
+    // Real port of components/avatarPicker.js's own openAvatarPicker()
+    // state: presets re-fetched fresh every real open (that file's own
+    // real getAvatarPresets() call, no caching), a single busy key
+    // rather than a per-tile boolean list since only one real upload
+    // or preset-set request is ever in flight at once, same real
+    // reasoning that file's own option.disabled/uploadOption.disabled
+    // toggle only ever the one real tile clicked.
+    private val _showAvatarPicker = MutableStateFlow(false)
+    val showAvatarPicker: StateFlow<Boolean> = _showAvatarPicker.asStateFlow()
+
+    private val _isLoadingAvatarPresets = MutableStateFlow(false)
+    val isLoadingAvatarPresets: StateFlow<Boolean> = _isLoadingAvatarPresets.asStateFlow()
+
+    private val _avatarPresets = MutableStateFlow<List<AvatarPresetDto>>(emptyList())
+    val avatarPresets: StateFlow<List<AvatarPresetDto>> = _avatarPresets.asStateFlow()
+
+    private val _avatarPickerStatus = MutableStateFlow<String?>(null)
+    val avatarPickerStatus: StateFlow<String?> = _avatarPickerStatus.asStateFlow()
+
+    // Null when nothing is in flight, "upload" for the upload tile, or
+    // a real preset's own Id for that tile.
+    private val _avatarBusyKey = MutableStateFlow<String?>(null)
+    val avatarBusyKey: StateFlow<String?> = _avatarBusyKey.asStateFlow()
 
     private var loadedUserId: String? = null
 
@@ -168,6 +193,72 @@ class SettingsViewModel @Inject constructor(
                 _sleepTimerActive.value = false
             } finally {
                 _isCancellingSleepTimer.value = false
+            }
+        }
+    }
+
+    // Real port of components/avatarPicker.js's own openAvatarPicker():
+    // presets fetched fresh on every real open, an empty real result
+    // getting the exact same real "upload your own instead" status
+    // that function's own early return shows.
+    fun openAvatarPicker() {
+        _showAvatarPicker.value = true
+        _avatarPickerStatus.value = null
+        _avatarBusyKey.value = null
+        viewModelScope.launch {
+            _isLoadingAvatarPresets.value = true
+            try {
+                val presets = repository.getAvatarPresets()
+                _avatarPresets.value = presets
+                if (presets.isEmpty()) {
+                    _avatarPickerStatus.value = "No preset avatars are available on this server, upload your own instead."
+                }
+            } catch (err: Exception) {
+                _avatarPickerStatus.value = "Could not load avatars."
+            } finally {
+                _isLoadingAvatarPresets.value = false
+            }
+        }
+    }
+
+    fun closeAvatarPicker() {
+        _showAvatarPicker.value = false
+    }
+
+    fun avatarPresetUrl(session: Session, id: String): String = repository.avatarPresetUrl(session.serverAddress, id)
+
+    fun selectAvatarPreset(session: Session, presetId: String) {
+        if (_avatarBusyKey.value != null) return
+        viewModelScope.launch {
+            _avatarBusyKey.value = presetId
+            _avatarPickerStatus.value = "Setting avatar…"
+            try {
+                repository.setUserAvatarFromPreset(session.userId, presetId)
+                _avatarPickerStatus.value = "Avatar updated."
+                _showAvatarPicker.value = false
+            } catch (err: Exception) {
+                _avatarPickerStatus.value = "Could not set that avatar."
+                _avatarBusyKey.value = null
+            }
+        }
+    }
+
+    // Real port of that file's own file input change handler: a real
+    // file the reader picked off their own device, Jellyfin already
+    // supports this natively (an animated gif included), real feedback
+    // asked directly for a way to reach it rather than presets only.
+    fun uploadAvatar(session: Session, bytes: ByteArray, contentType: String) {
+        if (_avatarBusyKey.value != null) return
+        viewModelScope.launch {
+            _avatarBusyKey.value = "upload"
+            _avatarPickerStatus.value = "Setting avatar…"
+            try {
+                repository.setUserAvatarFromBytes(session.userId, bytes, contentType)
+                _avatarPickerStatus.value = "Avatar updated."
+                _showAvatarPicker.value = false
+            } catch (err: Exception) {
+                _avatarPickerStatus.value = "Could not upload that picture."
+                _avatarBusyKey.value = null
             }
         }
     }
