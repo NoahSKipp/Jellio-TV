@@ -92,7 +92,7 @@ fun isFriday13(calendar: Calendar): Boolean =
 // it skips a disabled one, so priority among the themes this app does
 // support stays exactly real without drawing the wrong substitute for
 // one it does not.
-val SUPPORTED_SEASONAL_THEMES: Set<String> = DRIFT_THEMES.keys + setOf("friday13", "frost", "filmnoir")
+val SUPPORTED_SEASONAL_THEMES: Set<String> = DRIFT_THEMES.keys + setOf("friday13", "frost", "filmnoir", "newyear")
 
 // Real port of that file's own real, singular activeSeasonalTheme():
 // "what's active right now" against ConfigController.cs's own real
