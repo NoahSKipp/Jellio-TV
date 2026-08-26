@@ -665,6 +665,16 @@ class JellioRepository @Inject constructor(
     fun avatarPresetUrl(serverAddress: String, id: String): String =
         "$serverAddress/Jellio/avatars/${java.net.URLEncoder.encode(id, "UTF-8")}"
 
+    // Real screens/settings.js's own navigateTo('#/dashboard'): that
+    // file's own real hash just moves an already loaded jellyfin-web
+    // page onto its own real dashboard route rather than fetching a
+    // real new page, nothing this app has a WebView open for. Same
+    // real hash, handed to a device browser instead, the same real
+    // fallback discipline every other unmigrated route already gets
+    // (this app's own version of it: launched fresh rather than
+    // showing through underneath, since there is no underneath here).
+    fun adminDashboardUrl(serverAddress: String): String = "$serverAddress/web/index.html#/dashboard"
+
     // Real port of runtime/api.js's own setUserAvatar(presetId): fetch
     // that preset's own real bytes off Jellio's own AvatarsController,
     // hand them to the same real upload path a device file already

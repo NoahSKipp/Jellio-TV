@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,7 +69,9 @@ fun SettingsScreen(
     val rememberStream by viewModel.rememberStream.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
+    val isAdministrator by viewModel.isAdministrator.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
+    val context = LocalContext.current
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
@@ -77,13 +82,35 @@ fun SettingsScreen(
         SettingsSection(title = "Server") {
             SettingsRow(label = "Address", value = session.serverAddress)
             SettingsRow(label = "Signed in as", value = session.userName)
-            Surface(
-                onClick = { viewModel.openAvatarPicker() },
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
+                Surface(
+                    onClick = { viewModel.openAvatarPicker() },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                ) {
+                    Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
+                // Real screens/settings.js's own IsAdministrator gated
+                // "Open admin dashboard" button: that file's own click
+                // handler just moves the already loaded jellyfin-web
+                // page's own hash onto #/dashboard, real native chrome
+                // for it already loaded underneath. This app embeds no
+                // native jellyfin-web page to fall through to for that,
+                // so a device browser opens the same real dashboard
+                // route fresh instead (SettingsViewModel.kt's own
+                // adminDashboardUrl header comment).
+                if (isAdministrator) {
+                    Surface(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(viewModel.adminDashboardUrl(session)))
+                            context.startActivity(intent)
+                        },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                    ) {
+                        Text(text = "Open admin dashboard", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    }
+                }
             }
         }
 
