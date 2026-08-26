@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +56,13 @@ fun LandscapeRow(
     modifier: Modifier = Modifier,
     onTitleClick: (() -> Unit)? = null,
     onItemOptions: ((BaseItemDto) -> Unit)? = null,
+    // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
+    // the item mid real Thanos-snap shatter, kept in section.items (no
+    // row reflow yet) until CardShatterOverlay's own onFinished fires,
+    // the same real reason that file's own card stays in the DOM,
+    // merely hidden, until its own overlay's setTimeout removes it.
+    removingItemId: String? = null,
+    onShatterFinished: (BaseItemDto) -> Unit = {},
 ) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
@@ -69,6 +77,8 @@ fun LandscapeRow(
                     imageUrl = rawImageUrl,
                     onClick = { onItemClick(item) },
                     onOptionsClick = onItemOptions?.let { { it(item) } },
+                    isRemoving = removingItemId == item.Id,
+                    onShatterFinished = { onShatterFinished(item) },
                 )
             }
         }
@@ -126,6 +136,8 @@ fun LandscapeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onOptionsClick: (() -> Unit)? = null,
+    isRemoving: Boolean = false,
+    onShatterFinished: () -> Unit = {},
 ) {
     val isEpisode = item.Type == "Episode" && !item.SeriesName.isNullOrEmpty()
     val hasSeason = item.ParentIndexNumber != null
@@ -135,6 +147,19 @@ fun LandscapeCard(
     val percentage = item.UserData?.PlayedPercentage
 
     Box(modifier = modifier.width(LandscapeCardWidth)) {
+    if (isRemoving) {
+        val shatterUrl = landscapeImageUrl(item, imageUrl)
+        if (shatterUrl != null) {
+            CardShatterOverlay(
+                imageUrl = shatterUrl,
+                cardWidth = LandscapeCardWidth,
+                cardHeight = LandscapeCardWidth * 9f / 16f,
+                onFinished = onShatterFinished,
+            )
+        } else {
+            LaunchedEffect(item.Id) { onShatterFinished() }
+        }
+    } else {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
@@ -234,6 +259,7 @@ fun LandscapeCard(
                 Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Options", modifier = Modifier.size(16.dp))
             }
         }
+    }
     }
     }
 }
