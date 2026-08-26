@@ -7,7 +7,9 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
+import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.TrickplayInfoDto
+import com.jellio.tv.data.prefs.SubtitleStylePreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -191,10 +193,33 @@ data class PlayerUiState(
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val subtitleStylePreferences: SubtitleStylePreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    // Kept out of PlayerUiState on purpose: load() below fully replaces
+    // that state object on every real title change (a fresh
+    // PlayerUiState(...), not a .copy()), but this is a real persisted
+    // reader preference (SubtitleStylePreferences' own header comment),
+    // not per-title playback state, so it has to survive that reset.
+    private val _subtitleStyle = MutableStateFlow(SubtitleStyle())
+    val subtitleStyle: StateFlow<SubtitleStyle> = _subtitleStyle.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            subtitleStylePreferences.style.collect { _subtitleStyle.value = it }
+        }
+    }
+
+    fun setSubtitleSize(size: String) {
+        viewModelScope.launch { subtitleStylePreferences.setSize(size) }
+    }
+
+    fun setSubtitleBackground(background: String) {
+        viewModelScope.launch { subtitleStylePreferences.setBackground(background) }
+    }
 
     private var loadedItemId: String? = null
     private var itemId: String? = null
