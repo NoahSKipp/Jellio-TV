@@ -89,6 +89,13 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
+    // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
+    // "Remove" only ever starts the real shatter below, the real
+    // HomeViewModel.removeFromRow() call deferred to
+    // LandscapeRow's own onShatterFinished, the same real reason that
+    // file's own card stays in the DOM until its own overlay's
+    // setTimeout finishes.
+    var removingItemId by remember { mutableStateOf<String?>(null) }
     // Real components/homeCustomizer.js's own header: editMode lives
     // only in this real local closure, reset to off on every fresh
     // visit to this screen the same way that file's own real editMode
@@ -192,6 +199,11 @@ fun HomeScreen(
                                         onItemClick = onItemClick,
                                         onTitleClick = { rowListTarget = row.section },
                                         onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
+                                        removingItemId = removingItemId,
+                                        onShatterFinished = { item ->
+                                            removingItemId = null
+                                            viewModel.removeFromRow(session, item)
+                                        },
                                     )
                                 } else {
                                     PosterRow(
@@ -234,7 +246,7 @@ fun HomeScreen(
                 } else {
                     null
                 },
-                onRemoveFromRow = if (continueWatching || upNext) { { viewModel.removeFromRow(session, item) } } else null,
+                onRemoveFromRow = if (continueWatching || upNext) { { removingItemId = item.Id } } else null,
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
                 onDismiss = { cardMenuTarget = null },
