@@ -5,6 +5,8 @@ import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
+import com.jellio.tv.data.model.ForgotPasswordPinRequest
+import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.JoinSyncPlayGroupRequest
@@ -34,6 +36,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -200,6 +203,46 @@ class JellioRepository @Inject constructor(
     fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300): String {
         val base = "$serverAddress/Users/$userId/Images/Primary?maxWidth=$maxWidth"
         return if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+    }
+
+    // Real port of runtime/auth.js's own requestPasswordReset(): a real
+    // failure comes back true anyway, the same real leak-prevention
+    // design UserController.cs's own ForgotPassword action documents
+    // (a nonexistent username gets the exact same real response a real
+    // one does), so this app has nothing more specific to report than
+    // whether the request itself reached the server at all.
+    suspend fun requestPasswordReset(serverAddress: String, username: String): Boolean {
+        sessionManager.saveServerAddress(serverAddress)
+        return try {
+            api.requestPasswordReset(ForgotPasswordRequest(username))
+            true
+        } catch (err: Exception) {
+            false
+        }
+    }
+
+    // Real port of screens/login.js's own forgot password flow past a
+    // real Success redeem: that real call clears the account's own
+    // password server side rather than setting the one the reader
+    // asked for (real Jellyfin behaviour, not a choice made here), so
+    // this signs back in with a blank one immediately after, then
+    // calls updatePassword with the real new one, the same two real
+    // calls that file's own header comment documents.
+    suspend fun redeemPasswordReset(serverAddress: String, username: String, pin: String, newPassword: String): LoginResult {
+        return try {
+            val redeemed = api.redeemPasswordResetPin(ForgotPasswordPinRequest(pin))
+            if (!redeemed.Success) {
+                return LoginResult.Failure("That reset code is invalid or has expired.")
+            }
+            val loginResult = connectAndLogin(serverAddress, username, "")
+            if (loginResult is LoginResult.Failure) return loginResult
+            val userId = sessionManager.sessionFlow.first()?.userId
+                ?: return LoginResult.Failure("Could not finish resetting your password.")
+            updatePassword(userId, "", newPassword)
+            LoginResult.Success
+        } catch (err: Exception) {
+            LoginResult.Failure("Could not reset the password. Try again.")
+        }
     }
 
     suspend fun logout() = sessionManager.clearSession()

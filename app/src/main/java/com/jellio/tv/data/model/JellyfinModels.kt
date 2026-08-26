@@ -231,6 +231,23 @@ data class PlaybackReportRequest(
     val PlayMethod: String = "DirectStream",
 )
 
+// Real endpoint, POST /Users/ForgotPassword, confirmed against
+// UserController.cs's own ForgotPassword action before porting this.
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordRequest(val EnteredUsername: String)
+
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordPinRequest(val Pin: String)
+
+// Real Jellyfin PinRedeemResult shape: a real redeem clears the
+// account's own password server side rather than setting the one the
+// reader asked for, real Jellyfin behaviour JellioRepository.kt's own
+// redeemPasswordReset() header comment covers the two follow up real
+// calls this app makes for the same reason screens/login.js's own
+// forgot password flow does.
+@JsonClass(generateAdapter = true)
+data class PinRedeemResultDto(val Success: Boolean = false)
+
 @JsonClass(generateAdapter = true)
 data class UpdatePasswordRequest(
     val CurrentPw: String,

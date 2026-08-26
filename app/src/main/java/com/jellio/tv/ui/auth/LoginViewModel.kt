@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class LoginMode { CHECKING, PROFILE_PICKER, MANUAL }
+enum class LoginMode { CHECKING, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN }
 
 data class RememberedProfile(val userId: String, val name: String, val primaryImageTag: String?)
 
@@ -26,6 +26,14 @@ data class LoginUiState(
     val canReturnToProfiles: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
+    // Real port of screens/login.js's own forgot password state: the
+    // username step 2 (FORGOT_PIN) carries forward, same real reason
+    // that file's own renderForgotPassword() passes it straight into
+    // buildForgotPinForm() rather than asking for it twice.
+    val forgotPasswordUsername: String = "",
+    val isRequestingReset: Boolean = false,
+    val isRedeemingReset: Boolean = false,
+    val resetStatus: String? = null,
 )
 
 // Real port of screens/login.js's own renderProfilePicker()/
@@ -148,6 +156,70 @@ class LoginViewModel @Inject constructor(
 
     fun backToProfiles() {
         loadProfiles(_uiState.value.serverAddress)
+    }
+
+    // Real port of screens/login.js's own onForgotPassword hook off the
+    // manual form: opens step 1 with whatever the reader had already
+    // typed into the username field prefilled, same real reasoning
+    // that file's own buildManualForm() documents for not asking for
+    // it twice.
+    fun showForgotPassword(prefillUsername: String) {
+        _uiState.value = _uiState.value.copy(
+            mode = LoginMode.FORGOT_USERNAME,
+            forgotPasswordUsername = prefillUsername,
+            resetStatus = null,
+        )
+    }
+
+    fun requestPasswordReset(username: String) {
+        if (username.isBlank()) {
+            _uiState.value = _uiState.value.copy(resetStatus = "Enter your username.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRequestingReset = true, resetStatus = "Sending…")
+            val ok = repository.requestPasswordReset(_uiState.value.serverAddress, username)
+            _uiState.value = if (ok) {
+                _uiState.value.copy(
+                    mode = LoginMode.FORGOT_PIN,
+                    forgotPasswordUsername = username,
+                    isRequestingReset = false,
+                    resetStatus = "If that account exists, a reset code has been emailed to it. Enter it below with a new password.",
+                )
+            } else {
+                _uiState.value.copy(isRequestingReset = false, resetStatus = "Could not request a reset code. Try again later.")
+            }
+        }
+    }
+
+    fun redeemPasswordReset(pin: String, newPassword: String, confirmPassword: String) {
+        if (pin.isBlank() || newPassword.isBlank()) {
+            _uiState.value = _uiState.value.copy(resetStatus = "Enter the reset code and a new password.")
+            return
+        }
+        if (newPassword != confirmPassword) {
+            _uiState.value = _uiState.value.copy(resetStatus = "New passwords do not match.")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = "Resetting…")
+            when (val result = repository.redeemPasswordReset(_uiState.value.serverAddress, _uiState.value.forgotPasswordUsername, pin, newPassword)) {
+                // Success needs no state change here: AppViewModel's own
+                // real sessionFlow collection is what actually moves the
+                // app off this screen once the session is persisted.
+                is LoginResult.Success -> Unit
+                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isRedeemingReset = false, resetStatus = result.message)
+            }
+        }
+    }
+
+    fun cancelForgotPassword() {
+        _uiState.value = _uiState.value.copy(
+            mode = LoginMode.MANUAL,
+            manualPrefillUsername = _uiState.value.forgotPasswordUsername,
+            resetStatus = null,
+            error = null,
+        )
     }
 
     fun login(serverAddress: String, username: String, password: String) {

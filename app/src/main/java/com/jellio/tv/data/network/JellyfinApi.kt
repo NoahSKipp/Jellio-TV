@@ -6,11 +6,14 @@ import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
+import com.jellio.tv.data.model.ForgotPasswordPinRequest
+import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.JoinSyncPlayGroupRequest
 import com.jellio.tv.data.model.ItemsResultDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
+import com.jellio.tv.data.model.PinRedeemResultDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -212,6 +215,17 @@ interface JellyfinApi {
     // call the stock profile page's own password form uses.
     @POST("Users/{userId}/Password")
     suspend fun updatePassword(@Path("userId") userId: String, @Body body: UpdatePasswordRequest)
+
+    // Real endpoint, POST /Users/ForgotPassword, confirmed against
+    // UserController.cs's own ForgotPassword action before porting
+    // this: the same real generic response every request gets back
+    // regardless of whether the username exists at all, nothing this
+    // app acts on, hence no meaningful return type.
+    @POST("Users/ForgotPassword")
+    suspend fun requestPasswordReset(@Body body: ForgotPasswordRequest)
+
+    @POST("Users/ForgotPassword/Pin")
+    suspend fun redeemPasswordResetPin(@Body body: ForgotPasswordPinRequest): PinRedeemResultDto
 
     // Real endpoint, GET /QuickConnect/Enabled: a server admin can turn
     // the whole real feature off, checked before this screen bothers
