@@ -100,6 +100,13 @@ class SettingsViewModel @Inject constructor(
     private val _avatarBusyKey = MutableStateFlow<String?>(null)
     val avatarBusyKey: StateFlow<String?> = _avatarBusyKey.asStateFlow()
 
+    // Real screens/settings.js's own user.Policy.IsAdministrator gate:
+    // see SettingsScreen.kt's own header comment on the admin dashboard
+    // button for the real fallback this app substitutes for that
+    // file's own dead #/dashboard route.
+    private val _isAdministrator = MutableStateFlow(false)
+    val isAdministrator: StateFlow<Boolean> = _isAdministrator.asStateFlow()
+
     private var loadedUserId: String? = null
 
     init {
@@ -125,10 +132,12 @@ class SettingsViewModel @Inject constructor(
         if (loadedUserId == session.userId) return
         loadedUserId = session.userId
         viewModelScope.launch {
-            runCatching { repository.getUser(session.userId).Configuration }.getOrNull()?.let { configuration ->
+            val user = runCatching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
+            user.Configuration?.let { configuration ->
                 _audioLanguage.value = matchLanguageOption(configuration.AudioLanguagePreference)?.code
                 _subtitleLanguage.value = matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
             }
+            _isAdministrator.value = user.Policy?.IsAdministrator == true
         }
     }
 
@@ -226,6 +235,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun avatarPresetUrl(session: Session, id: String): String = repository.avatarPresetUrl(session.serverAddress, id)
+
+    fun adminDashboardUrl(session: Session): String = repository.adminDashboardUrl(session.serverAddress)
 
     fun selectAvatarPreset(session: Session, presetId: String) {
         if (_avatarBusyKey.value != null) return

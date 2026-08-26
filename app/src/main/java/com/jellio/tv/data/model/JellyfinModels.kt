@@ -26,6 +26,16 @@ data class UserDto(
     val Name: String,
     val PrimaryImageTag: String? = null,
     val Configuration: UserConfigurationDto? = null,
+    val Policy: UserPolicyDto? = null,
+)
+
+// Real Jellyfin UserDto.Policy shape: IsAdministrator is the one real
+// gate every native admin link already uses, confirmed against
+// screens/settings.js's own real user.Policy.IsAdministrator check
+// before porting this.
+@JsonClass(generateAdapter = true)
+data class UserPolicyDto(
+    val IsAdministrator: Boolean = false,
 )
 
 // Real fields screens/settings.js's own Language section reads/writes,
