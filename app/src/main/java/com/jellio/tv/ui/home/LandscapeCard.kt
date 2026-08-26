@@ -6,13 +6,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -48,6 +54,7 @@ fun LandscapeRow(
     onItemClick: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
     onTitleClick: (() -> Unit)? = null,
+    onItemOptions: ((BaseItemDto) -> Unit)? = null,
 ) {
     if (section.items.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
@@ -57,7 +64,12 @@ fun LandscapeRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(section.items, key = { it.Id }) { item ->
-                LandscapeCard(item = item, imageUrl = rawImageUrl, onClick = { onItemClick(item) })
+                LandscapeCard(
+                    item = item,
+                    imageUrl = rawImageUrl,
+                    onClick = { onItemClick(item) },
+                    onOptionsClick = onItemOptions?.let { { it(item) } },
+                )
             }
         }
     }
@@ -113,6 +125,7 @@ fun LandscapeCard(
     imageUrl: (String, String?, String, Int) -> String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onOptionsClick: (() -> Unit)? = null,
 ) {
     val isEpisode = item.Type == "Episode" && !item.SeriesName.isNullOrEmpty()
     val hasSeason = item.ParentIndexNumber != null
@@ -121,11 +134,12 @@ fun LandscapeCard(
     val remaining = remainingLabel(item)
     val percentage = item.UserData?.PlayedPercentage
 
+    Box(modifier = modifier.width(LandscapeCardWidth)) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-        modifier = modifier.width(LandscapeCardWidth),
+        modifier = Modifier.width(LandscapeCardWidth),
     ) {
         Box(modifier = Modifier.width(LandscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
             val url = landscapeImageUrl(item, imageUrl)
@@ -208,5 +222,18 @@ fun LandscapeCard(
                 }
             }
         }
+    }
+    if (onOptionsClick != null) {
+        Surface(
+            onClick = onOptionsClick,
+            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.55f), contentColor = JellioText),
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp).size(28.dp),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Options", modifier = Modifier.size(16.dp))
+            }
+        }
+    }
     }
 }

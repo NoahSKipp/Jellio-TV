@@ -24,6 +24,21 @@ sealed interface AuthState {
     data class LoggedIn(val session: Session) : AuthState
 }
 
+// Mirrors ui.detail.DetailViewModel's own PlayAction/resolvePlayAction:
+// a real single-source title needs no choice at all, forceChoice
+// always shows the picker regardless of any remembered choice
+// (components/cardOptionsMenu.js's own openStreamPicker(item,
+// {forceChoice: true}), the real "Play manually" semantics), otherwise
+// a still-valid remembered choice wins. Kept as this file's own real
+// copy rather than shared with that ViewModel's: this app's own
+// existing getMediaSources/rememberStreamChoice/rememberedMediaSourceId
+// wrappers already duplicate the same way between the two rather than
+// one ViewModel reaching into another.
+sealed interface PlayAction {
+    data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
+    data class ShowPicker(val item: BaseItemDto) : PlayAction
+}
+
 // Owns whatever every screen needs regardless of which one is active:
 // the real session state that gates Login vs the rest of the app, and
 // the real library list the top nav pill's own Library entries come
@@ -107,4 +122,16 @@ class AppViewModel @Inject constructor(
     // my stream" preference is even still on (a remembered choice
     // already made stays honoured here even if turned off since).
     suspend fun rememberedMediaSourceId(itemId: String): String? = streamPreferences.rememberedMediaSourceId(itemId)
+
+    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
+        val sources = getMediaSources(session, item.Id)
+        if (sources.size <= 1) return PlayAction.Direct(item.Id, sources.firstOrNull()?.Id)
+        if (!forceChoice && streamPreferences.isRememberEnabled()) {
+            val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
+            if (remembered != null && sources.any { it.Id == remembered }) {
+                return PlayAction.Direct(item.Id, remembered)
+            }
+        }
+        return PlayAction.ShowPicker(item)
+    }
 }

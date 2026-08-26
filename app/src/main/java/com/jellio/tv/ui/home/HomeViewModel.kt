@@ -264,6 +264,53 @@ class HomeViewModel @Inject constructor(
         _uiState.value = state.copy(rows = updatedRows)
     }
 
+    // Real port of components/cardOptionsMenu.js's own toggleWatched()
+    // real Continue Watching/Up Next branch: a real Remove there is
+    // always a real mark-played call, never a toggle, since neither
+    // row is reachable at all once its own title actually is played
+    // (that same real call is also the only way real Jellyfin ever
+    // clears a saved resume position or drops a title off NextUp, see
+    // that function's own header). Dropped from this screen's own row
+    // state directly rather than waiting on next real reload.
+    fun removeFromRow(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.setPlayed(session.userId, item.Id, true) }.getOrNull() ?: return@launch
+            removeItemFromRows(item.Id)
+        }
+    }
+
+    private fun removeItemFromRows(itemId: String) {
+        val state = _uiState.value
+        val updatedRows = state.rows.map { row ->
+            if (row is PosterHomeRow && row.section.items.any { it.Id == itemId }) {
+                row.copy(section = row.section.copy(items = row.section.items.filterNot { it.Id == itemId }))
+            } else {
+                row
+            }
+        }
+        _uiState.value = state.copy(rows = updatedRows)
+    }
+
+    // Real port of components/cardOptionsMenu.js's own
+    // restartFromBeginning(): no real Jellyfin endpoint clears a saved
+    // resume position on its own, marking played and immediately
+    // unplayed again is the only real way to reset it back to 0
+    // without leaving the title stuck flagged watched, same real gap
+    // that function's own header (and removeFromRow's above) already
+    // documents. Returns whether it actually succeeded so the caller
+    // only navigates into real playback on a real success, same real
+    // order that function's own .then(navigateTo) already keeps.
+    suspend fun restartFromBeginning(session: Session, item: BaseItemDto): Boolean {
+        return try {
+            repository.setPlayed(session.userId, item.Id, true)
+            val updated = repository.setPlayed(session.userId, item.Id, false)
+            updateItem(item.Id) { it.copy(UserData = updated) }
+            true
+        } catch (err: Exception) {
+            false
+        }
+    }
+
     // Real port of components/homeCustomizer.js's own real
     // buildRowBar() button handlers: HomeCustomization's own pure
     // effectiveOrder()/moveKey()/toggleHidden() do the actual work,

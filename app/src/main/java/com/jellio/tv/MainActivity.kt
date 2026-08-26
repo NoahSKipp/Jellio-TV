@@ -26,6 +26,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.AppViewModel
 import com.jellio.tv.ui.AuthState
+import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
@@ -190,6 +191,22 @@ private fun JellioTvApp(
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
                         contentFocusRequester = contentFocusRequester,
                         onCompactChange = { navCompact = it },
+                        onPlayDirect = onPlayDirect,
+                        // Real port of components/cardOptionsMenu.js's own
+                        // "Play manually" (openStreamPicker(item,
+                        // {forceChoice: true})): the exact same real
+                        // AppViewModel.resolvePlayAction/StreamPickerOverlay
+                        // path DetailScreen's own Change Stream button
+                        // already reaches below, from a card's own options
+                        // menu instead of the detail page.
+                        onPlayManually = { item ->
+                            scope.launch {
+                                when (val action = appViewModel.resolvePlayAction(session, item, forceChoice = true)) {
+                                    is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
+                                    is PlayAction.ShowPicker -> streamPickerItem = action.item
+                                }
+                            }
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
