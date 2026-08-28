@@ -10,22 +10,30 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +59,16 @@ import kotlinx.coroutines.launch
 // Uses Android's own document picker for the upload tile rather than
 // that file's own hidden <input type="file">, the closest real
 // platform equivalent.
+//
+// Real port of that same file's own grouping: a preset's own Category
+// (AvatarsController.cs's own one real subfolder deep grouping) gets
+// its own collapsible section, real state kept per category rather
+// than a single expanded/collapsed flag, same real reason the web
+// picker's own plain <details> elements each toggle independently.
+// FlowRow instead of a second real LazyVerticalGrid per section: a
+// lazy grid nested inside this LazyColumn would need its own real
+// fixed height to lay out at all, FlowRow just wraps naturally at
+// whatever real width this overlay's own column gives it.
 @Composable
 fun AvatarPickerOverlay(
     presets: List<AvatarPresetDto>,
@@ -78,6 +96,16 @@ fun AvatarPickerOverlay(
         }
     }
 
+    val loosePresets = remember(presets) { presets.filter { it.Category.isNullOrBlank() } }
+    val groupedPresets = remember(presets) {
+        presets.filter { !it.Category.isNullOrBlank() }.groupBy { it.Category!! }
+    }
+    // Every real category starts expanded, same real default the web
+    // picker's own <details open> already opens with: an admin who
+    // grouped presets into folders should still see all of them the
+    // first time this overlay opens, not a wall of collapsed headers.
+    val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -97,28 +125,77 @@ fun AvatarPickerOverlay(
             status?.let {
                 Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
             }
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize().padding(top = 20.dp),
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.fillMaxSize().padding(top = 20.dp).focusRestorer(),
             ) {
-                // Appended unconditionally, ahead of the real preset
-                // list: uploading a real device file has no real
-                // dependency on the preset fetch ever succeeding at
-                // all, same real reasoning that file's own comment
-                // documents for its own upload tile.
                 item {
-                    AvatarUploadTile(busy = busyKey == "upload", onClick = { launcher.launch("image/*") })
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // Appended unconditionally, ahead of every real
+                        // preset: uploading a real device file has no
+                        // real dependency on the preset fetch ever
+                        // succeeding at all, same real reasoning that
+                        // file's own comment documents for its own
+                        // upload tile.
+                        AvatarUploadTile(busy = busyKey == "upload", onClick = { launcher.launch("image/*") })
+                        loosePresets.forEach { preset ->
+                            AvatarPresetTile(
+                                imageUrl = presetImageUrl(preset.Id),
+                                busy = busyKey == preset.Id,
+                                onClick = { onSelectPreset(preset.Id) },
+                            )
+                        }
+                    }
                 }
-                items(presets, key = { it.Id }) { preset ->
-                    AvatarPresetTile(
-                        imageUrl = presetImageUrl(preset.Id),
-                        busy = busyKey == preset.Id,
-                        onClick = { onSelectPreset(preset.Id) },
-                    )
+                groupedPresets.forEach { (category, categoryPresets) ->
+                    val expanded = expandedCategories[category] ?: true
+                    item(key = "header:$category") {
+                        AvatarCategoryHeader(
+                            category = category,
+                            expanded = expanded,
+                            onToggle = { expandedCategories[category] = !expanded },
+                        )
+                    }
+                    if (expanded) {
+                        item(key = "grid:$category") {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                categoryPresets.forEach { preset ->
+                                    AvatarPresetTile(
+                                        imageUrl = presetImageUrl(preset.Id),
+                                        busy = busyKey == preset.Id,
+                                        onClick = { onSelectPreset(preset.Id) },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AvatarCategoryHeader(category: String, expanded: Boolean, onToggle: () -> Unit) {
+    Surface(
+        onClick = onToggle,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = JellioTextSecondary,
+                modifier = Modifier.size(20.dp).rotate(if (expanded) 90f else 0f),
+            )
+            Text(
+                text = category,
+                color = JellioTextSecondary,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 8.dp),
+            )
         }
     }
 }
@@ -130,7 +207,7 @@ private fun AvatarUploadTile(busy: Boolean, onClick: () -> Unit) {
         enabled = !busy,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBg),
-        modifier = Modifier.aspectRatio(1f),
+        modifier = Modifier.width(120.dp).aspectRatio(1f),
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -150,7 +227,7 @@ private fun AvatarPresetTile(imageUrl: String, busy: Boolean, onClick: () -> Uni
         enabled = !busy,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBg),
-        modifier = Modifier.aspectRatio(1f),
+        modifier = Modifier.width(120.dp).aspectRatio(1f),
     ) {
         AsyncImage(
             model = imageUrl,

@@ -329,11 +329,13 @@ data class SleepTimerStatusDto(
     val EndTimeUtc: String? = null,
 )
 
-// Real Controllers/AvatarsController.cs shape: Id is a real filename
-// ("preset.png"), whatever an admin dropped into Jellio's own plugin
-// data directory, not a synthetic id this app invents.
+// Real Controllers/AvatarsController.cs shape: Id is a real path
+// relative to Jellio's own plugin data directory ("preset.png" for a
+// loose one, "Kids/preset.png" for one an admin grouped into a real
+// subfolder), not a synthetic id this app invents. Category is that
+// subfolder's own name, null for a loose preset.
 @JsonClass(generateAdapter = true)
-data class AvatarPresetDto(val Id: String)
+data class AvatarPresetDto(val Id: String, val Category: String? = null)
 
 // Real GET /SyncPlay/List shape, confirmed against
 // components/groupWatch.js's own real field reads (GroupId, GroupName,

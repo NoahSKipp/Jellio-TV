@@ -859,8 +859,19 @@ class JellioRepository @Inject constructor(
 
     suspend fun getAvatarPresets(): List<AvatarPresetDto> = api.getAvatarPresets()
 
+    // id can carry a real "/" (a grouped preset's own subfolder, see
+    // AvatarPresetDto's own header): each real segment gets its own
+    // percent-encoding, java.net.URLEncoder left for URLEncoder itself
+    // (which also turns a literal "/" into %2F, real form-encoding
+    // syntax a URL path segment never wants), joined back with a real
+    // "/" so AvatarsController.cs's own {**id} catch-all route reads
+    // real path segments the same way FrontendController's own
+    // {**path} already does.
+    private fun encodeAvatarId(id: String): String =
+        id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
+
     fun avatarPresetUrl(serverAddress: String, id: String): String =
-        "$serverAddress/Jellio/avatars/${java.net.URLEncoder.encode(id, "UTF-8")}"
+        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}"
 
     // Real screens/settings.js's own navigateTo('#/dashboard'): that
     // file's own real hash just moves an already loaded jellyfin-web
@@ -877,7 +888,7 @@ class JellioRepository @Inject constructor(
     // hand them to the same real upload path a device file already
     // goes through below (setUserAvatarFromBytes).
     suspend fun setUserAvatarFromPreset(userId: String, presetId: String) {
-        val response = api.getAvatarPresetImage(presetId)
+        val response = api.getAvatarPresetImage(encodeAvatarId(presetId))
         // Reading a real ResponseBody's own bytes is blocking I/O
         // (@Streaming keeps it off the main network dispatcher's own
         // buffering), off the main thread here for the same real
