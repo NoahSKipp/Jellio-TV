@@ -234,7 +234,8 @@ class SettingsViewModel @Inject constructor(
         _showAvatarPicker.value = false
     }
 
-    fun avatarPresetUrl(session: Session, id: String): String = repository.avatarPresetUrl(session.serverAddress, id)
+    fun avatarPresetUrl(session: Session, id: String): String =
+        repository.avatarPresetUrl(session.serverAddress, session.accessToken, id)
 
     fun adminDashboardUrl(session: Session): String = repository.adminDashboardUrl(session.serverAddress)
 
