@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -179,7 +180,30 @@ fun HomeScreen(
                         .padding(top = 32.dp)
                         .focusRestorer(),
                 ) {
-                    item { HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick) }
+                    item {
+                        // Real bug found live: pressing Up back to this
+                        // real hero only ever scrolled this list the
+                        // minimum real distance Compose's own default
+                        // "bring the newly focused child into view"
+                        // logic needed to make that child's own bounds
+                        // visible, not necessarily this list's own real
+                        // top, so the hero's own top edge (its own real
+                        // title/logo row) stayed clipped behind
+                        // whatever content padding sits above it.
+                        // Forced back to a real hard scrollToItem(0) the
+                        // moment focus lands anywhere inside this real
+                        // item instead, same real fix a plain
+                        // BringIntoView request cannot give on its own.
+                        Box(
+                            modifier = Modifier.onFocusChanged { state ->
+                                if (state.hasFocus) {
+                                    scope.launch { listState.animateScrollToItem(0) }
+                                }
+                            },
+                        ) {
+                            HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                        }
+                    }
                     // Real screens/home.js's own jellio-home-greeting: real
                     // feedback found "Welcome back" read as a placeholder
                     // the moment it was ever anything else, a real

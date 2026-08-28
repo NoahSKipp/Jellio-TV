@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.draw.clip
@@ -71,6 +72,7 @@ import com.jellio.tv.data.model.TrailerDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
@@ -160,9 +162,8 @@ fun DetailScreen(
     // into a title from a card had no possible interaction once here,
     // same real root cause class the rail screens already hit.
     // requestFocus() explicitly on first composition, same real
-    // pattern GroupWatchOverlay's own initialFocusRequester already
-    // uses for the same real "own this screen's own initial focus"
-    // reasoning.
+    // pattern SidebarNav's own initialFocusRequester already uses for
+    // the same real "own this screen's own initial focus" reasoning.
     val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
     // Fires once the item actually loads and the LazyColumn below is
@@ -276,7 +277,21 @@ fun DetailScreen(
             onClick = onBack,
             shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-            modifier = Modifier.padding(top = 32.dp, start = 32.dp).size(56.dp),
+            // Real bug found live: this button floats over the hero
+            // backdrop rather than sitting in the LazyColumn's own
+            // document flow, so once it had real focus a D-pad press in
+            // any direction found nothing else nearby for Compose's own
+            // default spatial search to land on, stuck there for good.
+            // down explicitly targets contentFocusRequester (the same
+            // real requester this screen's own LaunchedEffect above
+            // already claims initial focus through), a direct real
+            // bridge back into the list rather than leaving Compose to
+            // guess a destination purely from overlapping on-screen
+            // bounds.
+            modifier = Modifier
+                .padding(top = 32.dp, start = 32.dp)
+                .size(56.dp)
+                .focusProperties { down = contentFocusRequester },
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back", tint = JellioText)
@@ -547,9 +562,33 @@ private fun SeasonsSection(
                 Surface(
                     onClick = { onSelectSeason(season.Id) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    // Real bug found live against a real screenshot: a
+                    // translucent white fill (JellioText.copy(alpha =
+                    // 0.18f)) behind the same real white JellioText it
+                    // was tinting read as barely-there, near-illegible
+                    // once this tab was both selected and focused (the
+                    // real screenshot's own Season 01), since neither
+                    // combination was set explicitly here and
+                    // ClickableSurfaceDefaults.colors() falls back to
+                    // its own real default focused/focused-selected
+                    // pair rather than this tab's own real selected
+                    // pair the moment it also has real focus. Same real
+                    // solid-fill, opposite-luminance-text pattern
+                    // ui/library/LibraryScreen.kt's own FilterChip
+                    // already uses instead: a real selected tab's own
+                    // fill is opaque JellioSecondary now, its own text
+                    // dark JellioBg, real contrast that holds regardless
+                    // of which of the four real Surface color slots
+                    // ends up actually painted.
                     colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (selected) JellioText.copy(alpha = 0.18f) else Color.Transparent,
-                        contentColor = if (selected) JellioText else JellioTextSecondary,
+                        containerColor = if (selected) JellioSecondary else JellioBgElevated,
+                        contentColor = if (selected) JellioBg else JellioText,
+                        focusedContainerColor = JellioSecondary,
+                        focusedContentColor = JellioBg,
+                        selectedContainerColor = JellioSecondary,
+                        selectedContentColor = JellioBg,
+                        focusedSelectedContainerColor = JellioSecondary,
+                        focusedSelectedContentColor = JellioBg,
                     ),
                 ) {
                     Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
