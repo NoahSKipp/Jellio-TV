@@ -59,7 +59,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioTvTheme
 import com.jellio.tv.ui.theme.scaled
 import com.jellio.tv.ui.update.AppUpdateViewModel
-import com.jellio.tv.ui.update.BootSplashVideo
+import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -115,11 +115,10 @@ private fun AppBootGate(
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
-    // jellio_load.webm (res/raw) runs ~10s, the ~8s this prefetch
-    // usually takes plus the 2s of real room asked for: the splash
-    // stays up for at least that long even on a fast/cached load,
-    // rather than cutting the animation off mid-play the moment
-    // homeState.isLoading flips.
+    // 10s: the ~8s this prefetch usually takes plus the 2s of real
+    // room asked for, so the splash stays up for at least that long
+    // even on a fast/cached load rather than flashing past the mark's
+    // own pop-in reveal the moment homeState.isLoading flips.
     var minSplashTimeElapsed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(10_000)
@@ -144,7 +143,7 @@ private fun AppBootGate(
     }
     if (homeState.isLoading || !minSplashTimeElapsed) {
         Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
-            BootSplashVideo(modifier = Modifier.fillMaxSize())
+            BootSplashMark(modifier = Modifier.fillMaxSize())
         }
     } else {
         JellioTvApp(session = session, appViewModel = appViewModel)

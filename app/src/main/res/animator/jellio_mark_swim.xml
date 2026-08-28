@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real port of jellio-mark-animated.svg's own jm-swim keyframes: a
+     gentle drift+rotate loop on the jellyfish silhouette alone (not the
+     triangle it sits inside), 3.2s, infinite. Targets jellio_mark_swim
+     in ic_jellio_mark.xml, the pivot group wrapping the jellyfish's own
+     static translate(58,113.5) scale(0.31) position so this animates as
+     a real delta on top of it, not a replacement for it. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:ordering="together">
+    <objectAnimator
+        android:propertyName="translateX"
+        android:duration="3200"
+        android:repeatCount="infinite"
+        android:repeatMode="restart"
+        android:interpolator="@interpolator/jellio_mark_swim_ease">
+        <propertyValuesHolder android:propertyName="translateX">
+            <keyframe android:fraction="0" android:value="0" />
+            <keyframe android:fraction="0.20" android:value="6.6" />
+            <keyframe android:fraction="0.46" android:value="3.4" />
+            <keyframe android:fraction="0.72" android:value="-1.2" />
+            <keyframe android:fraction="1" android:value="0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+    <objectAnimator
+        android:propertyName="translateY"
+        android:duration="3200"
+        android:repeatCount="infinite"
+        android:repeatMode="restart"
+        android:interpolator="@interpolator/jellio_mark_swim_ease">
+        <propertyValuesHolder android:propertyName="translateY">
+            <keyframe android:fraction="0" android:value="0" />
+            <keyframe android:fraction="0.20" android:value="-10" />
+            <keyframe android:fraction="0.46" android:value="-5.2" />
+            <keyframe android:fraction="0.72" android:value="1.8" />
+            <keyframe android:fraction="1" android:value="0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+    <objectAnimator
+        android:propertyName="rotation"
+        android:duration="3200"
+        android:repeatCount="infinite"
+        android:repeatMode="restart"
+        android:interpolator="@interpolator/jellio_mark_swim_ease">
+        <propertyValuesHolder android:propertyName="rotation">
+            <keyframe android:fraction="0" android:value="0" />
+            <keyframe android:fraction="0.20" android:value="1.5" />
+            <keyframe android:fraction="0.46" android:value="0.4" />
+            <keyframe android:fraction="0.72" android:value="-0.8" />
+            <keyframe android:fraction="1" android:value="0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+</set>
