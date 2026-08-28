@@ -178,6 +178,7 @@ fun CardOptionsMenu(
     onPlayManually: (() -> Unit)? = null,
     onStartOver: (() -> Unit)? = null,
     onRemoveFromRow: (() -> Unit)? = null,
+    onRemoveShowFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
     onDeleteItem: (() -> Unit)? = null,
@@ -225,6 +226,17 @@ fun CardOptionsMenu(
                     // its own, marking the episode played is the only
                     // real call that also drops it off this row.
                     onRemoveFromRow?.let { CardOptionsMenuRow(label = "Remove from Up Next", onClick = { it(); onDismiss() }, danger = true) }
+                    // Real port of components/cardOptionsMenu.js's own
+                    // "Remove Show from Up Next": the row entry above
+                    // only ever marks this one episode played, which
+                    // just advances the same series to its own next
+                    // episode on the row's very next fetch, not
+                    // actually leaving it. This hides the whole series
+                    // server side instead (Controllers/
+                    // NextUpHiddenController.cs), a real series stays
+                    // gone across a reload rather than resurfacing
+                    // under its next episode.
+                    onRemoveShowFromRow?.let { CardOptionsMenuRow(label = "Remove Show from Up Next", onClick = { it(); onDismiss() }, danger = true) }
                 }
                 else -> {
                     if (onToggleWatchlist != null) {
