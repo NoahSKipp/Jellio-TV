@@ -6,12 +6,9 @@ import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.ClientConfigDto
-import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
-import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
-import com.jellio.tv.data.model.JoinSyncPlayGroupRequest
 import com.jellio.tv.data.model.ItemsResultDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.PinRedeemResultDto
@@ -19,10 +16,8 @@ import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
-import com.jellio.tv.data.model.SendGroupWatchMessageRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
-import com.jellio.tv.data.model.SyncPlayGroupDto
 import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
@@ -296,42 +291,6 @@ interface JellyfinApi {
     @POST("Users/{userId}/Images/Primary")
     suspend fun uploadUserAvatar(@Path("userId") userId: String, @Body body: RequestBody)
 
-    // Real Jellyfin SyncPlay endpoints (SyncPlayController.cs): the
-    // exact same real REST surface native jellyfin-web's own hidden
-    // .headerSyncButton menu already drove, confirmed against
-    // components/groupWatch.js's own real
-    // getSyncPlayGroups/createSyncPlayGroup/joinSyncPlayGroup/
-    // leaveSyncPlayGroup before porting this. Leave takes no body: a
-    // signed in session can only ever be in one real group at a time,
-    // so there is nothing to target.
-    @GET("SyncPlay/List")
-    suspend fun getSyncPlayGroups(): List<SyncPlayGroupDto>
-
-    @POST("SyncPlay/New")
-    suspend fun createSyncPlayGroup(@Body body: CreateSyncPlayGroupRequest)
-
-    @POST("SyncPlay/Join")
-    suspend fun joinSyncPlayGroup(@Body body: JoinSyncPlayGroupRequest)
-
-    @POST("SyncPlay/Leave")
-    suspend fun leaveSyncPlayGroup()
-
-    // Real Controllers/GroupWatchChatController.cs endpoints: Jellio's
-    // own small in memory chat room per real SyncPlay GroupId, polled
-    // rather than pushed, see GroupWatchMessageDto's own header comment
-    // for why this app opens no WebSocket of its own to drive it live
-    // the way real Jellyfin SyncPlay's own playback lockstep would.
-    @GET("Jellio/groupwatch/{groupId}/messages")
-    suspend fun getGroupWatchMessages(
-        @Path("groupId") groupId: String,
-        @Query("after") after: Long = 0,
-    ): List<GroupWatchMessageDto>
-
-    @POST("Jellio/groupwatch/{groupId}/messages")
-    suspend fun sendGroupWatchMessage(
-        @Path("groupId") groupId: String,
-        @Body body: SendGroupWatchMessageRequest,
-    ): GroupWatchMessageDto
 }
 
 // Real Jellyfin auth convention every client sends, confirmed against
