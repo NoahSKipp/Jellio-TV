@@ -264,9 +264,15 @@ interface JellyfinApi {
     @GET("Jellio/avatars")
     suspend fun getAvatarPresets(): List<AvatarPresetDto>
 
+    // encoded = true: id can carry a real "/" (a grouped preset's own
+    // subfolder), the caller (JellioRepository's own encodeAvatarId())
+    // already percent-encodes each real path segment on its own, this
+    // just stops Retrofit from also encoding the literal "/" itself
+    // into %2F, which AvatarsController.cs's own {**id} catch-all route
+    // reads as real path segments, not one.
     @Streaming
     @GET("Jellio/avatars/{id}")
-    suspend fun getAvatarPresetImage(@Path("id") id: String): ResponseBody
+    suspend fun getAvatarPresetImage(@Path(value = "id", encoded = true) id: String): ResponseBody
 
     // Real endpoint, POST /Users/{id}/Images/Primary, confirmed against
     // runtime/api.js's own uploadUserAvatarBlob(): body is the image's
