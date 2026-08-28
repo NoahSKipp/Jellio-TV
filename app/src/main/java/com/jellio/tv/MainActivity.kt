@@ -18,9 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -32,9 +30,6 @@ import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
-import com.jellio.tv.ui.groupwatch.GroupWatchButton
-import com.jellio.tv.ui.groupwatch.GroupWatchOverlay
-import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
 import com.jellio.tv.ui.home.HomeScreen
 import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
@@ -45,7 +40,6 @@ import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.SidebarNav
 import com.jellio.tv.ui.nav.SidebarReservedWidth
 import com.jellio.tv.ui.nav.isImmersive
-import com.jellio.tv.ui.nowplaying.NowPlayingButton
 import com.jellio.tv.ui.nowplaying.NowPlayingPanel
 import com.jellio.tv.ui.nowplaying.NowPlayingViewModel
 import com.jellio.tv.ui.person.PersonScreen
@@ -198,7 +192,6 @@ private fun JellioTvApp(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
     nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
-    groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
     // AppBootGate's own hiltViewModel() call already kicked off
     // checkForUpdate(); this call resolves to that exact same
@@ -216,11 +209,11 @@ private fun JellioTvApp(
     var showLibraryPicker by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    // Real feedback live: SidebarNav's own items (and the corner
-    // NowPlaying/GroupWatch buttons beside it) stayed reachable while
-    // HomeScreen's own Customize mode was active, so a reader
-    // mid-reorder could jump straight off with nothing standing in the
-    // way. Threaded down the same real way SidebarNav's own enabled is.
+    // Real feedback live: SidebarNav's own items (and Now Playing's own
+    // row inside it) stayed reachable while HomeScreen's own Customize
+    // mode was active, so a reader mid-reorder could jump straight off
+    // with nothing standing in the way. Threaded down the same real
+    // way SidebarNav's own enabled is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -235,8 +228,6 @@ private fun JellioTvApp(
     LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
     var showNowPlayingPanel by remember { mutableStateOf(false) }
-    var showGroupWatch by remember { mutableStateOf(false) }
-    val groupWatchState by groupWatchViewModel.uiState.collectAsState()
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -406,16 +397,12 @@ private fun JellioTvApp(
                         switchTab(clicked)
                     }
                 },
-            )
-            // Real components/nowPlaying.js's own trigger button: its
-            // own real corner spot alongside SidebarNav rather than a
-            // link inside the rail itself, reachable from every same
-            // non-immersive screen the rail is.
-            NowPlayingButton(
-                sessionCount = nowPlayingSessions.size,
-                onClick = { showNowPlayingPanel = !showNowPlayingPanel },
-                enabled = !homeEditMode,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 32.dp),
+                // Real components/nowPlaying.js's own trigger: absorbed
+                // into this rail's own bottom row instead of its own
+                // floating corner spot, see SidebarNav's own header for
+                // why.
+                nowPlayingSessionCount = nowPlayingSessions.size,
+                onNowPlayingClick = { showNowPlayingPanel = !showNowPlayingPanel },
             )
             if (showNowPlayingPanel) {
                 NowPlayingPanel(
@@ -423,33 +410,6 @@ private fun JellioTvApp(
                     imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                     onDismiss = { showNowPlayingPanel = false },
                     modifier = Modifier.fillMaxSize(),
-                )
-            }
-            // Real components/groupWatch.js's own trigger button: same
-            // real reasoning NowPlayingButton's own header above
-            // documents, its own corner spot instead of a sidebar link
-            // this app has none of.
-            GroupWatchButton(
-                onClick = { showGroupWatch = true },
-                enabled = !homeEditMode,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.dp, end = 96.dp),
-            )
-            if (showGroupWatch) {
-                GroupWatchOverlay(
-                    state = groupWatchState,
-                    currentUserName = session.userName,
-                    currentUserId = session.userId,
-                    onRefresh = { groupWatchViewModel.refresh() },
-                    onCreateGroup = { name -> groupWatchViewModel.createGroup(name) },
-                    onJoinGroup = { groupId -> groupWatchViewModel.joinGroup(groupId) },
-                    onLeaveGroup = { groupId -> groupWatchViewModel.leaveGroup(groupId) },
-                    onOpenChat = { group -> groupWatchViewModel.openChat(group) },
-                    onCloseChat = { groupWatchViewModel.closeChat() },
-                    onSendMessage = { text -> groupWatchViewModel.sendMessage(text) },
-                    onDismiss = {
-                        groupWatchViewModel.closeChat()
-                        showGroupWatch = false
-                    },
                 )
             }
             if (showLibraryPicker) {

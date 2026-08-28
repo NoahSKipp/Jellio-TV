@@ -36,8 +36,8 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // on screen to surface it isn't a real notification at all. A small
 // floating card rather than a real full-screen scrim: this is
 // information, not a real blocking choice the rest of the screen
-// needs to wait on, same real reasoning NowPlayingPanel/GroupWatch's
-// own corner buttons stay reachable rather than gating the whole app.
+// needs to wait on, same real reasoning SidebarNav's own Now Playing
+// row stays reachable rather than gating the whole app.
 // Focus still claimed on appearance and trapped while it's up though,
 // same real pattern every other overlay in this app already uses:
 // unprompted content appearing with no D-pad path to it yet is a real

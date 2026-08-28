@@ -337,41 +337,6 @@ data class SleepTimerStatusDto(
 @JsonClass(generateAdapter = true)
 data class AvatarPresetDto(val Id: String, val Category: String? = null)
 
-// Real GET /SyncPlay/List shape, confirmed against
-// components/groupWatch.js's own real field reads (GroupId, GroupName,
-// Participants, PlayingItemName): Participants is a list of usernames,
-// not user ids, the same real thing that file's own membership check
-// already compares against a signed in Name.
-@JsonClass(generateAdapter = true)
-data class SyncPlayGroupDto(
-    val GroupId: String,
-    val GroupName: String? = null,
-    val Participants: List<String> = emptyList(),
-    val PlayingItemName: String? = null,
-)
-
-@JsonClass(generateAdapter = true)
-data class CreateSyncPlayGroupRequest(val GroupName: String)
-
-@JsonClass(generateAdapter = true)
-data class JoinSyncPlayGroupRequest(val GroupId: String)
-
-// Real Controllers/GroupWatchChatController.cs shape: Id is a real
-// monotonically increasing long GroupWatchChatService hands out per
-// room, not a client generated one, the same real cursor
-// getGroupWatchMessages(afterId) polls forward with.
-@JsonClass(generateAdapter = true)
-data class GroupWatchMessageDto(
-    val Id: Long = 0,
-    val UserId: String? = null,
-    val UserName: String? = null,
-    val Text: String? = null,
-    val Timestamp: String? = null,
-)
-
-@JsonClass(generateAdapter = true)
-data class SendGroupWatchMessageRequest(val Text: String)
-
 // Real Controllers/ConfigController.cs shape: one real server side,
 // admin controlled source components/seasonalEffects.js's own real
 // overlay reads (not a client only localStorage toggle), starting

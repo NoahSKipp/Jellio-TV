@@ -5,18 +5,13 @@ import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.ClientConfigDto
-import com.jellio.tv.data.model.CreateSyncPlayGroupRequest
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
-import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
-import com.jellio.tv.data.model.JoinSyncPlayGroupRequest
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
-import com.jellio.tv.data.model.SendGroupWatchMessageRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
-import com.jellio.tv.data.model.SyncPlayGroupDto
 import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
@@ -215,17 +210,17 @@ class JellioRepository @Inject constructor(
 
     // Real port of runtime/auth.js's own getPublicUsers(): unauthenticated,
     // a real admin's own "Display this user on the login screen" toggle
-    // already enforced server side, an unreachable server or a real
-    // failure both just come back empty rather than surfaced as an
-    // error the reader would have to dismiss before ever seeing the
-    // manual form underneath.
+    // already enforced server side. Throws rather than swallowing a
+    // real failure to an empty list now: LoginViewModel's own
+    // loadProfiles() needs to tell "the server said zero users are
+    // public" apart from "this request never actually reached the
+    // server" to prune a remembered profile the server no longer
+    // vouches for without also wiping every remembered profile out
+    // over a server that is just briefly unreachable, same real
+    // distinction runtime/auth.js's own getPublicUsers() now draws.
     suspend fun getPublicUsers(serverAddress: String): List<UserDto> {
         sessionManager.saveServerAddress(serverAddress)
-        return try {
-            api.getPublicUsers()
-        } catch (err: Exception) {
-            emptyList()
-        }
+        return api.getPublicUsers()
     }
 
     // Real port of runtime/auth.js's own quickSignIn(): spends one real
@@ -814,26 +809,6 @@ class JellioRepository @Inject constructor(
     // loop's own caller decides what a failed request means rather
     // than this method swallowing it.
     suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto> = api.getNowPlayingSessions()
-
-    suspend fun getSyncPlayGroups(): List<SyncPlayGroupDto> = api.getSyncPlayGroups()
-
-    suspend fun createSyncPlayGroup(groupName: String) {
-        api.createSyncPlayGroup(CreateSyncPlayGroupRequest(groupName))
-    }
-
-    suspend fun joinSyncPlayGroup(groupId: String) {
-        api.joinSyncPlayGroup(JoinSyncPlayGroupRequest(groupId))
-    }
-
-    suspend fun leaveSyncPlayGroup() {
-        api.leaveSyncPlayGroup()
-    }
-
-    suspend fun getGroupWatchMessages(groupId: String, after: Long): List<GroupWatchMessageDto> =
-        api.getGroupWatchMessages(groupId, after)
-
-    suspend fun sendGroupWatchMessage(groupId: String, text: String): GroupWatchMessageDto =
-        api.sendGroupWatchMessage(groupId, SendGroupWatchMessageRequest(text))
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
