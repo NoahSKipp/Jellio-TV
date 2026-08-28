@@ -76,9 +76,9 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // default D-pad entry point of its own either (the same real
 // LazyColumn gap the pill screens already hit), so a reader clicking
 // a row's own title into this modal had no way to navigate its own
-// list at all. Same real fix GroupWatchOverlay/LibraryPickerOverlay
-// already use: claim focus on open, trap exit, and focusRestorer() on
-// the list itself so a directional search always finds something.
+// list at all. Same real fix LibraryPickerOverlay already uses: claim
+// focus on open, trap exit, and focusRestorer() on the list itself so
+// a directional search always finds something.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun RowListModal(

@@ -42,9 +42,9 @@ import com.jellio.tv.ui.theme.JellioBorder
 // wherever it already was on the screen underneath, still focusable
 // behind this real scrim, every D-pad press moving that underlying
 // screen around instead of this overlay's own three entries. Same
-// real fix GroupWatchOverlay's own header comment already documents:
-// request focus onto the first entry on open, and trap exit so focus
-// can't wander back out into the screen behind the scrim.
+// real fix every other real overlay in this app already uses: request
+// focus onto the first entry on open, and trap exit so focus can't
+// wander back out into the screen behind the scrim.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryPickerOverlay(

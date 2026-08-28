@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,15 +36,21 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.SelectableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
@@ -89,6 +98,17 @@ fun SidebarNav(
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
     enabled: Boolean = true,
+    // Real feedback live: components/nowPlaying.js's own trigger lived
+    // in its own floating corner spot beside this rail (MainActivity's
+    // own NowPlayingButton), not inside it. Pinned to this rail's own
+    // bottom instead now, the same real "every persistent piece of nav
+    // chrome lives in one place" reasoning GroupWatchButton's own
+    // removal already simplified this screen down to. Optional so
+    // every other real caller of this rail (there are none today, but
+    // nothing forces a session count on it) is not forced to thread
+    // one through.
+    nowPlayingSessionCount: Int = 0,
+    onNowPlayingClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -113,6 +133,7 @@ fun SidebarNav(
     // initial focus onto whichever entry is already selected.
     val initialFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { initialFocusRequester.requestFocus() }
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = modifier
@@ -141,12 +162,43 @@ fun SidebarNav(
     ) {
         items.forEach { route ->
             SidebarItem(
-                route = route,
+                icon = route.icon(),
+                label = route.label(),
                 isSelected = route == selected,
                 expanded = expanded,
                 enabled = enabled,
-                onClick = { onSelect(route) },
+                onClick = {
+                    onSelect(route)
+                    // Real feedback live: this rail's own expansion is
+                    // driven entirely by onFocusChanged above, and a
+                    // click never actually changes focus (the item
+                    // clicked already had it, real D-pad Select), so
+                    // expanded never got a real onFocusChanged event to
+                    // flip back false on. Clearing focus here forces
+                    // exactly that: the rail collapses immediately on a
+                    // real selection, the same reliable default spatial
+                    // search this file's own header already leans on
+                    // for Down out of Search/Watchlist/Calendar/Settings
+                    // picking it back up the moment a reader presses a
+                    // real direction again.
+                    focusManager.clearFocus(force = true)
+                },
                 focusRequester = if (route == selected) initialFocusRequester else null,
+            )
+        }
+        if (onNowPlayingClick != null) {
+            Spacer(Modifier.weight(1f))
+            SidebarItem(
+                icon = Icons.Filled.LiveTv,
+                label = "Now Playing",
+                isSelected = false,
+                expanded = expanded,
+                enabled = enabled,
+                badgeCount = nowPlayingSessionCount,
+                onClick = {
+                    onNowPlayingClick()
+                    focusManager.clearFocus(force = true)
+                },
             )
         }
     }
@@ -159,12 +211,18 @@ fun SidebarNav(
 // fading in beside it rather than the row reflowing under it.
 @Composable
 private fun SidebarItem(
-    route: JellioRoute,
+    icon: ImageVector,
+    label: String,
     isSelected: Boolean,
     expanded: Boolean,
     onClick: () -> Unit,
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
+    // Now Playing's own real active session count, the same real
+    // badge NowPlayingButton's own floating corner spot used to carry
+    // on its own before this rail absorbed it: 0 never renders one,
+    // matching that composable's own real gate.
+    badgeCount: Int = 0,
 ) {
     val labelWidth by animateDpAsState(
         targetValue = if (expanded) SidebarLabelMaxWidth.scaled() else 0.dp,
@@ -207,15 +265,38 @@ private fun SidebarItem(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = route.icon(),
-                    contentDescription = if (!expanded) route.label() else null,
+                    imageVector = icon,
+                    contentDescription = if (!expanded) label else null,
                     tint = LocalContentColor.current,
                     modifier = Modifier.size(SidebarIconSize.scaled()),
                 )
+                if (badgeCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-2).dp, y = 2.dp)
+                            .size(18.dp)
+                            .background(JellioSecondary, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Real pre-existing bug, carried over verbatim
+                        // from the old floating NowPlayingButton this
+                        // badge was ported from and caught while it was
+                        // here for that: JellioText (white) on this same
+                        // real near-white JellioSecondary fill was
+                        // barely legible, the same real class of low
+                        // contrast bug DetailScreen.kt's own season tabs
+                        // just got fixed for. JellioBg (dark) instead,
+                        // same real light-fill/dark-text pairing that
+                        // fix and ui/library/LibraryScreen.kt's own
+                        // FilterChip both already use.
+                        Text(text = badgeCount.toString(), color = JellioBg, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
             Box(modifier = Modifier.width(labelWidth).clipToBounds()) {
                 Text(
-                    text = route.label(),
+                    text = label,
                     color = LocalContentColor.current,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,

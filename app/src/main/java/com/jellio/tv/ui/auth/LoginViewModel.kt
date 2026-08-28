@@ -76,20 +76,51 @@ class LoginViewModel @Inject constructor(
                 return@launch
             }
 
+            // Real bug, found live against a real screenshot: a
+            // remembered profile kept showing up here even after an
+            // admin later flipped that same real user's own "Display
+            // this user on the login screen" toggle off server side
+            // (UserPolicy.IsHidden), since nothing here ever
+            // cross-checked a remembered profile against a fresh real
+            // answer once it was remembered. getPublicUsers() already
+            // comes back with IsHidden already enforced (its own
+            // header explains why), so a remembered id no longer
+            // present in it is exactly a user who either got hidden or
+            // got deleted since this device last remembered them:
+            // forgotten outright here, not just filtered out of this
+            // one render, so this screen stops re-showing it on every
+            // real future launch too. Only reached once the fetch
+            // below actually succeeds (repository.getPublicUsers() now
+            // throws instead of quietly returning empty on a failed
+            // request, its own header explains why): a device offline
+            // or a server briefly down must never wipe out its own
+            // only real way back in over a request that never even
+            // reached the server.
             val remembered = repository.getRememberedUsers(serverAddress).map { (userId, entry) ->
                 RememberedProfile(userId, entry.name, entry.primaryImageTag)
             }
-            val publicUsers = repository.getPublicUsers(serverAddress)
-            val rememberedIds = remembered.map { it.userId }.toSet()
+            var publicUsers = emptyList<UserDto>()
+            var liveRemembered = remembered
+            try {
+                publicUsers = repository.getPublicUsers(serverAddress)
+                val publicIds = publicUsers.mapNotNull { it.Id }.toSet()
+                val stale = remembered.filterNot { it.userId in publicIds }
+                stale.forEach { repository.forgetRememberedUser(serverAddress, it.userId) }
+                liveRemembered = remembered - stale.toSet()
+            } catch (err: Exception) {
+                // A device offline or a server briefly down still gets
+                // its own remembered list, real endpoint or not.
+            }
+            val rememberedIds = liveRemembered.map { it.userId }.toSet()
             val publicOnly = publicUsers.filter { it.Id !in rememberedIds }
 
-            _uiState.value = if (remembered.isEmpty() && publicOnly.isEmpty()) {
+            _uiState.value = if (liveRemembered.isEmpty() && publicOnly.isEmpty()) {
                 LoginUiState(mode = LoginMode.MANUAL, serverAddress = serverAddress)
             } else {
                 LoginUiState(
                     mode = LoginMode.PROFILE_PICKER,
                     serverAddress = serverAddress,
-                    remembered = remembered,
+                    remembered = liveRemembered,
                     publicOnly = publicOnly,
                     canReturnToProfiles = true,
                 )

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -41,44 +39,8 @@ import com.jellio.tv.data.model.NowPlayingItemDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-
-// Real port of components/nowPlaying.js's own trigger button: same
-// real place a reader can always reach it from (rendered alongside
-// SidebarNav on every non-immersive screen, this app's own real
-// equivalent of that file's own sidebar-anchored button), the real
-// active-session count as a badge rather than a bare icon.
-@Composable
-fun NowPlayingButton(sessionCount: Int, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = JellioBgElevated.copy(alpha = 0.96f),
-            contentColor = JellioText,
-        ),
-        modifier = modifier.size(52.dp),
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(imageVector = Icons.Filled.LiveTv, contentDescription = "Now playing", modifier = Modifier.size(22.dp))
-            if (sessionCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-4).dp, y = 4.dp)
-                        .size(18.dp)
-                        .background(JellioSecondary, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(text = sessionCount.toString(), color = JellioText, style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-    }
-}
 
 // Real port of components/nowPlaying.js's own render(): a plain
 // vertical list, one row per real active session, "Nothing playing
