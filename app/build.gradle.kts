@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.tv.provider)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -12,6 +12,7 @@ import com.jellio.tv.data.recommend.RecommendationDataSource
 import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.data.watchnext.WatchNextSyncer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -126,6 +127,7 @@ private fun titleFor(name: String?, kind: String): String {
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val customizationStore: HomeCustomizationStore,
+    private val watchNextSyncer: WatchNextSyncer,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -160,6 +162,11 @@ class HomeViewModel @Inject constructor(
                     val customizationDeferred = async { runCatching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
 
                     val continueWatching = continueWatchingDeferred.await()
+                    // Fired, not awaited: Google TV's own home Watch
+                    // Next row is real background bookkeeping, not
+                    // something this screen's own load has any reason
+                    // to wait on before it can render.
+                    launch { runCatching { watchNextSyncer.sync(session, continueWatching) } }
                     val upNext = upNextDeferred.await()
                     val heroCandidates = heroCandidatesDeferred.await()
                     val comingSoon = comingSoonDeferred.await()
