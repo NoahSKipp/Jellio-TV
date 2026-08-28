@@ -870,8 +870,13 @@ class JellioRepository @Inject constructor(
     private fun encodeAvatarId(id: String): String =
         id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
 
-    fun avatarPresetUrl(serverAddress: String, id: String): String =
-        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}"
+    // Token goes on as an api_key query param, same real reason
+    // getStreamUrl/getTrickplayUrl already do this: AvatarsController's
+    // [Authorize] gate has nothing to check on a plain Coil AsyncImage
+    // request, which never carries this app's own X-Emby-Authorization
+    // header the way a Retrofit call does.
+    fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
+        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?api_key=$accessToken"
 
     // Real screens/settings.js's own navigateTo('#/dashboard'): that
     // file's own real hash just moves an already loaded jellyfin-web
