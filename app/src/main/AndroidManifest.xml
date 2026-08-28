@@ -32,12 +32,30 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.JellioTv">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- WatchNextSyncer's own real deep link: Google TV's home
+                 launches a Watch Next row tile through the exact Intent
+                 that class built (ACTION_VIEW against this same
+                 https://jellio.tv/play data, already package-scoped to
+                 this app, so no autoVerify App Links setup is needed
+                 for the OS to route it back here), handled in
+                 MainActivity.handleIntent() rather than a route this
+                 manifest itself owns any further. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/play" />
             </intent-filter>
         </activity>
 
