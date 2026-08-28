@@ -100,11 +100,14 @@ fun HomeScreen(
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
     // "Remove" only ever starts the real shatter below, the real
-    // HomeViewModel.removeFromRow() call deferred to
+    // HomeViewModel.removeFromRow()/hideSeriesFromRow() call deferred to
     // LandscapeRow's own onShatterFinished, the same real reason that
     // file's own card stays in the DOM until its own overlay's
-    // setTimeout finishes.
-    var removingItemId by remember { mutableStateOf<String?>(null) }
+    // setTimeout finishes. isShowRemoval picks which of those two real
+    // calls fires once the shatter actually finishes: "Remove from Up
+    // Next" (mark this one episode played) vs "Remove Show from Up
+    // Next" (hide the whole series server side).
+    var removingTarget by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     // Real port of components/cardOptionsMenu.js's own window.confirm()
     // step before deleteItem() ever fires: the card options menu itself
     // only ever sets this, RemoveFromLibraryConfirm below owns the
@@ -223,10 +226,15 @@ fun HomeScreen(
                                         onItemClick = onItemClick,
                                         onTitleClick = { rowListTarget = row.section },
                                         onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
-                                        removingItemId = removingItemId,
+                                        removingItemId = removingTarget?.first,
                                         onShatterFinished = { item ->
-                                            removingItemId = null
-                                            viewModel.removeFromRow(session, item)
+                                            val isShowRemoval = removingTarget?.second == true
+                                            removingTarget = null
+                                            if (isShowRemoval) {
+                                                viewModel.hideShowFromRow(item)
+                                            } else {
+                                                viewModel.removeFromRow(session, item)
+                                            }
                                         },
                                     )
                                 } else {
@@ -270,7 +278,8 @@ fun HomeScreen(
                 } else {
                     null
                 },
-                onRemoveFromRow = if (continueWatching || upNext) { { removingItemId = item.Id } } else null,
+                onRemoveFromRow = if (continueWatching || upNext) { { removingTarget = item.Id to false } } else null,
+                onRemoveShowFromRow = if (upNext && item.SeriesId != null) { { removingTarget = item.Id to true } } else null,
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
                 canDelete = !continueWatching && !upNext && uiState.canDeleteItems,

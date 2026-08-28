@@ -287,6 +287,22 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // Real port of components/cardOptionsMenu.js's own "Remove Show from
+    // Up Next": hides the whole series server side (Controllers/
+    // NextUpHiddenController.cs) instead of removeFromRow's own
+    // mark-played call above, which only ever advances this same series
+    // to its own next episode rather than actually leaving Up Next. See
+    // JellioRepository.getNextUp()'s own header for the real gap this
+    // closes.
+    fun hideShowFromRow(item: BaseItemDto) {
+        val seriesId = item.SeriesId ?: return
+        viewModelScope.launch {
+            runCatching { repository.hideSeriesFromNextUp(seriesId) }.onSuccess {
+                removeItemFromRows(item.Id)
+            }
+        }
+    }
+
     // Real port of components/cardOptionsMenu.js's own Remove from
     // Library option: the confirm step itself already happened
     // (HomeScreen's own RemoveFromLibraryConfirm), this only fires
