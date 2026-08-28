@@ -568,27 +568,24 @@ private fun SeasonsSection(
                     // was tinting read as barely-there, near-illegible
                     // once this tab was both selected and focused (the
                     // real screenshot's own Season 01), since neither
-                    // combination was set explicitly here and
-                    // ClickableSurfaceDefaults.colors() falls back to
-                    // its own real default focused/focused-selected
-                    // pair rather than this tab's own real selected
-                    // pair the moment it also has real focus. Same real
-                    // solid-fill, opposite-luminance-text pattern
-                    // ui/library/LibraryScreen.kt's own FilterChip
-                    // already uses instead: a real selected tab's own
-                    // fill is opaque JellioSecondary now, its own text
-                    // dark JellioBg, real contrast that holds regardless
-                    // of which of the four real Surface color slots
-                    // ends up actually painted.
+                    // was set explicitly here and ClickableSurfaceDefaults.
+                    // colors() fell back to its own real default focused
+                    // pair rather than this tab's own real selected one
+                    // the moment it also had real focus. This is a plain
+                    // ClickableSurfaceDefaults surface, not a selectable
+                    // one (selected here is this tab's own real boolean,
+                    // not Surface's own selected param SelectableSurfaceDefaults
+                    // alone accepts), so containerColor/contentColor
+                    // already fold that state in; focusedContainerColor/
+                    // focusedContentColor just needed to be a real solid,
+                    // opposite-luminance pair too instead of defaulting,
+                    // same real pairing ui/library/LibraryScreen.kt's own
+                    // FilterChip already uses.
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (selected) JellioSecondary else JellioBgElevated,
                         contentColor = if (selected) JellioBg else JellioText,
                         focusedContainerColor = JellioSecondary,
                         focusedContentColor = JellioBg,
-                        selectedContainerColor = JellioSecondary,
-                        selectedContentColor = JellioBg,
-                        focusedSelectedContainerColor = JellioSecondary,
-                        focusedSelectedContentColor = JellioBg,
                     ),
                 ) {
                     Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
