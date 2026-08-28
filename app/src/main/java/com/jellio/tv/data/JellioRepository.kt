@@ -458,8 +458,25 @@ class JellioRepository @Inject constructor(
     // real fetch, no second query added just to get them), RunTimeTicks
     // for the same real landscape card reason getResumeItems above
     // documents.
-    suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> =
-        api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
+    //
+    // Real gap in stock Jellyfin, same header runtime/api.js's own
+    // getNextUp() already documents: no endpoint hides one series from
+    // this row on its own, only ever the side effect of marking its
+    // current episode played, which just advances that same series to
+    // its own next episode instead of actually leaving. Filtered here
+    // against Controllers/NextUpHiddenController.cs's own per user list
+    // rather than in HomeViewModel, so every real caller of this
+    // function gets the same real exclusion for free.
+    suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> {
+        val items = api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
+        val hidden = runCatching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
+        if (hidden.isEmpty()) return items
+        return items.filterNot { hidden.contains(it.SeriesId) }
+    }
+
+    suspend fun hideSeriesFromNextUp(seriesId: String) {
+        api.hideSeriesFromNextUp(seriesId)
+    }
 
     // Scoped to one series, screens/detail.js's own resolveSeriesPlayTarget():
     // enableResumable stays at its own real server default (true) here,

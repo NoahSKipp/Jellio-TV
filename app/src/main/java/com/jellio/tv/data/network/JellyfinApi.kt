@@ -226,6 +226,17 @@ interface JellyfinApi {
     @GET("Jellio/sleep-timer/status")
     suspend fun getSleepTimerStatus(): SleepTimerStatusDto
 
+    // Real Controllers/NextUpHiddenController.cs endpoints: the real
+    // per user series id list Shows/NextUp's own results get filtered
+    // against, and the real call that adds one, see
+    // JellioRepository.getNextUp()'s own header for why this exists at
+    // all.
+    @GET("Jellio/next-up-hidden")
+    suspend fun getHiddenNextUpSeries(): List<String>
+
+    @POST("Jellio/next-up-hidden/{seriesId}")
+    suspend fun hideSeriesFromNextUp(@Path("seriesId") seriesId: String)
+
     // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
     // }, confirmed against jellyfin-apiclient-javascript's own
     // updateUserPassword rather than guessed field names, the same
