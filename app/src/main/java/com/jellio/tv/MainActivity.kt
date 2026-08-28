@@ -1,5 +1,6 @@
 package com.jellio.tv
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -68,21 +69,49 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    // WatchNextSyncer's own real deep link: a Watch Next row tile on
+    // Google TV's home launches this Activity through the manifest's
+    // own second intent-filter, singleTop keeping it to this same real
+    // instance (onNewIntent below) rather than a fresh one stacking
+    // underneath whatever screen was already open.
+    private val deepLinkItemId = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIntent(intent)
         setContent {
             JellioTvTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    JellioTvRoot()
+                    JellioTvRoot(
+                        deepLinkItemId = deepLinkItemId.value,
+                        onDeepLinkConsumed = { deepLinkItemId.value = null },
+                    )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.host == "jellio.tv" && uri.path == "/play") {
+            uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
         }
     }
 }
 
 @Composable
-private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
+private fun JellioTvRoot(
+    deepLinkItemId: String?,
+    onDeepLinkConsumed: () -> Unit,
+    appViewModel: AppViewModel = hiltViewModel(),
+) {
     when (val state = appViewModel.authState.collectAsState().value) {
         // A DataStore-backed sessionFlow always eventually emits, but
         // there is a real async gap before its first value: an empty
@@ -90,7 +119,12 @@ private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
         // screen for a reader who is actually already signed in.
         AuthState.Loading -> Box(Modifier.fillMaxSize()) {}
         AuthState.LoggedOut -> LoginScreen(modifier = Modifier.fillMaxSize())
-        is AuthState.LoggedIn -> AppBootGate(session = state.session, appViewModel = appViewModel)
+        is AuthState.LoggedIn -> AppBootGate(
+            session = state.session,
+            appViewModel = appViewModel,
+            deepLinkItemId = deepLinkItemId,
+            onDeepLinkConsumed = onDeepLinkConsumed,
+        )
     }
 }
 
@@ -109,6 +143,8 @@ private fun JellioTvRoot(appViewModel: AppViewModel = hiltViewModel()) {
 private fun AppBootGate(
     session: Session,
     appViewModel: AppViewModel,
+    deepLinkItemId: String?,
+    onDeepLinkConsumed: () -> Unit,
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
@@ -146,7 +182,12 @@ private fun AppBootGate(
             BootSplashMark(modifier = Modifier.fillMaxSize())
         }
     } else {
-        JellioTvApp(session = session, appViewModel = appViewModel)
+        JellioTvApp(
+            session = session,
+            appViewModel = appViewModel,
+            deepLinkItemId = deepLinkItemId,
+            onDeepLinkConsumed = onDeepLinkConsumed,
+        )
     }
 }
 
@@ -154,6 +195,8 @@ private fun AppBootGate(
 private fun JellioTvApp(
     session: Session,
     appViewModel: AppViewModel,
+    deepLinkItemId: String?,
+    onDeepLinkConsumed: () -> Unit,
     nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
@@ -210,6 +253,17 @@ private fun JellioTvApp(
     val onNavigateToDetail: (String) -> Unit = { itemId -> push(JellioRoute.Detail(itemId)) }
     val onNavigateToPerson: (String) -> Unit = { personId -> push(JellioRoute.Person(personId)) }
     val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> push(JellioRoute.Player(itemId, mediaSourceId)) }
+
+    // WatchNextSyncer's own real deep link, consumed the moment this
+    // real signed in tree is up and able to push a route at all: a
+    // Watch Next row tile tapped from Google TV's own home jumps
+    // straight into that title's own player rather than landing on
+    // Home first the way a cold app open otherwise would.
+    LaunchedEffect(deepLinkItemId) {
+        val itemId = deepLinkItemId ?: return@LaunchedEffect
+        onPlayDirect(itemId, null)
+        onDeepLinkConsumed()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Real components/seasonalEffects.js's own real z-index: 5,
