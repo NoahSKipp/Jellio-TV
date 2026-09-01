@@ -1,0 +1,223 @@
+package com.jellio.tv.ui.update
+
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Environment
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.jellio.tv.BuildConfig
+import com.jellio.tv.data.network.GitHubApi
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+import javax.inject.Inject
+
+private const val GITHUB_OWNER = "NoahSKipp"
+private const val GITHUB_REPO = "Jellio-TV"
+private const val UPDATE_CHECK_INTERVAL_MS = 3L * 60 * 60 * 1000
+private const val UPDATE_RECHECK_ON_RETURN_MS = 60L * 60 * 1000
+
+data class UpdateUiState(
+    val availableVersion: String? = null,
+    val downloadUrl: String? = null,
+    val downloading: Boolean = false,
+)
+
+sealed interface ManualCheckResult {
+    data object Checking : ManualCheckResult
+    data object UpToDate : ManualCheckResult
+    data class UpdateFound(val version: String) : ManualCheckResult
+    // The release exists but its APK is still being built and attached.
+    data class Preparing(val version: String) : ManualCheckResult
+    data object Error : ManualCheckResult
+}
+
+private sealed interface LatestRelease {
+    data class Ready(val version: String, val apkUrl: String) : LatestRelease
+    data class Preparing(val version: String) : LatestRelease
+    data object Failed : LatestRelease
+}
+
+// A release is published a few minutes before its APK is attached.
+private const val PREPARING_RECHECK_MS = 10L * 60 * 1000
+
+@HiltViewModel
+class AppUpdateViewModel @Inject constructor(
+    private val gitHubApi: GitHubApi,
+    @ApplicationContext private val context: Context,
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(UpdateUiState())
+    val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
+
+    private val _manualCheckResult = MutableStateFlow<ManualCheckResult?>(null)
+    val manualCheckResult: StateFlow<ManualCheckResult?> = _manualCheckResult.asStateFlow()
+
+    private var downloadId: Long? = null
+    private var receiverRegistered = false
+
+    private val downloadReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receivedContext: Context, intent: Intent) {
+            val completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+            if (completedId == -1L || completedId != downloadId) return
+            installDownloadedApk(completedId)
+        }
+    }
+
+    private var lastCheckAt = 0L
+    // A version turned down stays quiet for the background checks; the
+    // next app open still asks again.
+    private var dismissedVersion: String? = null
+
+    fun checkForUpdate() {
+        viewModelScope.launch { runCheck() }
+    }
+
+    private suspend fun runCheck() {
+        lastCheckAt = System.currentTimeMillis()
+        if (_uiState.value.availableVersion != null) return
+        val (latestVersion, apkUrl) = when (val latest = fetchLatestRelease()) {
+            is LatestRelease.Ready -> latest.version to latest.apkUrl
+            is LatestRelease.Preparing -> {
+                lastCheckAt = System.currentTimeMillis() - UPDATE_CHECK_INTERVAL_MS + PREPARING_RECHECK_MS
+                return
+            }
+            LatestRelease.Failed -> return
+        }
+        if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME) || latestVersion == dismissedVersion) return
+        if (_uiState.value.availableVersion != null) return
+        _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
+    }
+
+    suspend fun checkPeriodically() {
+        while (true) {
+            if (System.currentTimeMillis() - lastCheckAt >= UPDATE_RECHECK_ON_RETURN_MS) runCheck()
+            val untilNext = UPDATE_CHECK_INTERVAL_MS - (System.currentTimeMillis() - lastCheckAt)
+            delay(untilNext.coerceAtLeast(60_000L))
+            runCheck()
+        }
+    }
+
+    fun checkForUpdateManually() {
+        viewModelScope.launch {
+            _manualCheckResult.value = ManualCheckResult.Checking
+            val (latestVersion, apkUrl) = when (val latest = fetchLatestRelease()) {
+                is LatestRelease.Ready -> latest.version to latest.apkUrl
+                is LatestRelease.Preparing -> {
+                    _manualCheckResult.value = if (isNewerVersion(latest.version, BuildConfig.VERSION_NAME)) {
+                        ManualCheckResult.Preparing(latest.version)
+                    } else {
+                        ManualCheckResult.UpToDate
+                    }
+                    return@launch
+                }
+                LatestRelease.Failed -> {
+                    _manualCheckResult.value = ManualCheckResult.Error
+                    return@launch
+                }
+            }
+            if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME)) {
+                _manualCheckResult.value = ManualCheckResult.UpToDate
+                return@launch
+            }
+            _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
+            _manualCheckResult.value = ManualCheckResult.UpdateFound(latestVersion)
+        }
+    }
+
+    private suspend fun fetchLatestRelease(): LatestRelease {
+        val release = try {
+            gitHubApi.getLatestRelease(GITHUB_OWNER, GITHUB_REPO)
+        } catch (err: kotlinx.coroutines.CancellationException) {
+            throw err
+        } catch (err: Exception) {
+            val detail = (err as? retrofit2.HttpException)?.let { "HTTP ${it.code()}" } ?: err.javaClass.simpleName + ": " + err.message
+            android.util.Log.w("JellioUpdate", "update check failed: $detail")
+            return LatestRelease.Failed
+        }
+        val latestVersion = release.tag_name.removePrefix("v")
+        val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
+            ?: return LatestRelease.Preparing(latestVersion)
+        return LatestRelease.Ready(latestVersion, apkAsset.browser_download_url)
+    }
+
+    fun dismiss() {
+        dismissedVersion = _uiState.value.availableVersion ?: dismissedVersion
+        _uiState.value = UpdateUiState()
+        _manualCheckResult.value = null
+    }
+
+    fun download() {
+        val state = _uiState.value
+        val url = state.downloadUrl ?: return
+        val version = state.availableVersion ?: return
+        if (!receiverRegistered) {
+            ContextCompat.registerReceiver(
+                context,
+                downloadReceiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                ContextCompat.RECEIVER_EXPORTED,
+            )
+            receiverRegistered = true
+        }
+        val fileName = "jellio-tv-$version.apk"
+        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
+        if (apkFile.exists()) {
+            apkFile.delete()
+        }
+        val request = DownloadManager.Request(Uri.parse(url))
+            .setTitle("Jellio TV $version")
+            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadId = downloadManager.enqueue(request)
+        _uiState.value = state.copy(downloading = true)
+    }
+
+    private fun installDownloadedApk(completedId: Long) {
+        val version = _uiState.value.availableVersion ?: return
+        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "jellio-tv-$version.apk")
+        if (!apkFile.exists()) {
+            _uiState.value = _uiState.value.copy(downloading = false)
+            return
+        }
+        val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(installIntent)
+        _uiState.value = UpdateUiState()
+        _manualCheckResult.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (receiverRegistered) {
+            context.unregisterReceiver(downloadReceiver)
+            receiverRegistered = false
+        }
+    }
+}
+
+private fun isNewerVersion(remote: String, local: String): Boolean {
+    val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+    val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
+    val length = maxOf(remoteParts.size, localParts.size)
+    for (i in 0 until length) {
+        val r = remoteParts.getOrElse(i) { 0 }
+        val l = localParts.getOrElse(i) { 0 }
+        if (r != l) return r > l
+    }
+    return false
+}

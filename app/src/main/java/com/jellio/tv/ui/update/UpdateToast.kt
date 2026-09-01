@@ -1,0 +1,100 @@
+package com.jellio.tv.ui.update
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.Text
+import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioSecondary
+import com.jellio.tv.ui.theme.JellioText
+import com.jellio.tv.ui.theme.JellioTextSecondary
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun UpdateToast(
+    version: String,
+    downloading: Boolean,
+    onDownload: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val downloadFocusRequester = remember { FocusRequester() }
+    var hasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(hasFocus) {
+        if (hasFocus) return@LaunchedEffect
+        repeat(20) {
+            if (hasFocus) return@LaunchedEffect
+            runCatching { downloadFocusRequester.requestFocus() }
+            kotlinx.coroutines.delay(100)
+        }
+    }
+    BackHandler(onBack = onDismiss)
+
+    Box(modifier = modifier, contentAlignment = Alignment.BottomCenter) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 480.dp)
+                .padding(bottom = 48.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(JellioBgElevated.copy(alpha = 0.98f))
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                .padding(24.dp)
+                .onFocusChanged { hasFocus = it.hasFocus }
+                .focusProperties { onExit = { FocusRequester.Cancel } }
+                .focusGroup(),
+        ) {
+            Text(text = com.jellio.tv.ui.i18n.string("update_available_title"), style = MaterialTheme.typography.titleMedium, color = JellioText)
+            Text(
+                text = com.jellio.tv.ui.i18n.Strings.format("tv_update_ready", version),
+                style = MaterialTheme.typography.bodyMedium,
+                color = JellioTextSecondary,
+                modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    onClick = { if (!downloading) onDismiss() },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText),
+                ) {
+                    Text(text = com.jellio.tv.ui.i18n.string("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                }
+                Surface(
+                    onClick = { if (!downloading) onDownload() },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
+                    modifier = Modifier.focusRequester(downloadFocusRequester),
+                ) {
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get(if (downloading) "update_downloading" else "update_download"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                }
+            }
+        }
+    }
+}

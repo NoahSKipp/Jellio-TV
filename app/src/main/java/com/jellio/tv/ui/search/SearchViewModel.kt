@@ -1,0 +1,235 @@
+package com.jellio.tv.ui.search
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.UserItemDataDto
+import com.jellio.tv.data.session.Session
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import retrofit2.HttpException
+import javax.inject.Inject
+
+private const val DEBOUNCE_MS = 400L
+private const val SEARCH_WARM_COUNT = 3
+
+data class SearchUiState(
+    val query: String = "",
+    val isSearching: Boolean = false,
+    val results: List<BaseItemDto> = emptyList(),
+    val hasSearched: Boolean = false,
+    val error: String? = null,
+    val canDeleteItems: Boolean = false,
+    // Nothing found: related titles in the library, the way Netflix answers a
+    // title it doesn't carry.
+    val suggestions: com.jellio.tv.data.model.SearchSuggestionsDto? = null,
+)
+
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    private val repository: JellioRepository,
+) : ViewModel() {
+    private val _uiState = MutableStateFlow(SearchUiState())
+    val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
+
+    private var searchJob: Job? = null
+    private var permissionsLoadedFor: String? = null
+    private var warmJob: Job? = null
+    private var batchJob: Job? = null
+    private var warmSession: Session? = null
+
+    // The top results' stream lists are warmed once they stop changing; a
+    // new query drops what the last one had pending.
+    private val warmer = com.jellio.tv.data.streams.SearchWarmer<BaseItemDto>(
+        scheduler = { delayMs, block ->
+            val job = viewModelScope.launch {
+                delay(delayMs)
+                block()
+            }
+            com.jellio.tv.data.streams.Cancellable { job.cancel() }
+        },
+        onSettled = { items -> warmTopResults(items) },
+        onQueryChanged = {
+            warmJob?.cancel()
+            warmJob = null
+            batchJob?.cancel()
+            batchJob = null
+        },
+    )
+
+    private fun warmTopResults(items: List<BaseItemDto>) {
+        val session = warmSession ?: return
+        val top = items.filter { it.Type == "Movie" || it.Type == "Episode" || it.Type == "Series" }.take(SEARCH_WARM_COUNT)
+        warmJob?.cancel()
+        warmJob = viewModelScope.launch {
+            // A series plays its next (or first) episode; one not in the
+            // library yet is sent as is, which adds it.
+            val ids = top.map { item ->
+                if (item.Type != "Series") item.Id
+                else runCatching { repository.getSeriesNextUp(item.Id, session.userId)?.Id }.getOrNull() ?: item.Id
+            }
+            batchJob?.cancel()
+            batchJob = repository.prefetchStreamsBatch(ids)
+        }
+    }
+
+    fun loadPermissions(session: Session) {
+        if (permissionsLoadedFor == session.userId) return
+        permissionsLoadedFor = session.userId
+        viewModelScope.launch {
+            val canDelete = repository.canDeleteItems(session.userId)
+            _uiState.value = _uiState.value.copy(canDeleteItems = canDelete)
+        }
+    }
+
+    fun onQueryChange(session: Session, query: String) {
+        _uiState.value = _uiState.value.copy(query = query)
+        searchJob?.cancel()
+        warmSession = session
+        warmer.query()
+        if (query.isBlank()) {
+            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null, suggestions = null)
+            return
+        }
+        searchJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, results = emptyList(), error = null, suggestions = null)
+            delay(DEBOUNCE_MS)
+            if (_uiState.value.query != query) return@launch
+
+            val stateLock = Mutex()
+            val seen = HashSet<String>()
+            var pending = 3
+            var failures = 0
+            var fellBack = false
+
+            suspend fun add(items: List<BaseItemDto>) {
+                stateLock.withLock {
+                    if (_uiState.value.query != query) return
+                    val fresh = items.filter { item ->
+                        val keys = identityKeys(item)
+                        if (keys.any { it in seen }) false else { seen.addAll(keys); true }
+                    }
+                    if (fresh.isNotEmpty()) {
+                        _uiState.value = _uiState.value.copy(results = _uiState.value.results + fresh, error = null)
+                        warmer.results(_uiState.value.results)
+                    }
+                }
+            }
+
+            suspend fun settle(count: Int, failed: Boolean) {
+                stateLock.withLock {
+                    pending -= count
+                    if (failed) failures += count
+                    if (_uiState.value.query != query || pending > 0) return
+                    val nothing = _uiState.value.results.isEmpty()
+                    _uiState.value = _uiState.value.copy(
+                        isSearching = false,
+                        error = if (nothing && failures >= 3) com.jellio.tv.ui.i18n.Strings.get("search_network_error") else null,
+                    )
+                    if (nothing && failures < 3) {
+                        viewModelScope.launch {
+                            val answer = runCatching { repository.getSearchSuggestions(query) }.getOrNull()
+                            if (answer != null && answer.Rows.isNotEmpty() && _uiState.value.query == query) {
+                                _uiState.value = _uiState.value.copy(suggestions = answer)
+                            }
+                        }
+                    }
+                }
+            }
+
+            suspend fun fallBackToCombined() {
+                val first = stateLock.withLock { if (fellBack) false else { fellBack = true; true } }
+                // The other addon search's 404 is settled with this one.
+                if (!first) return
+                val ok = try {
+                    add(repository.searchItems(session.userId, query))
+                    true
+                } catch (err: CancellationException) {
+                    throw err
+                } catch (err: Exception) {
+                    false
+                }
+                settle(2, !ok)
+            }
+
+            suspend fun runAddon(fetch: suspend () -> List<BaseItemDto>) {
+                try {
+                    val items = fetch()
+                    if (!fellBack) add(items)
+                    settle(1, false)
+                } catch (err: CancellationException) {
+                    throw err
+                } catch (err: HttpException) {
+                    if (err.code() == 404) fallBackToCombined() else settle(1, true)
+                } catch (err: Exception) {
+                    settle(1, true)
+                }
+            }
+
+            coroutineScope {
+                launch {
+                    val ok = try {
+                        add(repository.searchLibrary(session.userId, query))
+                        true
+                    } catch (err: CancellationException) {
+                        throw err
+                    } catch (err: Exception) {
+                        false
+                    }
+                    settle(1, !ok)
+                }
+                launch { runAddon { repository.searchMovies(query) } }
+                launch { runAddon { repository.searchSeries(query) } }
+            }
+        }
+    }
+
+    private fun identityKeys(item: BaseItemDto): List<String> = buildList {
+        add("id:" + item.Id.replace("-", "").lowercase())
+        item.ProviderIds?.forEach { (provider, value) ->
+            if (value.isNotBlank() && provider.lowercase() in setOf("tmdb", "imdb", "tvdb")) add("${item.Type}:${provider.lowercase()}:$value")
+        }
+        val name = item.Name?.trim()?.lowercase()
+        if (!name.isNullOrEmpty() && item.ProductionYear != null) add("${item.Type}:name:$name:${item.ProductionYear}")
+    }
+
+    fun toggleWatchlist(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        }
+    }
+
+    fun toggleWatched(session: Session, item: BaseItemDto) {
+        val next = !(item.UserData?.Played ?: false)
+        viewModelScope.launch {
+            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            updateItem(item.Id) { it.copy(UserData = updated) }
+        }
+    }
+
+    fun deleteItem(item: BaseItemDto) {
+        viewModelScope.launch {
+            runCatching { repository.deleteItem(item.Id) }
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(results = _uiState.value.results.filterNot { it.Id == item.Id })
+                }
+        }
+    }
+
+    private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
+        _uiState.value = _uiState.value.copy(
+            results = _uiState.value.results.map { if (it.Id == itemId) transform(it) else it },
+        )
+    }
+}

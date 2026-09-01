@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real android animated-vector port of jellio-mark-animated.svg: the
+     pop-in reveal and the continuous swim wobble, the two dominant real
+     motions in that file, ported onto ic_jellio_mark.xml's own named
+     jellio_mark_root/jellio_mark_swim groups. The background caustic
+     ripples and tiny wake-trail dots stay web-only: masked, individually
+     timed micro shapes with no real Android equivalent to render them
+     against short of hand-building a dozen more clip-path groups for
+     detail invisible at this drawable's own real on-screen size. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_jellio_mark">
+    <target
+        android:name="jellio_mark_root"
+        android:animation="@animator/jellio_mark_pop" />
+    <target
+        android:name="jellio_mark_swim"
+        android:animation="@animator/jellio_mark_swim" />
+</animated-vector>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real port of jellio-mark-animated.svg's own jm-swim cubic-bezier(.3,0,.5,1). -->
+<pathInterpolator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:controlX1="0.3"
+    android:controlY1="0"
+    android:controlX2="0.5"
+    android:controlY2="1" />

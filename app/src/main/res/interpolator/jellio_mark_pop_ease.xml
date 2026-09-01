@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real port of jellio-mark-animated.svg's own jm-pop cubic-bezier(.2,1.2,.35,1):
+     a controlY past 1 is the real overshoot the pop's own 62% keyframe
+     already relies on (scale peaks at 1.03 before settling to 1), not a typo. -->
+<pathInterpolator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:controlX1="0.2"
+    android:controlY1="1.2"
+    android:controlX2="0.35"
+    android:controlY2="1" />

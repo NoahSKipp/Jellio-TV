@@ -1,0 +1,173 @@
+package com.jellio.tv.di
+
+import com.jellio.tv.BuildConfig
+import com.jellio.tv.data.network.APP_VERSION
+import com.jellio.tv.data.network.SharedHttp
+import com.jellio.tv.data.network.JellyfinApi
+import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
+import com.jellio.tv.data.session.SessionManager
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.runBlocking
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Interceptor
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
+import javax.inject.Qualifier
+import javax.inject.Singleton
+
+private const val PLACEHOLDER_BASE_URL = "http://localhost/"
+
+fun normalizeServerAddress(raw: String): String {
+    val trimmed = raw.trim().trimEnd('/')
+    if (trimmed.isEmpty()) return trimmed
+    val withScheme = if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+        trimmed
+    } else {
+        val lower = trimmed.lowercase()
+        if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || lower.startsWith("172.16.") || lower.startsWith("localhost")) {
+            "http://$trimmed"
+        } else {
+            "https://$trimmed"
+        }
+    }
+    return withScheme.toHttpUrlOrNull()?.toString()?.trimEnd('/') ?: withScheme
+}
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+private annotation class BaseUrlInterceptor
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+private annotation class AuthInterceptor
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+    @Provides
+    @Singleton
+    @BaseUrlInterceptor
+    fun provideBaseUrlInterceptor(sessionManager: SessionManager): Interceptor =
+        Interceptor { chain ->
+            val original = chain.request()
+            val raw = sessionManager.getCachedServerAddress()
+            if (raw.isNullOrBlank()) {
+                throw java.io.IOException("No server address configured. Enter your Jellyfin server address.")
+            }
+            val normalized = normalizeServerAddress(raw)
+            val target = normalized.toHttpUrlOrNull()
+                ?: throw java.io.IOException("Invalid server address: '$raw'. Please check your server URL.")
+
+            val newUrlBuilder = original.url.newBuilder()
+                .scheme(target.scheme)
+                .host(target.host)
+                .port(target.port)
+
+            val targetPathSegments = target.pathSegments.filter { it.isNotEmpty() }
+            if (targetPathSegments.isNotEmpty()) {
+                val originalPathSegments = original.url.pathSegments
+                newUrlBuilder.encodedPath("")
+                for (segment in targetPathSegments) {
+                    newUrlBuilder.addPathSegment(segment)
+                }
+                for (segment in originalPathSegments) {
+                    if (segment.isNotEmpty()) {
+                        newUrlBuilder.addPathSegment(segment)
+                    }
+                }
+            }
+
+            chain.proceed(original.newBuilder().url(newUrlBuilder.build()).build())
+        }
+
+    @Provides
+    @Singleton
+    @AuthInterceptor
+    fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
+        Interceptor { chain ->
+            val original = chain.request()
+            // A request carrying its own credentials (checking a saved
+            // profile's token) keeps them.
+            val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
+            if (original.header("Authorization") != null) {
+                return@Interceptor chain.proceed(
+                    original.newBuilder()
+                        .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
+                        .build()
+                )
+            }
+            val token = sessionManager.getCachedAccessToken()
+            val deviceId = sessionManager.getCachedDeviceId()
+            val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
+            val request = original.newBuilder()
+                .header("Authorization", header)
+                .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
+                .build()
+            chain.proceed(request)
+        }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        @BaseUrlInterceptor baseUrlInterceptor: Interceptor,
+        @AuthInterceptor authInterceptor: Interceptor,
+    ): OkHttpClient = OkHttpClient.Builder()
+        .connectionPool(SharedHttp.connectionPool)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .addInterceptor(baseUrlInterceptor)
+        .addInterceptor(authInterceptor)
+        // A call can ask for a longer wait with this header (following a pasted page to its stream can take
+        // over a minute on the server); everything else keeps the short read timeout.
+        .addInterceptor { chain ->
+            val seconds = chain.request().header("X-Read-Timeout-Seconds")?.toIntOrNull()
+            if (seconds == null) {
+                chain.proceed(chain.request())
+            } else {
+                chain.withReadTimeout(seconds, java.util.concurrent.TimeUnit.SECONDS)
+                    .proceed(chain.request().newBuilder().removeHeader("X-Read-Timeout-Seconds").build())
+            }
+        }
+        .apply {
+            if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+        }
+        .apply {
+            try {
+                val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                })
+                val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+                sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+                sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+                hostnameVerifier { _, _ -> true }
+            } catch (_: Exception) {}
+        }
+        .build()
+
+    @Provides
+    @Singleton
+    fun provideMoshi(): Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = Retrofit.Builder()
+        .baseUrl(PLACEHOLDER_BASE_URL)
+        .client(client)
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+
+    @Provides
+    @Singleton
+    fun provideJellyfinApi(retrofit: Retrofit): JellyfinApi = retrofit.create(JellyfinApi::class.java)
+}

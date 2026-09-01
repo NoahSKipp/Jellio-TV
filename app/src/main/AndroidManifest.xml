@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Home screen channels (Continue Watching, Next Up, ...). -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- AppUpdateViewModel's own real install step: DownloadManager
+         writes the fetched APK, this is the launch of the system
+         installer that actually installs it, not itself a real
+         dangerous/runtime permission on this SDK range but a real
+         device may still gate it behind its own "install unknown apps"
+         toggle for this app the first time. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application
+        android:name=".JellioTvApplication"
+        android:allowBackup="true"
+        android:banner="@drawable/tv_banner_v2"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.JellioTv"
+        android:usesCleartextTraffic="true"
+        android:largeHeap="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="landscape"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:theme="@style/Theme.JellioTv">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- WatchNextSyncer's own real deep link: Google TV's home
+                 launches a Watch Next row tile through the exact Intent
+                 that class built (ACTION_VIEW against this same
+                 https://jellio.tv/play data, already package-scoped to
+                 this app, so no autoVerify App Links setup is needed
+                 for the OS to route it back here), handled in
+                 MainActivity.handleIntent() rather than a route this
+                 manifest itself owns any further. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/play" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/item" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/home" />
+            </intent-filter>
+        </activity>
+
+        <!-- AppUpdateViewModel's own real FileProvider.getUriForFile()
+             call: the downloaded APK sits in this app's own external
+             files dir, a real content:// Uri is the only way to hand
+             a file there to the system installer without a legacy
+             file:// Uri's own StrictMode/FileUriExposedException. -->
+        <!-- Continue Watching artwork for the Google TV home. -->
+        <provider
+            android:name=".data.watchnext.WatchNextArtProvider"
+            android:authorities="${applicationId}.watchnextart"
+            android:exported="true" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

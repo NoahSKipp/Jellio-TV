@@ -1,0 +1,56 @@
+# Baseline Profile for Jellio TV
+# Pre-compiles critical startup, navigation, and playback classes to DEX AOT machine code on installation.
+
+# Core Activity & Session
+Lcom/jellio/tv/MainActivity;
+Lcom/jellio/tv/JellioTvApplication;
+Lcom/jellio/tv/data/session/Session;
+Lcom/jellio/tv/data/session/SessionManager;
+Lcom/jellio/tv/data/JellioRepository;
+Lcom/jellio/tv/data/network/JellyfinApi;
+
+# Snapshot Cache (Cold Starts)
+Lcom/jellio/tv/data/cache/RowSnapshotStore;
+Lcom/jellio/tv/data/cache/HomeSnapshot;
+Lcom/jellio/tv/data/cache/LibrarySnapshot;
+Lcom/jellio/tv/data/cache/CachedRowDto;
+Lcom/jellio/tv/data/model/BaseItemDto;
+
+# Home Screen & Lazy Rows
+Lcom/jellio/tv/ui/home/HomeScreenKt;
+Lcom/jellio/tv/ui/home/HomeViewModel;
+Lcom/jellio/tv/ui/home/HomeSection;
+Lcom/jellio/tv/ui/home/PosterHomeRow;
+Lcom/jellio/tv/ui/home/PosterCardKt;
+Lcom/jellio/tv/ui/home/HeroCarouselKt;
+
+# Detail & Library Screens
+Lcom/jellio/tv/ui/detail/DetailScreenKt;
+Lcom/jellio/tv/ui/detail/DetailViewModel;
+Lcom/jellio/tv/ui/library/LibraryScreenKt;
+Lcom/jellio/tv/ui/library/LibraryViewModel;
+
+# Playback & Audio
+Lcom/jellio/tv/ui/player/PlayerScreenKt;
+Lcom/jellio/tv/ui/player/PlayerViewModel;
+Lcom/jellio/tv/ui/player/PlayerPrefs;
+Lcom/jellio/tv/ui/player/JellioLoadControlKt;
+
+# Navigation & Search
+Lcom/jellio/tv/ui/nav/SidebarNavKt;
+Lcom/jellio/tv/ui/search/SearchScreenKt;
+Lcom/jellio/tv/ui/search/SearchViewModel;
+
+# Jetpack Compose TV & Foundation Runtime
+Landroidx/tv/foundation/lazy/list/TvLazyRowKt;
+Landroidx/tv/foundation/lazy/list/TvLazyColumnKt;
+Landroidx/tv/material3/SurfaceKt;
+Landroidx/compose/runtime/ComposerKt;
+Landroidx/compose/runtime/MutableState;
+Landroidx/compose/foundation/lazy/LazyListState;
+
+# Coil Image Loader
+Lcoil3/ImageLoader;
+Lcoil3/SingletonImageLoader;
+Lcoil3/request/ImageRequest;
+Lcoil3/compose/AsyncImageKt;

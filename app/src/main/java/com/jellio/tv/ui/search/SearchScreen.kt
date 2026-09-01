@@ -1,0 +1,209 @@
+package com.jellio.tv.ui.search
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.home.PosterCard
+import com.jellio.tv.ui.home.PosterWidth
+import com.jellio.tv.ui.home.rememberCardOptionsHost
+import com.jellio.tv.ui.common.JellioTextField
+import com.jellio.tv.ui.common.RegisterGridFocusItem
+import com.jellio.tv.ui.common.gridColumnFocus
+import com.jellio.tv.ui.common.rememberGridFocusController
+import com.jellio.tv.ui.common.rememberTvGridState
+import com.jellio.tv.ui.home.SkeletonPoster
+import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
+
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
+import androidx.tv.material3.Surface
+import androidx.compose.ui.graphics.Color
+import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioText
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun SearchScreen(
+    session: Session,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    onItemClick: (BaseItemDto) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: SearchViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val gridState = rememberTvGridState()
+    val focusController = rememberGridFocusController()
+    LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spoken.isNullOrBlank()) {
+                viewModel.onQueryChange(session, spoken)
+            }
+        }
+    }
+    val openItemOptions = rememberCardOptionsHost(
+        onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
+        onToggleWatched = { viewModel.toggleWatched(session, it) },
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(top = 32.dp, start = 48.dp, end = 48.dp),
+    ) {
+        Text(text = com.jellio.tv.ui.i18n.string("nav_search"), style = MaterialTheme.typography.titleLarge)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+        ) {
+            JellioTextField(
+                value = uiState.query,
+                onValueChange = { viewModel.onQueryChange(session, it) },
+                label = com.jellio.tv.ui.i18n.string("search_placeholder"),
+                modifier = Modifier.width(480.dp),
+            )
+            Surface(
+                onClick = {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, com.jellio.tv.ui.i18n.Strings.get("search_voice_prompt"))
+                    }
+                    speechLauncher.launch(intent)
+                },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = JellioBgElevated,
+                    focusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    contentColor = JellioText,
+                ),
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = com.jellio.tv.ui.i18n.string("search_voice_btn"),
+                        tint = JellioText,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+
+        when {
+            uiState.results.isNotEmpty() || uiState.isSearching -> {
+                val placeholders = when {
+                    !uiState.isSearching -> 0
+                    uiState.results.isEmpty() -> 12
+                    else -> 4
+                }
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val scaledPosterWidth = PosterWidth.scaled()
+                    val spacing = 16.dp
+                    val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
+                    val results = remember(uiState.results) { uiState.results.distinctBy { it.Id } }
+                    val totalCount = results.size
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(columnCount),
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 48.dp),
+                        modifier = Modifier.fillMaxSize().focusRestorer(focusController.requesterFor(0)),
+                    ) {
+                        items(totalCount, key = { results[it].Id }, contentType = { "poster_card" }) { index ->
+                            val item = results[index]
+                            RegisterGridFocusItem(focusController, index)
+                            PosterCard(
+                                item = item,
+                                imageUrl = imageUrl,
+                                onClick = { onItemClick(item) },
+                                onOptionsClick = { openItemOptions(item) },
+                                canExpand = false,
+                                modifier = Modifier.gridColumnFocus(
+                                    controller = focusController,
+                                    index = index,
+                                    totalCount = totalCount,
+                                    columnCount = columnCount,
+                                    allowExitUp = true,
+                                    allowExitLeft = true,
+                                ),
+                            )
+                        }
+                        items(placeholders, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
+                            SkeletonPoster()
+                        }
+                    }
+                }
+            }
+            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = uiState.error ?: "", color = JellioTextSecondary)
+            }
+            uiState.hasSearched && uiState.suggestions != null -> {
+                val answer = uiState.suggestions!!
+                androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item(key = "intro") {
+                        Text(
+                            text = com.jellio.tv.ui.i18n.formatString("search_suggest_intro", answer.MatchedTitle ?: uiState.query),
+                            color = JellioTextSecondary,
+                            modifier = Modifier.padding(start = 52.dp, top = 8.dp, bottom = 16.dp),
+                        )
+                    }
+                    items(answer.Rows.size, key = { "suggest:$it" }) { index ->
+                        val row = answer.Rows[index]
+                        val title = when (row.Kind) {
+                            "similar" -> com.jellio.tv.ui.i18n.formatString("search_suggest_similar", answer.MatchedTitle ?: uiState.query)
+                            "person" -> com.jellio.tv.ui.i18n.formatString("search_suggest_person", row.Name ?: "")
+                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", com.jellio.tv.ui.i18n.genreDisplayName(row.Name ?: ""))
+                        }
+                        com.jellio.tv.ui.home.PosterRow(
+                            section = com.jellio.tv.ui.home.HomeSection(title = title, items = row.Items),
+                            imageUrl = imageUrl,
+                            onItemClick = onItemClick,
+                        )
+                    }
+                }
+            }
+            uiState.hasSearched -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = com.jellio.tv.ui.i18n.formatString("search_no_results_for", uiState.query), color = JellioTextSecondary)
+            }
+        }
+    }
+}

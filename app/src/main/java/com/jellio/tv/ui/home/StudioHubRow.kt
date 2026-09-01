@@ -1,0 +1,108 @@
+package com.jellio.tv.ui.home
+
+import com.jellio.tv.ui.common.rowEntry
+import com.jellio.tv.ui.common.RowEntryTarget
+import com.jellio.tv.ui.common.rememberTvRowState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Surface
+import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
+import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioText
+import com.jellio.tv.ui.theme.scaled
+
+private val TileWidth = 200.dp
+private val TileHeight = 110.dp
+
+@Composable
+fun StudioHubRow(
+    services: List<String>,
+    logoUrl: (String) -> String,
+    onServiceClick: (String) -> Unit,
+) {
+    if (services.isEmpty()) return
+    Column(modifier = Modifier.padding(bottom = RowSpacing)) {
+        RowTitle(text = com.jellio.tv.ui.i18n.Strings.get("tv_studio_hubs"))
+        val firstTile = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            LazyRow(
+                state = rememberTvRowState(),
+                contentPadding = PaddingValues(horizontal = RowStartPadding),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.rowEntry(firstTile),
+            ) {
+                items(services, key = { it }) { service ->
+                    RowEntryTarget(if (service == services.first()) firstTile else null) {
+                        StudioHubTile(name = service, logoUrl = logoUrl(service), onClick = { onServiceClick(service) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
+    val tileWidth = TileWidth.scaled()
+    val tileHeight = TileHeight.scaled()
+    var hasError = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            focusedContainerColor = Color.White.copy(alpha = 0.12f),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        modifier = Modifier.width(tileWidth).height(tileHeight),
+    ) {
+        Box(
+            modifier = Modifier.padding(12.dp).fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (hasError.value) {
+                Text(
+                    text = name,
+                    color = JellioText,
+                    style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = name,
+                    contentScale = ContentScale.Fit,
+                    onState = { state -> 
+                        if (state is coil3.compose.AsyncImagePainter.State.Error) {
+                            hasError.value = true
+                        }
+                    },
+                    colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
+                    modifier = Modifier.size(width = tileWidth - 24.dp, height = tileHeight - 48.dp),
+                )
+            }
+        }
+    }
+}

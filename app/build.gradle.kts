@@ -1,0 +1,149 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+}
+
+android {
+    namespace = "com.jellio.tv"
+    // androidx.activity:activity-compose 1.11.0 (pulled in by the
+    // Compose BOM) requires compileSdk 36+, real CI failure, not
+    // guessed at. NuvioTV itself already builds clean against 36.
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.jellio.tv"
+        minSdk = 24
+        targetSdk = 36
+        // GITHUB_RUN_NUMBER only ever goes up across the real release
+        // history this repo will ever have, same real property a
+        // versionName tag from git-cliff has no use for (Google Play
+        // and a real device's own package manager both compare this
+        // field, not versionName, to decide whether a build is an
+        // upgrade). Falls back to 1 for a local dev build with no
+        // real CI run behind it.
+        versionCode = (System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
+        versionName = "0.67.4"
+    }
+
+    val signingKeystore = (System.getenv("SIGNING_KEYSTORE_FILE") ?: System.getenv("SIGNING_KEYSTORE_PATH"))
+        ?.takeIf { it.isNotBlank() }?.let { file(it) }
+        ?: file("/home/noahsk/jellio-tv.keystore").takeIf { it.exists() }
+    val storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+
+    signingConfigs {
+        if (signingKeystore != null && signingKeystore.exists() && !storePassword.isNullOrBlank()) {
+            create("sideload") {
+                storeFile = signingKeystore
+                this.storePassword = storePassword
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "jellio"
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: storePassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfigs.findByName("sideload")?.let { signingConfig = it }
+        }
+        // The published build. Same key as debug builds so it installs over them.
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // A published APK must carry the real key, or it won't install over
+            // existing ones; CI builds without the secrets may still use debug.
+            if (System.getenv("REQUIRE_RELEASE_SIGNING") == "true" && signingConfigs.findByName("sideload") == null) {
+                throw GradleException("Release signing key missing: set SIGNING_KEYSTORE_FILE and SIGNING_STORE_PASSWORD.")
+            }
+            signingConfig = signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose = true
+        // AGP 8's own real default flipped this off (real gap: without
+        // it there is no BuildConfig class at all), SettingsScreen's
+        // own real About section needs BuildConfig.VERSION_NAME.
+        buildConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose_stability_config.conf"))
+    // ./gradlew assembleRelease -PcomposeReports writes which composables still can't skip.
+    if (project.hasProperty("composeReports")) {
+        reportsDestination = layout.buildDirectory.dir("compose_reports")
+        metricsDestination = layout.buildDirectory.dir("compose_metrics")
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+        freeCompilerArgs.add("-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
+        freeCompilerArgs.add("-opt-in=androidx.tv.material3.ExperimentalTvMaterial3Api")
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    testImplementation("junit:junit:4.13.2")
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation("androidx.compose.material:material-icons-extended")
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    implementation(libs.androidx.tv.material)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.tv.provider)
+
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.moshi)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.moshi)
+    ksp(libs.moshi.codegen)
+
+    implementation(libs.coroutines.core)
+    implementation(libs.coroutines.android)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.gif)
+    implementation(libs.coil.svg)
+
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.common)
+    implementation(libs.media3.session)
+    implementation(libs.media3.exoplayer.hls)
+
+    implementation(libs.zxing.core)
+}

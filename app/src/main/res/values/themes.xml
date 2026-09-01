@@ -1,0 +1,10 @@
+<resources>
+    <!-- Compose owns every real screen; this only sets the window
+         background so the launcher-to-first-frame gap reads as the
+         real app instead of a flash of white. -->
+    <style name="Theme.JellioTv" parent="android:Theme.DeviceDefault">
+        <item name="android:windowBackground">@color/jellio_bg</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
