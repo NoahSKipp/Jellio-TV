@@ -106,6 +106,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.68.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.68.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.DynamicFeed, "Infinite Row Modal Pagination", "The full row modal now paginates continuously from the current list offset without premature exhaustion, loading all available titles seamlessly."),
+            ChangelogFeature(Icons.Filled.Palette, "Direct TMDB Poster Resolution", "Poster images for virtual discovery items now resolve directly via HTTP/HTTPS URLs, avoiding broken image fallbacks in rows and modals."),
+            ChangelogFeature(Icons.Filled.Tune, "Enhanced Catalog Discovery", "Genre collections discover multiple pages of virtual titles even for small libraries, preventing rows from remaining stranded with only a few items."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.68.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.68.0",

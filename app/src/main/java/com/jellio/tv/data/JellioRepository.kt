@@ -1823,6 +1823,12 @@ class JellioRepository @Inject constructor(
         maxWidth: Int = 400,
         accessToken: String? = null,
     ): String {
+        if (!tag.isNullOrEmpty() && (tag.startsWith("http://") || tag.startsWith("https://"))) {
+            return tag
+        }
+        if (itemId.startsWith("http://") || itemId.startsWith("https://")) {
+            return itemId
+        }
         val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=85"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
