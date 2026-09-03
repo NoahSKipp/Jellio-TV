@@ -178,6 +178,7 @@ private fun JellioTvRoot(
                 deepLinkItemId = deepLinkItemId,
                 onDeepLinkConsumed = onDeepLinkConsumed,
                 onPlayerActiveChanged = onPlayerActiveChanged,
+                remoteControlManager = appViewModel.remoteControlManager,
             )
         }
 
@@ -203,6 +204,7 @@ private fun AppBootGate(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
     onPlayerActiveChanged: (Boolean) -> Unit = {},
+    remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -229,6 +231,7 @@ private fun AppBootGate(
             deepLinkItemId = deepLinkItemId,
             onDeepLinkConsumed = onDeepLinkConsumed,
             onPlayerActiveChanged = onPlayerActiveChanged,
+            remoteControlManager = remoteControlManager,
         )
     }
 }
@@ -241,6 +244,7 @@ private fun JellioTvApp(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
     onPlayerActiveChanged: (Boolean) -> Unit = {},
+    remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
 ) {
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
@@ -307,7 +311,19 @@ private fun JellioTvApp(
 
     val onNavigateToDetail: (String) -> Unit = { itemId -> push(JellioRoute.Detail(itemId)) }
     val onNavigateToPerson: (String) -> Unit = { personId -> push(JellioRoute.Person(personId)) }
-    val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> push(JellioRoute.Player(itemId, mediaSourceId)) }
+    fun playItem(itemId: String, mediaSourceId: String? = null, startPositionTicks: Long? = null) {
+        push(JellioRoute.Player(itemId, mediaSourceId, startPositionTicks))
+    }
+    val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> playItem(itemId, mediaSourceId) }
+
+    LaunchedEffect(remoteControlManager) {
+        remoteControlManager.playCommands.collect { cmd ->
+            if (routeStack.lastOrNull() is JellioRoute.Player) {
+                routeStack = routeStack.dropLast(1)
+            }
+            playItem(cmd.itemId, cmd.mediaSourceId, cmd.startPositionTicks)
+        }
+    }
     // Play the way the title page does: one stream plays, several (with
     // nothing remembered) open the picker, none opens the picker to say so.
     val onPlay: (BaseItemDto) -> Unit = { item ->
@@ -482,6 +498,7 @@ private fun JellioTvApp(
                 session = session,
                 itemId = current.itemId,
                 mediaSourceId = current.mediaSourceId,
+                startPositionTicks = current.startPositionTicks,
                 onBack = { routeStack = routeStack.dropLast(1) },
                 onPlayNext = { nextItemId -> onPlayId(nextItemId, true) },
                 modifier = Modifier.fillMaxSize(),

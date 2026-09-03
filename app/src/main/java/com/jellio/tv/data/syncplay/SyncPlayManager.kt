@@ -65,6 +65,7 @@ private const val EXPLICIT_LEAVE_GRACE_MS = 20_000L
 class SyncPlayManager @Inject constructor(
     private val client: OkHttpClient,
     private val api: JellyfinApi,
+    private val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
 ) {
     private val _group = MutableStateFlow<SyncGroup?>(null)
     val group: StateFlow<SyncGroup?> = _group.asStateFlow()
@@ -114,7 +115,10 @@ class SyncPlayManager @Inject constructor(
             val socket = runCatching {
                 client.newWebSocket(socketRequest(session), object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
-                        launch { reconcile() }
+                        launch {
+                            reconcile()
+                            runCatching { remoteControlManager.reportCapabilities() }
+                        }
                     }
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val message = runCatching { JSONObject(text) }.getOrNull() ?: return
@@ -171,6 +175,9 @@ class SyncPlayManager @Inject constructor(
                         playlistItemId = data.optString("PlaylistItemId").ifEmpty { null },
                     ),
                 )
+            }
+            "Play", "Playstate", "GeneralCommand" -> {
+                remoteControlManager.handleWebSocketMessage(message)
             }
         }
     }

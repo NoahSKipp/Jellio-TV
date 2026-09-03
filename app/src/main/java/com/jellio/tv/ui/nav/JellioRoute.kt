@@ -26,7 +26,7 @@ sealed interface JellioRoute {
     data class Detail(val itemId: String) : JellioRoute
     data class Person(val personId: String) : JellioRoute
     data class Service(val name: String) : JellioRoute
-    data class Player(val itemId: String, val mediaSourceId: String?) : JellioRoute
+    data class Player(val itemId: String, val mediaSourceId: String? = null, val startPositionTicks: Long? = null) : JellioRoute
     data object LiveTv : JellioRoute
     data class LivePlayer(val channelId: String) : JellioRoute
 }

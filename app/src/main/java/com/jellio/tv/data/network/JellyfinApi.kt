@@ -170,6 +170,9 @@ interface JellyfinApi {
     @POST("Sessions/Playing/Stopped")
     suspend fun reportPlaybackStopped(@Body body: PlaybackReportRequest)
 
+    @POST("Sessions/Capabilities/Full")
+    suspend fun postCapabilities(@Body body: com.jellio.tv.data.model.ClientCapabilitiesDto): retrofit2.Response<Unit>
+
     @GET("LiveTv/Channels")
     suspend fun getLiveChannels(
         @Query("UserId") userId: String,

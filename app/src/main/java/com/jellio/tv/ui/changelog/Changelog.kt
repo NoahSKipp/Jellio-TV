@@ -106,6 +106,18 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.68.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.68.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Remote Playback & Smart TV Cast", "Cast and start media directly on your TV from Jellio Web and Jellyfin mobile apps over your local network, with real-time remote playback control including play, pause, seek, stop, volume control, and mute."),
+            ChangelogFeature(Icons.Filled.DynamicFeed, "Infinite Genre Rows", "Genre and catalog rows now load continuously as you scroll horizontally to the right, seamlessly paginating new recommendations and virtual catalog items."),
+            ChangelogFeature(Icons.Filled.Tune, "Smart Row Deduplication", "Sliding window deduplication ensures titles do not repeat across adjacent genre rows on your home screen while leaving personal rows like Continue Watching, Next Up, Watchlist, and Favorites untouched."),
+            ChangelogFeature(Icons.Filled.Palette, "Modern TMDB Rating Badge", "Updated ratings across showcase carousels, cards, title pages, and player overlays to feature the official compact TMDB badge with vibrant linear gradient."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Curated Google TV Top Picks", "Top pick recommendations for the Google TV launcher are now cleanly capped to a maximum of 6 highlighted items."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.67.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.67.3",
