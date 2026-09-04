@@ -2,8 +2,10 @@ package com.jellio.tv.ui.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -12,10 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -302,21 +302,33 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
+// Real bug found live testing on device: a LazyVerticalGrid nested
+// inside this screen's own outer LazyColumn item needs its own fixed
+// height to lay out at all (the same real reason
+// AvatarPickerOverlay.kt's own header already documents choosing
+// FlowRow over exactly this), and a nested lazy list is its own
+// separate real focus/scroll boundary regardless of that height being
+// sized correctly: a D-pad Down off its own last real row had nowhere
+// defined to go, real feedback's own "only see the first two rows,
+// nothing else" and "navigating down moves into the sidebar" both
+// traced to this same one real cause. FlowRow instead: no nested lazy
+// list, no separate focus boundary, every badge a real part of this
+// same outer LazyColumn's own real scroll and Down-navigation chain.
 @Composable
 private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(4),
-        modifier = modifier.height(110.dp * (badges.size / 4 + 1)),
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        items(badges) { badge -> BadgeTile(badge) }
+        badges.forEach { badge -> BadgeTile(badge, modifier = Modifier.width(120.dp)) }
     }
 }
 
 @Composable
-private fun BadgeTile(badge: BadgeDto) {
+private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
     val color = if (badge.Unlocked) rarityColor(badge.Rarity) else JellioBorder
     Column(
-        modifier = Modifier
+        modifier = modifier
             .padding(6.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = if (badge.Unlocked) 0.18f else 0.08f))

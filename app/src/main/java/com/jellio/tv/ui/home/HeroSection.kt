@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -40,7 +43,13 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 
-private val HeroHeight = 460.dp
+// Real feedback live, matching a real screenshot comparison against
+// the web build's own hero: at the old 460.dp this app's own hero
+// pushed "Still up, Noah?" and the Continue Watching row entirely
+// below the fold on a real TV viewport, needing a real scroll just to
+// confirm either even existed. Web's own real hero (css/hero-carousel.css)
+// runs comfortably shorter than that already.
+private val HeroHeight = 380.dp
 private const val ADVANCE_MS = 7000L
 
 private fun metaLine(item: BaseItemDto): String {
@@ -166,18 +175,60 @@ fun HeroSection(
                     Text(text = "View Details", modifier = Modifier.padding(start = 8.dp))
                 }
             }
+            // Real components/heroCarousel.js's own dots: purely a
+            // position indicator here rather than a real second D-pad
+            // target beside it, real feedback's own explicit ask. A
+            // real Surface per dot (this used to be) is still
+            // individually focusable regardless of any onClick at all,
+            // a whole real row of tiny targets a D-pad has no reason to
+            // stop at; a plain Box carries no such real focus node.
             if (items.size > 1) {
                 Row(modifier = Modifier.padding(top = 20.dp)) {
                     items.forEachIndexed { i, _ ->
-                        Surface(
-                            onClick = { index = i },
-                            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                            colors = ClickableSurfaceDefaults.colors(
-                                containerColor = if (i == index) JellioText else Color.White.copy(alpha = 0.3f),
-                            ),
-                            modifier = Modifier.padding(end = 8.dp).size(8.dp),
-                        ) {}
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (i == index) JellioText else Color.White.copy(alpha = 0.3f)),
+                        )
                     }
+                }
+            }
+        }
+        // Real components/heroCarousel.js's own prevButton/nextButton:
+        // this app's own real D-pad equivalent of that file's own
+        // mouse-click chevrons, vertically centered against each edge
+        // the same real way that file's own CSS docks them.
+        if (items.size > 1) {
+            Surface(
+                onClick = { index = (index - 1 + items.size) % items.size },
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.35f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContentColor = JellioText,
+                ),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
+                }
+            }
+            Surface(
+                onClick = { index = (index + 1) % items.size },
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.35f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContentColor = JellioText,
+                ),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
                 }
             }
         }

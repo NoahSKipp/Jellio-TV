@@ -194,10 +194,27 @@ fun HomeScreen(
                         // moment focus lands anywhere inside this real
                         // item instead, same real fix a plain
                         // BringIntoView request cannot give on its own.
+                        //
+                        // Real bug found live, round two: View Details
+                        // sits near this hero's own real bottom edge
+                        // (HeroSection's own Column is bottom-aligned),
+                        // so the moment it actually receives focus,
+                        // Compose's own default per-child bring-into-view
+                        // request fires for that button's own real
+                        // (smaller, lower) bounds too, racing the
+                        // animateScrollToItem(0) call below since both
+                        // target the same real scroll container. A
+                        // plain, un-animated scrollToItem(0) resolves in
+                        // one real frame instead of over an animation's
+                        // own real duration, closing the window the
+                        // default request used to win in and leaving
+                        // this list scrolled to this item's own real
+                        // top rather than wherever View Details happens
+                        // to sit.
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
                                 if (state.hasFocus) {
-                                    scope.launch { listState.animateScrollToItem(0) }
+                                    scope.launch { listState.scrollToItem(0) }
                                 }
                             },
                         ) {
