@@ -69,6 +69,7 @@ private enum class LanguageField { AUDIO, SUBTITLE }
 fun SettingsScreen(
     session: Session,
     onLogout: () -> Unit,
+    onViewProfile: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     // AppBootGate's own hiltViewModel() call already checks once per
@@ -113,6 +114,13 @@ fun SettingsScreen(
                 ) {
                     Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
+                Surface(
+                    onClick = onViewProfile,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                ) {
+                    Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                }
                 // Real screens/settings.js's own IsAdministrator gated
                 // "Open admin dashboard" button: that file's own click
                 // handler just moves the already loaded jellyfin-web
@@ -156,6 +164,16 @@ fun SettingsScreen(
                 label = "Default subtitle language",
                 value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
                 onClick = { openField = LanguageField.SUBTITLE },
+            )
+        }
+
+        val isPrivate by viewModel.isPrivate.collectAsState()
+        SettingsSection(title = "Privacy") {
+            SettingsToggleRow(
+                label = "Private profile",
+                description = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users.",
+                checked = isPrivate,
+                onToggle = { viewModel.setPrivate(!isPrivate) },
             )
         }
 
