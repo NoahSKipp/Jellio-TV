@@ -163,6 +163,7 @@ fun SidebarNav(
         items.forEach { route ->
             SidebarItem(
                 icon = route.icon(),
+                iconScale = route.iconScale(),
                 label = route.label(),
                 isSelected = route == selected,
                 expanded = expanded,
@@ -218,6 +219,7 @@ private fun SidebarItem(
     onClick: () -> Unit,
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
+    iconScale: Float = 1f,
     // Now Playing's own real active session count, the same real
     // badge NowPlayingButton's own floating corner spot used to carry
     // on its own before this rail absorbed it: 0 never renders one,
@@ -268,7 +270,7 @@ private fun SidebarItem(
                     imageVector = icon,
                     contentDescription = if (!expanded) label else null,
                     tint = LocalContentColor.current,
-                    modifier = Modifier.size(SidebarIconSize.scaled()),
+                    modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
                 )
                 if (badgeCount > 0) {
                     Box(
