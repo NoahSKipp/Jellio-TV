@@ -105,7 +105,7 @@ class AppViewModel @Inject constructor(
         repository.userImageUrl(session.serverAddress, userId, tag, maxWidth)
 
     fun bannerUrl(session: Session, userId: String): String =
-        repository.bannerUrl(session.serverAddress, userId)
+        repository.bannerUrl(session.serverAddress, session.accessToken, userId)
 
     // components/services.js's own real logoUrl(): the plugin's own
     // FrontendController.cs serves these SVGs straight off the

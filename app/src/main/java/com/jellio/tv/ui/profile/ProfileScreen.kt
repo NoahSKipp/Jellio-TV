@@ -1,8 +1,5 @@
 package com.jellio.tv.ui.profile
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -33,14 +30,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,8 +59,6 @@ import com.jellio.tv.ui.theme.JellioBorder
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 // Real port of screens/profile.js's own renderProfile(): banner, avatar,
 // name, bio, and (unless this is someone else's own private profile) a
@@ -85,21 +78,8 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val targetUserId = userId ?: session.userId
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(targetUserId) { viewModel.load(session, userId) }
-
-    val bannerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch(Dispatchers.IO) {
-            val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
-            if (bytes != null) {
-                val contentType = context.contentResolver.getType(uri) ?: "image/*"
-                viewModel.uploadBanner(bytes, contentType)
-            }
-        }
-    }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
@@ -126,13 +106,7 @@ fun ProfileScreen(
                 val bannerImageUrl = remember(targetUserId, uiState.bannerBustToken) { bannerUrl(targetUserId) }
 
                 LazyColumn(modifier = Modifier.fillMaxSize().focusRestorer()) {
-                    item {
-                        ProfileBanner(
-                            bannerUrl = bannerImageUrl,
-                            isOwner = uiState.isOwner,
-                            onChangeBanner = { bannerLauncher.launch("image/*") },
-                        )
-                    }
+                    item { ProfileBanner(bannerUrl = bannerImageUrl) }
                     item {
                         Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -234,7 +208,7 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileBanner(bannerUrl: String, isOwner: Boolean, onChangeBanner: () -> Unit) {
+private fun ProfileBanner(bannerUrl: String) {
     var showFallback by remember(bannerUrl) { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 4.2f)) {
         if (showFallback) {
@@ -247,16 +221,6 @@ private fun ProfileBanner(bannerUrl: String, isOwner: Boolean, onChangeBanner: (
                 onError = { showFallback = true },
                 modifier = Modifier.fillMaxSize(),
             )
-        }
-        if (isOwner) {
-            Surface(
-                onClick = onChangeBanner,
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            ) {
-                Text(text = "Change banner", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
         }
     }
 }

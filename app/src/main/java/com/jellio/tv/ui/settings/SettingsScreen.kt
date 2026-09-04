@@ -1,7 +1,5 @@
 package com.jellio.tv.ui.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -80,9 +77,7 @@ fun SettingsScreen(
     val rememberStream by viewModel.rememberStream.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
-    val isAdministrator by viewModel.isAdministrator.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
-    val context = LocalContext.current
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
@@ -120,27 +115,6 @@ fun SettingsScreen(
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
                 ) {
                     Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                }
-                // Real screens/settings.js's own IsAdministrator gated
-                // "Open admin dashboard" button: that file's own click
-                // handler just moves the already loaded jellyfin-web
-                // page's own hash onto #/dashboard, real native chrome
-                // for it already loaded underneath. This app embeds no
-                // native jellyfin-web page to fall through to for that,
-                // so a device browser opens the same real dashboard
-                // route fresh instead (SettingsViewModel.kt's own
-                // adminDashboardUrl header comment).
-                if (isAdministrator) {
-                    Surface(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(viewModel.adminDashboardUrl(session)))
-                            context.startActivity(intent)
-                        },
-                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-                    ) {
-                        Text(text = "Open admin dashboard", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                    }
                 }
             }
         }
@@ -183,13 +157,6 @@ fun SettingsScreen(
 
         SettingsSection(title = "Sleep Timer") {
             SleepTimerSection(viewModel = viewModel)
-        }
-
-        val quickConnectEnabled by viewModel.quickConnectEnabled.collectAsState()
-        if (quickConnectEnabled) {
-            SettingsSection(title = "Quick Connect") {
-                QuickConnectSection(viewModel = viewModel)
-            }
         }
 
         SettingsSection(title = "About") {
@@ -385,38 +352,6 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Text(text = if (isUpdating) "Updating..." else "Update password", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-        }
-    }
-}
-
-// Mirrors screens/settings.js's own buildQuickConnectSection(): only
-// ever shown when GET QuickConnect/Enabled says the server admin has
-// not turned the whole real feature off, POST QuickConnect/Authorize
-// approving a real pending request another device started.
-@Composable
-private fun QuickConnectSection(viewModel: SettingsViewModel) {
-    var code by remember { mutableStateOf("") }
-    val isAuthorizing by viewModel.isAuthorizingQuickConnect.collectAsState()
-    val status by viewModel.quickConnectStatus.collectAsState()
-    val tick by viewModel.quickConnectApproveTick.collectAsState()
-
-    LaunchedEffect(tick) {
-        if (tick > 0) code = ""
-    }
-
-    Column {
-        Text(text = "Approve a sign in on another device using its own real code.", color = JellioTextSecondary)
-        Spacer(modifier = Modifier.height(12.dp))
-        JellioTextField(value = code, onValueChange = { code = it }, label = "Code shown on the other device", modifier = Modifier.fillMaxWidth())
-        status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp)) }
-        Surface(
-            onClick = { viewModel.authorizeQuickConnect(code) },
-            enabled = !isAuthorizing,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text(text = if (isAuthorizing) "Approving..." else "Approve", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
         }
     }
 }

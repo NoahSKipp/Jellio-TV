@@ -278,9 +278,14 @@ class JellioRepository @Inject constructor(
     // screens/profile.js's own buildBanner() appends '&t=' +
     // Date.now() (a fresh upload replacing the file at this same real
     // path otherwise keeps serving whatever Coil already cached for
-    // it).
-    fun bannerUrl(serverAddress: String, userId: String): String =
-        "$serverAddress/Jellio/profile/banner/$userId?t=${System.currentTimeMillis()}"
+    // it). That controller carries [Authorize], same as avatarPresetUrl's
+    // own real Jellio/avatars endpoint just above, so this needs the
+    // exact same api_key query param that one already sends: never
+    // loaded at all on device without it, Coil's own image request
+    // getting back a plain 401 no <img> tag / browser cookie session
+    // ever hits.
+    fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String =
+        "$serverAddress/Jellio/profile/banner/$userId?api_key=$accessToken&t=${System.currentTimeMillis()}"
 
     // Real port of runtime/auth.js's own requestPasswordReset(): a real
     // failure comes back true anyway, the same real leak-prevention
