@@ -25,7 +25,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -181,6 +185,7 @@ private sealed interface SourcesState {
     data class Error(val message: String) : SourcesState
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun StreamPickerOverlay(
     item: BaseItemDto,
@@ -195,6 +200,16 @@ fun StreamPickerOverlay(
     var reloadKey by remember { mutableIntStateOf(0) }
     var remembered by remember { mutableStateOf<String?>(null) }
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
+    // Real bug found live testing on device, same real class every
+    // other overlay in this app already had to fix: nothing here ever
+    // requested initial D-pad focus, and nothing stopped focus
+    // wandering back out into DetailScreen underneath either. The Back
+    // button below is the one real target guaranteed to exist
+    // regardless of which SourcesState this overlay is in (Loading/
+    // Error/Loaded all still render it), so it is what claims focus on
+    // open rather than a source card that might not exist yet.
+    val backFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { backFocusRequester.requestFocus() }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -208,7 +223,7 @@ fun StreamPickerOverlay(
     LaunchedEffect(item.Id) { selectedLanguage = null }
     BackHandler(onBack = onDismiss)
 
-    Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
+    Box(modifier = modifier.fillMaxSize().focusProperties { exit = { FocusRequester.Cancel } }.background(JellioBg)) {
         if (backdropUrl != null) {
             coil3.compose.AsyncImage(
                 model = backdropUrl,
@@ -315,7 +330,7 @@ fun StreamPickerOverlay(
             onClick = onDismiss,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-            modifier = Modifier.padding(top = 32.dp, start = 32.dp),
+            modifier = Modifier.padding(top = 32.dp, start = 32.dp).focusRequester(backFocusRequester),
         ) {
             Text(text = "Back", color = JellioText, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }

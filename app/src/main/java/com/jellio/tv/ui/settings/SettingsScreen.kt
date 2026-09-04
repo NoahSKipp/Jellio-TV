@@ -28,8 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -230,6 +232,7 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
 // right the same way the player's own subtitle popover already is:
 // "No preference" first, then every real LANGUAGE_OPTIONS entry,
 // saving on selection rather than needing a separate confirm step.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun LanguagePickerOverlay(
     title: String,
@@ -251,6 +254,7 @@ private fun LanguagePickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
                 indication = null,

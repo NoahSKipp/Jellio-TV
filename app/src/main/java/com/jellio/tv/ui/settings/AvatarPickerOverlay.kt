@@ -25,14 +25,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -69,6 +74,7 @@ import kotlinx.coroutines.launch
 // lazy grid nested inside this LazyColumn would need its own real
 // fixed height to lay out at all, FlowRow just wraps naturally at
 // whatever real width this overlay's own column gives it.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AvatarPickerOverlay(
     presets: List<AvatarPresetDto>,
@@ -81,6 +87,17 @@ fun AvatarPickerOverlay(
 ) {
     BackHandler(onBack = onDismiss)
     val context = LocalContext.current
+    // Real bug found live testing on device, same real class
+    // LibraryPickerOverlay.kt's own header already documents: nothing
+    // here ever requested initial D-pad focus on open, so a reader's
+    // own next press just kept moving whatever screen sat behind this
+    // real scrim instead of ever landing on a real tile in this
+    // overlay. focusProperties { exit = { FocusRequester.Cancel } }
+    // below is that same file's own real fix for the second half of
+    // that bug too: without it, focus could still wander back out past
+    // this overlay's own edge once it did land inside.
+    val firstEntryFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstEntryFocusRequester.requestFocus() }
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -109,6 +126,7 @@ fun AvatarPickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
         contentAlignment = Alignment.Center,
@@ -137,7 +155,11 @@ fun AvatarPickerOverlay(
                         // succeeding at all, same real reasoning that
                         // file's own comment documents for its own
                         // upload tile.
-                        AvatarUploadTile(busy = busyKey == "upload", onClick = { launcher.launch("image/*") })
+                        AvatarUploadTile(
+                            busy = busyKey == "upload",
+                            onClick = { launcher.launch("image/*") },
+                            focusRequester = firstEntryFocusRequester,
+                        )
                         loosePresets.forEach { preset ->
                             AvatarPresetTile(
                                 imageUrl = presetImageUrl(preset.Id),
@@ -201,13 +223,15 @@ private fun AvatarCategoryHeader(category: String, expanded: Boolean, onToggle: 
 }
 
 @Composable
-private fun AvatarUploadTile(busy: Boolean, onClick: () -> Unit) {
+private fun AvatarUploadTile(busy: Boolean, onClick: () -> Unit, focusRequester: FocusRequester? = null) {
     Surface(
         onClick = onClick,
         enabled = !busy,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBg),
-        modifier = Modifier.width(120.dp).aspectRatio(1f),
+        modifier = Modifier.width(120.dp).aspectRatio(1f).let {
+            if (focusRequester != null) it.focusRequester(focusRequester) else it
+        },
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
