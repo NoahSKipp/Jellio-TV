@@ -211,10 +211,35 @@ fun HomeScreen(
                         // this list scrolled to this item's own real
                         // top rather than wherever View Details happens
                         // to sit.
+                        //
+                        // Real bug found live, round three: this fired on
+                        // every real focus change anywhere inside the
+                        // hero, not just the one real transition into it
+                        // (moving between the arrows and View Details
+                        // still reports hasFocus = true throughout, but
+                        // this lambda still runs again each time). Each
+                        // real call launched its own real coroutine
+                        // against the same listState, and Compose's own
+                        // scroll mutex cancels whichever real call was
+                        // already in flight the moment a newer one
+                        // starts, so a quick real run of them back to
+                        // back visibly interrupted each other mid-scroll
+                        // instead of any one ever finishing clean,
+                        // reading as "moves up and down a tiny bit" and
+                        // never actually settling at this item's own
+                        // real top. Guarded to the one real false-to-true
+                        // transition now, same real reasoning
+                        // onFocusChanged callers elsewhere in this app
+                        // already rely on for a "just entered" edge
+                        // rather than a "still inside" level.
+                        var heroGroupFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus) {
+                                if (state.hasFocus && !heroGroupFocused) {
+                                    heroGroupFocused = true
                                     scope.launch { listState.scrollToItem(0) }
+                                } else if (!state.hasFocus) {
+                                    heroGroupFocused = false
                                 }
                             },
                         ) {

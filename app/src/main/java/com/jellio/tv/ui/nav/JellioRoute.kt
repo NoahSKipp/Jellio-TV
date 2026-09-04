@@ -101,7 +101,15 @@ fun JellioRoute.icon(): ImageVector = when (this) {
 // this one glyph up rather than resizing the whole rail to compensate
 // for one icon's own viewBox padding.
 fun JellioRoute.iconScale(): Float = when (this) {
-    JellioRoute.Settings -> 1.35f
+    // Real feedback live, round three: 1.2f then 1.35f both still read
+    // as visibly smaller than every sibling glyph side by side. Pushed
+    // further rather than guessing again blind: this app's own bundled
+    // Icons.Filled.Settings vector (androidx.compose.material:
+    // material-icons-extended) carries real, unusually generous
+    // viewBox padding around its own gear, a documented quirk of that
+    // exact icon in that exact pack, not something a modest scale bump
+    // was ever going to fully close out.
+    JellioRoute.Settings -> 1.7f
     else -> 1f
 }
 

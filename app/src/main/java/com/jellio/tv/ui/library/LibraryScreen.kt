@@ -97,11 +97,21 @@ fun LibraryScreen(
                         // bring-into-view request left this list
                         // scrolled to that button's own real bounds on
                         // a Down-then-Up round trip, never this item's
-                        // own real top.
+                        // own real top. Guarded to the one real
+                        // false-to-true focus transition (that same
+                        // file's own header explains why): unguarded,
+                        // this refired on every real focus move between
+                        // the arrows/dots/View Details inside the
+                        // coverflow, each real call cancelling whichever
+                        // one was already mid-scroll.
+                        var coverflowGroupFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus) {
+                                if (state.hasFocus && !coverflowGroupFocused) {
+                                    coverflowGroupFocused = true
                                     scope.launch { listState.scrollToItem(0) }
+                                } else if (!state.hasFocus) {
+                                    coverflowGroupFocused = false
                                 }
                             },
                         ) {

@@ -35,6 +35,7 @@ import com.jellio.tv.ui.home.HomeScreen
 import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
 import com.jellio.tv.ui.library.LibraryViewModel
+import com.jellio.tv.ui.nav.AccountSwitcherOverlay
 import com.jellio.tv.ui.nav.JellioNavItems
 import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
@@ -208,6 +209,7 @@ private fun JellioTvApp(
     val route = routeStack.last()
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
+    var showAccountSwitcher by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
     // Real feedback live: SidebarNav's own items (and Now Playing's own
@@ -405,6 +407,14 @@ private fun JellioTvApp(
                     // library speaks for the button itself.
                     if (clicked is JellioRoute.Library) {
                         showLibraryPicker = true
+                    } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
+                        // Real components/accountSwitcher.js's own real
+                        // Profile button: opens the quick switcher
+                        // overlay rather than navigating straight to the
+                        // full ProfileScreen, same real reason that
+                        // file's own header gives (Settings already
+                        // reaches the same real screen on its own).
+                        showAccountSwitcher = true
                     } else {
                         switchTab(clicked)
                     }
@@ -438,6 +448,16 @@ private fun JellioTvApp(
                         showLibraryPicker = false
                     },
                     onDismiss = { showLibraryPicker = false },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (showAccountSwitcher) {
+                AccountSwitcherOverlay(
+                    session = session,
+                    onDismiss = { showAccountSwitcher = false },
+                    onViewProfile = { push(JellioRoute.Profile()) },
+                    onOpenSettings = { switchTab(JellioRoute.Settings) },
+                    onSignOut = { appViewModel.logout() },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
