@@ -30,8 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -48,6 +51,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.SelectableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -65,7 +69,14 @@ import com.jellio.tv.ui.theme.scaled
 private val SidebarCollapsedWidth = 88.dp
 private val SidebarExpandedWidth = 260.dp
 private val SidebarItemHeight = 64.dp
-private val SidebarIconSize = 30.dp
+// Real feedback live, round two: even after Settings' own iconScale()
+// bump, it still read smaller than its siblings side by side. Rather
+// than pushing that one glyph even further past its own siblings'
+// real size, every icon steps down slightly here instead, freeing up
+// the same real headroom to grow Settings' own relative scale further
+// without it ever reading larger than the rest, just finally even
+// with them.
+private val SidebarIconSize = 26.dp
 private val SidebarLabelMaxWidth = 160.dp
 
 // Real MainActivity.kt's own contentPadding(start = ...) always
@@ -109,6 +120,12 @@ fun SidebarNav(
     // one through.
     nowPlayingSessionCount: Int = 0,
     onNowPlayingClick: (() -> Unit)? = null,
+    // Real components/sidebar.js's own buildProfileButton(): the
+    // signed in reader's own real avatar and name, rendered on this
+    // rail's own Profile row (self, JellioRoute.Profile(userId = null))
+    // in place of a generic account icon.
+    profileAvatarUrl: String? = null,
+    profileName: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -161,10 +178,12 @@ fun SidebarNav(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { route ->
+            val isSelfProfile = route is JellioRoute.Profile && route.userId == null
             SidebarItem(
                 icon = route.icon(),
                 iconScale = route.iconScale(),
-                label = route.label(),
+                label = if (isSelfProfile && !profileName.isNullOrBlank()) profileName else route.label(),
+                avatarUrl = if (isSelfProfile) profileAvatarUrl else null,
                 isSelected = route == selected,
                 expanded = expanded,
                 enabled = enabled,
@@ -175,14 +194,24 @@ fun SidebarNav(
                     // click never actually changes focus (the item
                     // clicked already had it, real D-pad Select), so
                     // expanded never got a real onFocusChanged event to
-                    // flip back false on. Clearing focus here forces
-                    // exactly that: the rail collapses immediately on a
-                    // real selection, the same reliable default spatial
-                    // search this file's own header already leans on
-                    // for Down out of Search/Watchlist/Calendar/Settings
-                    // picking it back up the moment a reader presses a
-                    // real direction again.
-                    focusManager.clearFocus(force = true)
+                    // flip back false on. A real bug this exact fix used
+                    // to cause, also found live: focusManager.clearFocus
+                    // (force = true) drops focus system-wide with
+                    // nothing at all queued to receive it, and the very
+                    // next D-pad press's own real default focus search
+                    // (Compose has no other reference point once focus
+                    // is fully null) landed back on this rail's own
+                    // topmost item, reading as "every selection jumps
+                    // back to Home" even though the route underneath had
+                    // already switched correctly. moveFocus(Right) below
+                    // is the real fix: same rail collapse (this item
+                    // loses focus either way), but focus actually lands
+                    // in whatever real content now sits to this rail's
+                    // own right, the same spatial search this rail's
+                    // Down-out-of-content callers already lean on, just
+                    // driven here instead of left for a reader's own
+                    // next real press to trigger.
+                    focusManager.moveFocus(FocusDirection.Right)
                 },
                 focusRequester = if (route == selected) initialFocusRequester else null,
             )
@@ -198,7 +227,7 @@ fun SidebarNav(
                 badgeCount = nowPlayingSessionCount,
                 onClick = {
                     onNowPlayingClick()
-                    focusManager.clearFocus(force = true)
+                    focusManager.moveFocus(FocusDirection.Right)
                 },
             )
         }
@@ -220,6 +249,12 @@ private fun SidebarItem(
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
     iconScale: Float = 1f,
+    // Real components/sidebar.js's own buildProfileButton(): the
+    // reader's own real avatar in place of a generic icon, for this
+    // rail's own Profile row only. Null for every other item, an
+    // AsyncImage circle instead of the plain Icon slot below whenever
+    // it isn't.
+    avatarUrl: String? = null,
     // Now Playing's own real active session count, the same real
     // badge NowPlayingButton's own floating corner spot used to carry
     // on its own before this rail absorbed it: 0 never renders one,
@@ -266,12 +301,21 @@ private fun SidebarItem(
                 modifier = Modifier.width(SidebarCollapsedWidth.scaled() - 20.dp.scaled()),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = if (!expanded) label else null,
-                    tint = LocalContentColor.current,
-                    modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
-                )
+                if (avatarUrl != null) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = if (!expanded) label else null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size((SidebarIconSize.scaled() * 1.35f)).clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = if (!expanded) label else null,
+                        tint = LocalContentColor.current,
+                        modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
+                    )
+                }
                 if (badgeCount > 0) {
                     Box(
                         modifier = Modifier

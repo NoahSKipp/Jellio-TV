@@ -415,6 +415,8 @@ private fun JellioTvApp(
                 // why.
                 nowPlayingSessionCount = nowPlayingSessions.size,
                 onNowPlayingClick = { showNowPlayingPanel = !showNowPlayingPanel },
+                profileAvatarUrl = appViewModel.userImageUrl(session, session.userId, null, 200),
+                profileName = session.userName,
             )
             if (showNowPlayingPanel) {
                 NowPlayingPanel(

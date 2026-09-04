@@ -55,14 +55,22 @@ sealed interface JellioRoute {
 // reachable, no other affordance reaches them the way the phone's own
 // profile button and home tabs do), so those three sit appended after
 // the same shared four, in that same shared order.
+// Real components/sidebar.js's own real order: Profile leads the rail
+// (real feedback's own explicit ask, matching web pixel for pixel),
+// then Home/Search/Watchlist/Feed/Calendar exactly as that file's own
+// FIXED_NAV_LINKS + Calendar append it, Library folded in right after
+// (the one real library link a reader's own libraries would occupy
+// there on web, consolidated to this app's own single picker button
+// instead, JellioRoute's own header already explains why), Settings
+// still last.
 val JellioNavItems: List<JellioRoute> = listOf(
+    JellioRoute.Profile(),
     JellioRoute.Home,
     JellioRoute.Search,
-    JellioRoute.Library,
-    JellioRoute.Feed,
-    JellioRoute.Profile(),
     JellioRoute.Watchlist,
+    JellioRoute.Feed,
     JellioRoute.Calendar,
+    JellioRoute.Library,
     JellioRoute.Settings,
 )
 
@@ -93,7 +101,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
 // this one glyph up rather than resizing the whole rail to compensate
 // for one icon's own viewBox padding.
 fun JellioRoute.iconScale(): Float = when (this) {
-    JellioRoute.Settings -> 1.2f
+    JellioRoute.Settings -> 1.35f
     else -> 1f
 }
 

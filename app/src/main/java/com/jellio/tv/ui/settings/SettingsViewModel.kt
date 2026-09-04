@@ -64,18 +64,6 @@ class SettingsViewModel @Inject constructor(
     private val _isCancellingSleepTimer = MutableStateFlow(false)
     val isCancellingSleepTimer: StateFlow<Boolean> = _isCancellingSleepTimer.asStateFlow()
 
-    private val _quickConnectEnabled = MutableStateFlow(false)
-    val quickConnectEnabled: StateFlow<Boolean> = _quickConnectEnabled.asStateFlow()
-
-    private val _isAuthorizingQuickConnect = MutableStateFlow(false)
-    val isAuthorizingQuickConnect: StateFlow<Boolean> = _isAuthorizingQuickConnect.asStateFlow()
-
-    private val _quickConnectStatus = MutableStateFlow<String?>(null)
-    val quickConnectStatus: StateFlow<String?> = _quickConnectStatus.asStateFlow()
-
-    private val _quickConnectApproveTick = MutableStateFlow(0)
-    val quickConnectApproveTick: StateFlow<Int> = _quickConnectApproveTick.asStateFlow()
-
     // Real port of components/avatarPicker.js's own openAvatarPicker()
     // state: presets re-fetched fresh every real open (that file's own
     // real getAvatarPresets() call, no caching), a single busy key
@@ -100,13 +88,6 @@ class SettingsViewModel @Inject constructor(
     private val _avatarBusyKey = MutableStateFlow<String?>(null)
     val avatarBusyKey: StateFlow<String?> = _avatarBusyKey.asStateFlow()
 
-    // Real screens/settings.js's own user.Policy.IsAdministrator gate:
-    // see SettingsScreen.kt's own header comment on the admin dashboard
-    // button for the real fallback this app substitutes for that
-    // file's own dead #/dashboard route.
-    private val _isAdministrator = MutableStateFlow(false)
-    val isAdministrator: StateFlow<Boolean> = _isAdministrator.asStateFlow()
-
     // Real port of screens/settings.js's own buildPrivacyCard(): badges
     // and activity go dark for other users, the profile picture and
     // banner stay visible either way, same real Steam-style split
@@ -118,11 +99,6 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { _rememberStream.value = streamPreferences.isRememberEnabled() }
-        viewModelScope.launch { _quickConnectEnabled.value = repository.isQuickConnectEnabled() }
-        // Real screens/settings.js's own Promise.all: neither this nor
-        // the Quick Connect check above depends on the signed in
-        // user's own data at all, so both fire alongside the user
-        // fetch load() below kicks off, not one after another.
         viewModelScope.launch {
             val result = repository.getSleepTimerStatus() ?: return@launch
             _sleepTimerActive.value = result.Active
@@ -144,7 +120,6 @@ class SettingsViewModel @Inject constructor(
                 _audioLanguage.value = matchLanguageOption(configuration.AudioLanguagePreference)?.code
                 _subtitleLanguage.value = matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
             }
-            _isAdministrator.value = user.Policy?.IsAdministrator == true
         }
         // Real screens/settings.js's own async loaded Privacy card:
         // fired alongside the user fetch above, not blocking it.
@@ -258,8 +233,6 @@ class SettingsViewModel @Inject constructor(
     fun avatarPresetUrl(session: Session, id: String): String =
         repository.avatarPresetUrl(session.serverAddress, session.accessToken, id)
 
-    fun adminDashboardUrl(session: Session): String = repository.adminDashboardUrl(session.serverAddress)
-
     fun selectAvatarPreset(session: Session, presetId: String) {
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {
@@ -292,24 +265,6 @@ class SettingsViewModel @Inject constructor(
             } catch (err: Exception) {
                 _avatarPickerStatus.value = "Could not upload that picture."
                 _avatarBusyKey.value = null
-            }
-        }
-    }
-
-    fun authorizeQuickConnect(code: String) {
-        val trimmed = code.trim()
-        if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            _isAuthorizingQuickConnect.value = true
-            _quickConnectStatus.value = "Approving…"
-            try {
-                val authorized = repository.authorizeQuickConnect(trimmed)
-                _quickConnectStatus.value = if (authorized) "Device approved." else "That code was not recognized."
-                if (authorized) _quickConnectApproveTick.value += 1
-            } catch (err: Exception) {
-                _quickConnectStatus.value = "Could not approve that code."
-            } finally {
-                _isAuthorizingQuickConnect.value = false
             }
         }
     }
