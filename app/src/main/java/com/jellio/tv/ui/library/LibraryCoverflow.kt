@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TrendingUp
@@ -171,20 +173,61 @@ fun LibraryCoverflow(
                     )
                 }
             }
+            // Real HeroSection.kt's own header on this exact fix: real
+            // feedback found these two chevrons missing here too, same
+            // real D-pad equivalent of components/libraryCoverflow.js's
+            // own mouse-click prevButton/nextButton, docked against
+            // this stage's own edges rather than the hero's.
+            Surface(
+                onClick = { index = (index - 1 + items.size) % items.size },
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.35f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContentColor = JellioText,
+                ),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
+                }
+            }
+            Surface(
+                onClick = { index = (index + 1) % items.size },
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.35f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContentColor = JellioText,
+                ),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
+                }
+            }
         }
 
+        // Real feedback: purely a position indicator here, same real
+        // reason HeroSection.kt's own dot row is no longer a real
+        // Surface either. A real Surface per dot (even with its own
+        // onClick removed) is still individually focusable on its own,
+        // a whole real row of tiny D-pad targets with nothing useful to
+        // stop at; a plain Box carries no such real focus node at all.
         Row(modifier = Modifier.padding(start = 48.dp, top = 20.dp)) {
             items.forEachIndexed { i, _ ->
                 val active = i == index
                 val dotWidth by animateDpAsState(targetValue = if (active) 30.dp else 8.dp, animationSpec = tween(320), label = "dotWidth")
-                Surface(
-                    onClick = { index = i },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (active) JellioText else Color.White.copy(alpha = 0.3f),
-                    ),
-                    modifier = Modifier.padding(end = 8.dp).width(dotWidth).height(8.dp),
-                ) {}
+                Box(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .width(dotWidth)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (active) JellioText else Color.White.copy(alpha = 0.3f)),
+                )
             }
         }
     }
