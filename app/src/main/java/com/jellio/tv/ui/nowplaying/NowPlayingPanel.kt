@@ -21,10 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +51,7 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // vertical list, one row per real active session, "Nothing playing
 // right now" the same real empty state that file's own panel shows
 // rather than an empty list with no explanation.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NowPlayingPanel(
     sessions: List<NowPlayingSessionDto>,
@@ -54,9 +60,18 @@ fun NowPlayingPanel(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onDismiss)
+    // Real bug found live testing on device, same real class every
+    // other overlay in this app already had to fix: nothing here ever
+    // requested initial D-pad focus, and nothing stopped focus
+    // wandering back out into the sidebar/screen underneath either.
+    // The Close button is the one real target guaranteed to exist
+    // regardless of whether any real session is active.
+    val closeFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { closeFocusRequester.requestFocus() }
     Box(
         modifier = modifier
             .fillMaxSize()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -85,7 +100,7 @@ fun NowPlayingPanel(
                     onClick = onDismiss,
                     shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.1f), contentColor = JellioText),
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(28.dp).focusRequester(closeFocusRequester),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.Close, contentDescription = "Close", modifier = Modifier.size(14.dp))

@@ -355,18 +355,20 @@ class JellioRepository @Inject constructor(
         val tvView = views.firstOrNull { it.CollectionType == "tvshows" }
         val realAnimeView = views.firstOrNull { ANIME_VIEW_NAME.containsMatchIn(it.Name ?: "") }
 
-        val animeEntry = when {
-            realAnimeView != null -> realAnimeView
-            tvView != null -> {
-                val hasAnimeCatalogs = try {
-                    getCollections(userId).any { isAnimeCollection(it) }
-                } catch (err: Exception) {
-                    false
-                }
-                if (hasAnimeCatalogs) tvView.copy(Name = "Anime") else null
-            }
-            else -> null
-        }
+        // Real components/navShared.js's own getPrimaryNavLinks(): this
+        // used to wait on a real getCollections() round trip first,
+        // gating the fallback Anime entry on an actual anime/anilist
+        // catalog turning up, real feedback traced to that same real
+        // bug that file's own header now documents: Anime sat visibly
+        // slower to appear than Movies/Shows, and any failure or empty
+        // real result along that path (this one adds a second real
+        // network call getCollections() doesn't need to make at all)
+        // dropped the entry outright rather than degrading to an empty
+        // state. Pushed unconditionally now, the same real bet every
+        // other library entry here already makes: a server with no
+        // real anime catalogs still gets a real Anime entry, its own
+        // screen's own empty state the one real place that check lives.
+        val animeEntry = realAnimeView ?: tvView?.copy(Name = "Anime")
 
         return listOfNotNull(moviesView, tvView, animeEntry)
     }
