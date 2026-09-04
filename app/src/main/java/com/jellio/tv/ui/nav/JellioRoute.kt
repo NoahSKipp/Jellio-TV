@@ -85,6 +85,18 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
 }
 
+// Material's own filled Settings glyph carries noticeably more
+// built-in padding around the gear than the rest of this rail's icons
+// (the ported search/library path data especially), so it reads
+// visibly smaller than its siblings at the same box size even though
+// every SidebarItem box is identical. Real feedback live: nudge just
+// this one glyph up rather than resizing the whole rail to compensate
+// for one icon's own viewBox padding.
+fun JellioRoute.iconScale(): Float = when (this) {
+    JellioRoute.Settings -> 1.2f
+    else -> 1f
+}
+
 fun JellioRoute.label(): String = when (this) {
     is JellioRoute.Profile -> "Profile"
     JellioRoute.Home -> "Home"
