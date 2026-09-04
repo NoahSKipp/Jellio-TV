@@ -147,7 +147,7 @@ fun ProfileScreen(
                                     if (uiState.isOwner && profile?.IsPrivate == true) {
                                         Surface(
                                             onClick = {},
-                                            shape = RoundedCornerShape(999.dp),
+                                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                                             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioTextSecondary),
                                             modifier = Modifier.padding(top = 4.dp),
                                         ) {
@@ -251,7 +251,7 @@ private fun ProfileBanner(bannerUrl: String, isOwner: Boolean, onChangeBanner: (
         if (isOwner) {
             Surface(
                 onClick = onChangeBanner,
-                shape = RoundedCornerShape(999.dp),
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                 colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             ) {
@@ -284,14 +284,14 @@ private fun BioSection(
             Row(modifier = Modifier.padding(top = 8.dp)) {
                 Surface(
                     onClick = onSave,
-                    shape = RoundedCornerShape(999.dp),
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
                 ) {
                     Text(text = if (isSaving) "Saving..." else "Save", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onCancel,
-                    shape = RoundedCornerShape(999.dp),
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
                     modifier = Modifier.padding(start = 8.dp),
                 ) {
@@ -342,7 +342,7 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
-        modifier = modifier.height((badges.size / 4 + 1) * 110.dp),
+        modifier = modifier.height(110.dp * (badges.size / 4 + 1)),
     ) {
         items(badges) { badge -> BadgeTile(badge) }
     }
