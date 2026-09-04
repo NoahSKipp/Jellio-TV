@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,12 +26,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 // screens/detail.js's own #/item route and screens/player.js's own
 // #/play route draw against the sidebar's fixed link set.
 sealed interface JellioRoute {
-    data object Profile : JellioRoute
+    // userId null means the signed in reader's own profile
+    // (switchTab() below always uses that default); Feed rows push a
+    // real other user's own id instead (Workstream 2's own real
+    // #/profile?id=X port), same real reason Detail/Person/Player
+    // below already carry their own real identity rather than reading
+    // it back out of some other piece of screen state.
+    data class Profile(val userId: String? = null) : JellioRoute
     data object Home : JellioRoute
     data object Search : JellioRoute
     data object Watchlist : JellioRoute
     data object Calendar : JellioRoute
     data object Library : JellioRoute
+    data object Feed : JellioRoute
     data object Settings : JellioRoute
     data class Detail(val itemId: String) : JellioRoute
     data class Person(val personId: String) : JellioRoute
@@ -51,14 +59,15 @@ val JellioNavItems: List<JellioRoute> = listOf(
     JellioRoute.Home,
     JellioRoute.Search,
     JellioRoute.Library,
-    JellioRoute.Profile,
+    JellioRoute.Feed,
+    JellioRoute.Profile(),
     JellioRoute.Watchlist,
     JellioRoute.Calendar,
     JellioRoute.Settings,
 )
 
 fun JellioRoute.icon(): ImageVector = when (this) {
-    JellioRoute.Profile -> Icons.Filled.AccountCircle
+    is JellioRoute.Profile -> Icons.Filled.AccountCircle
     JellioRoute.Home -> Icons.Filled.Home
     // js/persistentSidebar.js's own SVG_ICONS.search, ported path data
     // the same real way Library's own icon already is: the Material
@@ -71,17 +80,19 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // called out VideoLibrary and then PermMedia in turn as visible
     // mismatches against this exact icon.
     JellioRoute.Library -> LibraryIconVector
+    JellioRoute.Feed -> Icons.Filled.DynamicFeed
     JellioRoute.Settings -> Icons.Filled.Settings
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
 }
 
 fun JellioRoute.label(): String = when (this) {
-    JellioRoute.Profile -> "Profile"
+    is JellioRoute.Profile -> "Profile"
     JellioRoute.Home -> "Home"
     JellioRoute.Search -> "Search"
     JellioRoute.Watchlist -> "Watchlist"
     JellioRoute.Calendar -> "Calendar"
     JellioRoute.Library -> "Library"
+    JellioRoute.Feed -> "Feed"
     JellioRoute.Settings -> "Settings"
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""
 }
@@ -95,3 +106,8 @@ fun JellioRoute.label(): String = when (this) {
 // hero just as immersive as screens/detail.js's own.
 fun JellioRoute.isImmersive(): Boolean =
     this is JellioRoute.Detail || this is JellioRoute.Person || this is JellioRoute.Service || this is JellioRoute.Player
+
+// A pushed real other-user Profile (Feed row click) still reserves
+// this pill's own real space and stays reachable, same as any other
+// non-immersive real screen: only Detail/Person/Service/Player above
+// go full bleed.

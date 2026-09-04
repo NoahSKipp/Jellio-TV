@@ -1,11 +1,13 @@
 package com.jellio.tv.data.network
 
+import com.jellio.tv.data.model.AchievementsDto
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AuthenticationResultDto
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.ClientConfigDto
+import com.jellio.tv.data.model.FeedEntryDto
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
@@ -15,7 +17,12 @@ import com.jellio.tv.data.model.PinRedeemResultDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
+import com.jellio.tv.data.model.ProfileDto
 import com.jellio.tv.data.model.PublicSystemInfoDto
+import com.jellio.tv.data.model.RealWatchRequest
+import com.jellio.tv.data.model.ReportDurationRequest
+import com.jellio.tv.data.model.SetBioRequest
+import com.jellio.tv.data.model.SetPrivacyRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.UpdatePasswordRequest
@@ -193,6 +200,13 @@ interface JellyfinApi {
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
 
+    // Real Controllers/FeedController.cs endpoint: server wide, every
+    // non-private user's own watch activity and badge unlocks merged
+    // and re-sorted by OccurredAtUtc, that controller's own header
+    // confirmed before porting this.
+    @GET("Jellio/feed")
+    suspend fun getFeed(): List<FeedEntryDto>
+
     // Real Controllers/ConfigController.cs endpoint: one real server
     // side, admin controlled source components/seasonalEffects.js's
     // own real overlay reads, confirmed against that controller's own
@@ -291,6 +305,61 @@ interface JellyfinApi {
     @POST("Users/{userId}/Images/Primary")
     suspend fun uploadUserAvatar(@Path("userId") userId: String, @Body body: RequestBody)
 
+    // Real Controllers/ProfileController.cs endpoints, confirmed
+    // against that controller's own source before porting this: the
+    // {userId} route is the one public read (IsPrivate/Bio, real
+    // Steam-style split, badges/activity go dark separately via
+    // AchievementsController below, not this one), settings/bio are
+    // self only.
+    @GET("Jellio/profile/{userId}")
+    suspend fun getProfile(@Path("userId") userId: String): ProfileDto
+
+    @GET("Jellio/profile/settings")
+    suspend fun getProfileSettings(): ProfileDto
+
+    @POST("Jellio/profile/bio")
+    suspend fun setProfileBio(@Body body: SetBioRequest)
+
+    @POST("Jellio/profile/privacy")
+    suspend fun setProfilePrivacy(@Body body: SetPrivacyRequest)
+
+    // Real Controllers/AchievementsController.cs's own {userId} route:
+    // the caller's own stats/badges/activity when userId is their own,
+    // a locked {IsPrivate: true} shell for anyone else's private
+    // profile, confirmed against that controller's own source.
+    @GET("Jellio/achievements/{userId}")
+    suspend fun getAchievements(@Path("userId") userId: String): AchievementsDto
+
+    // Real Controllers/ProfileBannerController.cs endpoints: upload
+    // mirrors uploadUserAvatar above exactly (same real base64 body/
+    // Content-Type convention, that controller's own header confirms
+    // runtime/api.js's own uploadUserAvatarBlob already works
+    // unchanged against it), no native Jellyfin image slot exists for
+    // a banner at all.
+    @POST("Jellio/profile/banner")
+    suspend fun uploadProfileBanner(@Body body: RequestBody)
+
+    @DELETE("Jellio/profile/banner")
+    suspend fun deleteProfileBanner()
+
+    // Real Controllers/AchievementsController.cs's own real-watch
+    // endpoint: item.RunTimeTicks is the library's own metadata
+    // runtime, not whatever Gelato actually resolved and streamed, so
+    // ui/player's own real ExoPlayer duration/position is what decides
+    // when to call this, not this file, same real reason
+    // screens/player.js's own creditRealWatch() call site never trusts
+    // item.RunTimeTicks either.
+    @POST("Jellio/achievements/real-watch")
+    suspend fun creditRealWatch(@Body body: RealWatchRequest)
+
+    // Real Controllers/RealDurationController.cs endpoints: a title's
+    // own real observed duration, not per user, fed by ui/player's own
+    // real trustworthy signals (ExoPlayer's own real duration, or the
+    // real position 'ended'/Up Next confirm a genuine full watch at),
+    // same real three signals screens/player.js's own
+    // reportRealDurationIfUseful() already uses.
+    @POST("Jellio/real-duration")
+    suspend fun reportRealDuration(@Body body: ReportDurationRequest)
 }
 
 // Real Jellyfin auth convention every client sends, confirmed against

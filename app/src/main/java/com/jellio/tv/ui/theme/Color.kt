@@ -21,3 +21,11 @@ val JellioTextTertiary = Color(0xFF808080)
 val JellioBorder = Color(0xFF333333)
 // css/app.css's own .jellio-card-options-item-danger: #ff6b81.
 val JellioDanger = Color(0xFFFF6B81)
+
+// css/app.css's own --jellio-rarity-* tokens, badge rarity tiers:
+// Legendary reuses --jellio-trending-color (#ff9800) there too, same
+// real value kept here rather than a separate accidental duplicate.
+val JellioRarityCommon = Color(0xFF8A90A0)
+val JellioRarityRare = Color(0xFF5B9DF0)
+val JellioRarityEpic = Color(0xFFB57BF2)
+val JellioRarityLegendary = Color(0xFFFF9800)

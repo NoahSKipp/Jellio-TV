@@ -30,6 +30,7 @@ import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
+import com.jellio.tv.ui.feed.FeedScreen
 import com.jellio.tv.ui.home.HomeScreen
 import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
@@ -278,9 +279,19 @@ private fun JellioTvApp(
                 .let { if (!route.isImmersive()) it.padding(start = SidebarReservedWidth.scaled()) else it },
         ) {
         when (val current = route) {
-            JellioRoute.Profile -> ProfileScreen(
+            is JellioRoute.Profile -> ProfileScreen(
                 session = session,
+                userId = current.userId,
+                userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
+                bannerUrl = { userId -> appViewModel.bannerUrl(session, userId) },
+                itemImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onLogout = { appViewModel.logout() },
+                modifier = Modifier.fillMaxSize(),
+            )
+            JellioRoute.Feed -> FeedScreen(
+                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
+                onUserClick = { userId -> push(JellioRoute.Profile(userId)) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Home -> HomeScreen(
@@ -342,6 +353,7 @@ private fun JellioTvApp(
             JellioRoute.Settings -> SettingsScreen(
                 session = session,
                 onLogout = { appViewModel.logout() },
+                onViewProfile = { push(JellioRoute.Profile()) },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Detail -> DetailScreen(

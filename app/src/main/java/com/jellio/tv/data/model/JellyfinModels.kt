@@ -362,3 +362,95 @@ data class ClientConfigDto(
     val SeasonalEffectsEnabled: Boolean = false,
     val SeasonalEffects: Map<String, SeasonalEffectConfigDto> = emptyMap(),
 )
+
+// Real Controllers/FeedController.cs shape, its own FeedEntry record:
+// Kind ("Watch" | "Badge") is a flat discriminator on one real merged,
+// re-sorted list, not two separate response arrays, that controller's
+// own header explains why. Watch fields (ItemId..LastEpisodeNumber)
+// are null on a Badge entry and vice versa.
+// Real Controllers/ProfileController.cs shape: the same {IsPrivate,
+// Bio} both its own public GET {userId} route and self only GET
+// settings return (settings also carries GrouplistEnabled, not
+// modeled here since Grouplist itself has no Android counterpart yet).
+@JsonClass(generateAdapter = true)
+data class ProfileDto(
+    val IsPrivate: Boolean = false,
+    val Bio: String? = null,
+)
+
+// Real Services/Achievements/GroupedActivityEntry.cs shape,
+// ActivityGrouping.Group's own real output: CompletedAtUtc, not
+// OccurredAtUtc (FeedEntryDto's own field for the same real concept,
+// server side a different record entirely despite the same real data
+// underneath it, confirmed against both real C# sources before typing
+// either one differently here).
+@JsonClass(generateAdapter = true)
+data class GroupedActivityEntryDto(
+    val ItemId: String,
+    val ItemName: String? = null,
+    val ItemType: String? = null,
+    val SeriesName: String? = null,
+    val SeriesId: String? = null,
+    val CompletedAtUtc: String? = null,
+    val EpisodeCount: Int = 0,
+    val SeasonNumber: Int? = null,
+    val FirstEpisodeNumber: Int? = null,
+    val LastEpisodeNumber: Int? = null,
+)
+
+// Real Controllers/AchievementsController.cs's own Build(userId)
+// shape, badge.Rarity.ToString() as the real BadgeDto.Rarity string
+// (Common/Rare/Epic/Legendary).
+@JsonClass(generateAdapter = true)
+data class BadgeDto(
+    val Id: String,
+    val Name: String? = null,
+    val Description: String? = null,
+    val Rarity: String? = null,
+    val Unlocked: Boolean = false,
+    val UnlockedAt: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AchievementsDto(
+    val IsPrivate: Boolean = false,
+    val MoviesCompleted: Int = 0,
+    val EpisodesCompleted: Int = 0,
+    val TotalCompleted: Int = 0,
+    val BestBingeStreak: Int = 0,
+    val Badges: List<BadgeDto> = emptyList(),
+    val RecentActivity: List<GroupedActivityEntryDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class SetBioRequest(val Bio: String?)
+
+@JsonClass(generateAdapter = true)
+data class SetPrivacyRequest(val IsPrivate: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class RealWatchRequest(val ItemId: String)
+
+@JsonClass(generateAdapter = true)
+data class ReportDurationRequest(val ItemId: String, val DurationTicks: Long)
+
+@JsonClass(generateAdapter = true)
+data class FeedEntryDto(
+    val UserId: String,
+    val UserName: String? = null,
+    val Kind: String,
+    val OccurredAtUtc: String,
+    val ItemId: String? = null,
+    val ItemName: String? = null,
+    val ItemType: String? = null,
+    val SeriesName: String? = null,
+    val SeriesId: String? = null,
+    val EpisodeCount: Int = 0,
+    val SeasonNumber: Int? = null,
+    val FirstEpisodeNumber: Int? = null,
+    val LastEpisodeNumber: Int? = null,
+    val BadgeId: String? = null,
+    val BadgeName: String? = null,
+    val BadgeDescription: String? = null,
+    val BadgeRarity: String? = null,
+)
