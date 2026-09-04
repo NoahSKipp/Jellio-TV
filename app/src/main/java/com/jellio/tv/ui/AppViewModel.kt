@@ -97,6 +97,16 @@ class AppViewModel @Inject constructor(
     fun rawImageUrl(session: Session, itemId: String, tag: String?, imageType: String, maxWidth: Int): String =
         repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth)
 
+    // Real port of runtime/api.js's own getUserImageUrl(): screens/
+    // feed.js and screens/profile.js's own avatar images, tag left
+    // null when the caller (a feed row) has no PrimaryImageTag handy,
+    // same real behaviour that file's own call already has.
+    fun userImageUrl(session: Session, userId: String, tag: String?, maxWidth: Int): String =
+        repository.userImageUrl(session.serverAddress, userId, tag, maxWidth)
+
+    fun bannerUrl(session: Session, userId: String): String =
+        repository.bannerUrl(session.serverAddress, userId)
+
     // components/services.js's own real logoUrl(): the plugin's own
     // FrontendController.cs serves these SVGs straight off the
     // Jellyfin server itself, not through Coil's usual Items/Images

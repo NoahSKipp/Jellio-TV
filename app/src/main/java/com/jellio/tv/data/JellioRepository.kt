@@ -1,15 +1,22 @@
 package com.jellio.tv.data
 
+import com.jellio.tv.data.model.AchievementsDto
 import com.jellio.tv.data.model.AuthenticateByNameRequest
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
 import com.jellio.tv.data.model.ClientConfigDto
+import com.jellio.tv.data.model.FeedEntryDto
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
+import com.jellio.tv.data.model.ProfileDto
+import com.jellio.tv.data.model.RealWatchRequest
+import com.jellio.tv.data.model.ReportDurationRequest
+import com.jellio.tv.data.model.SetBioRequest
+import com.jellio.tv.data.model.SetPrivacyRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.TrickplayInfoDto
@@ -143,6 +150,10 @@ private class TtlCache {
     fun invalidate(key: String) {
         entries.remove(key)
     }
+
+    fun clear() {
+        entries.clear()
+    }
 }
 
 // The one real place both auth and every other Jellyfin call go
@@ -156,6 +167,18 @@ class JellioRepository @Inject constructor(
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
     private val cache = TtlCache()
+
+    // Real port of runtime/api.js's own clearCache(): every real cache
+    // entry keyed off the previously signed in user (items, details,
+    // seasons/episodes, the user object itself, ...) is still real,
+    // still fresh data for that user, just the wrong one the moment
+    // this same real @Singleton switches to a different real account
+    // without a real process restart. Called from every real place
+    // sessionManager.saveSession() below actually changes which user is
+    // signed in (connectAndLogin, quickSignIn) plus logout() itself, so
+    // nothing cached under the outgoing account can leak into the next
+    // one that signs in during this same real process.
+    fun clearCache() = cache.clear()
 
     // The one real server address a fresh install has never asked for
     // yet: null only before the very first successful connectAndLogin()
@@ -180,6 +203,7 @@ class JellioRepository @Inject constructor(
             val deviceId = sessionManager.deviceId()
             val authHeader = buildEmbyAuthorizationHeader(deviceId, APP_VERSION)
             val result = api.authenticateByName(authHeader, AuthenticateByNameRequest(username, password))
+            clearCache()
             sessionManager.saveSession(normalized, result.AccessToken, result.User.Id, result.User.Name)
             rememberUser(normalized, result.User.Id, result.AccessToken, result.User.Name, result.User.PrimaryImageTag)
             LoginResult.Success
@@ -234,6 +258,7 @@ class JellioRepository @Inject constructor(
         sessionManager.saveServerAddress(serverAddress)
         return try {
             val user = api.getUserWithToken(entry.accessToken, userId)
+            clearCache()
             sessionManager.saveSession(serverAddress, entry.accessToken, user.Id, user.Name)
             rememberUser(serverAddress, user.Id, entry.accessToken, user.Name, user.PrimaryImageTag)
             LoginResult.Success
@@ -247,6 +272,15 @@ class JellioRepository @Inject constructor(
         val base = "$serverAddress/Users/$userId/Images/Primary?maxWidth=$maxWidth"
         return if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
     }
+
+    // Real Controllers/ProfileBannerController.cs's own GET {userId}:
+    // cache-busted with a real timestamp query param, same real reason
+    // screens/profile.js's own buildBanner() appends '&t=' +
+    // Date.now() (a fresh upload replacing the file at this same real
+    // path otherwise keeps serving whatever Coil already cached for
+    // it).
+    fun bannerUrl(serverAddress: String, userId: String): String =
+        "$serverAddress/Jellio/profile/banner/$userId?t=${System.currentTimeMillis()}"
 
     // Real port of runtime/auth.js's own requestPasswordReset(): a real
     // failure comes back true anyway, the same real leak-prevention
@@ -288,7 +322,10 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    suspend fun logout() = sessionManager.clearSession()
+    suspend fun logout() {
+        clearCache()
+        sessionManager.clearSession()
+    }
 
     suspend fun getLibraries(userId: String): List<BaseItemDto> =
         cache.get("views:$userId", CACHE_TTL_MS) { api.getUserViews(userId).Items }
@@ -801,6 +838,51 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+
+    // Plain passthrough, same as getCalendarEntries above: FeedViewModel's
+    // own load() decides what a failed request means (a real retry
+    // state, matching screens/feed.js's own try/catch), not this layer.
+    suspend fun getFeed(): List<FeedEntryDto> = api.getFeed()
+
+    // Plain passthroughs, same real reason getFeed above is:
+    // ProfileViewModel's own load() decides what a failure means (a
+    // real retry state, matching screens/profile.js's own try/catch),
+    // not this layer.
+    suspend fun getProfile(userId: String): ProfileDto = api.getProfile(userId)
+
+    suspend fun getAchievements(userId: String): AchievementsDto = api.getAchievements(userId)
+
+    suspend fun setProfileBio(bio: String?) {
+        api.setProfileBio(SetBioRequest(bio))
+    }
+
+    suspend fun getProfileSettings(): ProfileDto = api.getProfileSettings()
+
+    suspend fun setProfilePrivacy(isPrivate: Boolean) {
+        api.setProfilePrivacy(SetPrivacyRequest(isPrivate))
+    }
+
+    // PlayerViewModel's own real markRealWatchComplete()/
+    // reportRealDurationIfUseful() decide when either of these actually
+    // fires, off ui/player's own real ExoPlayer signals, not this
+    // layer.
+    suspend fun creditRealWatch(itemId: String) = api.creditRealWatch(RealWatchRequest(itemId))
+
+    suspend fun reportRealDuration(itemId: String, durationTicks: Long) =
+        api.reportRealDuration(ReportDurationRequest(itemId, durationTicks))
+
+    // Real port of the same real uploadUserAvatarBlob() shape
+    // setUserAvatarFromBytes() above already uses, pointed at
+    // ProfileBannerController.cs's own upload route instead.
+    suspend fun setProfileBannerFromBytes(bytes: ByteArray, contentType: String) {
+        val body = withContext(Dispatchers.Default) {
+            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            base64.toRequestBody(contentType.toMediaTypeOrNull())
+        }
+        api.uploadProfileBanner(body)
+    }
+
+    suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
 
