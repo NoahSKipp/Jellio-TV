@@ -107,14 +107,14 @@ fun SettingsScreen(
                 Surface(
                     onClick = { viewModel.openAvatarPicker() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 ) {
                     Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
                 Surface(
                     onClick = onViewProfile,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 ) {
                     Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
@@ -214,7 +214,7 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Row(
@@ -352,7 +352,7 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
             onClick = { viewModel.updatePassword(session, current, next, confirm) },
             enabled = !isUpdating,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Text(text = if (isUpdating) "Updating..." else "Update password", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
@@ -379,7 +379,7 @@ private fun SleepTimerSection(viewModel: SettingsViewModel) {
                 onClick = { viewModel.cancelSleepTimer() },
                 enabled = !isCancelling,
                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 modifier = Modifier.padding(top = 16.dp),
             ) {
                 Text(text = if (isCancelling) "Cancelling..." else "Cancel timer", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
@@ -421,7 +421,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
             onClick = { viewModel.checkForUpdateManually() },
             enabled = result != ManualCheckResult.Checking,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         ) {
             Text(text = "Check for Updates", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
         }
@@ -468,7 +468,7 @@ private fun SettingsToggleRow(label: String, description: String, checked: Boole
     Surface(
         onClick = onToggle,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

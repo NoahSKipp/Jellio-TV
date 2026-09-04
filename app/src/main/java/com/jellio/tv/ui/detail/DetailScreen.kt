@@ -629,7 +629,7 @@ private fun EpisodeCard(
             onClick = onClick,
             onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
             modifier = Modifier.width(cardWidth),
         ) {
             Column {
@@ -718,7 +718,7 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                 Surface(
                     onClick = { onOpen(url) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                     modifier = Modifier.width(trailerCardWidth),
                 ) {
                     Column {

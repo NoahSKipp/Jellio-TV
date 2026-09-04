@@ -210,7 +210,7 @@ private fun ProfileTile(
                 onClick = onClick,
                 enabled = !busy,
                 shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 modifier = Modifier.size(112.dp),
             ) {
                 if (isAddTile) {

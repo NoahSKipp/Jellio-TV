@@ -175,7 +175,7 @@ fun LandscapeCard(
         onClick = onClick,
         onLongClick = onOptionsClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.width(landscapeCardWidth),
     ) {
         Box(modifier = Modifier.width(landscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
