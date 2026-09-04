@@ -17,10 +17,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -39,6 +41,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(
@@ -51,6 +54,7 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
@@ -86,7 +90,23 @@ fun LibraryScreen(
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
                     item {
-                        LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge, editorial = uiState.editorial)
+                        // Real HomeScreen.kt's own header on this exact
+                        // fix: LibraryCoverflow's own real View Details
+                        // button sits near its own bottom edge too, so
+                        // without this, Compose's own default per-child
+                        // bring-into-view request left this list
+                        // scrolled to that button's own real bounds on
+                        // a Down-then-Up round trip, never this item's
+                        // own real top.
+                        Box(
+                            modifier = Modifier.onFocusChanged { state ->
+                                if (state.hasFocus) {
+                                    scope.launch { listState.scrollToItem(0) }
+                                }
+                            },
+                        ) {
+                            LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge, editorial = uiState.editorial)
+                        }
                     }
                 }
                 item {
