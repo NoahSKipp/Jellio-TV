@@ -107,6 +107,13 @@ class SettingsViewModel @Inject constructor(
     private val _isAdministrator = MutableStateFlow(false)
     val isAdministrator: StateFlow<Boolean> = _isAdministrator.asStateFlow()
 
+    // Real port of screens/settings.js's own buildPrivacyCard(): badges
+    // and activity go dark for other users, the profile picture and
+    // banner stay visible either way, same real Steam-style split
+    // ProfileScreen.kt's own header already documents.
+    private val _isPrivate = MutableStateFlow(false)
+    val isPrivate: StateFlow<Boolean> = _isPrivate.asStateFlow()
+
     private var loadedUserId: String? = null
 
     init {
@@ -138,6 +145,20 @@ class SettingsViewModel @Inject constructor(
                 _subtitleLanguage.value = matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
             }
             _isAdministrator.value = user.Policy?.IsAdministrator == true
+        }
+        // Real screens/settings.js's own async loaded Privacy card:
+        // fired alongside the user fetch above, not blocking it.
+        viewModelScope.launch {
+            val settings = runCatching { repository.getProfileSettings() }.getOrNull() ?: return@launch
+            _isPrivate.value = settings.IsPrivate
+        }
+    }
+
+    fun setPrivate(enabled: Boolean) {
+        val previous = _isPrivate.value
+        _isPrivate.value = enabled
+        viewModelScope.launch {
+            runCatching { repository.setProfilePrivacy(enabled) }.onFailure { _isPrivate.value = previous }
         }
     }
 
