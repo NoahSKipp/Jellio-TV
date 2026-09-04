@@ -769,9 +769,70 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { repository.reportPlaybackProgress(id, uiState.value.mediaSourceId, positionTicks, isPaused) }
     }
 
+    // Real bug, matches the exact same one screens/player.js's own
+    // cleanup() had to work around (real Jellio fix, confirmed against
+    // that file's own header before porting this here too): reporting
+    // the real current position here unconditionally used to undo
+    // markRealWatchComplete() below the moment this screen tore down.
+    // Native UserDataManager.UpdatePlayState still divides by the
+    // library's own inflated RunTimeTicks on every real stop report, so
+    // a real position sitting under its own 90% MaxResumePct there
+    // resurrects a real resume position (PlaybackPositionTicks set back
+    // to that real value) while never touching Played (stays true,
+    // setPlayed() below already set it) - watched correctly marked, but
+    // still stuck in Continue Watching with no time left. Reporting 0
+    // once markRealWatchComplete() already ran keeps native Jellyfin's
+    // own math in its own "ignore progress during the beginning" branch
+    // instead, which only ever touches positionTicks, never Played.
     fun reportStopped(positionTicks: Long) {
         val id = itemId ?: return
-        viewModelScope.launch { repository.reportPlaybackStopped(id, uiState.value.mediaSourceId, positionTicks) }
+        val reportedPositionTicks = if (hasCreditedRealWatch) 0 else positionTicks
+        viewModelScope.launch { repository.reportPlaybackStopped(id, uiState.value.mediaSourceId, reportedPositionTicks) }
+    }
+
+    // Real port of screens/player.js's own markRealWatchComplete():
+    // item.RunTimeTicks is the library's own metadata runtime, not
+    // whatever Gelato actually resolved and streamed, so a genuine full
+    // watch can land under AchievementService's own 90% metadata based
+    // gate and under native Jellyfin's own MaxResumePct gate alike.
+    // creditRealWatch feeds Jellio's own achievement/feed credit;
+    // setPlayed mirrors that same real completion into native
+    // Jellyfin's own Played flag too (Continue Watching, Up Next, the
+    // native watched checkmark all read that, not this plugin's own
+    // data), same real reason player.js's own markRealWatchComplete()
+    // calls both.
+    private var hasCreditedRealWatch = false
+
+    fun markRealWatchComplete() {
+        if (hasCreditedRealWatch) return
+        hasCreditedRealWatch = true
+        val id = itemId ?: return
+        val userId = trickplaySession?.userId ?: return
+        viewModelScope.launch { runCatching { repository.creditRealWatch(id) } }
+        viewModelScope.launch { runCatching { repository.setPlayed(userId, id, true) } }
+    }
+
+    // Real port of screens/player.js's own reportRealDurationIfUseful():
+    // monotonically increasing on purpose, not just deduped. Up Next's
+    // own real position (skipSegments' own Credits.Start, or the
+    // fallback trigger) is only ever a lower bound on this title's own
+    // real length (it always lands before the real end), so a later,
+    // smaller candidate is never actually better information and must
+    // not overwrite an already reported larger one; ExoPlayer's own
+    // real duration and the real position 'ended' fires at are both the
+    // true real total whenever they do fire, always >= any lower bound
+    // reported before them, so this same rule lets either of those
+    // through regardless of order.
+    private var lastReportedDurationSeconds = 0.0
+
+    fun reportRealDurationIfUseful(candidateSeconds: Double) {
+        if (candidateSeconds <= 0 || !candidateSeconds.isFinite()) return
+        if (candidateSeconds < lastReportedDurationSeconds + 5) return
+        lastReportedDurationSeconds = candidateSeconds
+        val id = itemId ?: return
+        viewModelScope.launch {
+            runCatching { repository.reportRealDuration(id, (candidateSeconds * 10_000_000L).toLong()) }
+        }
     }
 
     // Real port of screens/player.js's own startSleepTimer(minutes)

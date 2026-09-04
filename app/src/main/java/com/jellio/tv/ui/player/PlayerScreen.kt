@@ -200,6 +200,8 @@ fun PlayerScreen(
                 onReportStart = { viewModel.reportStart(it) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
                 onReportStopped = { viewModel.reportStopped(it) },
+                onMarkRealWatchComplete = { viewModel.markRealWatchComplete() },
+                onReportRealDuration = { seconds -> viewModel.reportRealDurationIfUseful(seconds) },
                 onSelectSubtitle = { track, positionTicks ->
                     when {
                         track == null -> viewModel.selectSubtitle(null)
@@ -256,6 +258,8 @@ private fun PlayerSurface(
     onReportStart: (Long) -> Unit,
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
+    onMarkRealWatchComplete: () -> Unit,
+    onReportRealDuration: (Double) -> Unit,
     onSelectSubtitle: (SubtitleTrackUiState?, Long) -> Unit,
     subtitleStyle: SubtitleStyle,
     onSetSubtitleSize: (String) -> Unit,
@@ -364,6 +368,15 @@ private fun PlayerSurface(
             }
             override fun onPlaybackStateChanged(state: Int) {
                 isEnded = state == Player.STATE_ENDED
+                // Real port of screens/player.js's own 'ended' listener:
+                // needs no known duration at all, the strongest of the
+                // three real signals since ExoPlayer only ever reaches
+                // STATE_ENDED once this real stream has genuinely run
+                // out of data to play.
+                if (isEnded) {
+                    onReportRealDuration(player.currentPosition / 1000.0)
+                    onMarkRealWatchComplete()
+                }
             }
         }
         player.addListener(listener)
@@ -400,6 +413,13 @@ private fun PlayerSurface(
         while (isActive) {
             if (player.duration > 0 && player.playbackState != Player.STATE_IDLE) {
                 durationMs = player.duration
+                // Real port of screens/player.js's own
+                // reconcileDuration(): ExoPlayer's own real duration,
+                // the strongest of the three real signals
+                // reportRealDurationIfUseful() takes since it is the
+                // real total, not a lower bound off wherever playback
+                // happens to be right now.
+                onReportRealDuration(durationMs / 1000.0)
                 if (!seekedToResume && startPositionTicks > 0) {
                     seekedToResume = true
                     player.seekTo(startPositionTicks / TICKS_PER_MS)
@@ -417,12 +437,31 @@ private fun PlayerSurface(
             }
             positionMs = player.currentPosition
             // Real port of screens/player.js's own timeupdate-driven
+            // REAL_WATCH_COMPLETION_THRESHOLD check: rides durationMs
+            // (only ever set once ExoPlayer's own real duration is
+            // actually known, see above), same real reason
+            // AchievementService's own item.RunTimeTicks based gate
+            // alone never reliably catches a genuine full watch of a
+            // title whose library metadata runtime is inflated.
+            if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9) {
+                onMarkRealWatchComplete()
+            }
+            // Real port of screens/player.js's own timeupdate-driven
             // shouldShowUpNextNow() check, fired at most once per real
             // title, same real showUpNext() guard that file's own
             // upNextShown/upNextDismissed pair already enforces.
             if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
                 if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
+                    // Real port of screens/player.js's own showUpNext():
+                    // playNextEpisode()/the countdown below can navigate
+                    // straight to the next episode's own screen before
+                    // 'ended' ever gets a chance to fire on this one, so
+                    // this real signal (skipSegments' own Credits.Start,
+                    // or the fallback trigger) has to credit and report
+                    // right here too, not only from 'ended'.
+                    onReportRealDuration(positionMs / 1000.0)
+                    onMarkRealWatchComplete()
                 }
             }
             delay(500)
