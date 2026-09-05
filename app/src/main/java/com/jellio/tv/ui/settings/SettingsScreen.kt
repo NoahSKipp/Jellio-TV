@@ -80,6 +80,13 @@ fun SettingsScreen(
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
+    // Real bug found live: AvatarPickerOverlay's own dismiss removed its
+    // whole real focused subtree with nothing requesting focus back
+    // onto this row first, the same real class of dead-remote bug -
+    // declared up here rather than inside the Column below since the
+    // overlay handling further down needs it too, outside that Column's
+    // own real scope.
+    val changeAvatarFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
@@ -99,12 +106,6 @@ fun SettingsScreen(
             .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
-
-        // Real ui/library/LibraryScreen.kt's own header on this same
-        // fix: AvatarPickerOverlay's own dismiss removed its whole real
-        // focused subtree with nothing requesting focus back onto this
-        // row first, the same real class of dead-remote bug.
-        val changeAvatarFocusRequester = remember { FocusRequester() }
 
         SettingsSection(title = "Server") {
             SettingsRow(label = "Address", value = session.serverAddress)
