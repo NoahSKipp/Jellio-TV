@@ -49,7 +49,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
-import com.jellio.tv.ui.common.ProgressSweep
+import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -133,11 +133,16 @@ fun HomeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
-                // Real port of css/progress.css's own real sweep, that
-                // file's own header calls out real work with nothing on
-                // screen to say so as the exact case this covers.
-                ProgressSweep(modifier = Modifier.align(Alignment.TopCenter))
-                Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.align(Alignment.Center))
+                // Real port of css/app.css's own .jellio-screen-spinner:
+                // this app's own generic "Loading..." state used to
+                // borrow ProgressSweep.kt's own real sweep bar instead,
+                // a real but different CSS class (that file's own
+                // header covers what it actually is), never what a
+                // reader on web actually sees here.
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
+                    ScreenSpinner()
+                    Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
+                }
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
