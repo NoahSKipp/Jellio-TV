@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +38,6 @@ import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -70,7 +68,6 @@ fun LibraryScreen(
     key(library.Id, library.Name) {
         val uiState by viewModel.uiState.collectAsState()
         val listState = rememberLazyListState()
-        val scope = rememberCoroutineScope()
         var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
         var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
         val openItemOptions = rememberCardOptionsHost(
@@ -166,18 +163,34 @@ fun LibraryScreen(
                         // it after something else already moved this
                         // list is still a real correction, not a
                         // visible fight.
-                        var coverflowWasFocused by remember { mutableStateOf(false) }
+                        // Real bug found live, on a real screen
+                        // recording: this fixed-count reassertion still
+                        // lost, every real time, to a later real default
+                        // scroll that only fired well after this real
+                        // 250ms window already closed (the exact real
+                        // moment this rail's own sidebar finished
+                        // collapsing shut, in that same recording) -
+                        // this real guard's own false-to-true condition
+                        // above never re-fires for it since focus never
+                        // actually left this item in between. Keeping
+                        // this real correction running for as long as
+                        // focus actually lives anywhere inside this item
+                        // instead, rather than a fixed real number of
+                        // attempts, closes that off regardless of how
+                        // late whatever it's racing against actually
+                        // fires.
+                        var coverflowHasFocus by remember { mutableStateOf(false) }
+                        LaunchedEffect(coverflowHasFocus) {
+                            if (coverflowHasFocus) {
+                                while (true) {
+                                    listState.scrollToItem(0)
+                                    delay(50)
+                                }
+                            }
+                        }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus && !coverflowWasFocused) {
-                                    scope.launch {
-                                        repeat(5) {
-                                            listState.scrollToItem(0)
-                                            delay(50)
-                                        }
-                                    }
-                                }
-                                coverflowWasFocused = state.hasFocus
+                                coverflowHasFocus = state.hasFocus
                             },
                         ) {
                             CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
