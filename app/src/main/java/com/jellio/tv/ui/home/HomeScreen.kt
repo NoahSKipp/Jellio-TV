@@ -299,18 +299,34 @@ fun HomeScreen(
                         // times over the next 250ms rather than
                         // trusting the first call alone closes that
                         // same race here too.
-                        var heroWasFocused by remember { mutableStateOf(false) }
+                        //
+                        // Real bug found live, round seven, on a real
+                        // screen recording: this fixed-count reassertion
+                        // still lost, every real time, to a later real
+                        // default scroll that only fired well after this
+                        // real 250ms window already closed - the exact
+                        // real moment this rail's own sidebar finished
+                        // collapsing shut, in that same recording. The
+                        // false-to-true guard above never re-fires for
+                        // it since focus never actually left this item
+                        // in between. Keeping this real correction
+                        // running for as long as focus actually lives
+                        // anywhere inside this item instead, rather than
+                        // a fixed real number of attempts, closes that
+                        // off regardless of how late whatever it's
+                        // racing against actually fires.
+                        var heroHasFocus by remember { mutableStateOf(false) }
+                        LaunchedEffect(heroHasFocus) {
+                            if (heroHasFocus) {
+                                while (true) {
+                                    listState.scrollToItem(0)
+                                    delay(50)
+                                }
+                            }
+                        }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus && !heroWasFocused) {
-                                    scope.launch {
-                                        repeat(5) {
-                                            listState.scrollToItem(0)
-                                            delay(50)
-                                        }
-                                    }
-                                }
-                                heroWasFocused = state.hasFocus
+                                heroHasFocus = state.hasFocus
                             },
                         ) {
                             CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
