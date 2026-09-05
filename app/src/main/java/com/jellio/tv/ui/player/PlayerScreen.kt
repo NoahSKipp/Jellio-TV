@@ -3,6 +3,7 @@ package com.jellio.tv.ui.player
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
@@ -875,112 +877,6 @@ private fun PlayerControls(
             }
         }
 
-        // Real port of the floating pill's own Speed and Subtitles
-        // buttons: the pill itself lives at the bottom on the web side
-        // (css/app.css's own .jellio-player-pill), but this screen
-        // already established its own top-right corner for the
-        // subtitle button before Speed existed, so Speed joins it there
-        // instead of standing up a second, differently placed real
-        // button just for itself.
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp),
-        ) {
-            Surface(
-                onClick = onOpenSpeedMenu,
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f), contentColor = JellioText),
-                modifier = Modifier.height(56.dp),
-            ) {
-                Box(Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-                    Text(text = speedLabel)
-                }
-            }
-            if (hasSubtitleTracks) {
-                Surface(
-                    onClick = onOpenSubtitleMenu,
-                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                    modifier = Modifier.size(56.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.ClosedCaption, contentDescription = "Subtitles", tint = JellioText)
-                    }
-                }
-            }
-            // Real port of the pill's own audioButton: disabled
-            // (rebuildAudioMenu()'s own early return) whenever this
-            // source carries one real audio track or fewer, same real
-            // condition hasAudioTracks already checks before this
-            // button even renders.
-            if (hasAudioTracks) {
-                Surface(
-                    onClick = onOpenAudioMenu,
-                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                    modifier = Modifier.size(56.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.GraphicEq, contentDescription = "Audio", tint = JellioText)
-                    }
-                }
-            }
-            // Real port of the pill's own sourceButton: disabled
-            // (sourceButton.disabled) until getMediaSources(itemId)
-            // actually resolves more than one real option, same real
-            // condition hasSourceOptions already checks before this
-            // button even renders.
-            if (hasSourceOptions) {
-                Surface(
-                    onClick = onOpenSourceMenu,
-                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                    modifier = Modifier.size(56.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.SwapHoriz, contentDescription = "Sources", tint = JellioText)
-                    }
-                }
-            }
-            // Real port of the pill's own episodesButton: disabled
-            // (episodesButton.disabled) until getSeasons(item.SeriesId)
-            // actually resolves a real season, same real condition
-            // hasEpisodes already checks before this button even
-            // renders. A Movie never gets here at all, same real gate
-            // this file's own isEpisodeItem && item.SeriesId check
-            // applies before that fetch ever fires.
-            if (hasEpisodes) {
-                Surface(
-                    onClick = onOpenEpisodesMenu,
-                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-                    modifier = Modifier.size(56.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.VideoLibrary, contentDescription = "Episodes", tint = JellioText)
-                    }
-                }
-            }
-            // Real port of the pill's own sleepButton: no live countdown
-            // label the way that file's own button never gets one
-            // either, just its own real jellio-player-pill-btn-active
-            // class toggled on and off, ported here as a real tinted
-            // background instead.
-            Surface(
-                onClick = onOpenSleepMenu,
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(
-                    containerColor = if (sleepTimerActive) JellioSecondary else Color.Black.copy(alpha = 0.4f),
-                    contentColor = JellioText,
-                ),
-                modifier = Modifier.size(56.dp),
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Filled.Bedtime, contentDescription = "Sleep timer", tint = JellioText)
-                }
-            }
-        }
-
         Box(
             modifier = Modifier.align(Alignment.Center).size(96.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape),
             contentAlignment = Alignment.Center,
@@ -1025,6 +921,98 @@ private fun PlayerControls(
                 Text(text = formatMs(positionMs), color = JellioTextSecondary)
                 Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
             }
+
+            // Real port of css/app.css's own .jellio-player-pill /
+            // screens/player.js's own buildPillButton(): real feedback
+            // live found this screen's own previous shape (a lone "1x"
+            // pill plus a separate row of bare icon circles, pinned to
+            // this screen's own top-right corner) didn't match the web
+            // build's own real player at all - one real pill-shaped bar
+            // instead, icon-over-label per button exactly like that
+            // file's own real speed/subtitle/audio/source/episodes/
+            // sleep buttons, docked under this real seek row the same
+            // way that file's own CSS margin already places it.
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(JellioBgElevated.copy(alpha = 0.82f))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp)),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(6.dp),
+                    ) {
+                        PlayerPillButton(icon = Icons.Filled.Speed, label = speedLabel, onClick = onOpenSpeedMenu)
+                        if (hasSubtitleTracks) {
+                            PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = "Subtitles", onClick = onOpenSubtitleMenu)
+                        }
+                        // Real port of the pill's own audioButton: disabled
+                        // (rebuildAudioMenu()'s own early return) whenever this
+                        // source carries one real audio track or fewer, same real
+                        // condition hasAudioTracks already checks before this
+                        // button even renders.
+                        if (hasAudioTracks) {
+                            PlayerPillButton(icon = Icons.Filled.GraphicEq, label = "Audio", onClick = onOpenAudioMenu)
+                        }
+                        // Real port of the pill's own sourceButton: disabled
+                        // (sourceButton.disabled) until getMediaSources(itemId)
+                        // actually resolves more than one real option, same real
+                        // condition hasSourceOptions already checks before this
+                        // button even renders.
+                        if (hasSourceOptions) {
+                            PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = "Sources", onClick = onOpenSourceMenu)
+                        }
+                        // Real port of the pill's own episodesButton: disabled
+                        // (episodesButton.disabled) until getSeasons(item.SeriesId)
+                        // actually resolves a real season, same real condition
+                        // hasEpisodes already checks before this button even
+                        // renders. A Movie never gets here at all, same real gate
+                        // this file's own isEpisodeItem && item.SeriesId check
+                        // applies before that fetch ever fires.
+                        if (hasEpisodes) {
+                            PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = "Episodes", onClick = onOpenEpisodesMenu)
+                        }
+                        // Real port of the pill's own sleepButton: no live
+                        // countdown label the way that file's own button never
+                        // gets one either, just its own real
+                        // jellio-player-pill-btn-active class toggled on and
+                        // off, ported here as the same real active tint.
+                        PlayerPillButton(
+                            icon = Icons.Filled.Bedtime,
+                            label = "Sleep",
+                            active = sleepTimerActive,
+                            onClick = onOpenSleepMenu,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerPillButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit, active: Boolean = false) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = if (active) JellioSecondary else JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContentColor = if (active) JellioSecondary else JellioText,
+        ),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.widthIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Icon(imageVector = icon, contentDescription = label)
+            Text(text = label, style = androidx.tv.material3.MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
