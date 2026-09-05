@@ -35,8 +35,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -135,6 +139,7 @@ private fun shortestOffset(slideIndex: Int, currentIndex: Int, count: Int): Int 
 // Compose TV has no swipe gesture to drive it, so the stage still
 // auto-advances on the same real ADVANCE_MS interval and the dot row
 // still jumps directly to an index, same as the reduced port kept.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryCoverflow(
     items: List<BaseItemDto>,
@@ -146,6 +151,21 @@ fun LibraryCoverflow(
 ) {
     if (items.size < COVERFLOW_MIN_SLIDES) return
     var index by remember(items) { mutableIntStateOf(0) }
+    // Real bug found live: shrinking this stage's own real vertical
+    // gap to its own content below (LibraryScreen.kt's own header on
+    // that exact round) made this rail's own filter fields spatially
+    // closer to View Details than either arrow now sits, so Compose's
+    // own default Left/Right search started landing there instead of
+    // this stage's own real chevrons - and since that field lives
+    // outside this composable's own NoOpBringIntoViewSpec suppression,
+    // landing on it fired Compose's own default per-child bring-into-
+    // view request for real, scrolling this list down and cutting off
+    // whatever real editorial/badge text sits above this stage. Explicit
+    // real focus targets on View Details below answer Left/Right
+    // itself rather than leaving it to that same real distance
+    // heuristic, closing both off at once.
+    val leftArrowFocusRequester = remember { FocusRequester() }
+    val rightArrowFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(items) {
         while (true) {
@@ -194,6 +214,8 @@ fun LibraryCoverflow(
                         slideHeight = slideHeight,
                         imageUrl = imageUrl,
                         onViewDetails = onViewDetails,
+                        leftArrowFocusRequester = leftArrowFocusRequester,
+                        rightArrowFocusRequester = rightArrowFocusRequester,
                     )
                 }
             }
@@ -221,7 +243,12 @@ fun LibraryCoverflow(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp).zIndex(10f),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp)
+                    .size(44.dp)
+                    .zIndex(10f)
+                    .focusRequester(leftArrowFocusRequester),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -236,7 +263,12 @@ fun LibraryCoverflow(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp).zIndex(10f),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+                    .size(44.dp)
+                    .zIndex(10f)
+                    .focusRequester(rightArrowFocusRequester),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
@@ -267,6 +299,7 @@ fun LibraryCoverflow(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CoverflowSlide(
     item: BaseItemDto,
@@ -276,6 +309,8 @@ private fun CoverflowSlide(
     slideHeight: Dp,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onViewDetails: (BaseItemDto) -> Unit,
+    leftArrowFocusRequester: FocusRequester,
+    rightArrowFocusRequester: FocusRequester,
 ) {
     val isCurrent = offset == 0
     val translateX by animateFloatAsState(
@@ -345,7 +380,17 @@ private fun CoverflowSlide(
                         containerColor = Color.White.copy(alpha = 0.12f),
                         contentColor = JellioText,
                     ),
-                    modifier = Modifier.padding(top = 12.dp),
+                    // Real header above on why this doesn't just leave
+                    // Left/Right to Compose's own default spatial
+                    // search: explicit real targets here always answer
+                    // to this stage's own chevrons, regardless of
+                    // whatever sits below this list's own item now.
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .focusProperties {
+                            left = leftArrowFocusRequester
+                            right = rightArrowFocusRequester
+                        },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),

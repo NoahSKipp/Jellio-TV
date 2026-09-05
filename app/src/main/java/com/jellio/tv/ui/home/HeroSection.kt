@@ -199,8 +199,22 @@ fun HeroSection(
         }
         // Real components/heroCarousel.js's own prevButton/nextButton:
         // this app's own real D-pad equivalent of that file's own
-        // mouse-click chevrons, vertically centered against each edge
-        // the same real way that file's own CSS docks them.
+        // mouse-click chevrons, that file's own CSS centers these
+        // against the whole real backdrop's own height, fine for a
+        // pointer since a mouse can just move to wherever it needs to.
+        //
+        // Real bug found live: centering against this box's own full
+        // real heroHeight put these level with roughly its own real
+        // vertical middle, while View Details sits inside this file's
+        // own real bottom-aligned info column instead, well below that
+        // middle once a title/meta/overview stack ahead of it - real
+        // feedback found the two landing at visibly different real
+        // heights. Bottom-aligned instead, with a real padding
+        // estimated against that same column's own real title+meta+
+        // overview+button stack (TvScale.kt's own scaled() still
+        // applies on top): not pixel exact for every real title (a
+        // short Overview leaves real slack below the button), but far
+        // closer than a full real center ever was.
         if (items.size > 1) {
             Surface(
                 onClick = { index = (index - 1 + items.size) % items.size },
@@ -211,7 +225,7 @@ fun HeroSection(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp),
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 86.dp).size(44.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -226,7 +240,7 @@ fun HeroSection(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 86.dp).size(44.dp),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
