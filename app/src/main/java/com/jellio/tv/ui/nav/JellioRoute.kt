@@ -109,7 +109,7 @@ fun JellioRoute.iconScale(): Float = when (this) {
     // viewBox padding around its own gear, a documented quirk of that
     // exact icon in that exact pack, not something a modest scale bump
     // was ever going to fully close out.
-    JellioRoute.Settings -> 1.7f
+    JellioRoute.Settings -> 2.0f
     else -> 1f
 }
 

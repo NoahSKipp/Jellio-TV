@@ -178,6 +178,16 @@ fun LibraryCoverflow(
             // real D-pad equivalent of components/libraryCoverflow.js's
             // own mouse-click prevButton/nextButton, docked against
             // this stage's own edges rather than the hero's.
+            //
+            // Real bug found live, on a real screenshot: both chevrons
+            // really were in this real tree the whole time, just
+            // invisible, and worse, invisibly focusable. CoverflowSlide's
+            // own real zIndex (5f, 6f for whichever slide is current)
+            // outranks a plain Surface's own real default (0f)
+            // regardless of composition order, so the current slide's
+            // own real full-bleed image painted over both buttons
+            // completely. A real zIndex higher than either of those
+            // wins this back.
             Surface(
                 onClick = { index = (index - 1 + items.size) % items.size },
                 shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
@@ -187,7 +197,7 @@ fun LibraryCoverflow(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(44.dp).zIndex(10f),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -202,7 +212,7 @@ fun LibraryCoverflow(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp),
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(44.dp).zIndex(10f),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")

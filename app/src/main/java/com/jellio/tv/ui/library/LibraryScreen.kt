@@ -41,6 +41,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Composable
@@ -97,21 +98,22 @@ fun LibraryScreen(
                         // bring-into-view request left this list
                         // scrolled to that button's own real bounds on
                         // a Down-then-Up round trip, never this item's
-                        // own real top. Guarded to the one real
-                        // false-to-true focus transition (that same
-                        // file's own header explains why): unguarded,
-                        // this refired on every real focus move between
-                        // the arrows/dots/View Details inside the
-                        // coverflow, each real call cancelling whichever
-                        // one was already mid-scroll.
-                        var coverflowGroupFocused by remember { mutableStateOf(false) }
+                        // own real top. A guarded, fire-once version of
+                        // this (that same file's own header covers why
+                        // it moved past that shape) still let this
+                        // list drift away from this item's own real top
+                        // on every later real focus move the guard no
+                        // longer answered: cancelling whichever real job
+                        // this callback's own last call started, every
+                        // real time rather than only the first, keeps
+                        // exactly one real scrollToItem(0) in flight at
+                        // once, always the newest.
+                        var coverflowScrollJob by remember { mutableStateOf<Job?>(null) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus && !coverflowGroupFocused) {
-                                    coverflowGroupFocused = true
-                                    scope.launch { listState.scrollToItem(0) }
-                                } else if (!state.hasFocus) {
-                                    coverflowGroupFocused = false
+                                if (state.hasFocus) {
+                                    coverflowScrollJob?.cancel()
+                                    coverflowScrollJob = scope.launch { listState.scrollToItem(0) }
                                 }
                             },
                         ) {
