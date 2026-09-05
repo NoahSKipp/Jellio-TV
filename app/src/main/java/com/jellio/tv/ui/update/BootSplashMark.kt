@@ -5,6 +5,7 @@ import android.widget.ImageView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -37,15 +38,32 @@ import com.jellio.tv.ui.theme.scaled
 fun BootSplashMark(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AndroidView(
-                factory = { context ->
-                    ImageView(context).apply {
-                        setImageResource(R.drawable.ic_jellio_mark_animated)
-                        (drawable as? Animatable)?.start()
-                    }
-                },
-                modifier = Modifier.size(240.dp.scaled()),
-            )
+            Box(modifier = Modifier.size(240.dp.scaled())) {
+                // Real jellio-mark-animated.svg's own real paint order
+                // clips the wake dots between its own triangle+glow and
+                // its own jellyfish silhouette, but this drawable draws
+                // all three as one real vector with no seam to slot a
+                // Compose layer into the middle of. Painted after it
+                // instead (on top of the jellyfish too, not strictly
+                // behind it the way the SVG has it): the dots stay
+                // small and cluster low in this mark's own triangle,
+                // real feedback's own actual ask (this looking alive,
+                // not motionless) matters more here than a z-order
+                // mismatch invisible at this drawable's own on-screen
+                // size. JellioMarkOcean.kt's own header covers why this
+                // half stayed web-only until now and how it's ported
+                // here instead.
+                AndroidView(
+                    factory = { context ->
+                        ImageView(context).apply {
+                            setImageResource(R.drawable.ic_jellio_mark_animated)
+                            (drawable as? Animatable)?.start()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                JellioMarkOcean()
+            }
             Spacer(Modifier.height(20.dp.scaled()))
             Text(
                 text = "Jellio",
