@@ -39,6 +39,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -103,6 +107,21 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    // Real ui/library/LibraryScreen.kt's own header on this exact fix:
+    // switching focus between an arrow and View Details still nudged
+    // this list a real few pixels for exactly one real frame before the
+    // real snapshotFlow correction below caught it back - reactive can
+    // only ever answer a real drift a frame after it already rendered.
+    // Blocking the real scroll from ever reaching this list in the
+    // first place, while this item holds real focus, closes that last
+    // real frame instead.
+    var heroHasFocus by remember { mutableStateOf(false) }
+    val blockScrollWhileHeroFocused = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                if (heroHasFocus) available else Offset.Zero
+        }
+    }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
@@ -188,6 +207,7 @@ fun HomeScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .nestedScroll(blockScrollWhileHeroFocused)
                         .padding(top = 32.dp)
                         .focusRestorer(),
                 ) {
@@ -317,8 +337,12 @@ fun HomeScreen(
                         // actually drifts off item 0, answers every real
                         // one of them regardless of timing - reactive to
                         // a real state change rather than a blind real
-                        // guess at when one might happen.
-                        var heroHasFocus by remember { mutableStateOf(false) }
+                        // guess at when one might happen. Kept as a real
+                        // fallback alongside the block above: heroHasFocus
+                        // now lives one real scope up (the nestedScroll
+                        // connection above needs it too), this item's own
+                        // onFocusChanged below is the one real place that
+                        // still sets it.
                         LaunchedEffect(heroHasFocus) {
                             if (heroHasFocus) {
                                 snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }

@@ -25,6 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.MaterialTheme
@@ -68,6 +72,31 @@ fun LibraryScreen(
     key(library.Id, library.Name) {
         val uiState by viewModel.uiState.collectAsState()
         val listState = rememberLazyListState()
+        // Real bug found live, on a real screen recording: switching
+        // focus between an arrow and View Details still nudged this
+        // list a real few pixels for exactly one real frame before the
+        // real snapshotFlow correction below caught it back - "tiny
+        // flickering", real feedback's own words, every real time on
+        // every real library with anything sitting above this stage to
+        // reveal it (Movies has nothing there, so the identical real
+        // nudge is invisible on it specifically). A real reactive
+        // correction can only ever answer a real drift a frame after
+        // it already rendered; blocking the real scroll from ever
+        // reaching this list in the first place, while this item holds
+        // real focus, is the only way to close that last real frame -
+        // NestedScrollConnection's own real onPreScroll sits above this
+        // list's own real internal scrollable in this same real
+        // modifier chain, first real refusal on any real delta trying
+        // to reach it. scrollToItem(0) itself is a direct real jump on
+        // this list's own real state, not a delta dispatched through
+        // this same real chain, so this real block never fights that.
+        var coverflowHasFocus by remember { mutableStateOf(false) }
+        val blockScrollWhileCoverflowFocused = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                    if (coverflowHasFocus) available else Offset.Zero
+            }
+        }
         var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
         var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
         val openItemOptions = rememberCardOptionsHost(
@@ -97,6 +126,7 @@ fun LibraryScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
+                    .nestedScroll(blockScrollWhileCoverflowFocused)
                     // Real feedback live: this rail's own reference
                     // viewport (TvScale.kt's own header) is only ~540dp
                     // tall, so on initial open (or back at this list's
@@ -180,8 +210,12 @@ fun LibraryScreen(
                         // actually drifts off item 0, answers every real
                         // one of them regardless of timing - reactive to
                         // a real state change rather than a blind real
-                        // guess at when one might happen.
-                        var coverflowHasFocus by remember { mutableStateOf(false) }
+                        // guess at when one might happen. Kept as a real
+                        // fallback alongside the block above: this list's
+                        // own coverflowHasFocus now lives one real scope
+                        // up (the nestedScroll connection above needs it
+                        // too), this item's own onFocusChanged below is
+                        // the one real place that still sets it.
                         LaunchedEffect(coverflowHasFocus) {
                             if (coverflowHasFocus) {
                                 snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
