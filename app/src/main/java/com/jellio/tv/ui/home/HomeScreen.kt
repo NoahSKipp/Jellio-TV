@@ -58,6 +58,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Which row a card's own options menu was opened from, real
@@ -285,11 +286,29 @@ fun HomeScreen(
                         // nothing else can nudge this list out from
                         // under it anymore, so there's nothing later to
                         // re-answer.
+                        // Real ui/library/LibraryScreen.kt's own header
+                        // on this exact round: a single scrollToItem(0)
+                        // call here only sometimes won against whatever
+                        // it's racing (confirmed live on that file's own
+                        // coverflow, via a real screen recording -
+                        // "occasionally correct but usually not"), a
+                        // real per-item header sitting above that
+                        // stage making the miss visible there in a way
+                        // this hero (nothing sits above it) never would
+                        // show on its own. Reasserting it a few real
+                        // times over the next 250ms rather than
+                        // trusting the first call alone closes that
+                        // same race here too.
                         var heroWasFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
                                 if (state.hasFocus && !heroWasFocused) {
-                                    scope.launch { listState.scrollToItem(0) }
+                                    scope.launch {
+                                        repeat(5) {
+                                            listState.scrollToItem(0)
+                                            delay(50)
+                                        }
+                                    }
                                 }
                                 heroWasFocused = state.hasFocus
                             },
