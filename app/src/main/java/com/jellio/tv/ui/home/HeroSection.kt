@@ -25,8 +25,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -76,6 +80,7 @@ private fun metaLine(item: BaseItemDto): String {
 // straight into playback with no chance to see anything about the
 // title first, real Nuvio reference only ever offers View Details
 // from its own hero either way.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HeroSection(
     items: List<BaseItemDto>,
@@ -85,6 +90,16 @@ fun HeroSection(
 ) {
     if (items.isEmpty()) return
     var index by remember(items) { mutableIntStateOf(0) }
+    // Real LibraryCoverflow.kt's own header on this exact fix: an
+    // arrow's own real Left/Right heading TOWARDS View Details had no
+    // real explicit target here either, only the reverse direction did
+    // - Compose's own default spatial search answering that other real
+    // direction instead occasionally landed below this hero entirely,
+    // scrolling this list and reading live as a real jitter every time
+    // this reader actually switched between an arrow and View Details.
+    val leftArrowFocusRequester = remember { FocusRequester() }
+    val rightArrowFocusRequester = remember { FocusRequester() }
+    val viewDetailsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(items) {
         if (items.size < 2) return@LaunchedEffect
@@ -184,6 +199,12 @@ fun HeroSection(
                     containerColor = Color.White.copy(alpha = 0.12f),
                     contentColor = JellioText,
                 ),
+                modifier = Modifier
+                    .focusRequester(viewDetailsFocusRequester)
+                    .focusProperties {
+                        left = leftArrowFocusRequester
+                        right = rightArrowFocusRequester
+                    },
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -242,7 +263,12 @@ fun HeroSection(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 86.dp).size(44.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 86.dp)
+                    .size(44.dp)
+                    .focusRequester(leftArrowFocusRequester)
+                    .focusProperties { right = { viewDetailsFocusRequester } },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -257,7 +283,12 @@ fun HeroSection(
                     focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     focusedContentColor = JellioText,
                 ),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 86.dp).size(44.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 86.dp)
+                    .size(44.dp)
+                    .focusRequester(rightArrowFocusRequester)
+                    .focusProperties { left = { viewDetailsFocusRequester } },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")

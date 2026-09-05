@@ -166,6 +166,19 @@ fun LibraryCoverflow(
     // heuristic, closing both off at once.
     val leftArrowFocusRequester = remember { FocusRequester() }
     val rightArrowFocusRequester = remember { FocusRequester() }
+    // Real bug found live, on a real screen recording: View Details'
+    // own real focusProperties above only ever answers Left/Right
+    // starting FROM it, the other real direction (an arrow's own
+    // Left/Right heading TOWARDS it) was still left to Compose's own
+    // default spatial search - and that same real search occasionally
+    // lands on this rail's own filter fields below instead (this
+    // file's own header up top on exactly why), scrolling this list
+    // and cutting off whatever real editorial/badge text sits above
+    // this stage, read live as a real jitter every time this reader
+    // actually switched between an arrow and View Details rather than
+    // only sometimes. A real focus target on View Details itself
+    // closes the other direction the exact same way.
+    val viewDetailsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(items) {
         while (true) {
@@ -237,6 +250,7 @@ fun LibraryCoverflow(
                         onViewDetails = onViewDetails,
                         leftArrowFocusRequester = leftArrowFocusRequester,
                         rightArrowFocusRequester = rightArrowFocusRequester,
+                        viewDetailsFocusRequester = viewDetailsFocusRequester,
                     )
                 }
             }
@@ -282,7 +296,8 @@ fun LibraryCoverflow(
                     .padding(start = 16.dp, bottom = 20.dp)
                     .size(44.dp)
                     .zIndex(10f)
-                    .focusRequester(leftArrowFocusRequester),
+                    .focusRequester(leftArrowFocusRequester)
+                    .focusProperties { right = { viewDetailsFocusRequester } },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -302,7 +317,8 @@ fun LibraryCoverflow(
                     .padding(end = 16.dp, bottom = 20.dp)
                     .size(44.dp)
                     .zIndex(10f)
-                    .focusRequester(rightArrowFocusRequester),
+                    .focusRequester(rightArrowFocusRequester)
+                    .focusProperties { left = { viewDetailsFocusRequester } },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
@@ -345,6 +361,7 @@ private fun CoverflowSlide(
     onViewDetails: (BaseItemDto) -> Unit,
     leftArrowFocusRequester: FocusRequester,
     rightArrowFocusRequester: FocusRequester,
+    viewDetailsFocusRequester: FocusRequester,
 ) {
     val isCurrent = offset == 0
     val translateX by animateFloatAsState(
@@ -421,6 +438,7 @@ private fun CoverflowSlide(
                     // whatever sits below this list's own item now.
                     modifier = Modifier
                         .padding(top = 12.dp)
+                        .focusRequester(viewDetailsFocusRequester)
                         .focusProperties {
                             left = leftArrowFocusRequester
                             right = rightArrowFocusRequester
