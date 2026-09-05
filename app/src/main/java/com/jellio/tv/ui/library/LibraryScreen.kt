@@ -3,16 +3,14 @@ package com.jellio.tv.ui.library
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -28,9 +26,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
@@ -40,10 +36,6 @@ import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
-import com.jellio.tv.ui.theme.JellioBg
-import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
-import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.launch
 
@@ -61,6 +53,7 @@ fun LibraryScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
+    var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
@@ -163,12 +156,12 @@ fun LibraryScreen(
                 }
                 if (uiState.genreOptions.isNotEmpty() || uiState.mainRow != null) {
                     item {
-                        LibraryFilterChips(
+                        LibraryFilterFields(
                             genres = uiState.genreOptions,
                             selectedSort = uiState.selectedSort,
                             selectedGenre = uiState.selectedGenre,
-                            onSelectSort = { viewModel.changeSort(session, it) },
-                            onSelectGenre = { viewModel.changeGenre(session, it) },
+                            onOpenSort = { openFilterField = LibraryFilterFieldTarget.Sort },
+                            onOpenGenre = { openFilterField = LibraryFilterFieldTarget.Genre },
                         )
                     }
                 }
@@ -205,61 +198,62 @@ fun LibraryScreen(
                 fetchAll = section.fetchAll,
             )
         }
+
+        openFilterField?.let { target ->
+            when (target) {
+                LibraryFilterFieldTarget.Sort -> LibraryFilterFieldOverlay(
+                    title = "Sort by",
+                    options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(it.label, it.value) },
+                    selectedValue = uiState.selectedSort,
+                    onSelect = { value ->
+                        openFilterField = null
+                        if (value != null) viewModel.changeSort(session, value)
+                    },
+                    onDismiss = { openFilterField = null },
+                )
+                LibraryFilterFieldTarget.Genre -> LibraryFilterFieldOverlay(
+                    title = "Genre",
+                    options = listOf(LibraryFilterOption("All genres", null)) +
+                        uiState.genreOptions.map { LibraryFilterOption(it, it) },
+                    selectedValue = uiState.selectedGenre,
+                    onSelect = { value ->
+                        openFilterField = null
+                        viewModel.changeGenre(session, value)
+                    },
+                    onDismiss = { openFilterField = null },
+                )
+            }
+        }
     }
 }
+
+private enum class LibraryFilterFieldTarget { Sort, Genre }
 
 // Real port of screens/library.js's own sort/genre <select> pair
 // (SORT_OPTIONS, discoverGenres()): governs only the main row above
-// this, same real scope that file's own header comment gives. Two
-// real chip rows rather than a dropdown, same real reason
-// ServiceScreen's own ServiceFilterChips already picks a chip row
-// over one: a D-pad has no real hover/click affordance a
-// dropdown needs, a focusable row of real chips does not.
+// this, same real scope that file's own header comment gives. Real
+// feedback live asked for this rail's own field-plus-popover shape
+// (matching that <select> pair's own real screenshot) rather than the
+// always visible chip row this used to be: LibraryFilterField opens
+// LibraryFilterFieldOverlay.kt's own real modal list instead of laying
+// every option out inline.
 @Composable
-private fun LibraryFilterChips(
+private fun LibraryFilterFields(
     genres: List<String>,
     selectedSort: String,
     selectedGenre: String?,
-    onSelectSort: (String) -> Unit,
-    onSelectGenre: (String?) -> Unit,
+    onOpenSort: () -> Unit,
+    onOpenGenre: () -> Unit,
 ) {
-    Column {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(bottom = if (genres.isNotEmpty()) 8.dp else 12.dp),
-        ) {
-            items(LIBRARY_SORT_OPTIONS, key = { it.value }) { option ->
-                FilterChip(label = option.label, selected = option.value == selectedSort, onClick = { onSelectSort(option.value) })
-            }
-        }
-        if (genres.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(bottom = 12.dp),
-            ) {
-                item {
-                    FilterChip(label = "All genres", selected = selectedGenre == null, onClick = { onSelectGenre(null) })
-                }
-                items(genres, key = { it }) { genre ->
-                    FilterChip(label = genre, selected = genre == selectedGenre, onClick = { onSelectGenre(genre) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) JellioSecondary else JellioBgElevated,
-            contentColor = if (selected) JellioBg else JellioText,
-        ),
+    val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.label ?: "Sort"
+    val genreLabel = selectedGenre ?: "All genres"
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
     ) {
-        Text(text = label, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+        LibraryFilterField(label = sortLabel, onClick = onOpenSort)
+        if (genres.isNotEmpty()) {
+            LibraryFilterField(label = genreLabel, onClick = onOpenGenre)
+        }
     }
 }

@@ -69,12 +69,26 @@ import kotlin.math.abs
 // below the fold. This app's own real reference viewport (TvScale.kt's
 // own header) is only ~540dp tall, so this stage's own previous real
 // 340dp (plus the editorial/badge header above it) left no real room
-// for anything else. Shrunk to a real banner-like strip instead: still
-// tall enough for a slide's own real title/meta/button, just no
-// longer a full third of the whole real screen on its own.
-private val CoverflowStageHeight = 220.dp
-private val SlideWidth = 560.dp
-private val SlideHeight = 165.dp
+// for anything else.
+//
+// Real feedback live, round two: shrinking SlideHeight alone while
+// leaving SlideWidth fixed (560dp) stretched every slide's own real
+// backdrop art from a normal ~2.2:1 crop out to a real 3.4:1 sliver,
+// reading as "incredibly small" even though this stage's own real
+// footprint had barely shrunk - a distorted crop, not actually a
+// smaller one. Both dimensions scaled down together this round
+// instead, same real ~2.2:1 shape a real backdrop crop already has.
+// CoverflowStageHeight now matches SlideHeight exactly too (real
+// feedback's own "View Details has a different height than the
+// arrows" report): the previous 220dp stage around a shorter 165dp
+// slide centered both of them in the same real box, but the arrows
+// anchor to this stage's own full real height while View Details sits
+// bottom-aligned inside the slide's own shorter box, so the two read
+// as sitting at different real heights whenever that gap existed. No
+// gap left to read differently now.
+private val CoverflowStageHeight = 210.dp
+private val SlideWidth = 460.dp
+private val SlideHeight = 210.dp
 
 // Below this a coverflow is not a coverflow (mirrors
 // components/libraryCoverflow.js's own real MIN_SLIDES floor exactly):
