@@ -129,7 +129,7 @@ fun LibraryFilterFieldOverlay(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 color = JellioTextSecondary,
-                modifier = Modifier.padding(horizontal = 20.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
             )
             // Mirrors ui/nav/LibraryPickerOverlay.kt's own plain
             // Column+forEachIndexed exactly (that file's own header
