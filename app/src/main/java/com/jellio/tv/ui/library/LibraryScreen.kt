@@ -20,6 +20,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
@@ -37,7 +38,6 @@ import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -164,27 +164,30 @@ fun LibraryScreen(
                         // list is still a real correction, not a
                         // visible fight.
                         // Real bug found live, on a real screen
-                        // recording: this fixed-count reassertion still
-                        // lost, every real time, to a later real default
-                        // scroll that only fired well after this real
-                        // 250ms window already closed - lining up
-                        // exactly with ui/nav/SidebarNav.kt's own rail
-                        // finishing its own real tween(180) collapse,
-                        // triggered by this same real focus-enter press
-                        // (SidebarNav's rail loses focus the same moment
-                        // this item gains it). Not a repeating real
-                        // cause, just a second, later effect of that one
-                        // real event - a real bounded second assertion
-                        // timed past that same known real 180ms answers
-                        // it directly, no real indefinite polling loop
-                        // required for something that only ever fires
-                        // once.
+                        // recording: a real guessed delay before a
+                        // second reassertion (first 250ms, then 220ms)
+                        // lost anyway, every real time, to a later real
+                        // default scroll landing at a real different
+                        // moment each time (confirmed live: once right
+                        // after this rail's own sidebar finished
+                        // collapsing, once past 500ms with no sidebar
+                        // involved at all) - not a fixed real delay at
+                        // all, so no real guessed delay ever answers it
+                        // for good. Watching this list's own real scroll
+                        // position directly instead, for as long as
+                        // focus actually lives anywhere inside this
+                        // item, and correcting the real instant it ever
+                        // actually drifts off item 0, answers every real
+                        // one of them regardless of timing - reactive to
+                        // a real state change rather than a blind real
+                        // guess at when one might happen.
                         var coverflowHasFocus by remember { mutableStateOf(false) }
                         LaunchedEffect(coverflowHasFocus) {
                             if (coverflowHasFocus) {
-                                listState.scrollToItem(0)
-                                delay(220)
-                                if (coverflowHasFocus) listState.scrollToItem(0)
+                                snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                                    .collect { (index, offset) ->
+                                        if (index != 0 || offset != 0) listState.scrollToItem(0)
+                                    }
                             }
                         }
                         Box(
