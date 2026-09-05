@@ -167,21 +167,6 @@ fun LibraryCoverflow(
     val leftArrowFocusRequester = remember { FocusRequester() }
     val rightArrowFocusRequester = remember { FocusRequester() }
 
-    // Real bug found live, on a real screenshot: entering this screen
-    // with a real Right press off the sidebar's own Library row left
-    // Compose's own default spatial search to pick whichever real
-    // focusable was the closest vertical match, and this stage's own
-    // real arrows/View Details sit far above that row while
-    // LibraryScreen.kt's own real filter fields sit much closer to it
-    // - landing there instead, with the exact same real scroll-down
-    // consequence this file's own header above already covers.
-    // Claiming this stage's own real initial focus outright, the same
-    // real fix SidebarNav.kt's own header already uses for its own
-    // cold-start focus gap, means this stage answers every real entry
-    // itself rather than leaving it to that same real distance
-    // heuristic.
-    LaunchedEffect(Unit) { leftArrowFocusRequester.requestFocus() }
-
     LaunchedEffect(items) {
         while (true) {
             delay(ADVANCE_MS)
@@ -189,7 +174,28 @@ fun LibraryCoverflow(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    // Real bug found live, on a real screenshot: entering this screen
+    // with a real Right press off the sidebar's own Library row let
+    // Compose's own default spatial search pick whichever real
+    // focusable was the closest vertical match, and this stage's own
+    // real arrows/View Details sit far above that row while
+    // LibraryScreen.kt's own real filter fields sit much closer to it
+    // - landing there instead, with the exact same real scroll-down
+    // consequence this file's own header above already covers. An
+    // imperative requestFocus() call here (this fix's own first real
+    // attempt) raced that same in-flight real spatial search instead
+    // of replacing it, landing this list in a real worse spot than
+    // either one alone. focusProperties { enter } is the real
+    // declarative answer instead: the focus system calls this the
+    // moment it is about to move focus into this subtree from
+    // anywhere outside it, before any real default search runs at
+    // all, so this stage always answers every real entry itself, no
+    // race to lose.
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .focusProperties { enter = { leftArrowFocusRequester } },
+    ) {
         if (editorial != null) {
             Column(modifier = Modifier.widthIn(max = 520.dp).padding(start = 48.dp, top = 16.dp, end = 24.dp, bottom = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
