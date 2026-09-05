@@ -368,7 +368,7 @@ private fun RetryButton(onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.padding(top = 20.dp),
     ) {
         Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))

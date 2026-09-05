@@ -42,6 +42,7 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -110,12 +111,23 @@ fun LibraryScreen(
                         // real time rather than only the first, keeps
                         // exactly one real scrollToItem(0) in flight at
                         // once, always the newest.
+                        // Real HomeScreen.kt's own header on this exact
+                        // round: cancelling our own previous call cannot
+                        // reach Compose's own default per-child bring-
+                        // into-view request, dispatched by the focus
+                        // system directly rather than through this
+                        // callback. A short delay before scrolling lets
+                        // that default request settle first, so this one
+                        // always runs last.
                         var coverflowScrollJob by remember { mutableStateOf<Job?>(null) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
                                 if (state.hasFocus) {
                                     coverflowScrollJob?.cancel()
-                                    coverflowScrollJob = scope.launch { listState.scrollToItem(0) }
+                                    coverflowScrollJob = scope.launch {
+                                        delay(150)
+                                        listState.scrollToItem(0)
+                                    }
                                 }
                             },
                         ) {

@@ -184,7 +184,7 @@ fun DetailScreen(
                     Surface(
                         onClick = { viewModel.retry(session, itemId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                         modifier = Modifier.padding(top = 20.dp),
                     ) {
                         Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
@@ -361,7 +361,7 @@ private fun EpisodeMenuRow(label: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))

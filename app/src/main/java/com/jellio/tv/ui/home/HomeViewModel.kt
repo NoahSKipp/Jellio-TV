@@ -135,11 +135,24 @@ class HomeViewModel @Inject constructor(
 
     private var loadedForUserId: String? = null
 
+    // Real bug found live: this used to return outright on a second
+    // real call for the same session, the real reason HomeScreen's own
+    // LaunchedEffect(session.userId) call (which fires again on every
+    // real remount, a genuine return trip through Library/Settings/
+    // etc. and back, not just this screen's own first real composition)
+    // never actually refreshed anything after the very first one. A
+    // real watch finished elsewhere never showed its own checkmark or
+    // moved Continue Watching until the app itself restarted. Runs the
+    // exact same real fetch on every real call now instead, only
+    // skipping the isLoading reset (and its own full-screen spinner)
+    // on a real returning visit so this quietly refreshes behind
+    // whatever this screen already has on it, the same real
+    // AppBootGate-gated first load still blocking on it same as before.
     fun load(session: Session) {
-        if (loadedForUserId == session.userId) return
+        val isReturningVisit = loadedForUserId == session.userId
         loadedForUserId = session.userId
         viewModelScope.launch {
-            _uiState.value = HomeUiState(isLoading = true)
+            if (!isReturningVisit) _uiState.value = HomeUiState(isLoading = true)
             try {
                 coroutineScope {
                     // Real port of screens/home.js's own buildHomeSections():
@@ -239,7 +252,13 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             } catch (err: Exception) {
-                _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
+                // A quiet returning-visit refresh failing (a transient
+                // network blip, say) leaves whatever real rows already
+                // rendered alone rather than replacing a working screen
+                // with an error state over one failed background retry.
+                if (!isReturningVisit) {
+                    _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
+                }
             }
         }
     }

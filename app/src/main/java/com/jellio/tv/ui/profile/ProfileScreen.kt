@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.profile
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -72,6 +73,7 @@ fun ProfileScreen(
     userImageUrl: (userId: String, tag: String?, maxWidth: Int) -> String,
     bannerUrl: (userId: String) -> String,
     itemImageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
+    onNavigateToDetail: (String) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
@@ -92,7 +94,7 @@ fun ProfileScreen(
                     Surface(
                         onClick = { viewModel.retry(session, userId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                         modifier = Modifier.padding(top = 20.dp),
                     ) {
                         Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
@@ -122,7 +124,7 @@ fun ProfileScreen(
                                         Surface(
                                             onClick = {},
                                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioTextSecondary),
+                                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioTextSecondary, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                                             modifier = Modifier.padding(top = 4.dp),
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -182,7 +184,11 @@ fun ProfileScreen(
                             }
                         } else {
                             items(achievements.RecentActivity) { entry ->
-                                ActivityRow(entry = entry, imageUrl = itemImageUrl)
+                                ActivityRow(
+                                    entry = entry,
+                                    imageUrl = itemImageUrl,
+                                    onClick = { onNavigateToDetail(entry.SeriesId ?: entry.ItemId) },
+                                )
                             }
                         }
                     }
@@ -256,7 +262,7 @@ private fun BioSection(
                 Surface(
                     onClick = onCancel,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                     modifier = Modifier.padding(start = 8.dp),
                 ) {
                     Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
@@ -324,37 +330,65 @@ private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
     }
 }
 
+// Real feedback live: this used to be a plain Column, no Surface/
+// clickable anywhere on it, so a D-pad had nothing to actually land on
+// here at all. Real port of screens/profile.js's own badge tile
+// hover/title tooltip: focusable now, badge.Description still its own
+// real contentDescription for a screen reader, no separate action
+// behind it since unlocking already happened server side.
 @Composable
 private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
     val color = if (badge.Unlocked) rarityColor(badge.Rarity) else JellioBorder
-    Column(
-        modifier = modifier
-            .padding(6.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(color.copy(alpha = if (badge.Unlocked) 0.18f else 0.08f))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Surface(
+        onClick = {},
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = color.copy(alpha = if (badge.Unlocked) 0.18f else 0.08f),
+            contentColor = if (badge.Unlocked) JellioText else JellioTextSecondary,
+            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContentColor = JellioText,
+        ),
+        modifier = modifier.padding(6.dp),
     ) {
-        Icon(
-            if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
-            contentDescription = badge.Description,
-            tint = if (badge.Unlocked) color else JellioTextSecondary,
-        )
-        Text(
-            text = badge.Name ?: "",
-            color = if (badge.Unlocked) JellioText else JellioTextSecondary,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
+                contentDescription = badge.Description,
+                tint = if (badge.Unlocked) color else JellioTextSecondary,
+            )
+            Text(
+                text = badge.Name ?: "",
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun ActivityRow(entry: GroupedActivityEntryDto, imageUrl: (String, String?, String, Int) -> String) {
+private fun ActivityRow(
+    entry: GroupedActivityEntryDto,
+    imageUrl: (String, String?, String, Int) -> String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContentColor = JellioText,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 2.dp),
+    ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         var showFallback by remember(entry.ItemId) { mutableStateOf(false) }
@@ -390,5 +424,6 @@ private fun ActivityRow(entry: GroupedActivityEntryDto, imageUrl: (String, Strin
             )
             Text(text = formatRelativeTime(entry.CompletedAtUtc), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
         }
+    }
     }
 }
