@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,6 +70,7 @@ private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
 // real rows, fetched from the real Jellio-Plugin backend rather than
 // placeholder content.
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     session: Session,
