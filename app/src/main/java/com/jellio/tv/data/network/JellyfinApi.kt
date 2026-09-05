@@ -12,7 +12,6 @@ import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.ItemsResultDto
-import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.PinRedeemResultDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
@@ -213,13 +212,6 @@ interface JellyfinApi {
     // real ClientConfig shape before porting this.
     @GET("Jellio/config")
     suspend fun getJellioConfig(): ClientConfigDto
-
-    // Real Controllers/NowPlayingController.cs endpoint: every real
-    // active session on the server with a real NowPlayingItem, backed
-    // by ISessionManager server side rather than a cron plus static
-    // file the way a plugin-less community script would need.
-    @GET("Jellio/now-playing")
-    suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto>
 
     // Real Controllers/SleepTimerController.cs endpoints: server side
     // duration timer, one per user/device. See SleepTimerStatusDto's

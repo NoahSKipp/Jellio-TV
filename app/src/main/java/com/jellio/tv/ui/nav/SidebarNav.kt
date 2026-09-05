@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +42,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LiveTv
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -52,9 +49,7 @@ import androidx.tv.material3.SelectableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
@@ -109,27 +104,16 @@ fun SidebarNav(
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
     enabled: Boolean = true,
-    // Real feedback live: components/nowPlaying.js's own trigger lived
-    // in its own floating corner spot beside this rail (MainActivity's
-    // own NowPlayingButton), not inside it. Pinned to this rail's own
-    // bottom instead now, the same real "every persistent piece of nav
-    // chrome lives in one place" reasoning GroupWatchButton's own
-    // removal already simplified this screen down to. Optional so
-    // every other real caller of this rail (there are none today, but
-    // nothing forces a session count on it) is not forced to thread
-    // one through.
-    nowPlayingSessionCount: Int = 0,
-    onNowPlayingClick: (() -> Unit)? = null,
     // Real components/sidebar.js's own buildProfileButton(): the
     // signed in reader's own real avatar and name, rendered on this
     // rail's own Profile row (self, JellioRoute.Profile(userId = null))
     // in place of a generic account icon.
     profileAvatarUrl: String? = null,
     profileName: String? = null,
-    // Real bug found live: MainActivity's own Library/Profile/Now
-    // Playing rows each open their own real popover rather than
-    // switching routes outright, and every one of those popovers'
-    // own real dismiss left this rail's own currently selected item
+    // Real bug found live: MainActivity's own Library/Profile rows
+    // each open their own real popover rather than switching routes
+    // outright, and every one of those popovers' own real dismiss
+    // left this rail's own currently selected item
     // with no real focus at all once its own focused content was
     // gone - Compose had nothing real left to fall back to, reading
     // live as "the remote stops selecting/navigating anything at
@@ -229,21 +213,6 @@ fun SidebarNav(
                 focusRequester = if (route == selected) restoreFocusRequester else null,
             )
         }
-        if (onNowPlayingClick != null) {
-            Spacer(Modifier.weight(1f))
-            SidebarItem(
-                icon = Icons.Filled.LiveTv,
-                label = "Now Playing",
-                isSelected = false,
-                expanded = expanded,
-                enabled = enabled,
-                badgeCount = nowPlayingSessionCount,
-                onClick = {
-                    onNowPlayingClick()
-                    focusManager.moveFocus(FocusDirection.Right)
-                },
-            )
-        }
     }
 }
 
@@ -268,11 +237,6 @@ private fun SidebarItem(
     // AsyncImage circle instead of the plain Icon slot below whenever
     // it isn't.
     avatarUrl: String? = null,
-    // Now Playing's own real active session count, the same real
-    // badge NowPlayingButton's own floating corner spot used to carry
-    // on its own before this rail absorbed it: 0 never renders one,
-    // matching that composable's own real gate.
-    badgeCount: Int = 0,
 ) {
     val labelWidth by animateDpAsState(
         targetValue = if (expanded) SidebarLabelMaxWidth.scaled() else 0.dp,
@@ -328,29 +292,6 @@ private fun SidebarItem(
                         tint = LocalContentColor.current,
                         modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
                     )
-                }
-                if (badgeCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-2).dp, y = 2.dp)
-                            .size(18.dp)
-                            .background(JellioSecondary, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        // Real pre-existing bug, carried over verbatim
-                        // from the old floating NowPlayingButton this
-                        // badge was ported from and caught while it was
-                        // here for that: JellioText (white) on this same
-                        // real near-white JellioSecondary fill was
-                        // barely legible, the same real class of low
-                        // contrast bug DetailScreen.kt's own season tabs
-                        // just got fixed for. JellioBg (dark) instead,
-                        // same real light-fill/dark-text pairing that
-                        // fix and ui/library/LibraryScreen.kt's own
-                        // FilterChip both already use.
-                        Text(text = badgeCount.toString(), color = JellioBg, style = MaterialTheme.typography.labelSmall)
-                    }
                 }
             }
             Box(modifier = Modifier.width(labelWidth).clipToBounds()) {

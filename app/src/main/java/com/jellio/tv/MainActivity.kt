@@ -43,8 +43,6 @@ import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.SidebarNav
 import com.jellio.tv.ui.nav.SidebarReservedWidth
 import com.jellio.tv.ui.nav.isImmersive
-import com.jellio.tv.ui.nowplaying.NowPlayingPanel
-import com.jellio.tv.ui.nowplaying.NowPlayingViewModel
 import com.jellio.tv.ui.person.PersonScreen
 import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
@@ -194,7 +192,6 @@ private fun JellioTvApp(
     appViewModel: AppViewModel,
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
-    nowPlayingViewModel: NowPlayingViewModel = hiltViewModel(),
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
     // AppBootGate's own hiltViewModel() call already kicked off
     // checkForUpdate(); this call resolves to that exact same
@@ -213,30 +210,20 @@ private fun JellioTvApp(
     var showAccountSwitcher by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    // Real feedback live: SidebarNav's own items (and Now Playing's own
-    // row inside it) stayed reachable while HomeScreen's own Customize
-    // mode was active, so a reader mid-reorder could jump straight off
-    // with nothing standing in the way. Threaded down the same real
-    // way SidebarNav's own enabled is.
+    // Real feedback live: SidebarNav's own items stayed reachable while
+    // HomeScreen's own Customize mode was active, so a reader
+    // mid-reorder could jump straight off with nothing standing in the
+    // way. Threaded down the same real way SidebarNav's own enabled is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    // Real components/nowPlaying.js's own startNowPlaying(): begun once
-    // a real session is confirmed signed in (JellioTvApp is only ever
-    // composed once AuthState.LoggedIn, matching that file's own real
-    // "called from app.js's own sync() once authenticated" reasoning),
-    // NowPlayingViewModel's own start() guarding against a second real
-    // poll loop if this composable recomposes.
-    LaunchedEffect(Unit) { nowPlayingViewModel.start() }
-    val nowPlayingSessions by nowPlayingViewModel.sessions.collectAsState()
     LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
-    var showNowPlayingPanel by remember { mutableStateOf(false) }
     // Real SidebarNav.kt's own header on this exact fix: every one of
-    // this rail's own real Library/Profile/Now Playing popovers used to
-    // just flip its own real boolean back to false with nothing real
-    // requesting focus back onto this rail first, so whichever real
-    // item opened it was left with no real focus at all the instant its
+    // this rail's own real Library/Profile popovers used to just flip
+    // its own real boolean back to false with nothing real requesting
+    // focus back onto this rail first, so whichever real item opened it
+    // was left with no real focus at all the instant its
     // own real content actually unmounted mid-dismiss - the real remote
     // going dead until a reader backed all the way out and back in.
     // Reclaimed explicitly in every real dismiss/select callback below,
@@ -433,27 +420,10 @@ private fun JellioTvApp(
                         switchTab(clicked)
                     }
                 },
-                // Real components/nowPlaying.js's own trigger: absorbed
-                // into this rail's own bottom row instead of its own
-                // floating corner spot, see SidebarNav's own header for
-                // why.
-                nowPlayingSessionCount = nowPlayingSessions.size,
-                onNowPlayingClick = { showNowPlayingPanel = !showNowPlayingPanel },
                 profileAvatarUrl = appViewModel.userImageUrl(session, session.userId, null, 200),
                 profileName = session.userName,
                 restoreFocusRequester = sidebarFocusRequester,
             )
-            if (showNowPlayingPanel) {
-                NowPlayingPanel(
-                    sessions = nowPlayingSessions,
-                    imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                    onDismiss = {
-                        sidebarFocusRequester.requestFocus()
-                        showNowPlayingPanel = false
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
             if (showLibraryPicker) {
                 LibraryPickerOverlay(
                     // Already the real curated nav set (Movies/Shows/Anime,
