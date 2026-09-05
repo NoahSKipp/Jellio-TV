@@ -167,25 +167,24 @@ fun LibraryScreen(
                         // recording: this fixed-count reassertion still
                         // lost, every real time, to a later real default
                         // scroll that only fired well after this real
-                        // 250ms window already closed (the exact real
-                        // moment this rail's own sidebar finished
-                        // collapsing shut, in that same recording) -
-                        // this real guard's own false-to-true condition
-                        // above never re-fires for it since focus never
-                        // actually left this item in between. Keeping
-                        // this real correction running for as long as
-                        // focus actually lives anywhere inside this item
-                        // instead, rather than a fixed real number of
-                        // attempts, closes that off regardless of how
-                        // late whatever it's racing against actually
-                        // fires.
+                        // 250ms window already closed - lining up
+                        // exactly with ui/nav/SidebarNav.kt's own rail
+                        // finishing its own real tween(180) collapse,
+                        // triggered by this same real focus-enter press
+                        // (SidebarNav's rail loses focus the same moment
+                        // this item gains it). Not a repeating real
+                        // cause, just a second, later effect of that one
+                        // real event - a real bounded second assertion
+                        // timed past that same known real 180ms answers
+                        // it directly, no real indefinite polling loop
+                        // required for something that only ever fires
+                        // once.
                         var coverflowHasFocus by remember { mutableStateOf(false) }
                         LaunchedEffect(coverflowHasFocus) {
                             if (coverflowHasFocus) {
-                                while (true) {
-                                    listState.scrollToItem(0)
-                                    delay(50)
-                                }
+                                listState.scrollToItem(0)
+                                delay(220)
+                                if (coverflowHasFocus) listState.scrollToItem(0)
                             }
                         }
                         Box(
