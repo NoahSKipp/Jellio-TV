@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -231,6 +232,18 @@ private fun JellioTvApp(
     LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
     var showNowPlayingPanel by remember { mutableStateOf(false) }
+    // Real SidebarNav.kt's own header on this exact fix: every one of
+    // this rail's own real Library/Profile/Now Playing popovers used to
+    // just flip its own real boolean back to false with nothing real
+    // requesting focus back onto this rail first, so whichever real
+    // item opened it was left with no real focus at all the instant its
+    // own real content actually unmounted mid-dismiss - the real remote
+    // going dead until a reader backed all the way out and back in.
+    // Reclaimed explicitly in every real dismiss/select callback below,
+    // right alongside flipping its own real boolean, so this rail's own
+    // currently selected item already holds real focus again before
+    // whichever real popover's own content is actually gone.
+    val sidebarFocusRequester = remember { FocusRequester() }
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -428,12 +441,16 @@ private fun JellioTvApp(
                 onNowPlayingClick = { showNowPlayingPanel = !showNowPlayingPanel },
                 profileAvatarUrl = appViewModel.userImageUrl(session, session.userId, null, 200),
                 profileName = session.userName,
+                restoreFocusRequester = sidebarFocusRequester,
             )
             if (showNowPlayingPanel) {
                 NowPlayingPanel(
                     sessions = nowPlayingSessions,
                     imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                    onDismiss = { showNowPlayingPanel = false },
+                    onDismiss = {
+                        sidebarFocusRequester.requestFocus()
+                        showNowPlayingPanel = false
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -448,14 +465,20 @@ private fun JellioTvApp(
                         switchTab(JellioRoute.Library)
                         showLibraryPicker = false
                     },
-                    onDismiss = { showLibraryPicker = false },
+                    onDismiss = {
+                        sidebarFocusRequester.requestFocus()
+                        showLibraryPicker = false
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
             if (showAccountSwitcher) {
                 AccountSwitcherOverlay(
                     session = session,
-                    onDismiss = { showAccountSwitcher = false },
+                    onDismiss = {
+                        sidebarFocusRequester.requestFocus()
+                        showAccountSwitcher = false
+                    },
                     onViewProfile = { push(JellioRoute.Profile()) },
                     onOpenSettings = { switchTab(JellioRoute.Settings) },
                     onSignOut = { appViewModel.logout() },

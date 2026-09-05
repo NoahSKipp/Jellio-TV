@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,19 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
 
     LaunchedEffect(Unit) { viewModel.start() }
 
+    // Real feedback live: every one of this flow's own real steps drew
+    // its own visual "Back"/"Cancel" button, real duplicate real
+    // affordance for what the remote's own real system Back already
+    // does everywhere else in this app. Wired here instead (this
+    // screen's own only real BackHandler, nothing here had one before),
+    // each step's own real button removed below in favor of it.
+    BackHandler(enabled = uiState.mode == LoginMode.MANUAL && uiState.canReturnToProfiles) {
+        viewModel.backToProfiles()
+    }
+    BackHandler(enabled = uiState.mode == LoginMode.FORGOT_USERNAME || uiState.mode == LoginMode.FORGOT_PIN) {
+        viewModel.cancelForgotPassword()
+    }
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (uiState.mode) {
             // Left blank rather than flashing the manual form for the
@@ -84,18 +98,15 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
             LoginMode.MANUAL -> ManualLoginForm(
                 uiState = uiState,
                 onLogin = { server, username, password -> viewModel.login(server, username, password) },
-                onBack = if (uiState.canReturnToProfiles) { { viewModel.backToProfiles() } } else null,
                 onForgotPassword = { username -> viewModel.showForgotPassword(username) },
             )
             LoginMode.FORGOT_USERNAME -> ForgotUsernameForm(
                 uiState = uiState,
                 onSubmit = { username -> viewModel.requestPasswordReset(username) },
-                onCancel = { viewModel.cancelForgotPassword() },
             )
             LoginMode.FORGOT_PIN -> ForgotPinForm(
                 uiState = uiState,
                 onSubmit = { pin, newPassword, confirmPassword -> viewModel.redeemPasswordReset(pin, newPassword, confirmPassword) },
-                onCancel = { viewModel.cancelForgotPassword() },
             )
         }
     }
@@ -257,7 +268,6 @@ private fun ProfileTile(
 private fun ManualLoginForm(
     uiState: LoginUiState,
     onLogin: (String, String, String) -> Unit,
-    onBack: (() -> Unit)?,
     onForgotPassword: (String) -> Unit,
 ) {
     var serverAddress by remember(uiState.serverAddress) { mutableStateOf(uiState.serverAddress) }
@@ -323,16 +333,6 @@ private fun ManualLoginForm(
         ) {
             Text(text = "Forgot password?", modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp))
         }
-        if (onBack != null) {
-            Surface(
-                onClick = onBack,
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioTextSecondary),
-                modifier = Modifier.padding(top = 12.dp),
-            ) {
-                Text(text = "Back", modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp))
-            }
-        }
     }
 }
 
@@ -346,7 +346,6 @@ private fun ManualLoginForm(
 private fun ForgotUsernameForm(
     uiState: LoginUiState,
     onSubmit: (String) -> Unit,
-    onCancel: () -> Unit,
 ) {
     var username by remember(uiState.forgotPasswordUsername) { mutableStateOf(uiState.forgotPasswordUsername) }
 
@@ -374,14 +373,6 @@ private fun ForgotUsernameForm(
         ) {
             Text(text = "Send reset code", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
-        Surface(
-            onClick = onCancel,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioTextSecondary),
-            modifier = Modifier.padding(top = 12.dp),
-        ) {
-            Text(text = "Back", modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp))
-        }
     }
 }
 
@@ -397,7 +388,6 @@ private fun ForgotUsernameForm(
 private fun ForgotPinForm(
     uiState: LoginUiState,
     onSubmit: (String, String, String) -> Unit,
-    onCancel: () -> Unit,
 ) {
     var pin by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
@@ -442,14 +432,6 @@ private fun ForgotPinForm(
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
         ) {
             Text(text = "Reset password", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
-        }
-        Surface(
-            onClick = onCancel,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioTextSecondary),
-            modifier = Modifier.padding(top = 12.dp),
-        ) {
-            Text(text = "Back", modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp))
         }
     }
 }

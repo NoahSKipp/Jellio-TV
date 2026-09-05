@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -128,16 +126,6 @@ fun PersonScreen(
             }
         }
 
-        Surface(
-            onClick = onBack,
-            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-            colors = ClickableSurfaceDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f)),
-            modifier = Modifier.padding(top = 32.dp, start = 32.dp).size(56.dp),
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back", tint = JellioText)
-            }
-        }
     }
 }
 

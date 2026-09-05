@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BookmarkAdded
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
@@ -49,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.draw.clip
@@ -270,31 +268,6 @@ fun DetailScreen(
                         }
                     }
                 }
-            }
-        }
-
-        Surface(
-            onClick = onBack,
-            shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-            // Real bug found live: this button floats over the hero
-            // backdrop rather than sitting in the LazyColumn's own
-            // document flow, so once it had real focus a D-pad press in
-            // any direction found nothing else nearby for Compose's own
-            // default spatial search to land on, stuck there for good.
-            // down explicitly targets contentFocusRequester (the same
-            // real requester this screen's own LaunchedEffect above
-            // already claims initial focus through), a direct real
-            // bridge back into the list rather than leaving Compose to
-            // guess a destination purely from overlapping on-screen
-            // bounds.
-            modifier = Modifier
-                .padding(top = 32.dp, start = 32.dp)
-                .size(56.dp)
-                .focusProperties { down = contentFocusRequester },
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back", tint = JellioText)
             }
         }
 

@@ -126,6 +126,20 @@ fun SidebarNav(
     // in place of a generic account icon.
     profileAvatarUrl: String? = null,
     profileName: String? = null,
+    // Real bug found live: MainActivity's own Library/Profile/Now
+    // Playing rows each open their own real popover rather than
+    // switching routes outright, and every one of those popovers'
+    // own real dismiss left this rail's own currently selected item
+    // with no real focus at all once its own focused content was
+    // gone - Compose had nothing real left to fall back to, reading
+    // live as "the remote stops selecting/navigating anything at
+    // all". Exposed here (defaulting to a real private one so every
+    // real caller that doesn't need this stays unaffected) so
+    // MainActivity can reclaim focus onto whichever of this rail's
+    // own real items is already selected the moment any of those
+    // real popovers close, the same real item this rail's own initial
+    // real open-focus already targets below.
+    restoreFocusRequester: FocusRequester = remember { FocusRequester() },
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -148,8 +162,7 @@ fun SidebarNav(
     // exactly once for this rail's own real lifetime (MainActivity's
     // own persistent Box, same as the pill it replaces), claiming
     // initial focus onto whichever entry is already selected.
-    val initialFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { initialFocusRequester.requestFocus() }
+    LaunchedEffect(Unit) { restoreFocusRequester.requestFocus() }
     val focusManager = LocalFocusManager.current
 
     Column(
@@ -213,7 +226,7 @@ fun SidebarNav(
                     // next real press to trigger.
                     focusManager.moveFocus(FocusDirection.Right)
                 },
-                focusRequester = if (route == selected) initialFocusRequester else null,
+                focusRequester = if (route == selected) restoreFocusRequester else null,
             )
         }
         if (onNowPlayingClick != null) {

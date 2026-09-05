@@ -63,6 +63,11 @@ sealed interface JellioRoute {
 // there on web, consolidated to this app's own single picker button
 // instead, JellioRoute's own header already explains why), Settings
 // still last.
+// Real feedback live: Settings sat in this rail too, its own real
+// second door onto the exact same real screen the Profile row's own
+// account switcher popover (its own header above already explains)
+// already opens a Settings button into - removed here rather than
+// leaving two real rail entries for one real screen.
 val JellioNavItems: List<JellioRoute> = listOf(
     JellioRoute.Profile(),
     JellioRoute.Home,
@@ -71,7 +76,6 @@ val JellioNavItems: List<JellioRoute> = listOf(
     JellioRoute.Feed,
     JellioRoute.Calendar,
     JellioRoute.Library,
-    JellioRoute.Settings,
 )
 
 fun JellioRoute.icon(): ImageVector = when (this) {

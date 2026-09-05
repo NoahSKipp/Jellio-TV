@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -99,6 +101,17 @@ fun LibraryScreen(
         }
         var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
         var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
+        // Real bug found live: selecting a real option (or dismissing
+        // via Back) removed this whole real overlay, focused option
+        // included, with nothing requesting focus anywhere else first -
+        // Compose had no real fallback target, and the real default it
+        // picked landed on this rail's own sidebar instead, expanding it
+        // ("selecting a genre opens the navbar", real feedback's own
+        // words). Reclaiming focus onto whichever real field opened it,
+        // in the same real callback that closes it, answers this the
+        // same real way MainActivity's own sidebar popovers just did.
+        val sortFieldFocusRequester = remember { FocusRequester() }
+        val genreFieldFocusRequester = remember { FocusRequester() }
         val openItemOptions = rememberCardOptionsHost(
             canDeleteItems = uiState.canDeleteItems,
             onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
@@ -254,6 +267,8 @@ fun LibraryScreen(
                             selectedGenre = uiState.selectedGenre,
                             onOpenSort = { openFilterField = LibraryFilterFieldTarget.Sort },
                             onOpenGenre = { openFilterField = LibraryFilterFieldTarget.Genre },
+                            sortFieldFocusRequester = sortFieldFocusRequester,
+                            genreFieldFocusRequester = genreFieldFocusRequester,
                         )
                     }
                 }
@@ -298,10 +313,14 @@ fun LibraryScreen(
                     options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(it.label, it.value) },
                     selectedValue = uiState.selectedSort,
                     onSelect = { value ->
+                        sortFieldFocusRequester.requestFocus()
                         openFilterField = null
                         if (value != null) viewModel.changeSort(session, value)
                     },
-                    onDismiss = { openFilterField = null },
+                    onDismiss = {
+                        sortFieldFocusRequester.requestFocus()
+                        openFilterField = null
+                    },
                 )
                 LibraryFilterFieldTarget.Genre -> LibraryFilterFieldOverlay(
                     title = "Genre",
@@ -309,10 +328,14 @@ fun LibraryScreen(
                         uiState.genreOptions.map { LibraryFilterOption(it, it) },
                     selectedValue = uiState.selectedGenre,
                     onSelect = { value ->
+                        genreFieldFocusRequester.requestFocus()
                         openFilterField = null
                         viewModel.changeGenre(session, value)
                     },
-                    onDismiss = { openFilterField = null },
+                    onDismiss = {
+                        genreFieldFocusRequester.requestFocus()
+                        openFilterField = null
+                    },
                 )
             }
         }
@@ -337,6 +360,8 @@ private fun LibraryFilterFields(
     selectedGenre: String?,
     onOpenSort: () -> Unit,
     onOpenGenre: () -> Unit,
+    sortFieldFocusRequester: FocusRequester,
+    genreFieldFocusRequester: FocusRequester,
 ) {
     val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.label ?: "Sort"
     val genreLabel = selectedGenre ?: "All genres"
@@ -344,9 +369,9 @@ private fun LibraryFilterFields(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
     ) {
-        LibraryFilterField(label = sortLabel, onClick = onOpenSort)
+        LibraryFilterField(label = sortLabel, onClick = onOpenSort, modifier = Modifier.focusRequester(sortFieldFocusRequester))
         if (genres.isNotEmpty()) {
-            LibraryFilterField(label = genreLabel, onClick = onOpenGenre)
+            LibraryFilterField(label = genreLabel, onClick = onOpenGenre, modifier = Modifier.focusRequester(genreFieldFocusRequester))
         }
     }
 }
