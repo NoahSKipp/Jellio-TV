@@ -62,9 +62,19 @@ import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
-private val CoverflowStageHeight = 340.dp
+// Real feedback live: on initial open (or on returning to this item's
+// own real top via View Details/an arrow), a reader should see this
+// stage, the library's own title+filter chips, AND its first content
+// row all at once, not just this stage alone with the row cut off
+// below the fold. This app's own real reference viewport (TvScale.kt's
+// own header) is only ~540dp tall, so this stage's own previous real
+// 340dp (plus the editorial/badge header above it) left no real room
+// for anything else. Shrunk to a real banner-like strip instead: still
+// tall enough for a slide's own real title/meta/button, just no
+// longer a full third of the whole real screen on its own.
+private val CoverflowStageHeight = 220.dp
 private val SlideWidth = 560.dp
-private val SlideHeight = 254.dp
+private val SlideHeight = 165.dp
 
 // Below this a coverflow is not a coverflow (mirrors
 // components/libraryCoverflow.js's own real MIN_SLIDES floor exactly):
@@ -132,7 +142,7 @@ fun LibraryCoverflow(
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (editorial != null) {
-            Column(modifier = Modifier.widthIn(max = 520.dp).padding(start = 48.dp, top = 32.dp, end = 24.dp, bottom = 16.dp)) {
+            Column(modifier = Modifier.widthIn(max = 520.dp).padding(start = 48.dp, top = 16.dp, end = 24.dp, bottom = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(imageVector = editorialIcon(editorial.icon), contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(18.dp))
                     Text(text = editorial.label, color = JellioTextSecondary, modifier = Modifier.padding(start = 6.dp))
@@ -147,7 +157,7 @@ fun LibraryCoverflow(
             // source on either end. JellioSecondary is the one real
             // bright tone that palette actually has.
             Row(
-                modifier = Modifier.padding(start = 48.dp, top = 32.dp, bottom = 16.dp),
+                modifier = Modifier.padding(start = 48.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(imageVector = Icons.Filled.TrendingUp, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(18.dp))
