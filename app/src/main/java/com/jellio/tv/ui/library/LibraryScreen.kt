@@ -92,7 +92,16 @@ fun LibraryScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 32.dp)
+                    // Real feedback live: this rail's own reference
+                    // viewport (TvScale.kt's own header) is only ~540dp
+                    // tall, so on initial open (or back at this list's
+                    // own real top via View Details/an arrow) a reader
+                    // should see this library's own carousel, title and
+                    // filter chips, AND its first content row, not just
+                    // the first two with the row cut off below the
+                    // fold. Trimmed from 32dp: every dp of top gutter
+                    // here is a dp this list's own first row loses.
+                    .padding(top = 16.dp)
                     .focusRestorer(),
             ) {
                 if (uiState.coverflowItems.size >= COVERFLOW_MIN_SLIDES) {
@@ -146,9 +155,9 @@ fun LibraryScreen(
                         text = uiState.title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(
-                            top = 12.dp,
+                            top = 8.dp,
                             start = 48.dp,
-                            bottom = 12.dp,
+                            bottom = 8.dp,
                         ),
                     )
                 }
