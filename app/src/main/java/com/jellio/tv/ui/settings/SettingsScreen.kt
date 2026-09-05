@@ -80,6 +80,13 @@ fun SettingsScreen(
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
+    // Real bug found live: AvatarPickerOverlay's own dismiss removed its
+    // whole real focused subtree with nothing requesting focus back
+    // onto this row first, the same real class of dead-remote bug -
+    // declared up here rather than inside the Column below since the
+    // overlay handling further down needs it too, outside that Column's
+    // own real scope.
+    val changeAvatarFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
@@ -108,6 +115,7 @@ fun SettingsScreen(
                     onClick = { viewModel.openAvatarPicker() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                    modifier = Modifier.focusRequester(changeAvatarFocusRequester),
                 ) {
                     Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
@@ -192,6 +200,19 @@ fun SettingsScreen(
     }
 
     val showAvatarPicker by viewModel.showAvatarPicker.collectAsState()
+    // Real bug found live: selecting a preset/finishing an upload
+    // closes this overlay from inside SettingsViewModel itself, once
+    // its own real network call settles - bypassing this composable's
+    // own onDismiss wrapper below entirely, the exact same real dead-
+    // remote class every other overlay in this app already had to fix.
+    // Watching the real flag itself instead answers every real path
+    // that can flip it false, not just the one this screen's own
+    // Surface directly calls.
+    var wasShowingAvatarPicker by remember { mutableStateOf(false) }
+    LaunchedEffect(showAvatarPicker) {
+        if (wasShowingAvatarPicker && !showAvatarPicker) changeAvatarFocusRequester.requestFocus()
+        wasShowingAvatarPicker = showAvatarPicker
+    }
     if (showAvatarPicker) {
         val avatarPresets by viewModel.avatarPresets.collectAsState()
         val avatarStatus by viewModel.avatarPickerStatus.collectAsState()
@@ -215,6 +236,7 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Row(
@@ -307,6 +329,7 @@ private fun LanguagePickerRow(
             containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
             contentColor = JellioText,
         ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it
         },

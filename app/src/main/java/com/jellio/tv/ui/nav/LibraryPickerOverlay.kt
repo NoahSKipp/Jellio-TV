@@ -91,6 +91,7 @@ fun LibraryPickerOverlay(
                     onClick = { onSelect(library) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                     modifier = Modifier.fillMaxWidth().let {
                         if (index == 0) it.focusRequester(firstEntryFocusRequester) else it
                     },

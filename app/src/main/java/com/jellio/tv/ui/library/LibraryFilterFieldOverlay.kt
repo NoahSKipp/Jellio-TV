@@ -64,6 +64,15 @@ fun LibraryFilterField(label: String, onClick: () -> Unit, modifier: Modifier = 
             focusedContainerColor = Color.White.copy(alpha = 0.18f),
             focusedContentColor = JellioText,
         ),
+        // Real feedback live: this field's own real label sits close
+        // enough to this pill's own real edge (widthIn(max) truncation
+        // included) that TV Material3's own default real focus grow
+        // pushed its own text past this pill's own real clipped bounds
+        // on focus, reading as "enlarges ugly where it touches the
+        // border". No real grow at all instead: this pill's own real
+        // focusedContainerColor above already carries the whole real
+        // selected-state signal on its own.
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = modifier,
     ) {
         Row(
@@ -154,6 +163,7 @@ fun LibraryFilterFieldOverlay(
                             focusedContainerColor = Color.White.copy(alpha = 0.18f),
                             focusedContentColor = JellioText,
                         ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                         modifier = Modifier.fillMaxWidth().let {
                             if (isFirst) it.focusRequester(firstEntryFocusRequester) else it
                         },

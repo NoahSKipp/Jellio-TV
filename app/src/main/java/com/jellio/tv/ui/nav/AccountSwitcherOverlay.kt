@@ -166,10 +166,23 @@ fun AccountSwitcherOverlay(
             } else if (uiState.remembered.isEmpty() && uiState.publicOnly.isEmpty()) {
                 Text(text = "No other profiles on this server.", color = JellioTextSecondary)
             } else {
+                // Real bug found live, on a real screenshot: this grid
+                // had no real weight of its own inside this real Column,
+                // so it measured against this dialog's own full real
+                // fillMaxHeight(0.8f) budget rather than whatever real
+                // space the header row and this title actually left
+                // behind - its own last real row (names included) then
+                // rendered past this real Column's own intended bottom
+                // edge with nothing clipping it, off the real screen
+                // entirely rather than scrolled inside its own bounds.
+                // weight(1f) bounds it to that real remaining space
+                // instead, this real grid's own lazy nature scrolls
+                // inside it rather than overflowing past it.
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 140.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.weight(1f),
                 ) {
                     items(uiState.remembered, key = { "r:" + it.userId }) { profile ->
                         SwitcherTile(

@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -203,13 +203,21 @@ fun StreamPickerOverlay(
     // Real bug found live testing on device, same real class every
     // other overlay in this app already had to fix: nothing here ever
     // requested initial D-pad focus, and nothing stopped focus
-    // wandering back out into DetailScreen underneath either. The Back
-    // button below is the one real target guaranteed to exist
-    // regardless of which SourcesState this overlay is in (Loading/
-    // Error/Loaded all still render it), so it is what claims focus on
-    // open rather than a source card that might not exist yet.
-    val backFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { backFocusRequester.requestFocus() }
+    // wandering back out into DetailScreen underneath either. Real
+    // feedback live also removed this overlay's own visual Back button
+    // below (the remote's own real system Back, already wired via
+    // BackHandler, does the same real job everywhere in this app now),
+    // so this can no longer anchor to that always-present real target -
+    // reattached below to whichever real element is first in reading
+    // order for whatever SourcesState this overlay is actually in
+    // (Retry on Error/empty, Resume/the first language chip/the first
+    // source card on Loaded, exactly one of those at a time), refired
+    // once state actually leaves Loading rather than once on open,
+    // since neither of those real targets exists yet during it.
+    val initialFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(state) {
+        if (state !is SourcesState.Loading) initialFocusRequester.requestFocus()
+    }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -254,12 +262,12 @@ fun StreamPickerOverlay(
                 }
                 is SourcesState.Error -> Column(modifier = Modifier.padding(top = 48.dp)) {
                     Text(text = currentState.message, color = JellioTextSecondary)
-                    RetryButton(onClick = { reloadKey++ })
+                    RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                 }
                 is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
                     Column(modifier = Modifier.padding(top = 48.dp)) {
                         Text(text = "No streams found for this title.", color = JellioTextSecondary)
-                        RetryButton(onClick = { reloadKey++ })
+                        RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                     }
                 } else {
                     // Real Jellyfin field, the same one the player's own
@@ -278,7 +286,7 @@ fun StreamPickerOverlay(
                             },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
-                            modifier = Modifier.padding(top = 24.dp),
+                            modifier = Modifier.padding(top = 24.dp).focusRequester(initialFocusRequester),
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -309,36 +317,60 @@ fun StreamPickerOverlay(
                     } ?: currentState.sources
 
                     if (languages.size > 1) {
-                        LanguageFilterChips(languages = languages, selected = selectedLanguage, onSelect = { selectedLanguage = it })
+                        LanguageFilterChips(
+                            languages = languages,
+                            selected = selectedLanguage,
+                            onSelect = { selectedLanguage = it },
+                            firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                        )
                     }
                     Text(
                         text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                     )
+                    // Real bug found live, matching
+                    // ui/nav/AccountSwitcherOverlay.kt's own real fix:
+                    // this list had no real weight of its own inside
+                    // this real Column, so it measured against this
+                    // Column's own full real fillMaxSize() height rather
+                    // than whatever real space the title/language chips/
+                    // count text above it actually left behind - its own
+                    // real content then rendered past this real
+                    // Column's own intended bottom edge, cut off with no
+                    // real Down target Compose's own spatial search
+                    // could actually find there. weight(1f) bounds it to
+                    // that real remaining space instead.
                     LazyColumn(
                         contentPadding = PaddingValues(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        items(filteredSources) { source -> SourceCard(source = source, onClick = { onSelect(source) }) }
+                        itemsIndexed(filteredSources) { index, source ->
+                            SourceCard(
+                                source = source,
+                                onClick = { onSelect(source) },
+                                modifier = if (index == 0 && resumeTicks <= 0 && languages.size <= 1) {
+                                    Modifier.focusRequester(initialFocusRequester)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                        }
                     }
                 }
             }
-        }
-
-        Surface(
-            onClick = onDismiss,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = 0.4f)),
-            modifier = Modifier.padding(top = 32.dp, start = 32.dp).focusRequester(backFocusRequester),
-        ) {
-            Text(text = "Back", color = JellioText, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
         }
     }
 }
 
 @Composable
-private fun LanguageFilterChips(languages: List<String>, selected: String?, onSelect: (String?) -> Unit) {
+private fun LanguageFilterChips(
+    languages: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    firstChipFocusRequester: FocusRequester? = null,
+) {
     val chips = buildList {
         add(null to "All")
         languages.forEach { code -> add(code to languageName(code)) }
@@ -347,7 +379,8 @@ private fun LanguageFilterChips(languages: List<String>, selected: String?, onSe
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.padding(top = 20.dp),
     ) {
-        items(chips, key = { it.first ?: "all" }) { (code, label) ->
+        itemsIndexed(chips, key = { _, pair -> pair.first ?: "all" }) { index, pair ->
+            val (code, label) = pair
             val isSelected = code == selected
             Surface(
                 onClick = { onSelect(code) },
@@ -356,6 +389,11 @@ private fun LanguageFilterChips(languages: List<String>, selected: String?, onSe
                     containerColor = if (isSelected) JellioSecondary else JellioBgElevated,
                     contentColor = if (isSelected) JellioBg else JellioText,
                 ),
+                modifier = if (index == 0 && firstChipFocusRequester != null) {
+                    Modifier.focusRequester(firstChipFocusRequester)
+                } else {
+                    Modifier
+                },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
@@ -364,19 +402,19 @@ private fun LanguageFilterChips(languages: List<String>, selected: String?, onSe
 }
 
 @Composable
-private fun RetryButton(onClick: () -> Unit) {
+private fun RetryButton(onClick: () -> Unit, focusRequester: FocusRequester? = null) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-        modifier = Modifier.padding(top = 20.dp),
+        modifier = Modifier.padding(top = 20.dp).let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
     ) {
         Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
     }
 }
 
 @Composable
-internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false) {
+internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false, modifier: Modifier = Modifier) {
     // Real .jellio-stream-picker-card-active treatment: a
     // JellioSecondary border plus a slightly brighter fill, ported as a
     // plain color swap here rather than a real border stroke, the same
@@ -388,7 +426,7 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else JellioBgElevated,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
