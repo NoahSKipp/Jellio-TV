@@ -268,7 +268,7 @@ fun HeroSection(
                     .padding(start = 16.dp, bottom = 86.dp)
                     .size(44.dp)
                     .focusRequester(leftArrowFocusRequester)
-                    .focusProperties { right = { viewDetailsFocusRequester } },
+                    .focusProperties { right = viewDetailsFocusRequester },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -288,7 +288,7 @@ fun HeroSection(
                     .padding(end = 16.dp, bottom = 86.dp)
                     .size(44.dp)
                     .focusRequester(rightArrowFocusRequester)
-                    .focusProperties { left = { viewDetailsFocusRequester } },
+                    .focusProperties { left = viewDetailsFocusRequester },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")

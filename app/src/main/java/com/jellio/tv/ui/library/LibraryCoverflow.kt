@@ -297,7 +297,7 @@ fun LibraryCoverflow(
                     .size(44.dp)
                     .zIndex(10f)
                     .focusRequester(leftArrowFocusRequester)
-                    .focusProperties { right = { viewDetailsFocusRequester } },
+                    .focusProperties { right = viewDetailsFocusRequester },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
@@ -318,7 +318,7 @@ fun LibraryCoverflow(
                     .size(44.dp)
                     .zIndex(10f)
                     .focusRequester(rightArrowFocusRequester)
-                    .focusProperties { left = { viewDetailsFocusRequester } },
+                    .focusProperties { left = viewDetailsFocusRequester },
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
