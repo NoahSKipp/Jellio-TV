@@ -16,6 +16,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,25 +50,38 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
-    var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
-    val openItemOptions = rememberCardOptionsHost(
-        canDeleteItems = uiState.canDeleteItems,
-        onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
-        onToggleWatched = { viewModel.toggleWatched(session, it) },
-        onDeleteItem = { viewModel.deleteItem(it) },
-    )
+    // Real bug found live: MainActivity's own call site for this screen
+    // is one fixed real position in a when branch, its own library
+    // argument changing (a picker tap between Shows/Anime/Movies) is
+    // never a fresh real composable instance on its own, only a
+    // recomposition of this same one - so listState's own scroll
+    // offset and the coverflow's own coverflowWasFocused guard further
+    // below both survived a real library switch untouched. If that
+    // guard already read true from whichever real library this reader
+    // was on before, its own false-to-true transition (the one real
+    // thing that fires scrollToItem(0) at all) never re-fired for this
+    // new one, leaving this list scrolled wherever the last real
+    // library left it - real feedback's own "view is too low, cuts off
+    // the text above the carousel" is exactly that. key() below forces
+    // every real remember in this whole function to start over fresh
+    // on a real library switch, this list's own scroll position and
+    // that guard included, rather than tracking each one down by hand.
+    key(library.Id, library.Name) {
+        val uiState by viewModel.uiState.collectAsState()
+        val listState = rememberLazyListState()
+        val scope = rememberCoroutineScope()
+        var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
+        var openFilterField by remember { mutableStateOf<LibraryFilterFieldTarget?>(null) }
+        val openItemOptions = rememberCardOptionsHost(
+            canDeleteItems = uiState.canDeleteItems,
+            onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
+            onToggleWatched = { viewModel.toggleWatched(session, it) },
+            onDeleteItem = { viewModel.deleteItem(it) },
+        )
 
-    // Keyed on both real Id and Name: getLibraryNavEntries()'s own
-    // synthetic Anime stand-in shares the plain Shows library's exact
-    // real Id (Anime has no library of its own), Id alone would never
-    // notice a picker tap swapping between the two.
-    LaunchedEffect(library.Id, library.Name) { viewModel.load(session, library) }
+        LaunchedEffect(Unit) { viewModel.load(session, library) }
 
-    Box(modifier = modifier.fillMaxSize()) {
+        Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
@@ -224,6 +238,7 @@ fun LibraryScreen(
                 )
             }
         }
+    }
     }
 }
 
