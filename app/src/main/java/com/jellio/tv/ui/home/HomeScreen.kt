@@ -54,6 +54,7 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 // Which row a card's own options menu was opened from, real
@@ -227,19 +228,34 @@ fun HomeScreen(
                         // instead of any one ever finishing clean,
                         // reading as "moves up and down a tiny bit" and
                         // never actually settling at this item's own
-                        // real top. Guarded to the one real false-to-true
-                        // transition now, same real reasoning
-                        // onFocusChanged callers elsewhere in this app
-                        // already rely on for a "just entered" edge
-                        // rather than a "still inside" level.
-                        var heroGroupFocused by remember { mutableStateOf(false) }
+                        // real top.
+                        //
+                        // Real bug found live, round four: guarding this
+                        // to only the one false-to-true transition (this
+                        // fix's own previous real shape) stopped the
+                        // race, but Compose's own default per-child
+                        // bring-into-view request still fires
+                        // independently on every later real focus move
+                        // between the arrows/View Details, uncorrected
+                        // now that this callback no longer answers back a
+                        // second time, so the list still drifted off
+                        // this item's own real top after the first
+                        // correct real landing, just slower. Cancelling
+                        // whichever real job this callback's own last
+                        // call started, every real time it runs rather
+                        // than only the first, is the actual fix: only
+                        // ever one real scrollToItem(0) in flight, always
+                        // the newest, so this never again races its own
+                        // previous real call the way the unguarded round
+                        // three version did, but still answers back every
+                        // single real time the default logic tries to
+                        // nudge this list away from this item's own top.
+                        var heroScrollJob by remember { mutableStateOf<Job?>(null) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus && !heroGroupFocused) {
-                                    heroGroupFocused = true
-                                    scope.launch { listState.scrollToItem(0) }
-                                } else if (!state.hasFocus) {
-                                    heroGroupFocused = false
+                                if (state.hasFocus) {
+                                    heroScrollJob?.cancel()
+                                    heroScrollJob = scope.launch { listState.scrollToItem(0) }
                                 }
                             },
                         ) {
