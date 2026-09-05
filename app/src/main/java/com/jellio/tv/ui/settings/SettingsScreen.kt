@@ -499,11 +499,24 @@ private fun SettingsToggleRow(label: String, description: String, checked: Boole
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.padding(end = 16.dp)) {
+            // Real bug found live, on a real screenshot: this column
+            // had no real weight of its own inside this real Row, so a
+            // long real description (this toggle's own real Privacy
+            // one, well past "Remember stream choice"'s own real
+            // shorter one) could grow wide enough to squeeze the real
+            // On/Off indicator right out of this row's own visible
+            // bounds - "doesn't show the on/off", real feedback's own
+            // words. weight(1f) bounds it to the real space actually
+            // left over instead.
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                 Text(text = label, color = JellioText)
                 Text(text = description, color = JellioTextSecondary, style = MaterialTheme.typography.bodyLarge)
             }
-            Text(text = if (checked) "On" else "Off", color = if (checked) JellioText else JellioTextSecondary)
+            Text(
+                text = if (checked) "On" else "Off",
+                color = if (checked) JellioText else JellioTextSecondary,
+                style = MaterialTheme.typography.titleSmall,
+            )
         }
     }
 }

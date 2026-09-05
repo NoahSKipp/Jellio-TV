@@ -2,7 +2,7 @@ package com.jellio.tv.ui.nav
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.BookmarkAdded
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Home
@@ -85,7 +85,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // the same real way Library's own icon already is: the Material
     // glyph was close in silhouette but not the real shape drawn here.
     JellioRoute.Search -> SearchIconVector
-    JellioRoute.Watchlist -> Icons.Filled.BookmarkAdded
+    JellioRoute.Watchlist -> Icons.Filled.BookmarkAdd
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
     // js/persistentSidebar.js's own SVG_ICONS.library, ported path
     // data rather than a Material approximation: real feedback live
