@@ -287,6 +287,7 @@ private fun JellioTvApp(
                 userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
                 bannerUrl = { userId -> appViewModel.bannerUrl(session, userId) },
                 itemImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                onNavigateToDetail = onNavigateToDetail,
                 onLogout = { appViewModel.logout() },
                 modifier = Modifier.fillMaxSize(),
             )

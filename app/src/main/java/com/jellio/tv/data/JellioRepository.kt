@@ -818,8 +818,23 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto =
-        if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
+    // Real bug found live: this app's own cache.get(key, ttl) wrapper
+    // around getCollectionItems/getLibraryItems/getGenreItems/
+    // getResumeItems (this repository's own real Home/Library/Continue
+    // Watching data) kept serving whatever it already had cached for up
+    // to CACHE_TTL_MS after a real watch just finished, so a reader
+    // landing back on Home/Library right after finishing something kept
+    // seeing it without a real watched checkmark until that cache
+    // entry aged out on its own. A played-state flip can appear in any
+    // one of those real cached lists, not just one, so the whole real
+    // cache clears here rather than guessing which specific keys need
+    // it, the same real blunt real reset connectAndLogin/quickSignIn/
+    // logout already reach for on an account switch.
+    suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto {
+        val result = if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
+        cache.clear()
+        return result
+    }
 
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)

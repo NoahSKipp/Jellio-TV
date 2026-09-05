@@ -96,14 +96,25 @@ class LibraryViewModel @Inject constructor(
     private var currentLibrary: BaseItemDto? = null
     private var currentItemType: String? = null
 
+    // Real HomeViewModel.kt's own header on this exact fix: returning
+    // outright on a second real call for the same library key meant a
+    // real watch finished elsewhere never showed its own checkmark (or
+    // moved off Continue Watching-style state) here again until the app
+    // itself restarted, since LibraryScreen's own LaunchedEffect fires
+    // again on every real remount (Home/Settings/etc. and back), not
+    // just this screen's own first composition. Re-fetches every real
+    // call now, only skipping the isLoading reset (and its own full
+    // screen spinner) on a real returning visit to the same library so
+    // this quietly refreshes instead of flashing back to a loading
+    // state the reader already got past.
     fun load(session: Session, library: BaseItemDto) {
         val key = library.Id + (library.Name ?: "")
-        if (loadedFor == key) return
+        val isReturningVisit = loadedFor == key
         loadedFor = key
         currentLibrary = library
         currentItemType = if (library.CollectionType == "movies") "Movie" else "Series"
         viewModelScope.launch {
-            _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
+            if (!isReturningVisit) _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
             if (repository.isAnimeLibrary(library)) {
                 loadAnime(session)
             } else {

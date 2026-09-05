@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,29 +121,18 @@ fun RowListModal(
                 .background(JellioBgElevated, RoundedCornerShape(20.dp))
                 .padding(vertical = 20.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // Real feedback: a real remote's own Back button already
+            // closes this (BackHandler above), a second real on-screen
+            // Close button next to it was one more real D-pad target
+            // doing the exact same real job.
+            Text(
+                text = title,
+                color = JellioText,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    text = title,
-                    color = JellioText,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Surface(
-                    onClick = onDismiss,
-                    shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.1f), contentColor = JellioText),
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.Close, contentDescription = "Close", modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
+            )
             LazyColumn(
                 modifier = Modifier
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -195,7 +182,7 @@ private fun RowListItem(
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

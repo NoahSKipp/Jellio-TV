@@ -1332,7 +1332,7 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
             Surface(
                 onClick = onCancel,
                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
                 Text(text = "Cancel timer", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
@@ -1341,7 +1341,7 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
                 Surface(
                     onClick = { onSelect(minutes) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(text = "$minutes min", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))

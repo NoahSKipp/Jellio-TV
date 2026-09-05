@@ -55,6 +55,7 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Which row a card's own options menu was opened from, real
@@ -255,12 +256,30 @@ fun HomeScreen(
                         // three version did, but still answers back every
                         // single real time the default logic tries to
                         // nudge this list away from this item's own top.
+                        // Real bug found live, round five: cancelling
+                        // our own previous real call before relaunching
+                        // stopped US from racing ourselves, but Compose's
+                        // own default per-child bring-into-view request
+                        // is dispatched by the focus system directly,
+                        // not through this callback at all, so this had
+                        // no real handle to cancel that one with. It
+                        // still ran alongside every real relaunch here,
+                        // and whichever of the two actually finished
+                        // last still won. A short real delay before
+                        // this ever calls scrollToItem(0) lets that
+                        // default request settle first, so this always
+                        // runs last and answers back correctly regardless
+                        // of whichever real child (an arrow, View
+                        // Details) just took focus.
                         var heroScrollJob by remember { mutableStateOf<Job?>(null) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
                                 if (state.hasFocus) {
                                     heroScrollJob?.cancel()
-                                    heroScrollJob = scope.launch { listState.scrollToItem(0) }
+                                    heroScrollJob = scope.launch {
+                                        delay(150)
+                                        listState.scrollToItem(0)
+                                    }
                                 }
                             },
                         ) {
