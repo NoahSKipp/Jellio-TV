@@ -364,9 +364,25 @@ fun StreamPickerOverlay(
                                 source = source,
                                 onClick = { onSelect(source) },
                                 modifier = if (index == 0) {
-                                    Modifier.focusRequester(firstSourceCardFocusRequester).let {
-                                        if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it
-                                    }
+                                    Modifier
+                                        .focusRequester(firstSourceCardFocusRequester)
+                                        .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
+                                        // Real bug found live, on a real
+                                        // screen recording: Up from this
+                                        // real first card, once actually
+                                        // inside this real list, had no
+                                        // explicit real target the same
+                                        // way Down into it now does -
+                                        // stuck there instead of reaching
+                                        // back up to the real Resume
+                                        // button/language chips above it.
+                                        // initialFocusRequester already
+                                        // resolves to whichever of those
+                                        // is first in reading order (or
+                                        // this same real card when
+                                        // neither exists, a real harmless
+                                        // no-op Up in that one case).
+                                        .focusProperties { up = initialFocusRequester }
                                 } else {
                                     Modifier
                                 },
@@ -437,8 +453,19 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        // Real bug found live, on a real screenshot: this card set no
+        // real focusedContainerColor/focusedContentColor of its own, so
+        // TV Material3's own real default focused pair took over
+        // instead - a real bright near-white fill this app never
+        // designed its own explicit JellioTextSecondary tag/language
+        // text against, reading as low contrast once focused. The same
+        // real dark-fill/bright-text pair every other real selectable
+        // text row in this app already uses instead.
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContentColor = JellioText,
         ),
         // Real bug found live, on a real screenshot: this card's own
         // real tags/language line ran close enough to its own edge that
