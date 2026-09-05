@@ -27,7 +27,7 @@ android {
         // upgrade). Falls back to 1 for a local dev build with no
         // real CI run behind it.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()) ?: 1
-        versionName = "0.18.0"
+        versionName = "0.18.1"
     }
 
     buildTypes {
