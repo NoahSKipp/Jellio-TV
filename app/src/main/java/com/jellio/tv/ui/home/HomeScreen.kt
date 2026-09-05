@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,13 +51,12 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Which row a card's own options menu was opened from, real
@@ -262,28 +263,38 @@ fun HomeScreen(
                         // own default per-child bring-into-view request
                         // is dispatched by the focus system directly,
                         // not through this callback at all, so this had
-                        // no real handle to cancel that one with. It
-                        // still ran alongside every real relaunch here,
-                        // and whichever of the two actually finished
-                        // last still won. A short real delay before
-                        // this ever calls scrollToItem(0) lets that
-                        // default request settle first, so this always
-                        // runs last and answers back correctly regardless
-                        // of whichever real child (an arrow, View
-                        // Details) just took focus.
-                        var heroScrollJob by remember { mutableStateOf<Job?>(null) }
+                        // no real handle to cancel that one with. A
+                        // delay before our own scrollToItem(0) let it
+                        // settle first and win, but real feedback live
+                        // still caught this as "jumps up and down a tiny
+                        // bit": the default request still visibly moved
+                        // this list for the delay's own real duration
+                        // before our own correction snapped it back, a
+                        // real visible artifact even though it did
+                        // eventually converge correctly.
+                        //
+                        // Real bug found live, round six: suppressing
+                        // that default request outright instead, via
+                        // NoOpBringIntoViewSpec (its own header covers
+                        // why), so this is the only real thing that ever
+                        // scrolls this list while focus lives anywhere
+                        // inside this item. Only fires once, on the real
+                        // false-to-true transition into the hero group:
+                        // nothing else can nudge this list out from
+                        // under it anymore, so there's nothing later to
+                        // re-answer.
+                        var heroWasFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus) {
-                                    heroScrollJob?.cancel()
-                                    heroScrollJob = scope.launch {
-                                        delay(150)
-                                        listState.scrollToItem(0)
-                                    }
+                                if (state.hasFocus && !heroWasFocused) {
+                                    scope.launch { listState.scrollToItem(0) }
                                 }
+                                heroWasFocused = state.hasFocus
                             },
                         ) {
-                            HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
+                                HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                            }
                         }
                     }
                     // Real screens/home.js's own jellio-home-greeting: real

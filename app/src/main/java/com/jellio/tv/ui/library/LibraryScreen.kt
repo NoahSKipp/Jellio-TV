@@ -10,8 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
@@ -41,8 +44,6 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -112,26 +113,29 @@ fun LibraryScreen(
                         // exactly one real scrollToItem(0) in flight at
                         // once, always the newest.
                         // Real HomeScreen.kt's own header on this exact
-                        // round: cancelling our own previous call cannot
-                        // reach Compose's own default per-child bring-
-                        // into-view request, dispatched by the focus
-                        // system directly rather than through this
-                        // callback. A short delay before scrolling lets
-                        // that default request settle first, so this one
-                        // always runs last.
-                        var coverflowScrollJob by remember { mutableStateOf<Job?>(null) }
+                        // round: a delay before scrolling let our own
+                        // scrollToItem(0) win the race against Compose's
+                        // own default per-child bring-into-view request,
+                        // but that default request still visibly nudged
+                        // this list for the delay's own real duration
+                        // before snapping back, reading as "jumps up and
+                        // down". NoOpBringIntoViewSpec (its own header
+                        // covers why) suppresses that default request
+                        // outright instead, so this is the only real
+                        // thing that ever scrolls this list while focus
+                        // lives anywhere inside this item.
+                        var coverflowWasFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
-                                if (state.hasFocus) {
-                                    coverflowScrollJob?.cancel()
-                                    coverflowScrollJob = scope.launch {
-                                        delay(150)
-                                        listState.scrollToItem(0)
-                                    }
+                                if (state.hasFocus && !coverflowWasFocused) {
+                                    scope.launch { listState.scrollToItem(0) }
                                 }
+                                coverflowWasFocused = state.hasFocus
                             },
                         ) {
-                            LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge, editorial = uiState.editorial)
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
+                                LibraryCoverflow(items = uiState.coverflowItems, imageUrl = imageUrl, onViewDetails = onItemClick, badgeText = uiState.coverflowBadge, editorial = uiState.editorial)
+                            }
                         }
                     }
                 }
