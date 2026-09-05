@@ -109,7 +109,21 @@ fun JellioRoute.iconScale(): Float = when (this) {
     // viewBox padding around its own gear, a documented quirk of that
     // exact icon in that exact pack, not something a modest scale bump
     // was ever going to fully close out.
-    JellioRoute.Settings -> 2.0f
+    //
+    // Real feedback live, round four: 2.0f still read as far smaller
+    // than every sibling. This icon's own dedicated slot
+    // (SidebarCollapsedWidth minus this rail's own horizontal padding,
+    // see SidebarItem below) is only 68dp wide once scaled, so this
+    // can't just keep climbing forever without this glyph's own bounds
+    // starting to press against that slot's own edges (26dp base size *
+    // 2.6f already reaches ~68dp) - 2.4f is the largest further step
+    // that still stays clear of it. A reader should confirm this
+    // against a clean, settled (not mid-expand) screenshot of the rail
+    // next round: a change this size should be unmistakable if it's
+    // actually reaching the screen, and if it still reads as smaller
+    // even now, the fix belongs on this slot's own size instead, not
+    // this scale factor again.
+    JellioRoute.Settings -> 2.4f
     else -> 1f
 }
 
