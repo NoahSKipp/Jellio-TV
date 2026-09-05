@@ -11,7 +11,6 @@ import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
-import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.ProfileDto
 import com.jellio.tv.data.model.RealWatchRequest
 import com.jellio.tv.data.model.ReportDurationRequest
@@ -907,12 +906,6 @@ class JellioRepository @Inject constructor(
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
-
-    // Real port of runtime/api.js's own getNowPlayingSessions(): a
-    // plain passthrough, same as getCalendarEntries above, the polling
-    // loop's own caller decides what a failed request means rather
-    // than this method swallowing it.
-    suspend fun getNowPlayingSessions(): List<NowPlayingSessionDto> = api.getNowPlayingSessions()
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 

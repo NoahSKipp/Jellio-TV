@@ -284,33 +284,6 @@ data class IntroSkipperSegmentsDto(
     val Credits: SkipSegmentDto? = null,
 )
 
-// Real shape Controllers/NowPlayingController.cs's own anonymous
-// projection returns, off the server's own real ISessionManager: only
-// a session with a real NowPlayingItem at all is included there, so
-// this is never a placeholder/idle session client side either.
-@JsonClass(generateAdapter = true)
-data class NowPlayingItemDto(
-    val Id: String,
-    val Name: String? = null,
-    val Type: String? = null,
-    val SeriesId: String? = null,
-    val SeriesName: String? = null,
-    val ParentIndexNumber: Int? = null,
-    val IndexNumber: Int? = null,
-    val ProductionYear: Int? = null,
-    val RunTimeTicks: Long? = null,
-)
-
-@JsonClass(generateAdapter = true)
-data class NowPlayingSessionDto(
-    val Id: String? = null,
-    val UserName: String? = null,
-    val DeviceName: String? = null,
-    val IsPaused: Boolean = false,
-    val PositionTicks: Long? = null,
-    val Item: NowPlayingItemDto? = null,
-)
-
 @JsonClass(generateAdapter = true)
 data class SleepTimerStartRequest(val Minutes: Int)
 
