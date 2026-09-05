@@ -167,6 +167,21 @@ fun LibraryCoverflow(
     val leftArrowFocusRequester = remember { FocusRequester() }
     val rightArrowFocusRequester = remember { FocusRequester() }
 
+    // Real bug found live, on a real screenshot: entering this screen
+    // with a real Right press off the sidebar's own Library row left
+    // Compose's own default spatial search to pick whichever real
+    // focusable was the closest vertical match, and this stage's own
+    // real arrows/View Details sit far above that row while
+    // LibraryScreen.kt's own real filter fields sit much closer to it
+    // - landing there instead, with the exact same real scroll-down
+    // consequence this file's own header above already covers.
+    // Claiming this stage's own real initial focus outright, the same
+    // real fix SidebarNav.kt's own header already uses for its own
+    // cold-start focus gap, means this stage answers every real entry
+    // itself rather than leaving it to that same real distance
+    // heuristic.
+    LaunchedEffect(Unit) { leftArrowFocusRequester.requestFocus() }
+
     LaunchedEffect(items) {
         while (true) {
             delay(ADVANCE_MS)
@@ -234,6 +249,19 @@ fun LibraryCoverflow(
             // own real full-bleed image painted over both buttons
             // completely. A real zIndex higher than either of those
             // wins this back.
+            //
+            // Real bug found live, on a real screenshot ("Movies" vs
+            // "Shows" side by side): centering these against this
+            // stage's own full real height put them level with its own
+            // middle, while View Details sits bottom-aligned inside
+            // CoverflowSlide's own info column instead (20dp from this
+            // same stage's own real bottom edge, since stage height now
+            // matches slide height exactly) - "Movies" only happened to
+            // read close enough not to notice, every other real library
+            // did not. Bottom-aligned here instead, with a real padding
+            // matching that same 20dp plus half this real 44dp circle,
+            // so both land at the exact same real height regardless of
+            // library.
             Surface(
                 onClick = { index = (index - 1 + items.size) % items.size },
                 shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
@@ -244,8 +272,8 @@ fun LibraryCoverflow(
                     focusedContentColor = JellioText,
                 ),
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 16.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 20.dp)
                     .size(44.dp)
                     .zIndex(10f)
                     .focusRequester(leftArrowFocusRequester),
@@ -264,8 +292,8 @@ fun LibraryCoverflow(
                     focusedContentColor = JellioText,
                 ),
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 20.dp)
                     .size(44.dp)
                     .zIndex(10f)
                     .focusRequester(rightArrowFocusRequester),

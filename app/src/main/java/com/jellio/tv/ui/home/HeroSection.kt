@@ -139,11 +139,23 @@ fun HeroSection(
                     ),
                 ),
         )
+        // Real bug found live: title/meta/overview/button/dots used to
+        // be one real bottom-aligned Column, so every rotation to a
+        // different real hero item (a different real overview length,
+        // sometimes no overview at all) reflowed the whole real stack -
+        // View Details and the dots moved with it, landing at a
+        // different real height every time, read live as "jitters up
+        // and down". Split into two real independently bottom-aligned
+        // columns instead: this one (title/meta/overview) is free to
+        // grow upward with whatever real content a given item has, the
+        // action column below (button+dots) stays pinned to a fixed
+        // real bottom position regardless, the arrows' own real bottom
+        // padding below already matches that fixed real spot.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .widthIn(max = 640.dp)
-                .padding(start = 48.dp, bottom = 56.dp, end = 24.dp),
+                .padding(start = 48.dp, bottom = 140.dp, end = 24.dp),
         ) {
             Text(text = item.Name ?: "", style = MaterialTheme.typography.titleLarge)
             val meta = metaLine(item)
@@ -159,6 +171,12 @@ fun HeroSection(
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 48.dp, bottom = 56.dp),
+        ) {
             Surface(
                 onClick = { onViewDetails(item) },
                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
@@ -166,7 +184,6 @@ fun HeroSection(
                     containerColor = Color.White.copy(alpha = 0.12f),
                     contentColor = JellioText,
                 ),
-                modifier = Modifier.padding(top = 20.dp),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
