@@ -38,6 +38,7 @@ import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -142,11 +143,39 @@ fun LibraryScreen(
                         // outright instead, so this is the only real
                         // thing that ever scrolls this list while focus
                         // lives anywhere inside this item.
+                        // Real bug found live, on a real screen
+                        // recording: NoOpBringIntoViewSpec's own real
+                        // suppression stops the default request from
+                        // ever nudging this list while focus already
+                        // lives inside this item, confirmed stable
+                        // across many real switches between the arrows
+                        // and View Details in that same real recording
+                        // - but the one real transition into this item
+                        // (false-to-true, this stage's own real
+                        // editorial/badge header still cut off well
+                        // after that point in that same recording, "
+                        // occasionally correct but usually not") still
+                        // raced something outside this real callback's
+                        // own control, a single real scrollToItem(0)
+                        // call only sometimes winning. Reasserting it a
+                        // few real times over the next 250ms, rather
+                        // than trusting the first call alone, closes
+                        // that race regardless of whatever it is
+                        // racing against: scrollToItem(0) is a real
+                        // instant jump, not an animation, so reasserting
+                        // it after something else already moved this
+                        // list is still a real correction, not a
+                        // visible fight.
                         var coverflowWasFocused by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier.onFocusChanged { state ->
                                 if (state.hasFocus && !coverflowWasFocused) {
-                                    scope.launch { listState.scrollToItem(0) }
+                                    scope.launch {
+                                        repeat(5) {
+                                            listState.scrollToItem(0)
+                                            delay(50)
+                                        }
+                                    }
                                 }
                                 coverflowWasFocused = state.hasFocus
                             },
