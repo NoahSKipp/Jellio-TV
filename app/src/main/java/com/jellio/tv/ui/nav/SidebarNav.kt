@@ -24,7 +24,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,6 +55,7 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
+import kotlinx.coroutines.launch
 
 // Real port of Jellio-Plugin's own desktop css/app.css: .jellio-sidebar
 // (--jellio-sidebar-width-collapsed: 5em, --jellio-sidebar-width: 15em,
@@ -148,6 +151,7 @@ fun SidebarNav(
     // initial focus onto whichever entry is already selected.
     LaunchedEffect(Unit) { restoreFocusRequester.requestFocus() }
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = modifier
@@ -200,15 +204,32 @@ fun SidebarNav(
                     // is fully null) landed back on this rail's own
                     // topmost item, reading as "every selection jumps
                     // back to Home" even though the route underneath had
-                    // already switched correctly. moveFocus(Right) below
-                    // is the real fix: same rail collapse (this item
-                    // loses focus either way), but focus actually lands
-                    // in whatever real content now sits to this rail's
-                    // own right, the same spatial search this rail's
-                    // Down-out-of-content callers already lean on, just
-                    // driven here instead of left for a reader's own
-                    // next real press to trigger.
-                    focusManager.moveFocus(FocusDirection.Right)
+                    // already switched correctly. moveFocus(Right) is
+                    // the real fix: same rail collapse (this item loses
+                    // focus either way), but focus actually lands in
+                    // whatever real content now sits to this rail's own
+                    // right, the same spatial search this rail's
+                    // Down-out-of-content callers already lean on.
+                    //
+                    // Real bug found live, on a real screen recording:
+                    // calling that same real moveFocus(Right) inline
+                    // here, in this same real onClick, still searched
+                    // whatever real screen was on screen BEFORE
+                    // onSelect(route) above - a plain var assignment,
+                    // not applied until this real composable's own next
+                    // real recomposition - so it ran against a real
+                    // screen already on its way out, found nothing real
+                    // there worth landing on once that screen actually
+                    // got replaced, and fell back to exactly the same
+                    // real "topmost item" default this same fix already
+                    // solved for once before. Deferred a real frame via
+                    // this rail's own scope instead, so the real new
+                    // screen has actually mounted its own real content
+                    // by the time this real search runs against it.
+                    scope.launch {
+                        withFrameNanos {}
+                        focusManager.moveFocus(FocusDirection.Right)
+                    }
                 },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
             )

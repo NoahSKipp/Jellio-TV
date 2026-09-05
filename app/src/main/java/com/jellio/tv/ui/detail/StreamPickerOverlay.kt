@@ -218,6 +218,15 @@ fun StreamPickerOverlay(
     LaunchedEffect(state) {
         if (state !is SourcesState.Loading) initialFocusRequester.requestFocus()
     }
+    // Real bug found live, on a real screen recording: Down from the
+    // Resume button/a language chip still couldn't reach this list even
+    // after this file's own weight(1f) fix below closed off the real
+    // sizing/clipping half of that same real report - a real explicit
+    // target, the same real pattern LibraryCoverflow.kt's own arrows/
+    // View Details already lean on rather than Compose's own default
+    // spatial search, answers the real navigation half directly instead
+    // of leaving it to guess.
+    val firstSourceCardFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -286,7 +295,10 @@ fun StreamPickerOverlay(
                             },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
-                            modifier = Modifier.padding(top = 24.dp).focusRequester(initialFocusRequester),
+                            modifier = Modifier
+                                .padding(top = 24.dp)
+                                .focusRequester(initialFocusRequester)
+                                .focusProperties { down = firstSourceCardFocusRequester },
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -322,6 +334,7 @@ fun StreamPickerOverlay(
                             selected = selectedLanguage,
                             onSelect = { selectedLanguage = it },
                             firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                            downFocusRequester = firstSourceCardFocusRequester,
                         )
                     }
                     Text(
@@ -343,15 +356,17 @@ fun StreamPickerOverlay(
                     // that real remaining space instead.
                     LazyColumn(
                         contentPadding = PaddingValues(bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f),
                     ) {
                         itemsIndexed(filteredSources) { index, source ->
                             SourceCard(
                                 source = source,
                                 onClick = { onSelect(source) },
-                                modifier = if (index == 0 && resumeTicks <= 0 && languages.size <= 1) {
-                                    Modifier.focusRequester(initialFocusRequester)
+                                modifier = if (index == 0) {
+                                    Modifier.focusRequester(firstSourceCardFocusRequester).let {
+                                        if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it
+                                    }
                                 } else {
                                     Modifier
                                 },
@@ -370,6 +385,7 @@ private fun LanguageFilterChips(
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
+    downFocusRequester: FocusRequester? = null,
 ) {
     val chips = buildList {
         add(null to "All")
@@ -389,11 +405,9 @@ private fun LanguageFilterChips(
                     containerColor = if (isSelected) JellioSecondary else JellioBgElevated,
                     contentColor = if (isSelected) JellioBg else JellioText,
                 ),
-                modifier = if (index == 0 && firstChipFocusRequester != null) {
-                    Modifier.focusRequester(firstChipFocusRequester)
-                } else {
-                    Modifier
-                },
+                modifier = Modifier
+                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
+                    .let { if (downFocusRequester != null) it.focusProperties { down = downFocusRequester } else it },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
@@ -426,18 +440,28 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else JellioBgElevated,
         ),
+        // Real bug found live, on a real screenshot: this card's own
+        // real tags/language line ran close enough to its own edge that
+        // TV Material3's own default focus grow pushed it past this
+        // card's own clipped bounds on focus, reading as "badges cut
+        // off on the side when selected" - same real class of fix as
+        // ui/library/LibraryFilterFieldOverlay.kt's own header covers.
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        // Real feedback live: shrunk from 16dp/2dp/6dp/4dp so more of
+        // this real list fits on screen at once without scrolling.
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),
                 color = JellioText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyLarge,
             )
             val description = sourceDescription(source)
             if (description.isNotEmpty()) {
-                Text(text = description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                Text(text = description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 1.dp))
             }
             val tags = listOfNotNull(
                 sourceResolutionLabel(source).ifEmpty { null },
@@ -447,7 +471,7 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
                 sourceAudioLabel(source).ifEmpty { null },
             )
             if (tags.isNotEmpty()) {
-                Text(text = tags.joinToString(" · "), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+                Text(text = tags.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
             // Real bug streamPicker.js's own buildSourceCard() documents
             // and fixes: an embedded MediaStreams Language ("de", ISO
@@ -459,7 +483,7 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
                 .mapNotNull { code -> languageName(code).takeIf { it != "Unknown" } }
                 .distinct()
             if (languageNames.isNotEmpty()) {
-                Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+                Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
         }
     }

@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +82,16 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val targetUserId = userId ?: session.userId
+    // Real DetailScreen.kt's own header on this exact fix: nothing here
+    // ever requested initial D-pad focus either, so a reader pushed
+    // into this screen (View Profile from the account switcher, a Feed
+    // row's own avatar) had no real target at all once landed - stuck
+    // on this rail's own sidebar, unable to select or navigate anything
+    // inside this screen itself.
+    val contentFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(uiState.isLoading, uiState.error) {
+        if (!uiState.isLoading && uiState.error == null) contentFocusRequester.requestFocus()
+    }
 
     LaunchedEffect(targetUserId) { viewModel.load(session, userId) }
 
@@ -107,7 +119,7 @@ fun ProfileScreen(
                 val achievements = uiState.achievements
                 val bannerImageUrl = remember(targetUserId, uiState.bannerBustToken) { bannerUrl(targetUserId) }
 
-                LazyColumn(modifier = Modifier.fillMaxSize().focusRestorer()) {
+                LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
                     item { ProfileBanner(bannerUrl = bannerImageUrl) }
                     item {
                         Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp)) {
