@@ -143,15 +143,14 @@ fun JellioRoute.label(): String = when (this) {
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""
 }
 
-// Detail/Player are full screen immersive views (real backdrop art,
-// real playback surface): the floating pill and its library picker
-// stay reserved for the fixed tab set above them, same real
-// distinction the web build draws between the sidebar/mobile nav and
-// screens/detail.js's own hero, which renders no nav chrome of its own.
-// Service carries the same real distinction, screens/service.js's own
-// hero just as immersive as screens/detail.js's own.
-fun JellioRoute.isImmersive(): Boolean =
-    this is JellioRoute.Detail || this is JellioRoute.Person || this is JellioRoute.Service || this is JellioRoute.Player
+// Real app.js's own FULLSCREEN_ROUTES: only the player route
+// ('play') ever hides the sidebar/mobile nav on web - Detail/Person/
+// Service all render their own hero with the nav rail still up
+// alongside it, same as Home/Library. Wrongly folded those three in
+// here before, which read as "the nav bar disappears on movie/series
+// pages" - it should only ever go away for the actual playback
+// surface.
+fun JellioRoute.isImmersive(): Boolean = this is JellioRoute.Player
 
 // A pushed real other-user Profile (Feed row click) still reserves
 // this pill's own real space and stays reachable, same as any other
