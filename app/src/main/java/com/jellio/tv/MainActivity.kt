@@ -2,6 +2,7 @@ package com.jellio.tv
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -30,6 +31,7 @@ import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
+import com.jellio.tv.ui.detail.StreamPickerDpadBridge
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.feed.FeedScreen
 import com.jellio.tv.ui.home.HomeScreen
@@ -98,6 +100,25 @@ class MainActivity : ComponentActivity() {
         if (uri.host == "jellio.tv" && uri.path == "/play") {
             uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
         }
+    }
+
+    // StreamPickerDpadBridge's own header explains why: Compose's own
+    // focus-based key dispatch never actually redirected Down/Up
+    // between the Stream Picker's Resume button/language chips and its
+    // stream list, on device, no matter where in that overlay's own
+    // Compose tree the handler sat. dispatchKeyEvent runs ahead of all
+    // of that - the real first look any key event gets, before
+    // Android's own View/Compose focus system touches it at all.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val handler = when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> StreamPickerDpadBridge.onDpadDown
+                KeyEvent.KEYCODE_DPAD_UP -> StreamPickerDpadBridge.onDpadUp
+                else -> null
+            }
+            if (handler != null && handler()) return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 }
 

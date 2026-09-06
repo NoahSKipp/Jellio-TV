@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,11 +34,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -245,6 +241,33 @@ fun StreamPickerOverlay(
     // onFocusChanged rather than trusting a leaf-level handler again.
     var topSectionHasFocus by remember { mutableStateOf(false) }
     var firstCardHasFocus by remember { mutableStateOf(false) }
+    // Bridges around Compose's own key dispatch entirely - see
+    // StreamPickerDpadBridge's own header for why. Reads
+    // topSectionHasFocus/firstCardHasFocus fresh on every real press
+    // rather than capturing a stale snapshot, live only while this
+    // overlay is actually mounted.
+    DisposableEffect(Unit) {
+        StreamPickerDpadBridge.onDpadDown = {
+            if (topSectionHasFocus) {
+                firstSourceCardFocusRequester.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
+        StreamPickerDpadBridge.onDpadUp = {
+            if (firstCardHasFocus) {
+                initialFocusRequester.requestFocus()
+                true
+            } else {
+                false
+            }
+        }
+        onDispose {
+            StreamPickerDpadBridge.onDpadDown = null
+            StreamPickerDpadBridge.onDpadUp = null
+        }
+    }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -261,24 +284,6 @@ fun StreamPickerOverlay(
     Box(
         modifier = modifier.fillMaxSize()
             .focusProperties { exit = { FocusRequester.Cancel } }
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionDown -> if (topSectionHasFocus) {
-                        firstSourceCardFocusRequester.requestFocus()
-                        true
-                    } else {
-                        false
-                    }
-                    Key.DirectionUp -> if (firstCardHasFocus) {
-                        initialFocusRequester.requestFocus()
-                        true
-                    } else {
-                        false
-                    }
-                    else -> false
-                }
-            }
             .background(JellioBg),
     ) {
         if (backdropUrl != null) {
