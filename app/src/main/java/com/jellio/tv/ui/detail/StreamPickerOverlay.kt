@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -232,6 +233,18 @@ fun StreamPickerOverlay(
     // spatial search, answers the real navigation half directly instead
     // of leaving it to guess.
     val firstSourceCardFocusRequester = remember { FocusRequester() }
+    // Real bug found live, twice over: neither focusProperties{down=}
+    // nor a plain onKeyEvent/onPreviewKeyEvent attached directly to the
+    // Resume button/chips/first card ever actually fired on device -
+    // TV Material3's own Surface implementation was still getting the
+    // first look at every D-pad key regardless of where in this file's
+    // own modifier chain the handler sat. Moved the interception up to
+    // this overlay's own outer Box below instead (the real root of
+    // this whole focus subtree, an ancestor of every one of those
+    // Surfaces), tracking which section currently holds focus via
+    // onFocusChanged rather than trusting a leaf-level handler again.
+    var topSectionHasFocus by remember { mutableStateOf(false) }
+    var firstCardHasFocus by remember { mutableStateOf(false) }
 
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
@@ -245,7 +258,29 @@ fun StreamPickerOverlay(
     LaunchedEffect(item.Id) { selectedLanguage = null }
     BackHandler(onBack = onDismiss)
 
-    Box(modifier = modifier.fillMaxSize().focusProperties { exit = { FocusRequester.Cancel } }.background(JellioBg)) {
+    Box(
+        modifier = modifier.fillMaxSize()
+            .focusProperties { exit = { FocusRequester.Cancel } }
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionDown -> if (topSectionHasFocus) {
+                        firstSourceCardFocusRequester.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                    Key.DirectionUp -> if (firstCardHasFocus) {
+                        initialFocusRequester.requestFocus()
+                        true
+                    } else {
+                        false
+                    }
+                    else -> false
+                }
+            }
+            .background(JellioBg),
+    ) {
         if (backdropUrl != null) {
             coil3.compose.AsyncImage(
                 model = backdropUrl,
@@ -292,45 +327,6 @@ fun StreamPickerOverlay(
                     // mechanism, picking the remembered/first source and
                     // letting the player itself do the actual seek.
                     val resumeTicks = item.UserData?.PlaybackPositionTicks ?: 0
-                    if (resumeTicks > 0) {
-                        Surface(
-                            onClick = {
-                                val target = currentState.sources.find { it.Id == remembered } ?: currentState.sources.firstOrNull()
-                                target?.let { onSelect(it) }
-                            },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
-                            modifier = Modifier
-                                .padding(top = 24.dp)
-                                .focusRequester(initialFocusRequester)
-                                .focusProperties { down = firstSourceCardFocusRequester }
-                                // focusProperties alone was not reliably
-                                // routing Down into the stream list on
-                                // device, and a plain onKeyEvent never saw
-                                // the key at all - Surface's own internal
-                                // key handling swallowed it first, being
-                                // closer to the focused node in the
-                                // bubbling chain. onPreviewKeyEvent runs
-                                // top-down before Surface gets a look at
-                                // it, so this always fires.
-                                .onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                                        firstSourceCardFocusRequester.requestFocus()
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
-                                Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
-                            }
-                        }
-                    }
                     // Real port of streamPicker.js's own language filter
                     // chip bar: only worth showing when there is a real
                     // choice behind it, same real reasoning the whole
@@ -350,14 +346,43 @@ fun StreamPickerOverlay(
                         currentState.sources.filter { sourceAudioLanguages(it).contains(code) }
                     } ?: currentState.sources
 
-                    if (languages.size > 1) {
-                        LanguageFilterChips(
-                            languages = languages,
-                            selected = selectedLanguage,
-                            onSelect = { selectedLanguage = it },
-                            firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
-                            downFocusRequester = firstSourceCardFocusRequester,
-                        )
+                    // Grouped under one onFocusChanged rather than
+                    // chasing focus per Surface: this overlay's own
+                    // outer Box above reads topSectionHasFocus to decide
+                    // whether a real Down press should jump into the
+                    // stream list, true the moment focus lands anywhere
+                    // in here (the Resume button or any chip) and false
+                    // again the moment it leaves.
+                    Column(modifier = Modifier.onFocusChanged { topSectionHasFocus = it.hasFocus }) {
+                        if (resumeTicks > 0) {
+                            Surface(
+                                onClick = {
+                                    val target = currentState.sources.find { it.Id == remembered } ?: currentState.sources.firstOrNull()
+                                    target?.let { onSelect(it) }
+                                },
+                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
+                                modifier = Modifier
+                                    .padding(top = 24.dp)
+                                    .focusRequester(initialFocusRequester),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
+                                    Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
+                                }
+                            }
+                        }
+                        if (languages.size > 1) {
+                            LanguageFilterChips(
+                                languages = languages,
+                                selected = selectedLanguage,
+                                onSelect = { selectedLanguage = it },
+                                firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                            )
+                        }
                     }
                     Text(
                         text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
@@ -398,21 +423,15 @@ fun StreamPickerOverlay(
                                         // stuck there instead of reaching
                                         // back up to the real Resume
                                         // button/language chips above it.
-                                        // initialFocusRequester already
-                                        // resolves to whichever of those
-                                        // is first in reading order (or
-                                        // this same real card when
-                                        // neither exists, a real harmless
-                                        // no-op Up in that one case).
-                                        .focusProperties { up = initialFocusRequester }
-                                        .onPreviewKeyEvent { event ->
-                                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
-                                                initialFocusRequester.requestFocus()
-                                                true
-                                            } else {
-                                                false
-                                            }
-                                        }
+                                        // Tracked the same way as
+                                        // topSectionHasFocus above: this
+                                        // overlay's own outer Box reads
+                                        // firstCardHasFocus to redirect a
+                                        // real Up press back to whichever
+                                        // of those is first in reading
+                                        // order (initialFocusRequester
+                                        // already resolves to that).
+                                        .onFocusChanged { firstCardHasFocus = it.hasFocus }
                                 } else {
                                     Modifier
                                 },
@@ -431,7 +450,6 @@ private fun LanguageFilterChips(
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
-    downFocusRequester: FocusRequester? = null,
 ) {
     val chips = buildList {
         add(null to "All")
@@ -458,22 +476,7 @@ private fun LanguageFilterChips(
                 // row's own bounds on focus - same fix as SourceCard's.
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 modifier = Modifier
-                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
-                    .let { if (downFocusRequester != null) it.focusProperties { down = downFocusRequester } else it }
-                    .let {
-                        if (downFocusRequester != null) {
-                            it.onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                                    downFocusRequester.requestFocus()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                        } else {
-                            it
-                        }
-                    },
+                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
