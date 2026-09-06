@@ -32,6 +32,11 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -298,7 +303,19 @@ fun StreamPickerOverlay(
                             modifier = Modifier
                                 .padding(top = 24.dp)
                                 .focusRequester(initialFocusRequester)
-                                .focusProperties { down = firstSourceCardFocusRequester },
+                                .focusProperties { down = firstSourceCardFocusRequester }
+                                // focusProperties alone was not reliably
+                                // routing Down into the stream list on
+                                // device - this forces it explicitly
+                                // rather than leaving it to focus search.
+                                .onKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                        firstSourceCardFocusRequester.requestFocus()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -383,6 +400,14 @@ fun StreamPickerOverlay(
                                         // neither exists, a real harmless
                                         // no-op Up in that one case).
                                         .focusProperties { up = initialFocusRequester }
+                                        .onKeyEvent { event ->
+                                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                                                initialFocusRequester.requestFocus()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
                                 } else {
                                     Modifier
                                 },
@@ -420,10 +445,30 @@ private fun LanguageFilterChips(
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = if (isSelected) JellioSecondary else JellioBgElevated,
                     contentColor = if (isSelected) JellioBg else JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                    focusedContentColor = JellioText,
                 ),
+                // Chip carried no scale override of its own, so TV
+                // Material3's default focus-grow expanded it past this
+                // row's own bounds on focus - same fix as SourceCard's.
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 modifier = Modifier
                     .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
-                    .let { if (downFocusRequester != null) it.focusProperties { down = downFocusRequester } else it },
+                    .let { if (downFocusRequester != null) it.focusProperties { down = downFocusRequester } else it }
+                    .let {
+                        if (downFocusRequester != null) {
+                            it.onKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                    downFocusRequester.requestFocus()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        } else {
+                            it
+                        }
+                    },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
