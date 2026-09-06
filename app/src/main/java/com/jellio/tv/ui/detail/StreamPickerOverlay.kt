@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -229,26 +230,28 @@ fun StreamPickerOverlay(
     // spatial search, answers the real navigation half directly instead
     // of leaving it to guess.
     val firstSourceCardFocusRequester = remember { FocusRequester() }
-    // Real bug found live, twice over: neither focusProperties{down=}
-    // nor a plain onKeyEvent/onPreviewKeyEvent attached directly to the
-    // Resume button/chips/first card ever actually fired on device -
-    // TV Material3's own Surface implementation was still getting the
-    // first look at every D-pad key regardless of where in this file's
-    // own modifier chain the handler sat. Moved the interception up to
-    // this overlay's own outer Box below instead (the real root of
-    // this whole focus subtree, an ancestor of every one of those
-    // Surfaces), tracking which section currently holds focus via
-    // onFocusChanged rather than trusting a leaf-level handler again.
-    var topSectionHasFocus by remember { mutableStateOf(false) }
+    // Real bug found live, five times running on the Down direction
+    // specifically: an ancestor Column's own onFocusChanged, observing
+    // focus state aggregated up from a LazyRow's own items, never
+    // actually reported true - a known unreliable path across a lazy
+    // list's own subcomposition boundary. Tracked directly on each real
+    // leaf instead (the Resume button and every chip individually, each
+    // reporting only its own real isFocused rather than an ancestor
+    // trying to aggregate across that boundary).
+    var resumeFocused by remember { mutableStateOf(false) }
+    // Which chip (by index) currently reports itself focused, or -1 for
+    // none - safer than a single shared "any chip focused" boolean two
+    // chips could both write to in either order across a focus move
+    // from one to the other.
+    var focusedChipIndex by remember { mutableIntStateOf(-1) }
     var firstCardHasFocus by remember { mutableStateOf(false) }
     // Bridges around Compose's own key dispatch entirely - see
-    // StreamPickerDpadBridge's own header for why. Reads
-    // topSectionHasFocus/firstCardHasFocus fresh on every real press
-    // rather than capturing a stale snapshot, live only while this
-    // overlay is actually mounted.
+    // StreamPickerDpadBridge's own header for why. Reads these fresh on
+    // every real press rather than capturing a stale snapshot, live
+    // only while this overlay is actually mounted.
     DisposableEffect(Unit) {
         StreamPickerDpadBridge.onDpadDown = {
-            if (topSectionHasFocus) {
+            if (resumeFocused || focusedChipIndex >= 0) {
                 firstSourceCardFocusRequester.requestFocus()
                 true
             } else {
@@ -351,14 +354,7 @@ fun StreamPickerOverlay(
                         currentState.sources.filter { sourceAudioLanguages(it).contains(code) }
                     } ?: currentState.sources
 
-                    // Grouped under one onFocusChanged rather than
-                    // chasing focus per Surface: this overlay's own
-                    // outer Box above reads topSectionHasFocus to decide
-                    // whether a real Down press should jump into the
-                    // stream list, true the moment focus lands anywhere
-                    // in here (the Resume button or any chip) and false
-                    // again the moment it leaves.
-                    Column(modifier = Modifier.onFocusChanged { topSectionHasFocus = it.hasFocus }) {
+                    Column {
                         if (resumeTicks > 0) {
                             Surface(
                                 onClick = {
@@ -369,7 +365,8 @@ fun StreamPickerOverlay(
                                 colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
                                 modifier = Modifier
                                     .padding(top = 24.dp)
-                                    .focusRequester(initialFocusRequester),
+                                    .focusRequester(initialFocusRequester)
+                                    .onFocusChanged { resumeFocused = it.isFocused },
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -386,6 +383,13 @@ fun StreamPickerOverlay(
                                 selected = selectedLanguage,
                                 onSelect = { selectedLanguage = it },
                                 firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                                onChipFocusChanged = { index, focused ->
+                                    if (focused) {
+                                        focusedChipIndex = index
+                                    } else if (focusedChipIndex == index) {
+                                        focusedChipIndex = -1
+                                    }
+                                },
                             )
                         }
                     }
@@ -429,8 +433,9 @@ fun StreamPickerOverlay(
                                         // back up to the real Resume
                                         // button/language chips above it.
                                         // Tracked the same way as
-                                        // topSectionHasFocus above: this
-                                        // overlay's own outer Box reads
+                                        // resumeFocused/focusedChipIndex
+                                        // above: StreamPickerDpadBridge's
+                                        // own onDpadUp reads
                                         // firstCardHasFocus to redirect a
                                         // real Up press back to whichever
                                         // of those is first in reading
@@ -455,6 +460,7 @@ private fun LanguageFilterChips(
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
+    onChipFocusChanged: (index: Int, focused: Boolean) -> Unit = { _, _ -> },
 ) {
     val chips = buildList {
         add(null to "All")
@@ -481,7 +487,8 @@ private fun LanguageFilterChips(
                 // row's own bounds on focus - same fix as SourceCard's.
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 modifier = Modifier
-                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it },
+                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
+                    .onFocusChanged { onChipFocusChanged(index, it.isFocused) },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
