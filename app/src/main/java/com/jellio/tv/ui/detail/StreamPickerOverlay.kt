@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -306,9 +306,14 @@ fun StreamPickerOverlay(
                                 .focusProperties { down = firstSourceCardFocusRequester }
                                 // focusProperties alone was not reliably
                                 // routing Down into the stream list on
-                                // device - this forces it explicitly
-                                // rather than leaving it to focus search.
-                                .onKeyEvent { event ->
+                                // device, and a plain onKeyEvent never saw
+                                // the key at all - Surface's own internal
+                                // key handling swallowed it first, being
+                                // closer to the focused node in the
+                                // bubbling chain. onPreviewKeyEvent runs
+                                // top-down before Surface gets a look at
+                                // it, so this always fires.
+                                .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                                         firstSourceCardFocusRequester.requestFocus()
                                         true
@@ -400,7 +405,7 @@ fun StreamPickerOverlay(
                                         // neither exists, a real harmless
                                         // no-op Up in that one case).
                                         .focusProperties { up = initialFocusRequester }
-                                        .onKeyEvent { event ->
+                                        .onPreviewKeyEvent { event ->
                                             if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
                                                 initialFocusRequester.requestFocus()
                                                 true
@@ -457,7 +462,7 @@ private fun LanguageFilterChips(
                     .let { if (downFocusRequester != null) it.focusProperties { down = downFocusRequester } else it }
                     .let {
                         if (downFocusRequester != null) {
-                            it.onKeyEvent { event ->
+                            it.onPreviewKeyEvent { event ->
                                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
                                     downFocusRequester.requestFocus()
                                     true
