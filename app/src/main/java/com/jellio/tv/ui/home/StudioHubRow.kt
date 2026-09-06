@@ -13,7 +13,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,6 +83,15 @@ private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
                 model = logoUrl,
                 contentDescription = name,
                 contentScale = ContentScale.Fit,
+                // Real css/app.css's own .jellio-hub-tile-logo rule:
+                // filter: brightness(0) invert(1). Simple Icons ships
+                // these with whatever fill colour (or several, Peacock/
+                // Disney's own real files) the mark happens to carry,
+                // forced to a flat white silhouette there rather than
+                // trusted as-is - same real flatten here, SrcIn keeps
+                // the source alpha and replaces every opaque pixel with
+                // white regardless of its own real original colour.
+                colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
                 modifier = Modifier.size(width = tileWidth - 24.dp, height = tileHeight - 48.dp),
             )
             Text(
