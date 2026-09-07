@@ -39,6 +39,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -636,6 +638,12 @@ internal fun PlayerSurface(
     val currentAudioIndex by androidx.compose.runtime.rememberUpdatedState(selectedAudioStreamIndex)
     val currentAudioTracks by androidx.compose.runtime.rememberUpdatedState(audioTracks)
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
+    var holdSeekTargetMs by remember { mutableStateOf<Long?>(null) }
+    var holdSeekDeltaMs by remember { mutableLongStateOf(0L) }
+    var holdSeekKey by remember { mutableStateOf<Key?>(null) }
+    var holdSeekStartPos by remember { mutableLongStateOf(0L) }
+    var holdSeekStartTime by remember { mutableLongStateOf(0L) }
+    var wasPlayingBeforeHold by remember { mutableStateOf(false) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
     val bufferWatch = remember { BufferWatch() }
@@ -1227,7 +1235,57 @@ internal fun PlayerSurface(
                 false
             }
             .onKeyEvent { event ->
+                val isSeekKey = event.key == Key.DirectionLeft || event.key == Key.DirectionRight ||
+                    event.key == Key.MediaRewind || event.key == Key.MediaFastForward
+                val isMedia = event.key == Key.MediaRewind || event.key == Key.MediaFastForward
+                val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
+
+                if (event.type == KeyEventType.KeyDown) {
+                    if (isSeekKey && (!controlsVisible || isMedia)) {
+                        val repeatCount = event.nativeKeyEvent.repeatCount
+                        val now = android.os.SystemClock.uptimeMillis()
+                        if (repeatCount == 0 && holdSeekKey != event.key) {
+                            holdSeekKey = event.key
+                            holdSeekStartTime = now
+                            holdSeekStartPos = positionMs
+                            holdSeekTargetMs = null
+                            holdSeekDeltaMs = 0L
+                        } else if (repeatCount > 0 || (now - holdSeekStartTime > 250L)) {
+                            // Hold to fast forward / rewind
+                            if (holdSeekTargetMs == null && player.isPlaying) {
+                                wasPlayingBeforeHold = true
+                                player.pause()
+                            }
+                            val elapsed = now - holdSeekStartTime
+                            val step = when {
+                                repeatCount > 40 || elapsed > 3500L -> 60_000L
+                                repeatCount > 20 || elapsed > 1800L -> 30_000L
+                                repeatCount > 5 || elapsed > 600L -> 15_000L
+                                else -> SEEK_STEP_MS
+                            }
+                            val base = holdSeekTargetMs ?: holdSeekStartPos
+                            val next = seekTarget(base, if (forward) step else -step, shownDurationMs)
+                            holdSeekTargetMs = next
+                            holdSeekDeltaMs += if (forward) step else -step
+                            seekFlash = SeekFlash(next, holdSeekDeltaMs, System.nanoTime())
+                        }
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                if (!isSeekKey && holdSeekTargetMs != null) {
+                    val target = holdSeekTargetMs!!
+                    userSeek(target)
+                    holdSeekTargetMs = null
+                    holdSeekDeltaMs = 0L
+                    holdSeekKey = null
+                    if (wasPlayingBeforeHold) {
+                        player.play()
+                        wasPlayingBeforeHold = false
+                    }
+                }
                 if (pauseOverlayDismissKey == event.key) {
                     pauseOverlayDismissKey = null
                     when (event.key) {
@@ -1316,11 +1374,24 @@ internal fun PlayerSurface(
                         true
                     }
                     Key.DirectionLeft, Key.DirectionRight, Key.MediaRewind, Key.MediaFastForward -> {
-                        val isMedia = event.key == Key.MediaRewind || event.key == Key.MediaFastForward
                         if (controlsVisible && !isMedia) return@onKeyEvent false
-                        // Controls hidden: just jump, with a small badge saying
+                        if (holdSeekTargetMs != null) {
+                            // Finished holding down - seek and resume
+                            val target = holdSeekTargetMs!!
+                            userSeek(target)
+                            seekFlash = SeekFlash(target, holdSeekDeltaMs, System.nanoTime())
+                            holdSeekTargetMs = null
+                            holdSeekDeltaMs = 0L
+                            holdSeekKey = null
+                            if (wasPlayingBeforeHold) {
+                                player.play()
+                                wasPlayingBeforeHold = false
+                            }
+                            return@onKeyEvent true
+                        }
+                        // Controls hidden: quick single tap jump, with a small badge saying
                         // where to, rather than bringing the whole overlay up.
-                        val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
+                        holdSeekKey = null
                         val base = seekFlash?.target ?: positionMs
                         val newPos = seekTarget(base, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, shownDurationMs)
                         userSeek(newPos)
@@ -1385,25 +1456,48 @@ internal fun PlayerSurface(
         // The quick-jump badge: shown for a moment after the last press,
         // adding up repeated presses (+30s after three).
         seekFlash?.let { flash ->
-            LaunchedEffect(flash.stamp) {
-                delay(1200)
-                seekFlash = null
+            val isHolding = holdSeekTargetMs != null
+            if (!isHolding) {
+                LaunchedEffect(flash.stamp) {
+                    delay(1200)
+                    seekFlash = null
+                }
             }
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 48.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(JellioBgElevated.copy(alpha = 0.9f))
-                    .padding(horizontal = 22.dp, vertical = 10.dp),
+                    .background(JellioBgElevated.copy(alpha = 0.92f))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
             ) {
-                val seconds = flash.totalMs / 1000
-                Text(
-                    text = (if (seconds >= 0) "+${seconds}s" else "${seconds}s") + "  ·  " + com.jellio.tv.ui.common.formatPlaybackTime(flash.target) +
-                        if (shownDurationMs > 0) " / " + com.jellio.tv.ui.common.formatPlaybackTime(shownDurationMs) else "",
-                    color = JellioText,
-                    style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
-                )
+                val totalSeconds = flash.totalMs / 1000
+                val sign = if (totalSeconds >= 0) "+" else "-"
+                val absSec = kotlin.math.abs(totalSeconds)
+                val deltaText = if (absSec >= 60) {
+                    val m = absSec / 60
+                    val s = absSec % 60
+                    if (s > 0) "$sign${m}m ${s}s" else "$sign${m}m"
+                } else {
+                    "$sign${absSec}s"
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isHolding) {
+                        Icon(
+                            imageVector = if (flash.totalMs >= 0) Icons.Filled.FastForward else Icons.Filled.FastRewind,
+                            contentDescription = null,
+                            tint = JellioSecondary,
+                            modifier = Modifier.size(20.dp).padding(end = 8.dp),
+                        )
+                    }
+                    Text(
+                        text = "$deltaText  ·  ${com.jellio.tv.ui.common.formatPlaybackTime(flash.target)}" +
+                            if (shownDurationMs > 0) " / " + com.jellio.tv.ui.common.formatPlaybackTime(shownDurationMs) else "",
+                        color = JellioText,
+                        style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
+                    )
+                }
             }
         }
 

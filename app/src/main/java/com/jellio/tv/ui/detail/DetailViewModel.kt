@@ -118,6 +118,8 @@ class DetailViewModel @Inject constructor(
                 if (preloaded?.Type == "Series") {
                     loadSeasons(session, preloaded.Id)
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, preloaded.Id) }
+                } else if (preloaded?.Type == "Episode" && preloaded.SeriesId != null) {
+                    loadSeasons(session, preloaded.SeriesId, preferredSeasonId = preloaded.SeasonId, preferredSeasonNumber = preloaded.ParentIndexNumber)
                 }
                 // Two retries with backoff; the art drawn from memory stays up meanwhile.
                 val item = withRetries(
@@ -154,6 +156,10 @@ class DetailViewModel @Inject constructor(
                 if (item.Type == "Series" && preloaded?.Type != "Series") {
                     loadSeasons(session, item.Id)
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
+                } else if (item.Type == "Episode" && item.SeriesId != null) {
+                    if (preloaded?.Type != "Episode" || _uiState.value.seasons.isEmpty()) {
+                        loadSeasons(session, item.SeriesId, preferredSeasonId = item.SeasonId, preferredSeasonNumber = item.ParentIndexNumber)
+                    }
                 }
             } catch (err: Exception) {
                 android.util.Log.w("JellioDetail", "details for $itemId failed: ${err.message}")
@@ -201,22 +207,33 @@ class DetailViewModel @Inject constructor(
         return target.episode
     }
 
-    private fun loadSeasons(session: Session, seriesId: String) {
+    private fun loadSeasons(session: Session, seriesId: String, preferredSeasonId: String? = null, preferredSeasonNumber: Int? = null) {
         fun ordered(list: List<BaseItemDto>) = list.sortedBy { if (repository.isSpecialsSeason(it)) 1 else 0 }
+        fun pickSeason(list: List<BaseItemDto>): BaseItemDto? {
+            if (preferredSeasonId != null) {
+                list.firstOrNull { it.Id == preferredSeasonId }?.let { return it }
+            }
+            if (preferredSeasonNumber != null) {
+                list.firstOrNull { it.IndexNumber == preferredSeasonNumber }?.let { return it }
+            }
+            return list.firstOrNull()
+        }
         repository.recentSeasons(seriesId)?.let { known ->
-            _uiState.value = _uiState.value.copy(seasons = ordered(known))
-            ordered(known).firstOrNull()?.let { selectSeason(session, seriesId, it.Id) }
+            val seasons = ordered(known)
+            _uiState.value = _uiState.value.copy(seasons = seasons)
+            pickSeason(seasons)?.let { selectSeason(session, seriesId, it.Id) }
         }
         viewModelScope.launch {
             val seasons = ordered(runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
             if (seasons.isEmpty() && _uiState.value.seasons.isNotEmpty()) return@launch
             _uiState.value = _uiState.value.copy(seasons = seasons)
             val selected = _uiState.value.selectedSeasonId
-            if (selected == null || seasons.none { it.Id == selected }) {
-                seasons.firstOrNull()?.let { selectSeason(session, seriesId, it.Id) }
+            val toSelect = if (selected != null && seasons.any { it.Id == selected }) {
+                seasons.firstOrNull { it.Id == selected }
             } else {
-                selectSeason(session, seriesId, selected)
+                pickSeason(seasons)
             }
+            toSelect?.let { selectSeason(session, seriesId, it.Id) }
         }
     }
 
@@ -233,9 +250,13 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
             if (_uiState.value.selectedSeasonId != seasonId) return@launch
-            val seriesCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+            val isEpisode = _uiState.value.item?.Type == "Episode"
+            val itemCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
             val seasonCast = season.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
-            _uiState.value = _uiState.value.copy(selectedSeason = season, cast = seasonCast.ifEmpty { seriesCast })
+            _uiState.value = _uiState.value.copy(
+                selectedSeason = season,
+                cast = if (isEpisode && itemCast.isNotEmpty()) itemCast else seasonCast.ifEmpty { itemCast },
+            )
         }
         viewModelScope.launch {
             val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch

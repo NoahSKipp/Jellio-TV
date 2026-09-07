@@ -310,6 +310,13 @@ private fun JellioTvApp(
     }
 
     val onNavigateToDetail: (String) -> Unit = { itemId -> push(JellioRoute.Detail(itemId)) }
+    val onNavigateToDetailReplace: (String) -> Unit = { itemId ->
+        if (routeStack.lastOrNull() is JellioRoute.Detail) {
+            routeStack = routeStack.dropLast(1) + JellioRoute.Detail(itemId)
+        } else {
+            push(JellioRoute.Detail(itemId))
+        }
+    }
     val onNavigateToPerson: (String) -> Unit = { personId -> push(JellioRoute.Person(personId)) }
     fun playItem(itemId: String, mediaSourceId: String? = null, startPositionTicks: Long? = null) {
         push(JellioRoute.Player(itemId, mediaSourceId, startPositionTicks))
@@ -473,6 +480,7 @@ private fun JellioTvApp(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 onBack = { routeStack = routeStack.dropLast(1) },
                 onNavigateToDetail = onNavigateToDetail,
+                onNavigateToDetailReplace = onNavigateToDetailReplace,
                 onNavigateToPerson = onNavigateToPerson,
                 onOpenStreamPicker = { item -> streamPickerItem = item },
                 onPlayDirect = onPlayDirect,
