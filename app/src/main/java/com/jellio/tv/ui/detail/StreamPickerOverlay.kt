@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.detail
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -228,6 +229,22 @@ fun StreamPickerOverlay(
     // for why Down doesn't need that here.
     val firstSourceCardFocusRequester = remember { FocusRequester() }
     var firstCardHasFocus by remember { mutableStateOf(false) }
+    // TEMPORARY diagnostic: isolates whether requestFocus() can EVER
+    // land on a SourceCard at all, independent of any key-press-driven
+    // navigation. firstSourceCardFocusRequester is already uniquely
+    // bound to card 0 only (no multi-attachment conflict with
+    // initialFocusRequester above). A short delay past the normal
+    // initial-focus effect so this doesn't race it for the very first
+    // frame - if Card[0] onFocusChanged never logs even after this,
+    // the bug is SourceCard's own focusability, not cross-boundary
+    // navigation.
+    LaunchedEffect(state) {
+        if (state !is SourcesState.Loading) {
+            kotlinx.coroutines.delay(500)
+            Log.d("JellioDpadDebug", "Diagnostic: attempting firstSourceCardFocusRequester.requestFocus()")
+            firstSourceCardFocusRequester.requestFocus()
+        }
+    }
     // Bridges around Compose's own key dispatch entirely - see
     // StreamPickerDpadBridge's own header for why. Down used to live
     // here too (a forced requestFocus() onto a LazyColumn item that,
@@ -405,29 +422,13 @@ fun StreamPickerOverlay(
                             SourceCard(
                                 source = source,
                                 onClick = { onSelect(source) },
-                                modifier = if (index == 0) {
-                                    Modifier
+                                modifier = when (index) {
+                                    0 -> Modifier
                                         .focusRequester(firstSourceCardFocusRequester)
                                         .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
-                                        // Real bug found live, on a real
-                                        // screen recording: Up from this
-                                        // real first card, once actually
-                                        // inside this real list, had no
-                                        // explicit real target the same
-                                        // way Down into it now does -
-                                        // stuck there instead of reaching
-                                        // back up to the real Resume
-                                        // button/language chips above it.
-                                        // StreamPickerDpadBridge's own
-                                        // onDpadUp reads firstCardHasFocus
-                                        // to redirect a real Up press
-                                        // back to whichever of those is
-                                        // first in reading order
-                                        // (initialFocusRequester already
-                                        // resolves to that).
-                                        .onFocusChanged { firstCardHasFocus = it.hasFocus }
-                                } else {
-                                    Modifier
+                                        .onFocusChanged { Log.d("JellioDpadDebug", "Card[0] onFocusChanged hasFocus=${it.hasFocus}"); firstCardHasFocus = it.hasFocus }
+                                    1 -> Modifier.onFocusChanged { Log.d("JellioDpadDebug", "Card[1] onFocusChanged hasFocus=${it.hasFocus}") }
+                                    else -> Modifier
                                 },
                             )
                         }
