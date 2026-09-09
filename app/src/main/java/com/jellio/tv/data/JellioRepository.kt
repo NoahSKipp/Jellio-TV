@@ -1002,7 +1002,12 @@ class JellioRepository @Inject constructor(
         runCatching { api.getIntroSkipperSegments(itemId) }.getOrNull()
 
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
-        val nextUp = try {
+        val continueWatchingEp = try {
+            getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId }
+        } catch (err: Exception) {
+            null
+        }
+        val nextUp = continueWatchingEp ?: try {
             getSeriesNextUp(seriesId, userId)
         } catch (err: Exception) {
             null
@@ -1023,6 +1028,74 @@ class JellioRepository @Inject constructor(
         val hasProgress = (episode.UserData?.PlaybackPositionTicks ?: 0) > 0
         val resume = hasProgress || !isFirstEpisode
         return SeriesPlayTarget(episode, resume)
+    }
+
+    fun isEpisodicAnthology(series: BaseItemDto?): Boolean {
+        if (series == null) return false
+        val genres = series.Genres.orEmpty()
+        val tags = series.Tags.orEmpty()
+        if (genres.any { it.contains("anthology", ignoreCase = true) }) return true
+        if (tags.any { it.contains("anthology", ignoreCase = true) }) return true
+        val overview = series.Overview.orEmpty()
+        if (overview.contains("anthology series", ignoreCase = true) || overview.contains("anthology", ignoreCase = true)) return true
+        val name = series.Name?.lowercase() ?: ""
+        val knownAnthologies = listOf(
+            "black mirror",
+            "love, death & robots",
+            "love death and robots",
+            "love death & robots",
+            "love death + robots",
+            "twilight zone",
+            "cabinet of curiosities",
+            "electric dreams",
+            "room 104",
+            "star wars: visions",
+            "star wars visions",
+            "inside no. 9",
+            "inside no 9",
+            "modern love",
+            "oats studios",
+            "tales from the crypt",
+            "tales from the loop",
+            "american horror stories",
+        )
+        return knownAnthologies.any { name.contains(it) }
+    }
+
+    suspend fun autoCompletePreviousEpisodesIfSkipped(userId: String, episode: BaseItemDto) {
+        val seriesId = episode.SeriesId ?: return
+        val currentSeasonNum = episode.ParentIndexNumber ?: return
+        val currentEpNum = episode.IndexNumber ?: return
+        if (currentSeasonNum <= 0) return
+
+        val series = runCatching { getItem(userId, seriesId) }.getOrNull()
+        if (isEpisodicAnthology(series)) {
+            android.util.Log.d("JellioProgress", "Skipping auto-complete for anthology series: ${series?.Name}")
+            return
+        }
+
+        try {
+            val allEpisodes = api.getEpisodes(seriesId = seriesId, userId = userId, fields = "UserData").Items
+            val toMark = allEpisodes.filter { ep ->
+                val sNum = ep.ParentIndexNumber ?: 0
+                val eNum = ep.IndexNumber ?: 0
+                if (sNum == 0) return@filter false
+                val isBefore = sNum < currentSeasonNum || (sNum == currentSeasonNum && eNum < currentEpNum)
+                isBefore && (ep.UserData?.Played != true || (ep.UserData?.PlaybackPositionTicks ?: 0L) > 0L)
+            }
+
+            if (toMark.isNotEmpty()) {
+                android.util.Log.i("JellioProgress", "Auto-completing ${toMark.size} previous skipped episodes for series ${series?.Name ?: seriesId}")
+                for (prevEp in toMark) {
+                    runCatching {
+                        api.markPlayed(userId, prevEp.Id)
+                    }
+                }
+                cache.clear()
+            }
+        } catch (err: Exception) {
+            android.util.Log.w("JellioProgress", "Failed to auto-complete previous episodes: ${err.message}")
+        }
     }
 
     fun isSpecialsSeason(season: BaseItemDto): Boolean {

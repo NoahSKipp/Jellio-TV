@@ -143,6 +143,7 @@ data class BaseItemDto(
     val Status: String? = null,
     val EndDate: String? = null,
     val Genres: List<String>? = null,
+    val Tags: List<String>? = null,
     val People: List<PersonDto>? = null,
     val RemoteTrailers: List<TrailerDto>? = null,
     val ImageTags: Map<String, String>? = null,
