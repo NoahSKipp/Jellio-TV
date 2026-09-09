@@ -2,6 +2,7 @@ package com.jellio.tv
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -111,12 +112,15 @@ class MainActivity : ComponentActivity() {
     // Android's own View/Compose focus system touches it at all.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
+            Log.d("JellioDpadDebug", "dispatchKeyEvent keyCode=${event.keyCode} hasDownHandler=${StreamPickerDpadBridge.onDpadDown != null} hasUpHandler=${StreamPickerDpadBridge.onDpadUp != null}")
             val handler = when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> StreamPickerDpadBridge.onDpadDown
                 KeyEvent.KEYCODE_DPAD_UP -> StreamPickerDpadBridge.onDpadUp
                 else -> null
             }
-            if (handler != null && handler()) return true
+            val consumed = handler?.invoke() ?: false
+            Log.d("JellioDpadDebug", "handler invoked=${handler != null} consumed=$consumed")
+            if (consumed) return true
         }
         return super.dispatchKeyEvent(event)
     }
