@@ -102,13 +102,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // StreamPickerDpadBridge's own header explains why Up still needs
-    // this: dispatchKeyEvent runs ahead of everything else - the real
-    // first look any key event gets, before Android's own View/Compose
-    // focus system touches it at all.
+    // StreamPickerDpadBridge's own header explains why: dispatchKeyEvent
+    // runs ahead of everything else - the real first look any key event
+    // gets, before Android's own View/Compose focus system touches it
+    // at all.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-            if (StreamPickerDpadBridge.onDpadUp?.invoke() == true) return true
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val handler = when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> StreamPickerDpadBridge.onDpadDown
+                KeyEvent.KEYCODE_DPAD_UP -> StreamPickerDpadBridge.onDpadUp
+                else -> null
+            }
+            if (handler?.invoke() == true) return true
         }
         return super.dispatchKeyEvent(event)
     }
