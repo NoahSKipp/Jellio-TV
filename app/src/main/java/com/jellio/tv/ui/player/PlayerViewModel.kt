@@ -145,6 +145,13 @@ data class PlayerUiState(
     // actually picks a different one.
     val selectedAudioStreamIndex: Int? = null,
     val defaultAudioStreamIndex: Int? = null,
+    // Whether streamUrl is currently a Direct Play (Static=true) source
+    // rather than a transcode - switchAudioTrack() below reads this to
+    // decide whether a track change can happen as a plain local
+    // ExoPlayer track selection (PlayerScreen's own LaunchedEffect on
+    // selectedAudioStreamIndex/directPlay) or needs a real fresh
+    // PlaybackInfo negotiation the way a transcoded source always did.
+    val directPlay: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
     val skipSegments: IntroSkipperSegmentsDto? = null,
@@ -289,6 +296,7 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
+                    directPlay = target.directPlay,
                 )
 
                 // Real port of screens/player.js's own real fire-and-
@@ -454,6 +462,7 @@ class PlayerViewModel @Inject constructor(
                     resumePercent = null,
                     selectedSubtitleIndex = null,
                     subtitleTracks = subtitleTracks,
+                    directPlay = target.directPlay,
                 )
             } catch (err: Exception) {
                 // Real port of screens/player.js's own Start Over catch
@@ -556,6 +565,7 @@ class PlayerViewModel @Inject constructor(
                     startPositionTicks = target.startPositionTicks,
                     selectedSubtitleIndex = streamIndex,
                     subtitleTracks = subtitleTracks,
+                    directPlay = target.directPlay,
                 )
                 showToast("Requested $requestedLabel (burned in), reloading…")
             } catch (err: Exception) {
@@ -571,19 +581,31 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/player.js's own switchAudioTrack(): a fresh
-    // real PlaybackInfo negotiation, MediaSourceId held to the source
-    // already playing, AudioStreamIndex the one real new thing being
-    // asked for, same real reasoning that function's own comment
-    // documents at length (a bare stream URL query param change alone
-    // never produced a genuinely new transcode job server side). Also
-    // clears any real selected subtitle the same way that function's
-    // own activeTrack.remove() does: a fresh negotiation's own subtitle
-    // track list has no guarantee of lining up with whichever index was
-    // active on the old one.
+    // Real port of screens/player.js's own switchAudioTrack() - but
+    // only when the source currently playing is itself a forced
+    // transcode already. player.js has no other option: a bare
+    // <video> element only ever gets whichever one audio track the
+    // server actually decoded into the stream, so picking a different
+    // embedded track has always meant asking the server for a fresh
+    // one. A native Media3/ExoPlayer decode, direct playing the whole
+    // container, already has every embedded audio track demuxed and
+    // available locally - real bug found live tracing Gelato/Jellio's
+    // own playback path: this app was forcing that exact same real
+    // transcode-and-reload unconditionally too, even though nothing
+    // about picking a different track already inside the same real
+    // file needs the server involved at all. See PlayerScreen.kt's own
+    // LaunchedEffect(player, selectedAudioStreamIndex, directPlay) for
+    // the actual local ExoPlayer TrackSelectionOverride this now
+    // triggers instead, matching subtitle switching's own real
+    // no-reload path just above.
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
+        if (_uiState.value.directPlay) {
+            _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
+            showToast("Switched to $label")
+            return
+        }
         // Real port of that file's own audio menu click handler: a
         // toast the instant the tap is received, before the real
         // negotiation even starts, same real reasoning that handler's
@@ -612,6 +634,7 @@ class PlayerViewModel @Inject constructor(
                     selectedAudioStreamIndex = streamIndex,
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
+                    directPlay = target.directPlay,
                 )
                 showToast("Requested $label, reloading…")
             } catch (err: Exception) {
@@ -661,6 +684,7 @@ class PlayerViewModel @Inject constructor(
                     selectedAudioStreamIndex = null,
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
+                    directPlay = target.directPlay,
                 )
             } catch (err: Exception) {
                 // Real port of that file's own switchSource() catch
