@@ -183,6 +183,7 @@ fun PlayerScreen(
                 audioTracks = uiState.audioTracks,
                 selectedAudioStreamIndex = uiState.selectedAudioStreamIndex,
                 defaultAudioStreamIndex = uiState.defaultAudioStreamIndex,
+                directPlay = uiState.directPlay,
                 sourceOptions = uiState.sourceOptions,
                 currentMediaSourceId = uiState.mediaSourceId,
                 currentItemId = itemId,
@@ -241,6 +242,7 @@ private fun PlayerSurface(
     audioTracks: List<AudioTrackUiState>,
     selectedAudioStreamIndex: Int?,
     defaultAudioStreamIndex: Int?,
+    directPlay: Boolean,
     sourceOptions: List<MediaSourceDto>,
     currentMediaSourceId: String?,
     currentItemId: String,
@@ -408,6 +410,33 @@ private fun PlayerSurface(
                 params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
             }
         }
+        player.trackSelectionParameters = params.build()
+    }
+
+    // PlayerViewModel.switchAudioTrack()'s own header explains why this
+    // only ever runs when directPlay is true: a Direct Play source
+    // already has every embedded audio track demuxed locally by
+    // ExoPlayer, no reload needed, same real no-reload shape the text
+    // track override just above already has. Jellyfin's own audio
+    // MediaStreams carry no id ExoPlayer's own demuxed Format could
+    // match against the way subtitle tracks do above (those get an
+    // explicit .setId() when this file's own MediaItem.Builder attaches
+    // them) - matched here by ordinal position among this source's own
+    // audio-only MediaStreams instead (audioTracks is already built in
+    // that same real order), which holds as long as Gelato/Jellyfin
+    // lists a container's own audio tracks in the same order the
+    // container itself declares them, the same order ExoPlayer's own
+    // demuxer discovers them in.
+    LaunchedEffect(player, selectedAudioStreamIndex, directPlay) {
+        if (!directPlay) return@LaunchedEffect
+        val targetIndex = selectedAudioStreamIndex ?: defaultAudioStreamIndex
+        val ordinal = audioTracks.indexOfFirst { it.streamIndex == targetIndex }
+        if (ordinal < 0) return@LaunchedEffect
+        val audioGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+        val group = audioGroups.getOrNull(ordinal) ?: return@LaunchedEffect
+        val params = player.trackSelectionParameters.buildUpon()
+        params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+        params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
         player.trackSelectionParameters = params.build()
     }
 

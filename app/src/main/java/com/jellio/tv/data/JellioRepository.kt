@@ -87,6 +87,11 @@ data class PlaybackTarget(
     val mediaSource: MediaSourceDto,
     val playSessionId: String?,
     val startPositionTicks: Long,
+    // Lets PlayerViewModel skip a full re-negotiation entirely when
+    // switching audio tracks on a source already Direct Playing - see
+    // switchAudioTrack()'s own header for why that real distinction
+    // matters there.
+    val directPlay: Boolean,
 )
 
 // A native Media3/ExoPlayer decode envelope on real Android TV
@@ -1097,7 +1102,7 @@ class JellioRepository @Inject constructor(
             }
         }
 
-        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks)
+        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks, directPlay)
     }
 
     // Real port of runtime/api.js's own getAudioStreams().
