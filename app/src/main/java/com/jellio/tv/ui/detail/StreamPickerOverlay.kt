@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.detail
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -250,7 +250,9 @@ fun StreamPickerOverlay(
     // every real press rather than capturing a stale snapshot, live
     // only while this overlay is actually mounted.
     DisposableEffect(Unit) {
+        Log.d("JellioDpadDebug", "StreamPickerOverlay: registering bridge callbacks")
         StreamPickerDpadBridge.onDpadDown = {
+            Log.d("JellioDpadDebug", "onDpadDown invoked: resumeFocused=$resumeFocused focusedChipIndex=$focusedChipIndex")
             if (resumeFocused || focusedChipIndex >= 0) {
                 firstSourceCardFocusRequester.requestFocus()
                 true
@@ -259,6 +261,7 @@ fun StreamPickerOverlay(
             }
         }
         StreamPickerDpadBridge.onDpadUp = {
+            Log.d("JellioDpadDebug", "onDpadUp invoked: firstCardHasFocus=$firstCardHasFocus")
             if (firstCardHasFocus) {
                 initialFocusRequester.requestFocus()
                 true
@@ -267,6 +270,7 @@ fun StreamPickerOverlay(
             }
         }
         onDispose {
+            Log.d("JellioDpadDebug", "StreamPickerOverlay: clearing bridge callbacks")
             StreamPickerDpadBridge.onDpadDown = null
             StreamPickerDpadBridge.onDpadUp = null
         }
@@ -366,7 +370,7 @@ fun StreamPickerOverlay(
                                 modifier = Modifier
                                     .padding(top = 24.dp)
                                     .focusRequester(initialFocusRequester)
-                                    .onFocusChanged { resumeFocused = it.isFocused },
+                                    .onFocusChanged { Log.d("JellioDpadDebug", "Resume onFocusChanged isFocused=${it.isFocused}"); resumeFocused = it.isFocused },
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -384,6 +388,7 @@ fun StreamPickerOverlay(
                                 onSelect = { selectedLanguage = it },
                                 firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
                                 onChipFocusChanged = { index, focused ->
+                                    Log.d("JellioDpadDebug", "Chip onFocusChanged index=$index focused=$focused")
                                     if (focused) {
                                         focusedChipIndex = index
                                     } else if (focusedChipIndex == index) {
@@ -441,7 +446,7 @@ fun StreamPickerOverlay(
                                         // of those is first in reading
                                         // order (initialFocusRequester
                                         // already resolves to that).
-                                        .onFocusChanged { firstCardHasFocus = it.hasFocus }
+                                        .onFocusChanged { Log.d("JellioDpadDebug", "First card onFocusChanged hasFocus=${it.hasFocus}"); firstCardHasFocus = it.hasFocus }
                                 } else {
                                     Modifier
                                 },
