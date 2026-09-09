@@ -416,7 +416,17 @@ fun StreamPickerOverlay(
                         // TvLazyColumn. focusRestorer() is Compose's own
                         // real fix, not a guess - the same one already
                         // proven working in this exact codebase.
-                        modifier = Modifier.weight(1f).focusRestorer(),
+                        // TEMPORARY diagnostic: focusRestorer() removed
+                        // to test whether its own internal focus-
+                        // restoration FocusRequester is what's silently
+                        // blocking firstSourceCardFocusRequester.
+                        // requestFocus() (confirmed live: that direct
+                        // call produces zero effect, no exception, no
+                        // Card[0] onFocusChanged) - a single-variable
+                        // test against the one structural difference
+                        // from the language chips' own LazyRow, which
+                        // demonstrably DOES accept requestFocus().
+                        modifier = Modifier.weight(1f),
                     ) {
                         itemsIndexed(filteredSources) { index, source ->
                             SourceCard(
