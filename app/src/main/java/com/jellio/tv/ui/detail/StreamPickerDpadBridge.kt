@@ -1,23 +1,24 @@
 package com.jellio.tv.ui.detail
 
-// Real bug found live, four times running: neither focusProperties{down=},
-// a plain onKeyEvent, nor onPreviewKeyEvent attached anywhere in
-// StreamPickerOverlay's own Compose tree - down to its own outermost
-// Box, the real root of that whole overlay's focus subtree - ever
-// actually redirected a real Down/Up press between the Resume button/
-// language chips and the stream list. Something ahead of Compose's own
-// focus-based key dispatch was already swallowing it every time,
-// regardless of where in that dispatch chain the handler sat.
+// Down's own real bug turned out to live one layer lower than any of
+// this: firstSourceCardFocusRequester.requestFocus() (StreamPicker-
+// Overlay.kt) was never actually landing focus on a LazyColumn item at
+// all, confirmed live via Logcat - the same gap ui/home/HomeScreen.kt's
+// own header already documents, fixed there with focusRestorer() and
+// now fixed the same way here. This bridge stays for Up only: leaving
+// the stream list back up to the Resume button/language chips still
+// needs an explicit redirect (Compose's own default arrow-key search
+// has no reason to prefer that direction on its own), and
+// initialFocusRequester targets a plain non-lazy Surface, which
+// requestFocus() reaches reliably.
 //
-// This bridges around Compose's own key dispatch entirely: MainActivity
-// below overrides dispatchKeyEvent, which Android calls on every real
-// key event before its own View/Compose focus system gets a look at
-// it at all. StreamPickerOverlay sets these two callbacks live while
-// it is actually the front-most screen and clears them on its own real
-// dismiss; a plain top-level var rather than a CompositionLocal or
-// ViewModel field, since nothing outside this one overlay/Activity
+// MainActivity overrides dispatchKeyEvent, which Android calls on
+// every real key event before its own View/Compose focus system gets
+// a look at it at all. StreamPickerOverlay sets this callback live
+// while it is actually the front-most screen and clears it on its own
+// real dismiss; a plain top-level var rather than a CompositionLocal
+// or ViewModel field, since nothing outside this one overlay/Activity
 // pair ever needs to read it.
 internal object StreamPickerDpadBridge {
-    var onDpadDown: (() -> Boolean)? = null
     var onDpadUp: (() -> Boolean)? = null
 }
