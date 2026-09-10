@@ -106,6 +106,21 @@ interface JellyfinApi {
         @Query("personIds") personIds: String? = null,
     ): ItemsResultDto
 
+    // Gelato's own endpoints (Controllers/GelatoApiController.cs), not
+    // Jellio ones: the native Users/{id}/Items search getItems() above
+    // uses, when Gelato intercepts it, waits on a combined movie+series
+    // search server side before answering at all. These resolve
+    // independently, plain JSON arrays (not ItemsResultDto's own
+    // {Items: [...]} wrapper - Gelato's controller returns Ok(dtos)
+    // directly), so SearchViewModel can paint whichever type's real
+    // addon round trip lands first instead of both waiting on the
+    // slower one.
+    @GET("gelato/search/movie")
+    suspend fun searchGelatoMovies(@Query("q") query: String): List<BaseItemDto>
+
+    @GET("gelato/search/series")
+    suspend fun searchGelatoSeries(@Query("q") query: String): List<BaseItemDto>
+
     @GET("Users/{userId}/Items/{itemId}")
     suspend fun getItem(
         @Path("userId") userId: String,

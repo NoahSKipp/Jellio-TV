@@ -65,26 +65,43 @@ fun SearchScreen(
         )
 
         when {
+            // Checked ahead of isSearching/error below on purpose:
+            // SearchViewModel.onQueryChange's own header documents why -
+            // Movies and Series now resolve independently, so results
+            // can be real and non-empty while the other half is still in
+            // flight (isSearching stays true until both settle). A
+            // reader should see whichever half already landed rather
+            // than a blank "Searching..." screen hiding it.
+            uiState.results.isNotEmpty() -> Column(Modifier.fillMaxSize()) {
+                if (uiState.isSearching) {
+                    Text(
+                        text = "Still searching...",
+                        color = JellioTextSecondary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Adaptive(minSize = 170.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 48.dp),
+                    modifier = Modifier.fillMaxSize().focusRestorer(),
+                ) {
+                    items(uiState.results, key = { it.Id }) { item ->
+                        PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) }, onOptionsClick = { openItemOptions(item) })
+                    }
+                }
+            }
             uiState.isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Searching...", color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "", color = JellioTextSecondary)
             }
-            uiState.hasSearched && uiState.results.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            uiState.hasSearched -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "No results for \"${uiState.query}\"", color = JellioTextSecondary)
-            }
-            uiState.results.isNotEmpty() -> LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Adaptive(minSize = 170.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 48.dp),
-                modifier = Modifier.fillMaxSize().focusRestorer(),
-            ) {
-                items(uiState.results, key = { it.Id }) { item ->
-                    PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) }, onOptionsClick = { openItemOptions(item) })
-                }
             }
         }
     }
