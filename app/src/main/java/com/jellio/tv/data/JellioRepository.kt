@@ -33,12 +33,15 @@ import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -171,6 +174,18 @@ class JellioRepository @Inject constructor(
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
     private val cache = TtlCache()
+
+    // Own scope rather than viewModelScope: prefetchStreams below is
+    // called from a poster's own onFocusChanged, fired from five
+    // different screens (Home/Library/Watchlist/Service rows, Search's
+    // own grid), each with its own ViewModel and its own lifetime. A
+    // request already in flight when a reader navigates away should
+    // still finish and warm Gelato's own cache rather than being
+    // cancelled with the screen that happened to trigger it, same real
+    // reasoning this @Singleton's own clearCache() above already
+    // applies to living longer than any one screen.
+    private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val prefetchedItemIds = ConcurrentHashMap.newKeySet<String>()
 
     // Real port of runtime/api.js's own clearCache(): every real cache
     // entry keyed off the previously signed in user (items, details,
@@ -861,6 +876,25 @@ class JellioRepository @Inject constructor(
     suspend fun canDeleteItems(userId: String): Boolean {
         val policy = runCatching { getUser(userId) }.getOrNull()?.Policy ?: return false
         return policy.IsAdministrator || policy.EnableContentDeletion
+    }
+
+    // Mirrors runtime/api.js's own prefetchStreams(): fired from a
+    // poster's own onFocusChanged (PosterCard.kt), well before a real
+    // click/Enter commits to opening it, so Gelato's own stream sync is
+    // already warm by the time GetStaticMediaSources actually needs it.
+    // Non-suspend and best-effort by design, same as the web version:
+    // a Composable's onFocusChanged callback is not itself a coroutine,
+    // and a server without Gelato installed, or an old build without
+    // this route yet, must fail silently here, never surface anywhere
+    // a reader could see it. itemId is deliberately never removed from
+    // prefetchedItemIds on failure the way the web version's is: a
+    // repeated focus on a card whose prefetch already failed once this
+    // session would otherwise keep re-firing the same doomed request.
+    fun prefetchStreams(itemId: String) {
+        if (!prefetchedItemIds.add(itemId)) return
+        prefetchScope.launch {
+            runCatching { api.prefetchGelatoStreams(itemId) }
+        }
     }
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
