@@ -106,6 +106,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "In-Page Episode Selector", "The episode detail screen now features an episode carousel directly below the action buttons, allowing you to browse and switch episodes in the season without navigating away."),
+            ChangelogFeature(Icons.Filled.Speed, "Hold-to-Seek Remote Control", "Holding Left or Right on your remote D-pad now smoothly accelerates seeking forward or backward with live target timeline feedback."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Skipped Episode Progression", "Jumping forward to a later episode in a series automatically marks earlier unfinished episodes as watched, while safely preserving non-linear watch orders for anthology series like Black Mirror and Love, Death & Robots."),
+            ChangelogFeature(Icons.Filled.Sync, "Stream Switching Overlay Dismissal", "Resolved an issue where the stream switching progress card remained stuck on screen after playback of the new stream had begun."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.68.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.68.1",
