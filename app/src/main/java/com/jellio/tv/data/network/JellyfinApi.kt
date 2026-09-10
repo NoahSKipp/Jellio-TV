@@ -227,6 +227,17 @@ interface JellyfinApi {
     @GET("Jellio/sleep-timer/status")
     suspend fun getSleepTimerStatus(): SleepTimerStatusDto
 
+    // Gelato's own endpoint (Controllers/GelatoApiController.cs), not a
+    // Jellio one: card-open blocks on GetStaticMediaSources syncing
+    // streams from the Stremio addon live the first time an item is
+    // opened, a real chunk of why opening a title feels slower than
+    // Nuvio's own speculative resolution. This fires that same sync
+    // ahead of time so a real open lands on an already-warm cache.
+    // Returns 202 with no body; Unit here matches cancelSleepTimer()
+    // above, which does the same for a different empty-body response.
+    @POST("gelato/prefetch/{itemId}")
+    suspend fun prefetchGelatoStreams(@Path("itemId") itemId: String)
+
     // Real Controllers/NextUpHiddenController.cs endpoints: the real
     // per user series id list Shows/NextUp's own results get filtered
     // against, and the real call that adds one, see
