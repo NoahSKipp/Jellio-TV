@@ -21,7 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -43,7 +47,17 @@ import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
+import kotlinx.coroutines.delay
 import java.util.Locale
+
+// Real gap found live right after prefetch-on-focus shipped: D-pad
+// scrolling through a long row focused, and so fired a prefetch for,
+// every card passed over on the way to the one a reader actually
+// stopped on - wasted round trips against their own addon/debrid/TMDb
+// rate limits for titles nobody was ever about to open. Mirrors
+// components/card.js's own PREFETCH_DEBOUNCE_MS: only fires once focus
+// actually lingers past this, not on every transient landing.
+private const val PREFETCH_DEBOUNCE_MS = 200L
 
 // Visible to RowExpandButton (PosterRow.kt), same package: its own
 // button height matches a real poster's own aspect-ratio height,
@@ -83,6 +97,13 @@ fun PosterCard(
     // explains why a fixed dp size alone was not real enough coverage.
     val posterWidth = PosterWidth.scaled()
     val prefetchViewModel: GelatoPrefetchViewModel = hiltViewModel()
+    var isFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(isFocused, item.Id) {
+        if (isFocused) {
+            delay(PREFETCH_DEBOUNCE_MS)
+            prefetchViewModel.prefetch(item)
+        }
+    }
     Box(modifier = modifier.width(posterWidth)) {
         Surface(
             onClick = onClick,
@@ -90,7 +111,7 @@ fun PosterCard(
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
             modifier = Modifier.width(posterWidth)
-                .onFocusChanged { state -> if (state.isFocused) prefetchViewModel.prefetch(item) },
+                .onFocusChanged { state -> isFocused = state.isFocused },
         ) {
             Box(modifier = Modifier.width(posterWidth).aspectRatio(2f / 3f)) {
                 AsyncImage(
