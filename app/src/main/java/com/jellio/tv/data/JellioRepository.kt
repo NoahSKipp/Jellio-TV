@@ -638,6 +638,18 @@ class JellioRepository @Inject constructor(
         ).Items
     }
 
+    // Split halves of searchItems above, fired independently by
+    // SearchViewModel so a slower half never holds up the faster one.
+    // JellyfinApi.kt's own header on these documents the real bottleneck
+    // (Gelato's own SearchActionFilter.cs waiting on both before
+    // answering); no runCatching here, SearchViewModel's own per-call
+    // try/catch already needs the real thrown exception to tell an HTTP
+    // 404 (no Gelato on this server, fall back to searchItems) apart
+    // from any other real failure.
+    suspend fun searchMovies(term: String): List<BaseItemDto> = api.searchGelatoMovies(term)
+
+    suspend fun searchSeries(term: String): List<BaseItemDto> = api.searchGelatoSeries(term)
+
     suspend fun getWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> =
         cache.get("watchlist:$userId:$limit", SHORT_CACHE_TTL_MS) {
             api.getItems(
