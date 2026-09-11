@@ -54,7 +54,8 @@ fun RowListModal(
     var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null || fetchPage != null) }
     // Paged rows load ROW_PAGE_SIZE titles at a time, the next page once the
     // focus nears the end, until the server runs out.
-    var nextStart by remember(items) { mutableStateOf(items.size) }
+    var rawNextStart by remember(items) { mutableStateOf(items.size) }
+    var consecutiveEmptyPages by remember(items) { mutableStateOf(0) }
     var exhausted by remember(items) { mutableStateOf(fetchPage == null) }
     var columns by remember { mutableStateOf(1) }
     var initialFocusRequested by remember(items) { mutableStateOf(false) }
@@ -65,19 +66,34 @@ fun RowListModal(
         val page = fetchPage ?: return
         if (exhausted) return
         isLoadingRest = true
-        val start = nextStart
-        val result = runCatching { page(start, ROW_PAGE_SIZE) }.getOrNull()
-        if (result == null) {
-            isLoadingRest = false
-            return
+        while (!exhausted) {
+            val start = rawNextStart
+            val result = runCatching { page(start, ROW_PAGE_SIZE) }.getOrNull()
+            if (result == null) {
+                break
+            }
+            rawNextStart = start + ROW_PAGE_SIZE
+            if (result.isEmpty()) {
+                exhausted = true
+                break
+            }
+            val existingIds = displayedItems.mapTo(hashSetOf()) { it.Id }
+            val existingKeys = displayedItems.mapTo(hashSetOf()) { com.jellio.tv.data.recommend.titleKey(it) }
+            val fresh = result.filter { item ->
+                existingIds.add(item.Id) && existingKeys.add(com.jellio.tv.data.recommend.titleKey(item))
+            }
+            if (fresh.isNotEmpty()) {
+                consecutiveEmptyPages = 0
+                displayedItems = displayedItems + fresh
+                break
+            } else {
+                consecutiveEmptyPages += 1
+                if (consecutiveEmptyPages >= 2) {
+                    exhausted = true
+                    break
+                }
+            }
         }
-        nextStart = start + result.size
-        val existingIds = displayedItems.mapTo(hashSetOf()) { it.Id }
-        val fresh = result.filterNot { it.Id in existingIds }
-        if (result.isEmpty() || (result.size < 5 && fresh.isEmpty())) {
-            exhausted = true
-        }
-        if (fresh.isNotEmpty()) displayedItems = displayedItems + fresh
         isLoadingRest = false
     }
     LaunchedEffect(items, fetchPage) {
@@ -188,4 +204,4 @@ fun RowListModal(
     }
 }
 
-private const val ROW_PAGE_SIZE = 60
+internal const val ROW_PAGE_SIZE = 60

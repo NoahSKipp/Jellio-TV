@@ -106,9 +106,31 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Reliable Stream Switch Dismissal", "The stream switching indicator now polls live ExoPlayer playback and readiness state directly, dismissing immediately once the new stream starts playing."),
+            ChangelogFeature(Icons.Filled.Tv, "Responsive Detail Action Row", "Expanding the More Options button on episode detail pages now smoothly compacts the All Episodes button to keep all actions on screen and navigable."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Smarter Resume & Watchlist Cleanup", "Series play targets now verify Continue Watching against Next Up progression, and auto-removal from Watchlist reliably checks season completion."),
+            ChangelogFeature(Icons.Filled.DynamicFeed, "Seamless Row & Modal Pagination", "Horizontal rows and full row modals now advance by raw server page offsets, preventing duplicate fetches or early stops on heavily filtered rows."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "In-Page Episode Selector", "The episode detail screen now features an episode carousel directly below the action buttons, allowing you to browse and switch episodes in the season without navigating away."),
+            ChangelogFeature(Icons.Filled.Speed, "Hold-to-Seek Remote Control", "Holding Left or Right on your remote D-pad now smoothly accelerates seeking forward or backward with live target timeline feedback."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Skipped Episode Progression", "Jumping forward to a later episode in a series automatically marks earlier unfinished episodes as watched, while safely preserving non-linear watch orders for anthology series like Black Mirror and Love, Death & Robots."),
+            ChangelogFeature(Icons.Filled.Sync, "Stream Switching Overlay Dismissal", "Resolved an issue where the stream switching progress card remained stuck on screen after playback of the new stream had begun."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.68.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.68.2",
         features = listOf(
             ChangelogFeature(Icons.Filled.Tv, "In-Page Episode Selector", "The episode detail screen now features an episode carousel directly below the action buttons, allowing you to browse and switch episodes in the season without navigating away."),
             ChangelogFeature(Icons.Filled.Speed, "Hold-to-Seek Remote Control", "Holding Left or Right on your remote D-pad now smoothly accelerates seeking forward or backward with live target timeline feedback."),
@@ -380,7 +402,7 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.58.6",
         features = listOf(
-            ChangelogFeature(Icons.Filled.Tv, "Rating on Every Card", "Titles without a TMDB rating yet now show \"TMDB –\" instead of no rating at all."),
+            ChangelogFeature(Icons.Filled.Tv, "Rating on Every Card", "Titles without a TMDB rating yet now show \"TMDB -\" instead of no rating at all."),
             ChangelogFeature(Icons.Filled.Tv, "Back Up to Resume", "In the source picker you can move up from the language and quality filters to Resume from again."),
             ChangelogFeature(Icons.Filled.Tv, "Steadier Playback Start", "Matching the frame rate is off by default for now, and audio or subtitle sync only switches on once you set an offset, so starting playback works as before."),
         ),

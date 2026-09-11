@@ -6,6 +6,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,7 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -160,7 +163,9 @@ fun DetailScreen(
             listState.scrollToItem(0)
             for (attempt in 0 until 30) {
                 withFrameNanos {}
-                runCatching { playButtonFocusRequester.requestFocus() }
+                if (runCatching { playButtonFocusRequester.requestFocus() }.isSuccess && attempt >= 1) {
+                    break
+                }
             }
         }
     }
@@ -324,6 +329,7 @@ fun DetailScreen(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun EpisodeOptionsMenu(
     episode: BaseItemDto,
@@ -334,11 +340,22 @@ private fun EpisodeOptionsMenu(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        for (attempt in 0 until 10) {
+            withFrameNanos {}
+            if (runCatching { firstFocusRequester.requestFocus() }.isSuccess && attempt >= 1) {
+                break
+            }
+        }
+    }
     val isPlayed = episode.UserData?.Played == true
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .background(Color.Black.copy(alpha = 0.5f))
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -352,7 +369,11 @@ private fun EpisodeOptionsMenu(
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(vertical = 12.dp),
         ) {
-            EpisodeMenuRow(label = if (isPlayed) com.jellio.tv.ui.i18n.string("detail_mark_unwatched") else com.jellio.tv.ui.i18n.string("detail_mark_watched"), onClick = { onToggleWatched(); onDismiss() })
+            EpisodeMenuRow(
+                label = if (isPlayed) com.jellio.tv.ui.i18n.string("detail_mark_unwatched") else com.jellio.tv.ui.i18n.string("detail_mark_watched"),
+                onClick = { onToggleWatched(); onDismiss() },
+                modifier = Modifier.focusRequester(firstFocusRequester),
+            )
             if (hasPrevious) {
                 EpisodeMenuRow(label = com.jellio.tv.ui.i18n.string("detail_mark_previous_watched"), onClick = { onMarkPreviousWatched(); onDismiss() })
             }
@@ -362,12 +383,12 @@ private fun EpisodeOptionsMenu(
 }
 
 @Composable
-private fun EpisodeMenuRow(label: String, onClick: () -> Unit) {
+private fun EpisodeMenuRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))
     }
@@ -428,7 +449,7 @@ private fun DetailHero(
         )
 
         Column(
-            modifier = Modifier.align(Alignment.BottomStart).widthIn(max = 820.dp).padding(start = 56.dp, bottom = 56.dp, end = 32.dp),
+            modifier = Modifier.align(Alignment.BottomStart).widthIn(max = 920.dp).padding(start = 56.dp, bottom = 56.dp, end = 32.dp),
         ) {
             if (item.Type == "Episode" && item.SeriesId != null && item.SeriesName != null) {
                 Surface(
@@ -524,7 +545,7 @@ private fun DetailHero(
                 )
             }
 
-            var actionsExpanded by remember { mutableStateOf(false) }
+            var actionsExpanded by remember(item.Id) { mutableStateOf(false) }
             Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     onClick = onPlay,
@@ -553,6 +574,7 @@ private fun DetailHero(
                     }
                 }
                 if (item.Type == "Episode" && item.SeriesId != null) {
+                    val allEpisodesText = com.jellio.tv.ui.i18n.string("detail_all_episodes")
                     Surface(
                         onClick = { onSeriesClick(item.SeriesId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
@@ -570,9 +592,26 @@ private fun DetailHero(
                         ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
-                        Row(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Filled.Tv, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Text(text = com.jellio.tv.ui.i18n.string("detail_all_episodes"), modifier = Modifier.padding(start = 8.dp))
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = if (actionsExpanded) 16.dp else 24.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Tv,
+                                contentDescription = allEpisodesText,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            AnimatedVisibility(
+                                visible = !actionsExpanded,
+                                enter = fadeIn() + expandHorizontally(),
+                                exit = fadeOut() + shrinkHorizontally(),
+                            ) {
+                                Text(
+                                    text = allEpisodesText,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
+                            }
                         }
                     }
                 }
