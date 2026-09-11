@@ -310,6 +310,22 @@ class PlayerViewModel @Inject constructor(
                         val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
+                            // Real Nuvio-competitive gap, not a
+                            // hypothetical one: the up next card itself
+                            // doesn't show until shouldShowUpNextNow's
+                            // own real timing condition near the very
+                            // end of this episode, but the real id it
+                            // needs is already known right here, at the
+                            // very start of it. Firing this now hands it
+                            // this whole episode's own runtime as lead
+                            // time - far more than a poster's own
+                            // hover/focus debounce ever gets - so a real
+                            // binge watcher never sees a loading gap
+                            // between episodes at all, matching
+                            // AIOStreams' own precacheNextEpisode setting
+                            // doing the equivalent one layer further
+                            // upstream.
+                            repository.prefetchStreams(next.Id)
                         }
                     }
                 }
