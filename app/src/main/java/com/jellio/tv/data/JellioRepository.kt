@@ -299,12 +299,12 @@ class JellioRepository @Inject constructor(
     // path otherwise keeps serving whatever Coil already cached for
     // it). That controller carries [Authorize], same as avatarPresetUrl's
     // own real Jellio/avatars endpoint just above, so this needs the
-    // exact same api_key query param that one already sends: never
+    // exact same ApiKey query param that one already sends: never
     // loaded at all on device without it, Coil's own image request
     // getting back a plain 401 no <img> tag / browser cookie session
     // ever hits.
     fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String =
-        "$serverAddress/Jellio/profile/banner/$userId?api_key=$accessToken&t=${System.currentTimeMillis()}"
+        "$serverAddress/Jellio/profile/banner/$userId?ApiKey=$accessToken&t=${System.currentTimeMillis()}"
 
     // Real port of runtime/auth.js's own requestPasswordReset(): a real
     // failure comes back true anyway, the same real leak-prevention
@@ -1010,13 +1010,13 @@ class JellioRepository @Inject constructor(
     private fun encodeAvatarId(id: String): String =
         id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
 
-    // Token goes on as an api_key query param, same real reason
+    // Token goes on as an ApiKey query param, same real reason
     // getStreamUrl/getTrickplayUrl already do this: AvatarsController's
     // [Authorize] gate has nothing to check on a plain Coil AsyncImage
     // request, which never carries this app's own X-Emby-Authorization
     // header the way a Retrofit call does.
     fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
-        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?api_key=$accessToken"
+        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?ApiKey=$accessToken"
 
     // Real screens/settings.js's own navigateTo('#/dashboard'): that
     // file's own real hash just moves an already loaded jellyfin-web
@@ -1129,7 +1129,7 @@ class JellioRepository @Inject constructor(
             append("/Videos/").append(itemId).append("/stream.").append(container)
             append("?MediaSourceId=").append(resolvedMediaSourceId)
             append("&DeviceId=").append(deviceId)
-            append("&api_key=").append(token)
+            append("&ApiKey=").append(token)
             append("&StartTimeTicks=").append(startTimeTicks)
             response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
             if (directPlay) {
@@ -1176,7 +1176,7 @@ class JellioRepository @Inject constructor(
     // real tile sheet's own position, several real thumbnails packed
     // into one sheet, not a single thumbnail's own index.
     fun trickplayTileUrl(serverAddress: String, accessToken: String, itemId: String, mediaSourceId: String?, width: Int, tileIndex: Int): String =
-        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?api_key=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
+        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?ApiKey=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
 
     private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
         val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
