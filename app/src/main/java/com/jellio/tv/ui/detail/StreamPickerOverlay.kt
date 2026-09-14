@@ -227,6 +227,21 @@ fun StreamPickerOverlay(
     }
     val firstSourceCardFocusRequester = remember { FocusRequester() }
     var firstCardHasFocus by remember { mutableStateOf(false) }
+    // Real difference traced live, confirmed against both Resume (a
+    // plain, non-scrolled child of a bare Column) and the first
+    // language chip (LazyRow, its own default focus-into-view already
+    // proven to work): firstSourceCardFocusRequester alone lives inside
+    // a Modifier.weight(1f).verticalScroll(...) child further down, the
+    // one real structural difference the prior retry-across-frames fix
+    // never actually addressed. Hoisted up here (rather than the inline
+    // rememberScrollState() the stream list's own modifier still reads
+    // below) so the retry loop can pair each requestFocus() attempt
+    // with an explicit scrollTo(0) on this same real ScrollState
+    // instance - verticalScroll() has no built-in bring-into-view
+    // contract of its own the way LazyColumn/LazyRow's real internal
+    // BringIntoViewResponder already gives every other focus target in
+    // this overlay for free.
+    val sourceListScrollState = rememberScrollState()
     // Real root cause traced live over several rounds: LazyColumn's own
     // item recycling was silently breaking requestFocus() into its
     // items (see the stream list's own header comment below for the
@@ -285,25 +300,24 @@ fun StreamPickerOverlay(
             StreamPickerDpadBridge.onDpadUp = null
         }
     }
-    // Real finding off this same overlay's own Logcat tracing: this
-    // title alone returned 366 real sources, nowhere near the "tens"
-    // the plain-Column-over-LazyColumn trade above assumed (the same
-    // log line confirms this whole Loaded branch, all 366 SourceCards
-    // included, genuinely recomposes on every Down press too -
-    // LaunchedEffect(downFocusRequestCount) reading that counter as its
-    // own key is itself a real composable-scope read, not just a
-    // background effect). A single requestFocus() call landed nowhere,
-    // no exception, no onFocusChanged, even from this real
-    // LaunchedEffect context - consistent with the target not
-    // actually being laid out yet the one frame this waited, not a
-    // wrong FocusRequester instance or a wrong node. Retries across a
-    // handful of real frames instead of trusting the first one: cheap,
-    // since nothing is reloading, only real layout catching up with
-    // what has already composed.
+    // Real root cause, confirmed live against both Resume (a plain,
+    // non-scrolled Column child, succeeds) and the first language chip
+    // (a LazyRow, also succeeds): firstSourceCardFocusRequester alone
+    // lives inside Modifier.weight(1f).verticalScroll(...) further
+    // down, and verticalScroll() carries none of LazyColumn/LazyRow's
+    // own real bring-into-view cooperation with the focus system - a
+    // requestFocus() call into it can land on a target Compose has not
+    // actually scrolled/settled into a real attached state yet, no
+    // exception, no onFocusChanged, exactly what every prior round here
+    // (LazyColumn, dispatchKeyEvent, single-frame, ten-frame retry)
+    // kept showing. scrollTo(0) paired with each retry forces that real
+    // settle explicitly rather than assuming a fresh ScrollState always
+    // starts there already composed and attached.
     LaunchedEffect(downFocusRequestCount) {
         if (downFocusRequestCount > 0) {
             android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card")
             repeat(10) {
+                sourceListScrollState.scrollTo(0)
                 firstSourceCardFocusRequester.requestFocus()
                 withFrameNanos {}
             }
@@ -491,7 +505,7 @@ fun StreamPickerOverlay(
                     // around a real upstream Compose bug indefinitely.
                     Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+                        modifier = Modifier.weight(1f).verticalScroll(sourceListScrollState).padding(bottom = 24.dp),
                     ) {
                         filteredSources.forEachIndexed { index, source ->
                             SourceCard(
