@@ -2,6 +2,7 @@ package com.jellio.tv
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -113,7 +114,21 @@ class MainActivity : ComponentActivity() {
                 KeyEvent.KEYCODE_DPAD_UP -> StreamPickerDpadBridge.onDpadUp
                 else -> null
             }
-            if (handler?.invoke() == true) return true
+            // Temporary diagnostic logging: filter Logcat on "StreamPickerDpad"
+            // while reproducing the "can't navigate down onto the streams"
+            // report. Confirms whether this even runs at all (a null handler
+            // means StreamPickerOverlay's own DisposableEffect never wired
+            // the bridge for this key event, or already cleared it) and, if
+            // it did run, whether it consumed the event or fell through to
+            // Compose's own default focus search.
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN || event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                Log.d("StreamPickerDpad", "dispatchKeyEvent keyCode=${event.keyCode} handlerBound=${handler != null}")
+            }
+            val consumed = handler?.invoke() == true
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN || event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                Log.d("StreamPickerDpad", "dispatchKeyEvent keyCode=${event.keyCode} consumed=$consumed")
+            }
+            if (consumed) return true
         }
         return super.dispatchKeyEvent(event)
     }
