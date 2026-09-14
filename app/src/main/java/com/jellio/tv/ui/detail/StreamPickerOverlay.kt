@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -284,16 +285,39 @@ fun StreamPickerOverlay(
             StreamPickerDpadBridge.onDpadUp = null
         }
     }
+    // Real finding off this same overlay's own Logcat tracing: this
+    // title alone returned 366 real sources, nowhere near the "tens"
+    // the plain-Column-over-LazyColumn trade above assumed (the same
+    // log line confirms this whole Loaded branch, all 366 SourceCards
+    // included, genuinely recomposes on every Down press too -
+    // LaunchedEffect(downFocusRequestCount) reading that counter as its
+    // own key is itself a real composable-scope read, not just a
+    // background effect). A single requestFocus() call landed nowhere,
+    // no exception, no onFocusChanged, even from this real
+    // LaunchedEffect context - consistent with the target not
+    // actually being laid out yet the one frame this waited, not a
+    // wrong FocusRequester instance or a wrong node. Retries across a
+    // handful of real frames instead of trusting the first one: cheap,
+    // since nothing is reloading, only real layout catching up with
+    // what has already composed.
     LaunchedEffect(downFocusRequestCount) {
         if (downFocusRequestCount > 0) {
             android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card")
-            firstSourceCardFocusRequester.requestFocus()
+            repeat(10) {
+                firstSourceCardFocusRequester.requestFocus()
+                withFrameNanos {}
+            }
+            android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card done retrying")
         }
     }
     LaunchedEffect(upFocusRequestCount) {
         if (upFocusRequestCount > 0) {
             android.util.Log.d("StreamPickerDpad", "deferred requestFocus back to initial")
-            initialFocusRequester.requestFocus()
+            repeat(10) {
+                initialFocusRequester.requestFocus()
+                withFrameNanos {}
+            }
+            android.util.Log.d("StreamPickerDpad", "deferred requestFocus back to initial done retrying")
         }
     }
 
