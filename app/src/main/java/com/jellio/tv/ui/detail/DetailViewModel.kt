@@ -14,6 +14,7 @@ import com.jellio.tv.ui.common.isUnreleasedItem
 import com.jellio.tv.ui.common.markTodayItemHasStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,38 +75,73 @@ class DetailViewModel @Inject constructor(
 
     private var loadedItemId: String? = null
     private var ratingTargetId: String? = null
+    private var loadJob: Job? = null
+    private var seasonsJob: Job? = null
+    private var episodesJob: Job? = null
+    private var streamLookupJob: Job? = null
     private var seriesPlayDeferred: Deferred<BaseItemDto?>? = null
 
+    private fun cancelActiveWork() {
+        loadJob?.cancel()
+        loadJob = null
+        seasonsJob?.cancel()
+        seasonsJob = null
+        episodesJob?.cancel()
+        episodesJob = null
+        streamLookupJob?.cancel()
+        streamLookupJob = null
+        secondSourceJob?.cancel()
+        secondSourceJob = null
+        playPrefetchJob?.cancel()
+        playPrefetchJob = null
+        seriesPlayDeferred?.cancel()
+        seriesPlayDeferred = null
+    }
+
+    private fun isCurrentSeries(seriesId: String, ownerItemId: String? = loadedItemId): Boolean =
+        ownerItemId != null && loadedItemId == ownerItemId && (loadedItemId == seriesId || _uiState.value.item?.SeriesId == seriesId)
+
     fun load(session: Session, itemId: String) {
-        if (loadedItemId == itemId) return
+        if (loadedItemId == itemId && !_uiState.value.isLoading && _uiState.value.item?.Id == itemId && !_uiState.value.detailsFailed) return
+        cancelActiveWork()
         loadedItemId = itemId
+        ratingTargetId = null
+        val preview = repository.previewItem(itemId)
+        val preloaded = repository.preloadedDetails(itemId) ?: preview
+        _uiState.value = if (preloaded != null) {
+            DetailUiState(
+                isLoading = false,
+                item = preloaded,
+                loadingArt = loadingArt(session, preloaded),
+                cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
+                trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
+                isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
+                isWatched = preloaded.UserData?.Played ?: false,
+            )
+        } else {
+            DetailUiState(
+                isLoading = true,
+                item = null,
+                loadingArt = preview?.let { loadingArt(session, it) },
+            )
+        }
         loadInternal(session, itemId)
     }
 
     fun retry(session: Session, itemId: String) {
+        cancelActiveWork()
         loadedItemId = itemId
+        ratingTargetId = null
         loadInternal(session, itemId)
     }
 
     private fun loadInternal(session: Session, itemId: String) {
+        loadJob?.cancel()
+        seriesPlayDeferred?.cancel()
         seriesPlayDeferred = null
-        viewModelScope.launch {
-            // The player's loader, with art from the row the title was
-            // picked in, until the full details arrive.
-            val preview = repository.previewItem(itemId)
-            val preloaded = repository.preloadedDetails(itemId) ?: preview
-            _uiState.value = if (preloaded != null) {
-                DetailUiState(
-                    isLoading = false,
-                    item = preloaded,
-                    cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
-                    trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
-                    isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
-                    isWatched = preloaded.UserData?.Played ?: false,
-                )
-            } else {
-                DetailUiState(isLoading = true, loadingArt = preview?.let { loadingArt(session, it) })
-            }
+        loadJob = viewModelScope.launch {
+            if (loadedItemId != itemId) return@launch
+            val preloaded = _uiState.value.item?.takeIf { it.Id == itemId }
             // The stream lookup does not wait for the details when the type is already known.
             var streamsStarted = false
             if ((preloaded?.Type == "Movie" || preloaded?.Type == "Episode") && (!isUnreleasedItem(preloaded) || isReleasedToday(preloaded))) {
@@ -123,8 +159,13 @@ class DetailViewModel @Inject constructor(
                 }
                 // Two retries with backoff; the art drawn from memory stays up meanwhile.
                 val item = withRetries(
-                    onRetry = { if (_uiState.value.item != null) _uiState.value = _uiState.value.copy(detailsRetrying = true, detailsFailed = false) },
+                    onRetry = {
+                        if (loadedItemId == itemId && _uiState.value.item?.Id == itemId) {
+                            _uiState.value = _uiState.value.copy(detailsRetrying = true, detailsFailed = false)
+                        }
+                    },
                 ) { repository.getItemDetails(session.userId, itemId) }
+                if (loadedItemId != itemId) return@launch
                 android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms" + if (preloaded != null) " (drawn from memory first)" else "")
                 ratingTargetId = item.Id
                 // Updates the page in place, keeping seasons and stream state.
@@ -145,6 +186,7 @@ class DetailViewModel @Inject constructor(
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     viewModelScope.launch {
                         runCatching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
+                            if (loadedItemId != itemId) return@launch
                             ratingTargetId = series.Id
                             _uiState.value = _uiState.value.copy(likes = series.UserData?.Likes)
                         }
@@ -161,13 +203,17 @@ class DetailViewModel @Inject constructor(
                         loadSeasons(session, item.SeriesId, preferredSeasonId = item.SeasonId, preferredSeasonNumber = item.ParentIndexNumber)
                     }
                 }
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Exception) {
+                if (loadedItemId != itemId) return@launch
                 android.util.Log.w("JellioDetail", "details for $itemId failed: ${err.message}")
                 // A page already drawn from memory stays up, with a Retry.
-                if (_uiState.value.item != null) {
-                    _uiState.value = _uiState.value.copy(detailsRetrying = false, detailsFailed = true)
+                val currentItem = _uiState.value.item?.takeIf { it.Id == itemId }
+                if (currentItem != null) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, item = currentItem, detailsRetrying = false, detailsFailed = true)
                 } else {
-                    _uiState.value = DetailUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
+                    _uiState.value = DetailUiState(isLoading = false, item = null, error = com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
                 }
             }
         }
@@ -193,6 +239,7 @@ class DetailViewModel @Inject constructor(
 
     private suspend fun resolveSeriesPlay(session: Session, seriesId: String): BaseItemDto? {
         val target = runCatching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return null
+        if (loadedItemId != seriesId) return null
         if (target.resume) {
             _uiState.value = _uiState.value.copy(
                 playLabel = com.jellio.tv.ui.i18n.Strings.format("detail_resume_episode", target.episode.ParentIndexNumber ?: 0, target.episode.IndexNumber ?: 0),
@@ -208,6 +255,8 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun loadSeasons(session: Session, seriesId: String, preferredSeasonId: String? = null, preferredSeasonNumber: Int? = null) {
+        val ownerItemId = loadedItemId ?: return
+        if (!isCurrentSeries(seriesId, ownerItemId)) return
         fun ordered(list: List<BaseItemDto>) = list.sortedBy { if (repository.isSpecialsSeason(it)) 1 else 0 }
         fun pickSeason(list: List<BaseItemDto>): BaseItemDto? {
             if (preferredSeasonId != null) {
@@ -219,12 +268,15 @@ class DetailViewModel @Inject constructor(
             return list.firstOrNull()
         }
         repository.recentSeasons(seriesId)?.let { known ->
+            if (!isCurrentSeries(seriesId, ownerItemId)) return
             val seasons = ordered(known)
             _uiState.value = _uiState.value.copy(seasons = seasons)
             pickSeason(seasons)?.let { selectSeason(session, seriesId, it.Id) }
         }
-        viewModelScope.launch {
+        seasonsJob?.cancel()
+        seasonsJob = viewModelScope.launch {
             val seasons = ordered(runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
+            if (!isCurrentSeries(seriesId, ownerItemId)) return@launch
             if (seasons.isEmpty() && _uiState.value.seasons.isNotEmpty()) return@launch
             _uiState.value = _uiState.value.copy(seasons = seasons)
             val selected = _uiState.value.selectedSeasonId
@@ -238,6 +290,8 @@ class DetailViewModel @Inject constructor(
     }
 
     fun selectSeason(session: Session, seriesId: String, seasonId: String) {
+        val ownerItemId = loadedItemId ?: return
+        if (!isCurrentSeries(seriesId, ownerItemId)) return
         val known = repository.recentEpisodes(seriesId, seasonId)
         val showing = _uiState.value.selectedSeasonId == seasonId && _uiState.value.selectedSeasonEpisodes.isNotEmpty()
         _uiState.value = _uiState.value.copy(
@@ -247,20 +301,22 @@ class DetailViewModel @Inject constructor(
         if (known != null) {
             checkTodayEpisodeStreams(session, known)
         }
-        viewModelScope.launch {
-            val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
-            if (_uiState.value.selectedSeasonId != seasonId) return@launch
-            val isEpisode = _uiState.value.item?.Type == "Episode"
-            val itemCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
-            val seasonCast = season.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
-            _uiState.value = _uiState.value.copy(
-                selectedSeason = season,
-                cast = if (isEpisode && itemCast.isNotEmpty()) itemCast else seasonCast.ifEmpty { itemCast },
-            )
-        }
-        viewModelScope.launch {
-            val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
-            if (_uiState.value.selectedSeasonId == seasonId) {
+        episodesJob?.cancel()
+        episodesJob = viewModelScope.launch {
+            launch {
+                val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
+                if (!isCurrentSeries(seriesId, ownerItemId) || _uiState.value.selectedSeasonId != seasonId) return@launch
+                val isEpisode = _uiState.value.item?.Type == "Episode"
+                val itemCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+                val seasonCast = season.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+                _uiState.value = _uiState.value.copy(
+                    selectedSeason = season,
+                    cast = if (isEpisode && itemCast.isNotEmpty()) itemCast else seasonCast.ifEmpty { itemCast },
+                )
+            }
+            launch {
+                val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
+                if (!isCurrentSeries(seriesId, ownerItemId) || _uiState.value.selectedSeasonId != seasonId) return@launch
                 repository.seedPreviews(episodes)
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
                 checkTodayEpisodeStreams(session, episodes)
@@ -347,19 +403,23 @@ class DetailViewModel @Inject constructor(
     // same lookup (the repository shares it and caches the answer).
     private var secondSourceJob: kotlinx.coroutines.Job? = null
 
-    // Leaving the page drops the second source's warm-up if it hasn't run.
-    fun onScreenHidden() {
+    // Leaving the page cancels active warmups.
+    fun onScreenHidden(itemId: String? = null) {
         secondSourceJob?.cancel()
         secondSourceJob = null
+        playPrefetchJob?.cancel()
+        playPrefetchJob = null
     }
 
     private fun lookForStreams(session: Session, itemId: String) {
+        if (loadedItemId != itemId) return
         repository.prefetchStreams(itemId)
         val openedAt = System.currentTimeMillis()
         _uiState.value = _uiState.value.copy(findingStreams = true, streamStatus = null)
-        viewModelScope.launch {
+        streamLookupJob?.cancel()
+        streamLookupJob = viewModelScope.launch {
             val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
-            if (_uiState.value.item?.Id != itemId) return@launch
+            if (loadedItemId != itemId || _uiState.value.item?.Id != itemId) return@launch
             val currentItem = _uiState.value.item
             if (currentItem?.Type == "Episode" && isReleasedToday(currentItem)) {
                 val hasStream = !sources.getOrNull().isNullOrEmpty()
@@ -381,10 +441,11 @@ class DetailViewModel @Inject constructor(
     // Still on the page after a moment: the next source in line is the likely
     // fallback, so have its probe done too.
     private fun warmSecondSource(session: Session, itemId: String, sources: List<MediaSourceDto>, openedAt: Long) {
+        if (loadedItemId != itemId) return
         secondSourceJob?.cancel()
         secondSourceJob = viewModelScope.launch {
             kotlinx.coroutines.delay((SECOND_SOURCE_DELAY_MS - (System.currentTimeMillis() - openedAt)).coerceAtLeast(0L))
-            if (_uiState.value.item?.Id != itemId) return@launch
+            if (loadedItemId != itemId || _uiState.value.item?.Id != itemId) return@launch
             val bad = sources.filter { com.jellio.tv.ui.player.BadStreams.isBad(itemId, it) }
             val second = ((sources - bad.toSet()) + bad).getOrNull(1)?.Id ?: return@launch
             val warm = repository.getWarmSources(itemId).orEmpty().keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }

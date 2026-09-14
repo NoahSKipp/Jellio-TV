@@ -157,7 +157,7 @@ fun DetailScreen(
     val playButtonFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
-    androidx.compose.runtime.DisposableEffect(itemId) { onDispose { viewModel.onScreenHidden() } }
+    androidx.compose.runtime.DisposableEffect(itemId) { onDispose { viewModel.onScreenHidden(itemId) } }
     LaunchedEffect(uiState.item?.Id) {
         if (uiState.item != null) {
             listState.scrollToItem(0)

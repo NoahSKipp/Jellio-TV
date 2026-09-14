@@ -76,7 +76,7 @@ import java.util.Locale
 
 // Only a card the viewer stays on prefetches its streams, never every card
 // passed over on the way along a row (mirrors components/card.js).
-private const val PREFETCH_DEBOUNCE_MS = 500L
+private const val PREFETCH_DEBOUNCE_MS = 600L
 
 // How long a card has to stay focused before it widens into its banner.
 private const val EXPAND_DELAY_MS = 2500L
