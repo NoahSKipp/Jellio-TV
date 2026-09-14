@@ -33,7 +33,6 @@ import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -47,11 +46,14 @@ interface JellyfinApi {
     @GET("System/Info/Public")
     suspend fun getPublicSystemInfo(): PublicSystemInfoDto
 
+    // No explicit @Header here (a real prior version of this call sent
+    // its own X-Emby-Authorization, see the fix note lower in this file
+    // by buildEmbyAuthorizationHeader): NetworkModule.kt's own auth
+    // interceptor now attaches a real Authorization header to every
+    // outgoing request including this one, device metadata included
+    // even with no session token yet to fold in.
     @POST("Users/AuthenticateByName")
-    suspend fun authenticateByName(
-        @Header("X-Emby-Authorization") authHeader: String,
-        @Body body: AuthenticateByNameRequest,
-    ): AuthenticationResultDto
+    suspend fun authenticateByName(@Body body: AuthenticateByNameRequest): AuthenticationResultDto
 
     @GET("Users/{userId}")
     suspend fun getUser(@Path("userId") userId: String): UserDto
@@ -67,13 +69,18 @@ interface JellyfinApi {
     // Same real GET /Users/{userId} getUser() above already calls, a
     // second real Retrofit method only because this one carries an
     // explicit candidate token rather than trusting NetworkModule's own
-    // auth interceptor (which has nothing to attach yet on the login
-    // screen this is called from): the same real verification
-    // runtime/auth.js's own quickSignIn() does before trusting a
-    // remembered token at all.
+    // auth interceptor (which is still carrying whatever the outgoing
+    // session's own token is at this point, not this candidate one):
+    // the same real verification runtime/auth.js's own quickSignIn()
+    // does before trusting a remembered token at all. ApiKey query
+    // param, not a header: AuthorizationContext.cs's own
+    // GetAuthorizationInfoFromDictionary() only reads X-Emby-Token
+    // behind the same disabled EnableLegacyAuthorization flag
+    // buildEmbyAuthorizationHeader's own header explains, but always
+    // reads a real ApiKey query param regardless of it.
     @GET("Users/{userId}")
     suspend fun getUserWithToken(
-        @Header("X-Emby-Token") token: String,
+        @Query("ApiKey") token: String,
         @Path("userId") userId: String,
     ): UserDto
 
@@ -380,9 +387,25 @@ interface JellyfinApi {
     suspend fun reportRealDuration(@Body body: ReportDurationRequest)
 }
 
+// This app's own real client version, sent on every request's own
+// Authorization header below; NetworkModule.kt's own auth interceptor
+// needs the exact same value login already sent, one shared constant
+// rather than two copies that could quietly drift apart.
+const val APP_VERSION = "0.1.0"
+
 // Real Jellyfin auth convention every client sends, confirmed against
 // the same real shape jellyfin-apiclient-javascript's own boot line
 // already relies on (IndexHtmlPatchService.cs's own header explains
 // that real log line, this is the equally real request side of it).
-fun buildEmbyAuthorizationHeader(deviceId: String, appVersion: String): String =
-    "MediaBrowser Client=\"Jellio TV\", Device=\"Android TV\", DeviceId=\"$deviceId\", Version=\"$appVersion\""
+// Sent as the real "Authorization" header everywhere in this app now
+// (NetworkModule.kt's own auth interceptor, this file's own header
+// above authenticateByName explains why X-Emby-Authorization stopped
+// working): token folded into this same header's own Token="..." field
+// when one exists, rather than a separate X-Emby-Token header, the
+// real un-gated path AuthorizationContext.cs's own
+// GetAuthorizationInfoFromDictionary() always reads regardless of
+// EnableLegacyAuthorization.
+fun buildEmbyAuthorizationHeader(deviceId: String, appVersion: String, token: String? = null): String {
+    val base = "MediaBrowser Client=\"Jellio TV\", Device=\"Android TV\", DeviceId=\"$deviceId\", Version=\"$appVersion\""
+    return if (!token.isNullOrEmpty()) "$base, Token=\"$token\"" else base
+}
