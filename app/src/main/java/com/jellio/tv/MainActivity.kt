@@ -2,8 +2,6 @@ package com.jellio.tv
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -32,7 +30,6 @@ import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
-import com.jellio.tv.ui.detail.StreamPickerDpadBridge
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.feed.FeedScreen
 import com.jellio.tv.ui.home.HomeScreen
@@ -101,24 +98,6 @@ class MainActivity : ComponentActivity() {
         if (uri.host == "jellio.tv" && uri.path == "/play") {
             uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
         }
-    }
-
-    // StreamPickerDpadBridge's own header explains why Up still needs
-    // this: dispatchKeyEvent runs ahead of everything else - the real
-    // first look any key event gets, before Android's own View/Compose
-    // focus system touches it at all.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Temporary, non-consuming diagnostic: confirms real Down key
-        // events genuinely reach dispatchKeyEvent at all (this override
-        // itself never blocks Down anymore, but something else further
-        // down Android's own dispatch chain still could).
-        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            Log.d("StreamPickerDpad", "dispatchKeyEvent saw DPAD_DOWN, not consuming")
-        }
-        if (event.action == KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-            if (StreamPickerDpadBridge.onDpadUp?.invoke() == true) return true
-        }
-        return super.dispatchKeyEvent(event)
     }
 }
 

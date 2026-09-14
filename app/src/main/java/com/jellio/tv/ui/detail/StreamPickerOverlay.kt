@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,6 +36,9 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -265,29 +267,6 @@ fun StreamPickerOverlay(
             runCatching { initialFocusRequester.requestFocus() }
         }
     }
-    // Bridges around Compose's own key dispatch entirely - see
-    // StreamPickerDpadBridge's own header for why. Down used to live
-    // here too (a forced requestFocus() onto a LazyColumn item that,
-    // confirmed live via Logcat across several real fix attempts, never
-    // actually landed no matter which Compose-driven context it was
-    // called from - see the LazyColumn's own focusRestorer() comment
-    // below for the real fix). Up still needs this: firstCardHasFocus
-    // targets initialFocusRequester, a plain non-lazy Surface, which
-    // requestFocus() already reaches reliably.
-    DisposableEffect(Unit) {
-        StreamPickerDpadBridge.onDpadUp = {
-            if (firstCardHasFocus) {
-                initialFocusRequester.requestFocus()
-                true
-            } else {
-                false
-            }
-        }
-        onDispose {
-            StreamPickerDpadBridge.onDpadUp = null
-        }
-    }
-
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
         state = try {
@@ -456,16 +435,40 @@ fun StreamPickerOverlay(
                                     Modifier
                                         .focusRequester(firstSourceCardFocusRequester)
                                         .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
-                                        // StreamPickerDpadBridge's own
-                                        // onDpadUp reads firstCardHasFocus
-                                        // to redirect a real Up press
-                                        // back to whichever of those is
-                                        // first in reading order
-                                        // (initialFocusRequester already
-                                        // resolves to that).
                                         .onFocusChanged {
                                             firstCardHasFocus = it.hasFocus
                                             android.util.Log.d("StreamPickerDpad", "first card focus=${it.hasFocus}")
+                                        }
+                                        // Real port of Nuvio's own
+                                        // StreamItem onUpKey (Stream
+                                        // Components.kt): a real
+                                        // Modifier.onKeyEvent{} attached
+                                        // directly to the focused node
+                                        // itself, not a separate
+                                        // Activity-level dispatchKeyEvent
+                                        // bridge - real feedback found
+                                        // that bridge left the reader
+                                        // stuck once Down actually
+                                        // started reaching the list (its
+                                        // own real pre-warm fix above),
+                                        // Up out of the list back to
+                                        // Resume/the first chip never
+                                        // firing regardless. Compose asks
+                                        // the currently focused node
+                                        // directly for its own real
+                                        // onKeyEvent before any default
+                                        // arrow-key search even runs, no
+                                        // separate cross-cutting object
+                                        // for it to fail to fire through.
+                                        .onKeyEvent { event ->
+                                            if (event.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN &&
+                                                event.key == Key.DirectionUp
+                                            ) {
+                                                initialFocusRequester.requestFocus()
+                                                true
+                                            } else {
+                                                false
+                                            }
                                         }
                                 } else {
                                     Modifier
