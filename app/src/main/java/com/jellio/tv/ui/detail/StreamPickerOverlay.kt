@@ -5,16 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
@@ -25,13 +25,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -219,119 +219,35 @@ fun StreamPickerOverlay(
     // since neither of those real targets exists yet during it.
     val initialFocusRequester = remember { FocusRequester() }
     LaunchedEffect(state) {
-        android.util.Log.d("StreamPickerDpad", "state=${state::class.simpleName}")
-        if (state !is SourcesState.Loading) {
-            android.util.Log.d("StreamPickerDpad", "requesting initial focus")
-            initialFocusRequester.requestFocus()
-        }
+        if (state !is SourcesState.Loading) initialFocusRequester.requestFocus()
     }
+    // Still attached to the first card below (and still the initial-
+    // focus target when there's neither a Resume button nor more than
+    // one language) even though nothing calls requestFocus() on it for
+    // Down anymore - see the LazyColumn's own focusRestorer() comment
+    // for why Down doesn't need that here.
     val firstSourceCardFocusRequester = remember { FocusRequester() }
     var firstCardHasFocus by remember { mutableStateOf(false) }
-    // Real difference traced live, confirmed against both Resume (a
-    // plain, non-scrolled child of a bare Column) and the first
-    // language chip (LazyRow, its own default focus-into-view already
-    // proven to work): firstSourceCardFocusRequester alone lives inside
-    // a Modifier.weight(1f).verticalScroll(...) child further down, the
-    // one real structural difference the prior retry-across-frames fix
-    // never actually addressed. Hoisted up here (rather than the inline
-    // rememberScrollState() the stream list's own modifier still reads
-    // below) so the retry loop can pair each requestFocus() attempt
-    // with an explicit scrollTo(0) on this same real ScrollState
-    // instance - verticalScroll() has no built-in bring-into-view
-    // contract of its own the way LazyColumn/LazyRow's real internal
-    // BringIntoViewResponder already gives every other focus target in
-    // this overlay for free.
-    val sourceListScrollState = rememberScrollState()
-    // Real root cause traced live over several rounds: LazyColumn's own
-    // item recycling was silently breaking requestFocus() into its
-    // items (see the stream list's own header comment below for the
-    // full story and the upstream Compose issue this matches). Now a
-    // plain Column, so requestFocus() reaches these cards the same
-    // reliable way it already reaches every other real Surface in this
-    // overlay (Resume/chips/Retry).
-    var resumeFocused by remember { mutableStateOf(false) }
-    var focusedChipIndex by remember { mutableIntStateOf(-1) }
-    // Real fix candidate, found live off this overlay's own Logcat
-    // tracing: requestFocus() used to fire synchronously from inside
-    // MainActivity's own dispatchKeyEvent override below - a raw
-    // Android View-level callback that runs ahead of, and outside,
-    // Compose's own composition/snapshot pipeline entirely. Every OTHER
-    // requestFocus() call in this file that is confirmed working
-    // (LaunchedEffect(state) above, the chip/resume onFocusChanged
-    // ones) runs from inside a real Compose-driven context instead;
-    // this one alone never did, and Logcat showed it being called
-    // (consumed=true) with no onFocusChanged ever following it - not
-    // even an exception, exactly the documented shape of Compose's own
-    // focus system silently dropping a request made mid-dispatch,
-    // before its own input handling has caught up with the same key
-    // event for this same frame. These two counters replace the direct
-    // call: the bridge lambda below only increments a plain snapshot
-    // state write (safe from any thread/context), and the two
-    // LaunchedEffects further down fire the actual requestFocus() call
-    // from a real Compose recomposition instead.
-    var downFocusRequestCount by remember { mutableIntStateOf(0) }
-    var upFocusRequestCount by remember { mutableIntStateOf(0) }
+    // Bridges around Compose's own key dispatch entirely - see
+    // StreamPickerDpadBridge's own header for why. Down used to live
+    // here too (a forced requestFocus() onto a LazyColumn item that,
+    // confirmed live via Logcat across several real fix attempts, never
+    // actually landed no matter which Compose-driven context it was
+    // called from - see the LazyColumn's own focusRestorer() comment
+    // below for the real fix). Up still needs this: firstCardHasFocus
+    // targets initialFocusRequester, a plain non-lazy Surface, which
+    // requestFocus() already reaches reliably.
     DisposableEffect(Unit) {
-        android.util.Log.d("StreamPickerDpad", "bridge wired")
-        StreamPickerDpadBridge.onDpadDown = {
-            android.util.Log.d(
-                "StreamPickerDpad",
-                "onDpadDown resumeFocused=$resumeFocused focusedChipIndex=$focusedChipIndex",
-            )
-            if (resumeFocused || focusedChipIndex >= 0) {
-                downFocusRequestCount++
-                true
-            } else {
-                false
-            }
-        }
         StreamPickerDpadBridge.onDpadUp = {
-            android.util.Log.d("StreamPickerDpad", "onDpadUp firstCardHasFocus=$firstCardHasFocus")
             if (firstCardHasFocus) {
-                upFocusRequestCount++
+                initialFocusRequester.requestFocus()
                 true
             } else {
                 false
             }
         }
         onDispose {
-            android.util.Log.d("StreamPickerDpad", "bridge cleared")
-            StreamPickerDpadBridge.onDpadDown = null
             StreamPickerDpadBridge.onDpadUp = null
-        }
-    }
-    // Real root cause, confirmed live against both Resume (a plain,
-    // non-scrolled Column child, succeeds) and the first language chip
-    // (a LazyRow, also succeeds): firstSourceCardFocusRequester alone
-    // lives inside Modifier.weight(1f).verticalScroll(...) further
-    // down, and verticalScroll() carries none of LazyColumn/LazyRow's
-    // own real bring-into-view cooperation with the focus system - a
-    // requestFocus() call into it can land on a target Compose has not
-    // actually scrolled/settled into a real attached state yet, no
-    // exception, no onFocusChanged, exactly what every prior round here
-    // (LazyColumn, dispatchKeyEvent, single-frame, ten-frame retry)
-    // kept showing. scrollTo(0) paired with each retry forces that real
-    // settle explicitly rather than assuming a fresh ScrollState always
-    // starts there already composed and attached.
-    LaunchedEffect(downFocusRequestCount) {
-        if (downFocusRequestCount > 0) {
-            android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card")
-            repeat(10) {
-                sourceListScrollState.scrollTo(0)
-                firstSourceCardFocusRequester.requestFocus()
-                withFrameNanos {}
-            }
-            android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card done retrying")
-        }
-    }
-    LaunchedEffect(upFocusRequestCount) {
-        if (upFocusRequestCount > 0) {
-            android.util.Log.d("StreamPickerDpad", "deferred requestFocus back to initial")
-            repeat(10) {
-                initialFocusRequester.requestFocus()
-                withFrameNanos {}
-            }
-            android.util.Log.d("StreamPickerDpad", "deferred requestFocus back to initial done retrying")
         }
     }
 
@@ -428,11 +344,7 @@ fun StreamPickerOverlay(
                                 colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
                                 modifier = Modifier
                                     .padding(top = 24.dp)
-                                    .focusRequester(initialFocusRequester)
-                                    .onFocusChanged {
-                                        resumeFocused = it.isFocused
-                                        android.util.Log.d("StreamPickerDpad", "resume focus=${it.isFocused}")
-                                    },
+                                    .focusRequester(initialFocusRequester),
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -449,65 +361,50 @@ fun StreamPickerOverlay(
                                 selected = selectedLanguage,
                                 onSelect = { selectedLanguage = it },
                                 firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
-                                onChipFocusChanged = { index, focused ->
-                                    android.util.Log.d("StreamPickerDpad", "chip index=$index focused=$focused")
-                                    if (focused) {
-                                        focusedChipIndex = index
-                                    } else if (focusedChipIndex == index) {
-                                        focusedChipIndex = -1
-                                    }
-                                },
                             )
                         }
                     }
-                    android.util.Log.d(
-                        "StreamPickerDpad",
-                        "loaded resumeTicks=$resumeTicks languages=${languages.size} " +
-                            "sources=${currentState.sources.size} filtered=${filteredSources.size}",
-                    )
                     Text(
                         text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                     )
-                    // Real bug found live, matching
-                    // ui/nav/AccountSwitcherOverlay.kt's own real fix:
-                    // this list had no real weight of its own inside
-                    // this real Column, so it measured against this
-                    // Column's own full real fillMaxSize() height rather
-                    // than whatever real space the title/language chips/
-                    // count text above it actually left behind - its own
-                    // real content then rendered past this real
-                    // Column's own intended bottom edge, cut off with no
-                    // real Down target Compose's own spatial search
-                    // could actually find there. weight(1f) bounds it to
-                    // that real remaining space instead.
                     // Real root cause, confirmed live over several
-                    // rounds of Logcat tracing: a direct, unambiguous
-                    // firstSourceCardFocusRequester.requestFocus() call,
-                    // fired 500ms after load with no key event or
-                    // navigation involved at all, produced zero effect -
-                    // no exception, no onFocusChanged, nothing. Ruled
-                    // out StreamPickerDpadBridge/dispatchKeyEvent,
-                    // focusRestorer(), and Compose's own default arrow-
-                    // key search in turn; none of them were ever the
-                    // actual problem. What's left is LazyColumn's own
-                    // item recycling: a documented real Compose bug
-                    // class (JetBrains/compose-multiplatform#3526,
-                    // "FocusRequester uninitialized in LazyColumn"),
-                    // whose own real finding is exactly this file's own:
-                    // "using a Column instead of LazyColumn works as
-                    // expected." Streams are capped in the tens (Gelato's
-                    // own resultLimits), nowhere near where a plain
-                    // scrollable Column's lack of windowing would cost
-                    // anything real, so this trades LazyColumn's own
-                    // recycling for a real fix rather than working
-                    // around a real upstream Compose bug indefinitely.
-                    Column(
+                    // rounds of Logcat tracing spanning two separate
+                    // sessions: a direct firstSourceCardFocusRequester.
+                    // requestFocus() call - from dispatchKeyEvent, from a
+                    // real Compose LaunchedEffect, retried across ten
+                    // real frames, even paired with an explicit
+                    // scrollTo(0) on a plain verticalScroll() Column
+                    // standing in for this LazyColumn - never once
+                    // landed, no exception, no onFocusChanged. None of
+                    // those were ever the actual problem. The one thing
+                    // never tried across any of that: a real stable
+                    // key for each item below. Real gap ui/home/
+                    // HomeScreen.kt's own header already documents and
+                    // already fixes there the identical way: plain
+                    // Compose Foundation LazyColumn advertises no
+                    // default D-pad entry point of its own for a system
+                    // that has never focused anything inside it yet,
+                    // and without a real per-item key, its own item
+                    // recycling can silently break a remembered
+                    // FocusRequester's own association with whichever
+                    // node it was last attached to (the documented real
+                    // upstream class this file's own prior LazyColumn
+                    // attempt matched, JetBrains/compose-multiplatform
+                    // #3526) - the standard real fix for that is a
+                    // stable key, not abandoning LazyColumn outright.
+                    // focusRestorer() plus a real per-item key below
+                    // (source.Id, falling back to index for the one
+                    // pathological source with none) is the same
+                    // proven-working shape HomeScreen.kt already ships,
+                    // neither piece ever combined here before.
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f).verticalScroll(sourceListScrollState).padding(bottom = 24.dp),
+                        modifier = Modifier.weight(1f).focusRestorer(),
                     ) {
-                        filteredSources.forEachIndexed { index, source ->
+                        itemsIndexed(filteredSources, key = { index, source -> source.Id ?: index }) { index, source ->
                             SourceCard(
                                 source = source,
                                 onClick = { onSelect(source) },
@@ -515,10 +412,14 @@ fun StreamPickerOverlay(
                                     Modifier
                                         .focusRequester(firstSourceCardFocusRequester)
                                         .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
-                                        .onFocusChanged {
-                                            firstCardHasFocus = it.hasFocus
-                                            android.util.Log.d("StreamPickerDpad", "first card focus=${it.hasFocus}")
-                                        }
+                                        // StreamPickerDpadBridge's own
+                                        // onDpadUp reads firstCardHasFocus
+                                        // to redirect a real Up press
+                                        // back to whichever of those is
+                                        // first in reading order
+                                        // (initialFocusRequester already
+                                        // resolves to that).
+                                        .onFocusChanged { firstCardHasFocus = it.hasFocus }
                                 } else {
                                     Modifier
                                 },
@@ -537,7 +438,6 @@ private fun LanguageFilterChips(
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
-    onChipFocusChanged: (index: Int, focused: Boolean) -> Unit = { _, _ -> },
 ) {
     val chips = buildList {
         add(null to "All")
@@ -564,8 +464,7 @@ private fun LanguageFilterChips(
                 // row's own bounds on focus - same fix as SourceCard's.
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 modifier = Modifier
-                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
-                    .onFocusChanged { onChipFocusChanged(index, it.isFocused) },
+                    .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it },
             ) {
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
