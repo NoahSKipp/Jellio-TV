@@ -218,7 +218,11 @@ fun StreamPickerOverlay(
     // since neither of those real targets exists yet during it.
     val initialFocusRequester = remember { FocusRequester() }
     LaunchedEffect(state) {
-        if (state !is SourcesState.Loading) initialFocusRequester.requestFocus()
+        android.util.Log.d("StreamPickerDpad", "state=${state::class.simpleName}")
+        if (state !is SourcesState.Loading) {
+            android.util.Log.d("StreamPickerDpad", "requesting initial focus")
+            initialFocusRequester.requestFocus()
+        }
     }
     val firstSourceCardFocusRequester = remember { FocusRequester() }
     var firstCardHasFocus by remember { mutableStateOf(false) }
@@ -232,7 +236,12 @@ fun StreamPickerOverlay(
     var resumeFocused by remember { mutableStateOf(false) }
     var focusedChipIndex by remember { mutableIntStateOf(-1) }
     DisposableEffect(Unit) {
+        android.util.Log.d("StreamPickerDpad", "bridge wired")
         StreamPickerDpadBridge.onDpadDown = {
+            android.util.Log.d(
+                "StreamPickerDpad",
+                "onDpadDown resumeFocused=$resumeFocused focusedChipIndex=$focusedChipIndex",
+            )
             if (resumeFocused || focusedChipIndex >= 0) {
                 firstSourceCardFocusRequester.requestFocus()
                 true
@@ -241,6 +250,7 @@ fun StreamPickerOverlay(
             }
         }
         StreamPickerDpadBridge.onDpadUp = {
+            android.util.Log.d("StreamPickerDpad", "onDpadUp firstCardHasFocus=$firstCardHasFocus")
             if (firstCardHasFocus) {
                 initialFocusRequester.requestFocus()
                 true
@@ -249,6 +259,7 @@ fun StreamPickerOverlay(
             }
         }
         onDispose {
+            android.util.Log.d("StreamPickerDpad", "bridge cleared")
             StreamPickerDpadBridge.onDpadDown = null
             StreamPickerDpadBridge.onDpadUp = null
         }
@@ -348,7 +359,10 @@ fun StreamPickerOverlay(
                                 modifier = Modifier
                                     .padding(top = 24.dp)
                                     .focusRequester(initialFocusRequester)
-                                    .onFocusChanged { resumeFocused = it.isFocused },
+                                    .onFocusChanged {
+                                        resumeFocused = it.isFocused
+                                        android.util.Log.d("StreamPickerDpad", "resume focus=${it.isFocused}")
+                                    },
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -366,6 +380,7 @@ fun StreamPickerOverlay(
                                 onSelect = { selectedLanguage = it },
                                 firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
                                 onChipFocusChanged = { index, focused ->
+                                    android.util.Log.d("StreamPickerDpad", "chip index=$index focused=$focused")
                                     if (focused) {
                                         focusedChipIndex = index
                                     } else if (focusedChipIndex == index) {
@@ -375,6 +390,11 @@ fun StreamPickerOverlay(
                             )
                         }
                     }
+                    android.util.Log.d(
+                        "StreamPickerDpad",
+                        "loaded resumeTicks=$resumeTicks languages=${languages.size} " +
+                            "sources=${currentState.sources.size} filtered=${filteredSources.size}",
+                    )
                     Text(
                         text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
                         color = JellioTextSecondary,
@@ -425,7 +445,10 @@ fun StreamPickerOverlay(
                                     Modifier
                                         .focusRequester(firstSourceCardFocusRequester)
                                         .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
-                                        .onFocusChanged { firstCardHasFocus = it.hasFocus }
+                                        .onFocusChanged {
+                                            firstCardHasFocus = it.hasFocus
+                                            android.util.Log.d("StreamPickerDpad", "first card focus=${it.hasFocus}")
+                                        }
                                 } else {
                                     Modifier
                                 },
