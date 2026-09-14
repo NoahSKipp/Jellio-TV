@@ -1,6 +1,8 @@
 package com.jellio.tv.di
 
+import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.JellyfinApi
+import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.session.SessionManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -62,17 +64,25 @@ object NetworkModule {
             chain.proceed(request)
         }
 
+    // Real "Authorization" header, not X-Emby-Token: AuthorizationContext.cs's
+    // own GetAuthorizationInfoFromDictionary() only ever reads that legacy
+    // header behind the same disabled EnableLegacyAuthorization flag
+    // JellyfinApi.kt's own buildEmbyAuthorizationHeader() documents, so an
+    // X-Emby-Token here used to authenticate nothing at all on a server with
+    // it off: every request after a real successful login still read back
+    // as anonymous. Sent on every request, session token or not, since the
+    // Client/Device/DeviceId fields matter even pre-login (AuthenticateByName
+    // itself reads them off this same header, JellyfinApi.kt's own header on
+    // that call explains why).
     @Provides
     @Singleton
     @AuthInterceptor
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val token = runBlocking { sessionManager.accessToken() }
-            val request = if (!token.isNullOrEmpty()) {
-                chain.request().newBuilder().addHeader("X-Emby-Token", token).build()
-            } else {
-                chain.request()
-            }
+            val deviceId = runBlocking { sessionManager.deviceId() }
+            val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
+            val request = chain.request().newBuilder().addHeader("Authorization", header).build()
             chain.proceed(request)
         }
 

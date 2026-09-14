@@ -27,7 +27,6 @@ import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.network.JellyfinApi
-import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
@@ -50,8 +49,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val APP_VERSION = "0.1.0"
 
 // BackdropImageTags is not included by default (real bug found live:
 // the hero backdrop silently never loaded because this app never
@@ -219,9 +216,10 @@ class JellioRepository @Inject constructor(
             // Confirms the address is a real reachable Jellyfin server
             // before ever sending real credentials to it.
             api.getPublicSystemInfo()
-            val deviceId = sessionManager.deviceId()
-            val authHeader = buildEmbyAuthorizationHeader(deviceId, APP_VERSION)
-            val result = api.authenticateByName(authHeader, AuthenticateByNameRequest(username, password))
+            // NetworkModule.kt's own auth interceptor attaches this
+            // request's own real Authorization header itself now (device
+            // metadata, no session token to fold in yet at this point).
+            val result = api.authenticateByName(AuthenticateByNameRequest(username, password))
             clearCache()
             sessionManager.saveSession(normalized, result.AccessToken, result.User.Id, result.User.Name)
             rememberUser(normalized, result.User.Id, result.AccessToken, result.User.Name, result.User.PrimaryImageTag)
