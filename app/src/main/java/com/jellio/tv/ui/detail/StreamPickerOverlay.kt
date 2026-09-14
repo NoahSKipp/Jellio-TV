@@ -235,6 +235,26 @@ fun StreamPickerOverlay(
     // overlay (Resume/chips/Retry).
     var resumeFocused by remember { mutableStateOf(false) }
     var focusedChipIndex by remember { mutableIntStateOf(-1) }
+    // Real fix candidate, found live off this overlay's own Logcat
+    // tracing: requestFocus() used to fire synchronously from inside
+    // MainActivity's own dispatchKeyEvent override below - a raw
+    // Android View-level callback that runs ahead of, and outside,
+    // Compose's own composition/snapshot pipeline entirely. Every OTHER
+    // requestFocus() call in this file that is confirmed working
+    // (LaunchedEffect(state) above, the chip/resume onFocusChanged
+    // ones) runs from inside a real Compose-driven context instead;
+    // this one alone never did, and Logcat showed it being called
+    // (consumed=true) with no onFocusChanged ever following it - not
+    // even an exception, exactly the documented shape of Compose's own
+    // focus system silently dropping a request made mid-dispatch,
+    // before its own input handling has caught up with the same key
+    // event for this same frame. These two counters replace the direct
+    // call: the bridge lambda below only increments a plain snapshot
+    // state write (safe from any thread/context), and the two
+    // LaunchedEffects further down fire the actual requestFocus() call
+    // from a real Compose recomposition instead.
+    var downFocusRequestCount by remember { mutableIntStateOf(0) }
+    var upFocusRequestCount by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
         android.util.Log.d("StreamPickerDpad", "bridge wired")
         StreamPickerDpadBridge.onDpadDown = {
@@ -243,7 +263,7 @@ fun StreamPickerOverlay(
                 "onDpadDown resumeFocused=$resumeFocused focusedChipIndex=$focusedChipIndex",
             )
             if (resumeFocused || focusedChipIndex >= 0) {
-                firstSourceCardFocusRequester.requestFocus()
+                downFocusRequestCount++
                 true
             } else {
                 false
@@ -252,7 +272,7 @@ fun StreamPickerOverlay(
         StreamPickerDpadBridge.onDpadUp = {
             android.util.Log.d("StreamPickerDpad", "onDpadUp firstCardHasFocus=$firstCardHasFocus")
             if (firstCardHasFocus) {
-                initialFocusRequester.requestFocus()
+                upFocusRequestCount++
                 true
             } else {
                 false
@@ -262,6 +282,18 @@ fun StreamPickerOverlay(
             android.util.Log.d("StreamPickerDpad", "bridge cleared")
             StreamPickerDpadBridge.onDpadDown = null
             StreamPickerDpadBridge.onDpadUp = null
+        }
+    }
+    LaunchedEffect(downFocusRequestCount) {
+        if (downFocusRequestCount > 0) {
+            android.util.Log.d("StreamPickerDpad", "deferred requestFocus onto first card")
+            firstSourceCardFocusRequester.requestFocus()
+        }
+    }
+    LaunchedEffect(upFocusRequestCount) {
+        if (upFocusRequestCount > 0) {
+            android.util.Log.d("StreamPickerDpad", "deferred requestFocus back to initial")
+            initialFocusRequester.requestFocus()
         }
     }
 
