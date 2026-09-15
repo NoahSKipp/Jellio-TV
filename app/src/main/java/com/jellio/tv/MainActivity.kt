@@ -18,8 +18,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -231,6 +234,24 @@ private fun JellioTvApp(
     // currently selected item already holds real focus again before
     // whichever real popover's own content is actually gone.
     val sidebarFocusRequester = remember { FocusRequester() }
+    // Real feedback live: switching views (sidebar clicks and content
+    // clicks alike, an episode card on a Detail page included) kept
+    // reopening this rail - the destination screen's own content
+    // wasn't reliably claiming real focus fast enough (or at all, some
+    // screens never tried), so whatever focused node the OLD screen
+    // held got torn down with nothing real waiting to receive it, and
+    // Compose's own global default fallback search landed back on this
+    // rail's own topmost item, the one always-present real focusable
+    // thing regardless of which screen. sidebarHasRealFocus mirrors
+    // SidebarNav's own real hasFocus (its own onFocusChange param
+    // explains why this couldn't just read that rail's own private
+    // state directly); sidebarForceCollapsed visually collapses this
+    // rail immediately on every real navigation, decoupled from that
+    // real focus state on purpose (SidebarNav's own forceCollapsed
+    // header explains why faking that state itself would be worse).
+    var sidebarHasRealFocus by remember { mutableStateOf(false) }
+    var sidebarForceCollapsed by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -397,6 +418,35 @@ private fun JellioTvApp(
         }
 
         if (!route.isImmersive()) {
+            // Real fix for sidebarHasRealFocus/sidebarForceCollapsed's
+            // own header above: forces this rail visually collapsed the
+            // instant any real navigation lands on a non-immersive
+            // route, then reacts to every real transition of this
+            // rail's own hasFocus for as long as this same route is
+            // current - moveFocus(Right) again each real time it
+            // becomes true (Compose's own fallback search can land back
+            // here more than once while a slow-loading destination has
+            // nothing real to claim yet), clearing the forced collapse
+            // once it finally leaves for good. snapshotFlow rather than
+            // a single deferred attempt: ui/home/HomeScreen.kt's own
+            // hero-pin header covers why a guessed one-shot delay keeps
+            // losing races a real reactive collect() doesn't have to
+            // guess at. Scoped inside this same real branch (not a bare
+            // top-level effect) so it starts fresh with every real
+            // mount here and simply doesn't exist during an immersive
+            // route, where this rail isn't mounted at all and
+            // moveFocus(Right) would have nothing real of its own to
+            // mean anyway.
+            LaunchedEffect(route) {
+                sidebarForceCollapsed = true
+                snapshotFlow { sidebarHasRealFocus }.collect { hasFocus ->
+                    if (hasFocus) {
+                        focusManager.moveFocus(FocusDirection.Right)
+                    } else {
+                        sidebarForceCollapsed = false
+                    }
+                }
+            }
             SidebarNav(
                 items = JellioNavItems,
                 selected = route,
@@ -423,6 +473,8 @@ private fun JellioTvApp(
                 profileAvatarUrl = appViewModel.userImageUrl(session, session.userId, null, 200),
                 profileName = session.userName,
                 restoreFocusRequester = sidebarFocusRequester,
+                forceCollapsed = sidebarForceCollapsed,
+                onFocusChange = { sidebarHasRealFocus = it },
             )
             if (showLibraryPicker) {
                 LibraryPickerOverlay(
