@@ -123,7 +123,7 @@ object NetworkModule {
         .followRedirects(true)
         .followSslRedirects(true)
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
         // A call can ask for a longer wait with this header (following a pasted page to its stream can take

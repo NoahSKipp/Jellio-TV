@@ -184,11 +184,20 @@ class HomeViewModel @Inject constructor(
             if (!isReturningVisit) {
                 val cachedSnapshot = runCatching { rowSnapshotStore.loadHomeSnapshot(session.userId) }.getOrNull()
                 if (cachedSnapshot != null && (cachedSnapshot.rows.isNotEmpty() || cachedSnapshot.heroItems.isNotEmpty())) {
+                    val restoredRows = cachedSnapshot.rows.map { it.toHomeRow() }
+                    restoredRows.forEach { row ->
+                        when (row) {
+                            is PosterHomeRow -> repository.seedPreviews(row.section.items)
+                            is ComingSoonHomeRow -> repository.seedPreviews(row.items.values.toList())
+                            else -> {}
+                        }
+                    }
+                    repository.seedPreviews(cachedSnapshot.heroItems)
                     _uiState.value = HomeUiState(
                         isLoading = false,
                         heroItems = cachedSnapshot.heroItems,
                         greeting = cachedSnapshot.greeting.ifEmpty { greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), null) },
-                        rows = cachedSnapshot.rows.map { it.toHomeRow() },
+                        rows = restoredRows,
                         loadingMore = true,
                     )
                 } else {
@@ -212,6 +221,10 @@ class HomeViewModel @Inject constructor(
                     launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNext) } }
                     repository.prefetchStreamsInTurn(
                         continueWatching.filter { it.Type == "Movie" || it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT).map { it.Id },
+                    )
+                    repository.preloadEpisodeSeasonsInTurn(
+                        session.userId,
+                        (continueWatching + upNext).filter { it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT),
                     )
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through recExclude and catalog/genre filtering below) every discovery row.
@@ -266,6 +279,7 @@ class HomeViewModel @Inject constructor(
                     val watchlist = watchlistDeferred.await().filter { removedFromWatchlist[it.Id] == null }
                     val policy = user?.Policy
                     val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
+                    val existingComingSoon = _uiState.value.rows.filterIsInstance<ComingSoonHomeRow>().firstOrNull()
                     val topRows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
@@ -282,7 +296,11 @@ class HomeViewModel @Inject constructor(
                         if (watchlistSeries.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_shows"), watchlistSeries, key = "watchlist-shows")))
                         }
-                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon, comingSoonItems))
+                        if (comingSoon.isNotEmpty()) {
+                            add(ComingSoonHomeRow(comingSoon, comingSoonItems))
+                        } else if (existingComingSoon != null) {
+                            add(existingComingSoon)
+                        }
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
                     }
                     if (!isReturningVisit) {
@@ -317,14 +335,25 @@ class HomeViewModel @Inject constructor(
                     var finished = false
 
                     fun assembled(): List<HomeRow> = buildList {
-                        val topRowKeys = setOf("continue-watching", "up-next", "watchlist-movies", "watchlist-shows", "coming-soon", "studio-hubs")
-                        val currentTop = _uiState.value.rows.filter { it.key in topRowKeys }.ifEmpty { topRows }
-                        val filteredTop = currentTop.mapNotNull { row ->
-                            if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
-                                val remaining = row.section.items.filterNot { removedFromWatchlist.containsKey(it.Id) }
-                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
-                            } else {
-                                row
+                        val filteredTop = topRows.mapNotNull { row ->
+                            when {
+                                row is PosterHomeRow && row.section.key == "continue-watching" -> {
+                                    val remaining = row.section.items.filterNot { it.Id in removedContinueWatchingIds || it.Id in removedItemIds }
+                                    if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                                }
+                                row is PosterHomeRow && row.section.key == "up-next" -> {
+                                    val remaining = row.section.items.filterNot { it.Id in removedItemIds || (it.SeriesId != null && it.SeriesId in hiddenSeriesIds) }
+                                    if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                                }
+                                row is PosterHomeRow && row.section.key.startsWith("watchlist") -> {
+                                    val remaining = row.section.items.filterNot { removedFromWatchlist.containsKey(it.Id) || it.Id in removedItemIds }
+                                    if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                                }
+                                row is ComingSoonHomeRow -> {
+                                    val remaining = row.entries.filterNot { it.ItemId in hiddenComingSoonIds }
+                                    if (remaining.isEmpty()) null else row.copy(entries = remaining)
+                                }
+                                else -> row
                             }
                         }
                         addAll(filteredTop)
@@ -452,10 +481,15 @@ class HomeViewModel @Inject constructor(
         loadShowcaseInfo(repository, session.userId, item)
 
     private val removedFromWatchlist = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    private val hiddenComingSoonIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val removedItemIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val removedContinueWatchingIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val hiddenSeriesIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     // Gone from the row at once; back if the server says no.
     fun removeFromComingSoon(itemId: String) {
         val before = _uiState.value.rows
+        hiddenComingSoonIds.add(itemId)
         _uiState.value = _uiState.value.copy(
             rows = before.mapNotNull { row ->
                 if (row is ComingSoonHomeRow) {
@@ -468,6 +502,7 @@ class HomeViewModel @Inject constructor(
         )
         viewModelScope.launch {
             if (!repository.hideFromComingSoon(itemId)) {
+                hiddenComingSoonIds.remove(itemId)
                 _uiState.value = _uiState.value.copy(rows = before)
             }
         }
@@ -626,13 +661,20 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleWatched(session: Session, item: BaseItemDto) {
-        val next = !(item.UserData?.Played ?: false)
+        val prevPlayed = item.UserData?.Played ?: false
+        val next = !prevPlayed
+        updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(Played = next)) }
         viewModelScope.launch {
-            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
-            updateItem(item.Id) { it.copy(UserData = updated) }
-            if (next) {
-                handleAutoRemovedWatchlist(session.userId)
-            }
+            runCatching { repository.setPlayed(session.userId, item.Id, next) }
+                .onSuccess { updated ->
+                    updateItem(item.Id) { it.copy(UserData = updated) }
+                    if (next) {
+                        handleAutoRemovedWatchlist(session.userId)
+                    }
+                }
+                .onFailure {
+                    updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(Played = prevPlayed)) }
+                }
         }
     }
 
@@ -651,28 +693,41 @@ class HomeViewModel @Inject constructor(
 
     fun removeFromRow(session: Session, item: BaseItemDto) {
         val before = _uiState.value.rows
+        removedItemIds.add(item.Id)
         removeItemFromRows(item.Id)
         viewModelScope.launch {
             runCatching { repository.setPlayed(session.userId, item.Id, true) }
                 .onSuccess { handleAutoRemovedWatchlist(session.userId) }
-                .onFailure { _uiState.value = _uiState.value.copy(rows = before) }
+                .onFailure {
+                    removedItemIds.remove(item.Id)
+                    _uiState.value = _uiState.value.copy(rows = before)
+                }
         }
     }
 
     fun hideShowFromRow(item: BaseItemDto) {
         val seriesId = item.SeriesId ?: return
         val before = _uiState.value.rows
+        hiddenSeriesIds.add(seriesId)
+        removedItemIds.add(item.Id)
         removeSeriesFromUpNext(seriesId, item.Id)
         viewModelScope.launch {
             runCatching { repository.hideSeriesFromNextUp(seriesId) }
-                .onFailure { _uiState.value = _uiState.value.copy(rows = before) }
+                .onFailure {
+                    hiddenSeriesIds.remove(seriesId)
+                    removedItemIds.remove(item.Id)
+                    _uiState.value = _uiState.value.copy(rows = before)
+                }
         }
     }
 
     fun deleteItem(item: BaseItemDto) {
         viewModelScope.launch {
             runCatching { repository.deleteItem(item.Id) }
-                .onSuccess { removeItemFromRows(item.Id) }
+                .onSuccess {
+                    removedItemIds.add(item.Id)
+                    removeItemFromRows(item.Id)
+                }
         }
     }
 
@@ -680,6 +735,7 @@ class HomeViewModel @Inject constructor(
     // position is cleared, so elsewhere it just loses its progress bar.
     fun removeFromContinueWatching(session: Session, item: BaseItemDto) {
         val before = _uiState.value.rows
+        removedContinueWatchingIds.add(item.Id)
         _uiState.value = _uiState.value.copy(
             rows = before.map { row ->
                 if (row is PosterHomeRow && row.section.key == "continue-watching") {
@@ -692,6 +748,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = runCatching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull()
             if (updated == null) {
+                removedContinueWatchingIds.remove(item.Id)
                 _uiState.value = _uiState.value.copy(rows = before)
                 return@launch
             }
