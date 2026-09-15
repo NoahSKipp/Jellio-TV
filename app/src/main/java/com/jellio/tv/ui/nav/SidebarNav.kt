@@ -24,9 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -34,13 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
@@ -55,7 +51,6 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
-import kotlinx.coroutines.launch
 
 // Real port of Jellio-Plugin's own desktop css/app.css: .jellio-sidebar
 // (--jellio-sidebar-width-collapsed: 5em, --jellio-sidebar-width: 15em,
@@ -127,16 +122,38 @@ fun SidebarNav(
     // real popovers close, the same real item this rail's own initial
     // real open-focus already targets below.
     restoreFocusRequester: FocusRequester = remember { FocusRequester() },
+    // Real feedback live: switching views left this rail expanded (or
+    // re-expanded a moment later) behind whatever screen just took
+    // over, real focus genuinely still sitting on this rail's own item
+    // until MainActivity's own central redirect (its header on this
+    // exact param explains why) actually lands focus on the new
+    // screen's own content - which, while that destination is still
+    // loading, can take a real moment. This rail's own expanded state
+    // is otherwise driven purely by real hasFocus below (deliberately:
+    // faking it closed while genuinely still focused would leave the
+    // remote controlling an invisible rail, worse than this bug),
+    // so MainActivity forces this true the instant any real navigation
+    // starts and clears it once focus has actually moved on, visually
+    // collapsing this rail right away without needing to fake or ever
+    // touch the real underlying focus state itself.
+    forceCollapsed: Boolean = false,
+    // Same MainActivity-owned mechanism: this rail's own real
+    // hasFocus, reported outward since the underlying var above is
+    // private to this composable and MainActivity has no other real
+    // way to know whether its own moveFocus(Right) redirect actually
+    // succeeded yet.
+    onFocusChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val visuallyExpanded = expanded && !forceCollapsed
     val width by animateDpAsState(
-        targetValue = if (expanded) SidebarExpandedWidth.scaled() else SidebarCollapsedWidth.scaled(),
+        targetValue = if (visuallyExpanded) SidebarExpandedWidth.scaled() else SidebarCollapsedWidth.scaled(),
         animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "sidebarWidth",
     )
     val shadowAlpha by animateFloatAsState(
-        targetValue = if (expanded) 0.5f else 0f,
+        targetValue = if (visuallyExpanded) 0.5f else 0f,
         animationSpec = tween(180, easing = FastOutSlowInEasing),
         label = "sidebarShadowAlpha",
     )
@@ -150,8 +167,6 @@ fun SidebarNav(
     // own persistent Box, same as the pill it replaces), claiming
     // initial focus onto whichever entry is already selected.
     LaunchedEffect(Unit) { restoreFocusRequester.requestFocus() }
-    val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
 
     Column(
         modifier = modifier
@@ -175,7 +190,10 @@ fun SidebarNav(
             // node or any real descendant), so a plain onFocusChanged
             // here is the whole real mechanism, nothing to hand-roll
             // per item.
-            .onFocusChanged { state -> expanded = state.hasFocus },
+            .onFocusChanged { state ->
+                expanded = state.hasFocus
+                onFocusChange(state.hasFocus)
+            },
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { route ->
@@ -186,51 +204,23 @@ fun SidebarNav(
                 label = if (isSelfProfile && !profileName.isNullOrBlank()) profileName else route.label(),
                 avatarUrl = if (isSelfProfile) profileAvatarUrl else null,
                 isSelected = route == selected,
-                expanded = expanded,
+                expanded = visuallyExpanded,
                 enabled = enabled,
-                onClick = {
-                    onSelect(route)
-                    // Real feedback live: this rail's own expansion is
-                    // driven entirely by onFocusChanged above, and a
-                    // click never actually changes focus (the item
-                    // clicked already had it, real D-pad Select), so
-                    // expanded never got a real onFocusChanged event to
-                    // flip back false on. A real bug this exact fix used
-                    // to cause, also found live: focusManager.clearFocus
-                    // (force = true) drops focus system-wide with
-                    // nothing at all queued to receive it, and the very
-                    // next D-pad press's own real default focus search
-                    // (Compose has no other reference point once focus
-                    // is fully null) landed back on this rail's own
-                    // topmost item, reading as "every selection jumps
-                    // back to Home" even though the route underneath had
-                    // already switched correctly. moveFocus(Right) is
-                    // the real fix: same rail collapse (this item loses
-                    // focus either way), but focus actually lands in
-                    // whatever real content now sits to this rail's own
-                    // right, the same spatial search this rail's
-                    // Down-out-of-content callers already lean on.
-                    //
-                    // Real bug found live, on a real screen recording:
-                    // calling that same real moveFocus(Right) inline
-                    // here, in this same real onClick, still searched
-                    // whatever real screen was on screen BEFORE
-                    // onSelect(route) above - a plain var assignment,
-                    // not applied until this real composable's own next
-                    // real recomposition - so it ran against a real
-                    // screen already on its way out, found nothing real
-                    // there worth landing on once that screen actually
-                    // got replaced, and fell back to exactly the same
-                    // real "topmost item" default this same fix already
-                    // solved for once before. Deferred a real frame via
-                    // this rail's own scope instead, so the real new
-                    // screen has actually mounted its own real content
-                    // by the time this real search runs against it.
-                    scope.launch {
-                        withFrameNanos {}
-                        focusManager.moveFocus(FocusDirection.Right)
-                    }
-                },
+                // Real feedback live: this rail's own expansion is
+                // driven entirely by onFocusChanged above, and a click
+                // never actually changes focus (the item clicked
+                // already had it, real D-pad Select), so a real Down/
+                // moveFocus redirect used to live here, deferred a real
+                // frame so the new screen had time to mount. Now just
+                // onSelect(route): MainActivity's own central
+                // LaunchedEffect(route) (its header on forceCollapsed
+                // above explains why) owns that redirect for every real
+                // navigation now, sidebar-initiated ones included, not
+                // only this one - a second real moveFocus(Right) firing
+                // here too, after that central one already landed focus
+                // somewhere real, risked shoving it somewhere neither
+                // one intended.
+                onClick = { onSelect(route) },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
             )
         }

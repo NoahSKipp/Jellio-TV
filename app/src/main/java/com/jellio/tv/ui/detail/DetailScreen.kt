@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,14 +48,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +78,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.PersonDto
 import com.jellio.tv.data.model.TrailerDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -151,24 +162,70 @@ fun DetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
-    // Real bug found live testing on device: this screen is immersive
-    // (MainActivity's own !route.isImmersive() gate never mounts
-    // SidebarNav here), so there is no existing focus anywhere on the
-    // rail for a D-pad press to search Down from the way every other
-    // screen's own focusRestorer() fix relies on. Nothing had ever
-    // requested focus into this screen at all, so a reader pushing
-    // into a title from a card had no possible interaction once here,
-    // same real root cause class the rail screens already hit.
-    // requestFocus() explicitly on first composition, same real
-    // pattern SidebarNav's own initialFocusRequester already uses for
-    // the same real "own this screen's own initial focus" reasoning.
-    val contentFocusRequester = remember { FocusRequester() }
+    // Real bug found live testing on device: this screen is pushed as
+    // new content to the right of SidebarNav (JellioRoute.isImmersive()
+    // only ever excludes that rail for Player, not Detail), not
+    // switched to the way a rail tap itself is, so nothing had ever
+    // requested real focus into it - a reader pushing into a title from
+    // a card had no possible interaction once here. MainActivity's own
+    // central redirect now covers the generic case (any route push,
+    // this one included) as a real fallback, but an explicit target
+    // here is still worth keeping: precise (the real Play button, not
+    // whatever a generic rightward spatial search happens to land on
+    // first) and immediate, not waiting on that central mechanism's own
+    // reactive retry loop to eventually find its own way in.
+    // Real feedback live: cold focusRestorer() entry (the LazyColumn's
+    // own default "first focusable descendant" pick, back when this
+    // screen only ever requested focus onto the list itself) landed on
+    // the series-name link above the hero's own Play button for an
+    // Episode - the one earlier, purely incidental clickable Surface in
+    // reading order, not a deliberate first stop. Targeted explicitly
+    // now instead of left to that implicit default, same real lesson
+    // ui/detail/StreamPickerOverlay.kt's own header on Nuvio's pre-warm
+    // fix already covers: an explicit target beats trusting whichever
+    // child a cold focus group happens to pick first.
+    val playButtonFocusRequester = remember { FocusRequester() }
+    // Hoisted so the hero-pin effect below can scrollToItem(0) on the
+    // same real list this screen's own focusRestorer() still reads.
+    val listState = rememberLazyListState()
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
     // Fires once the item actually loads and the LazyColumn below is
     // really composed, not in the load effect above: requesting focus
-    // before that node exists would silently do nothing.
+    // before that node exists would silently do nothing. Retried across
+    // real frames (matching StreamPickerOverlay.kt's own real fix,
+    // ported from Nuvio) rather than trusting a single call: this
+    // screen only ever requests real focus once, nothing else competes
+    // for it first the way Resume/chips did there, but the retry is
+    // cheap insurance against that same class of timing gap regardless.
     LaunchedEffect(uiState.item) {
-        if (uiState.item != null) contentFocusRequester.requestFocus()
+        if (uiState.item != null) {
+            listState.scrollToItem(0)
+            for (attempt in 0 until 30) {
+                withFrameNanos {}
+                runCatching { playButtonFocusRequester.requestFocus() }
+            }
+        }
+    }
+    // Real ui/home/HomeScreen.kt's own header on this exact mechanism
+    // (an 8-round real fix there): Compose's own default per-child
+    // bring-into-view request scrolls this list just far enough to
+    // reveal whatever's newly focused inside the hero (the Play button,
+    // sitting well down its own real bottom-aligned Column), cropping
+    // the hero's own real backdrop/title above it rather than keeping
+    // the full banner in view the way real feedback wants for every
+    // real focus target inside it, Play included, not just the hero's
+    // own real top edge. Ported wholesale rather than re-derived: same
+    // real NestedScrollConnection blocking scroll from ever reaching
+    // this list while the hero holds focus, same real
+    // NoOpBringIntoViewSpec suppressing Compose's own default request
+    // outright, same real reactive snapshotFlow correction as a
+    // fallback for whatever either of those still misses.
+    var heroHasFocus by remember { mutableStateOf(false) }
+    val blockScrollWhileHeroFocused = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                if (heroHasFocus) available else Offset.Zero
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
@@ -191,15 +248,34 @@ fun DetailScreen(
             }
             uiState.item != null -> {
                 val item = uiState.item!!
-                LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().nestedScroll(blockScrollWhileHeroFocused).focusRestorer(),
+                ) {
                     item {
-                        DetailHero(
-                            session = session,
-                            item = item,
-                            state = uiState,
-                            imageUrl = imageUrl,
-                            onSeriesClick = onNavigateToDetail,
-                            onPlay = {
+                        // heroHasFocus (declared above, shared with the
+                        // nestedScroll connection) is the one real place
+                        // that sets it; the reactive correction below
+                        // reads it back to know how long to keep
+                        // watching this list's own scroll position.
+                        LaunchedEffect(heroHasFocus) {
+                            if (heroHasFocus) {
+                                snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                                    .collect { (index, offset) ->
+                                        if (index != 0 || offset != 0) listState.scrollToItem(0)
+                                    }
+                            }
+                        }
+                        Box(modifier = Modifier.onFocusChanged { heroHasFocus = it.hasFocus }) {
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
+                                DetailHero(
+                                    session = session,
+                                    item = item,
+                                    state = uiState,
+                                    imageUrl = imageUrl,
+                                    onSeriesClick = onNavigateToDetail,
+                                    playButtonFocusRequester = playButtonFocusRequester,
+                                    onPlay = {
                                 // screens/detail.js's own real playButton.disabled
                                 // = true while its own targetPromise is still
                                 // resolving, re-enabled once it settles either
@@ -238,7 +314,9 @@ fun DetailScreen(
                             onToggleWatched = { viewModel.toggleWatched(session) },
                             onLike = { viewModel.setLike(session, true) },
                             onDislike = { viewModel.setLike(session, false) },
-                        )
+                                )
+                            }
+                        }
                     }
                     if (item.Type == "Series") {
                         item {
@@ -348,6 +426,7 @@ private fun DetailHero(
     state: DetailUiState,
     imageUrl: (String, String?, String, Int) -> String,
     onSeriesClick: (String) -> Unit,
+    playButtonFocusRequester: FocusRequester,
     onPlay: () -> Unit,
     onChangeStream: (() -> Unit)?,
     onToggleWatchlist: () -> Unit,
@@ -441,6 +520,7 @@ private fun DetailHero(
                     enabled = !state.resolvingPlay,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
+                    modifier = Modifier.focusRequester(playButtonFocusRequester),
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
