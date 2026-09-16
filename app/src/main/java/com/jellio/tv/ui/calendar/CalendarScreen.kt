@@ -68,7 +68,6 @@ private fun dateHeading(date: Date): String {
     return when {
         diffDays == 0 -> "Today"
         diffDays == 1 -> "Tomorrow"
-        diffDays in 2..6 -> SimpleDateFormat("EEEE", Locale.getDefault()).format(date)
         else -> SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date)
     }
 }
