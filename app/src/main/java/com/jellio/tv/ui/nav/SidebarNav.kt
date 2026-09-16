@@ -137,11 +137,9 @@ fun SidebarNav(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val visuallyExpanded = expanded && !forceCollapsed
-    var isLibraryDrawerOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(visuallyExpanded) {
         if (!visuallyExpanded) {
-            isLibraryDrawerOpen = false
         }
     }
 
@@ -225,7 +223,7 @@ fun SidebarNav(
                 // one intended.
                 onClick = {
                     if (isLibrary && libraries?.isNotEmpty() == true) {
-                        isLibraryDrawerOpen = !isLibraryDrawerOpen
+                        onSelect(route)
                     } else {
                         onSelect(route)
                     }
@@ -233,28 +231,6 @@ fun SidebarNav(
                 focusRequester = if (route == selected) restoreFocusRequester else null,
             )
 
-            if (isLibrary && isLibraryDrawerOpen && libraries != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 12.dp, top = 2.dp, bottom = 4.dp)
-                        .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
-                        .padding(vertical = 4.dp, horizontal = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    libraries.forEach { lib ->
-                        SidebarItem(
-                            icon = com.jellio.tv.ui.nav.LibraryIconVector,
-                            iconScale = 0.85f,
-                            label = lib.Name ?: "Library",
-                            isSelected = false,
-                            expanded = visuallyExpanded,
-                            enabled = enabled,
-                            onClick = { onLibrarySelect?.invoke(lib) }
-                        )
-                    }
-                }
-            }
         }
     }
 }
