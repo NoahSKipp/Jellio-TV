@@ -97,8 +97,9 @@ fun LibraryPickerOverlay(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = getLibraryIcon(library.CollectionType),
+                            imageVector = getLibraryIcon(library.Name, library.CollectionType),
                             contentDescription = null,
+
                             tint = JellioText,
                             modifier = Modifier.size(24.dp)
                         )
