@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import android.graphics.BlurMaskFilter
 import kotlinx.coroutines.launch
 
 // Real, full port of jellio-mark-animated.svg, not an approximation of
@@ -246,6 +249,10 @@ fun JellioMarkOcean(modifier: Modifier = Modifier) {
 }
 
 private fun DrawScope.drawCaustics(clockMs: Float, scale: Float) {
+    val paint = Paint().apply {
+        blendMode = BlendMode.SrcAtop
+        asFrameworkPaint().maskFilter = BlurMaskFilter(26f * scale, BlurMaskFilter.Blur.NORMAL)
+    }
     JellioMarkCaustics.forEach { c ->
         val t = ((clockMs + c.delayMs) % CausticDurationMs) / CausticDurationMs
         val opacity = lerpStops(CausticOpacity, t)
@@ -254,11 +261,16 @@ private fun DrawScope.drawCaustics(clockMs: Float, scale: Float) {
         val ty = CausticTranslateY * scale * t
         translate(left = tx, top = ty) {
             rotate(degrees = c.rotationDeg, pivot = Offset(c.cx * scale, c.cy * scale)) {
-                drawOval(blendMode = BlendMode.SrcAtop, 
-                    color = Color.White.copy(alpha = opacity),
-                    topLeft = Offset((c.cx - c.rx) * scale, (c.cy - c.ry) * scale),
-                    size = Size(c.rx * 2 * scale, c.ry * 2 * scale),
-                )
+                drawIntoCanvas { canvas ->
+                    paint.color = Color.White.copy(alpha = opacity)
+                    canvas.drawOval(
+                        left = (c.cx - c.rx) * scale,
+                        top = (c.cy - c.ry) * scale,
+                        right = (c.cx + c.rx) * scale,
+                        bottom = (c.cy + c.ry) * scale,
+                        paint = paint
+                    )
+                }
             }
         }
     }
@@ -326,6 +338,7 @@ private fun DrawScope.drawJellyfish(clockMs: Float, scale: Float, path: Path) {
         translate(left = swimX * scale, top = swimY * scale)
         rotate(degrees = swimRotation, pivot = Offset(175f * scale, 200f * scale))
     }) {
+        path.fillType = androidx.compose.ui.graphics.PathFillType.EvenOdd
         drawPath(path, color = Color.White)
     }
 }
