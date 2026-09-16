@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -52,25 +54,12 @@ fun LibraryPickerOverlay(
     val firstEntryFocusRequester = remember { FocusRequester() }
     LaunchedEffect(libraries) { firstEntryFocusRequester.requestFocus() }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .focusProperties { exit = { FocusRequester.Cancel } },
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
-        )
         Column(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 130.dp)
                 .width(360.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(JellioBgElevated)
