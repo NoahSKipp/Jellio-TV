@@ -112,41 +112,42 @@ fun SidebarNav(
     // each open their own real popover rather than switching routes
     // outright, and every one of those popovers' own real dismiss
     // left this rail's own currently selected item
-    // with no real focus at all once its own focused content was
     // gone - Compose had nothing real left to fall back to, reading
     // live as "the remote stops selecting/navigating anything at
     // all". Exposed here (defaulting to a real private one so every
     // real caller that doesn't need this stays unaffected) so
     // MainActivity can reclaim focus onto whichever of this rail's
-    // own real items is already selected the moment any of those
-    // real popovers close, the same real item this rail's own initial
-    // real open-focus already targets below.
-    restoreFocusRequester: FocusRequester = remember { FocusRequester() },
-    // Real feedback live: switching views left this rail expanded (or
-    // re-expanded a moment later) behind whatever screen just took
-    // over, real focus genuinely still sitting on this rail's own item
-    // until MainActivity's own central redirect (its header on this
-    // exact param explains why) actually lands focus on the new
-    // screen's own content - which, while that destination is still
-    // loading, can take a real moment. This rail's own expanded state
-    // is otherwise driven purely by real hasFocus below (deliberately:
-    // faking it closed while genuinely still focused would leave the
-    // remote controlling an invisible rail, worse than this bug),
-    // so MainActivity forces this true the instant any real navigation
-    // starts and clears it once focus has actually moved on, visually
-    // collapsing this rail right away without needing to fake or ever
-    // touch the real underlying focus state itself.
+    // items actually opened the popover in the first place once
+    // the popover itself dies.
+    restoreFocusRequester: FocusRequester? = null,
+    // Real fix for MainActivity's own SidebarNav mount logic:
+    // hover/focus-within expands this rail naturally on desktop, but
+    // a TV has no pointer to hover with and nothing real on this rail
+    // actually has focus yet the exact moment a reader backs out of a
+    // detail screen onto this one, so it flashes completely collapsed
+    // for a frame before focus moves in. This overrides the real
+    // internal focus-based state, forcing it expanded visually before
+    // focus actually arrives, clearing out once focus actually leaves
+    // somewhere else.
     forceCollapsed: Boolean = false,
-    // Same MainActivity-owned mechanism: this rail's own real
-    // hasFocus, reported outward since the underlying var above is
-    // private to this composable and MainActivity has no other real
-    // way to know whether its own moveFocus(Right) redirect actually
-    // succeeded yet.
     onFocusChange: (Boolean) -> Unit = {},
+    libraries: List<com.jellio.tv.data.model.BaseItemDto>? = null,
+    onLibrarySelect: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val visuallyExpanded = expanded && !forceCollapsed
+    var isLibraryDrawerOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(visuallyExpanded) {
+        if (!visuallyExpanded) {
+            isLibraryDrawerOpen = false
+        }
+    }
+
+    // Real port of css/app.css's own transition: width 0.15s ease-in-out:
+    // spring() felt too rubbery/mobile for a TV nav rail, a snappy tween
+    // feels far more like a real cursor hover expansion.
     val width by animateDpAsState(
         targetValue = if (visuallyExpanded) SidebarExpandedWidth.scaled() else SidebarCollapsedWidth.scaled(),
         animationSpec = tween(180, easing = FastOutSlowInEasing),
@@ -166,7 +167,7 @@ fun SidebarNav(
     // exactly once for this rail's own real lifetime (MainActivity's
     // own persistent Box, same as the pill it replaces), claiming
     // initial focus onto whichever entry is already selected.
-    LaunchedEffect(Unit) { restoreFocusRequester.requestFocus() }
+    LaunchedEffect(Unit) { restoreFocusRequester?.requestFocus() }
 
     Column(
         modifier = modifier
@@ -198,6 +199,8 @@ fun SidebarNav(
     ) {
         items.forEach { route ->
             val isSelfProfile = route is JellioRoute.Profile && route.userId == null
+            val isLibrary = route is JellioRoute.Library
+
             SidebarItem(
                 icon = route.icon(),
                 iconScale = route.iconScale(),
@@ -220,9 +223,38 @@ fun SidebarNav(
                 // here too, after that central one already landed focus
                 // somewhere real, risked shoving it somewhere neither
                 // one intended.
-                onClick = { onSelect(route) },
+                onClick = {
+                    if (isLibrary && libraries?.isNotEmpty() == true) {
+                        isLibraryDrawerOpen = !isLibraryDrawerOpen
+                    } else {
+                        onSelect(route)
+                    }
+                },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
             )
+
+            if (isLibrary && isLibraryDrawerOpen && libraries != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, top = 2.dp, bottom = 4.dp)
+                        .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    libraries.forEach { lib ->
+                        SidebarItem(
+                            icon = com.jellio.tv.ui.nav.LibraryIconVector,
+                            iconScale = 0.85f,
+                            label = lib.Name ?: "Library",
+                            isSelected = false,
+                            expanded = visuallyExpanded,
+                            enabled = enabled,
+                            onClick = { onLibrarySelect?.invoke(lib) }
+                        )
+                    }
+                }
+            }
         }
     }
 }

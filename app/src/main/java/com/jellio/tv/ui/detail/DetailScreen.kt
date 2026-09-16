@@ -146,6 +146,7 @@ private fun formatPremiereDate(raw: String?): String? {
 }
 
 @Composable
+@androidx.compose.foundation.ExperimentalFoundationApi
 fun DetailScreen(
     session: Session,
     itemId: String,

@@ -7,9 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -25,26 +28,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioBorder
+import com.jellio.tv.ui.theme.JellioText
+import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.nav.LibraryIconVector
 
-// Mirrors components/libraryPicker.js's own real popover, opened from
-// the top pill's own single Library button rather than one button per
-// real library. A full screen dismiss scrim plus BackHandler stand in
-// for that file's own outside click/Escape dismissal, the real D-pad
-// equivalent.
-//
-// Real bug found live testing on device: nothing here ever requested
-// initial D-pad focus when this overlay opened, so focus stayed
-// wherever it already was on the screen underneath, still focusable
-// behind this real scrim, every D-pad press moving that underlying
-// screen around instead of this overlay's own three entries. Same
-// real fix every other real overlay in this app already uses: request
-// focus onto the first entry on open, and trap exit so focus can't
-// wander back out into the screen behind the scrim.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryPickerOverlay(
@@ -75,31 +69,57 @@ fun LibraryPickerOverlay(
         )
         Column(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 120.dp)
-                .width(320.dp)
+                .align(Alignment.CenterStart)
+                .padding(start = 130.dp)
+                .width(360.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(JellioBgElevated)
                 .border(1.dp, JellioBorder, RoundedCornerShape(16.dp))
-                .padding(8.dp),
+                .padding(16.dp),
         ) {
+            Text(
+                text = "Select Library",
+                style = MaterialTheme.typography.titleMedium,
+                color = JellioText,
+                modifier = Modifier.padding(start = 12.dp, bottom = 12.dp, top = 4.dp),
+            )
+            
             if (libraries.isEmpty()) {
-                Text(text = "No libraries yet.", modifier = Modifier.padding(16.dp))
+                Text(text = "No libraries yet.", modifier = Modifier.padding(12.dp), color = JellioTextSecondary)
             }
+            
             libraries.forEachIndexed { index, library ->
                 Surface(
                     onClick = { onSelect(library) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                    modifier = Modifier.fillMaxWidth().let {
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent, 
+                        contentColor = JellioText, 
+                        focusedContainerColor = Color.White.copy(alpha = 0.18f), 
+                        focusedContentColor = JellioText
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).let {
                         if (index == 0) it.focusRequester(firstEntryFocusRequester) else it
                     },
                 ) {
-                    Text(
-                        text = library.Name ?: "Library",
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = LibraryIconVector,
+                            contentDescription = null,
+                            tint = JellioText,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = library.Name ?: "Library",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = JellioText,
+                        )
+                    }
                 }
             }
         }
