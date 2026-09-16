@@ -110,6 +110,7 @@ fun PosterCard(
             onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             modifier = Modifier.width(posterWidth)
                 .onFocusChanged { state -> isFocused = state.isFocused },
         ) {

@@ -59,18 +59,18 @@ fun PosterRow(
             // real button at the row's own start, same shape and
             // height a real card here has, replaces it instead of
             // dropping "view all" entirely.
-            if (onTitleClick != null) {
-                item {
-                    RowExpandButton(onClick = onTitleClick, height = PosterWidth.scaled() * 1.5f)
-                }
-            }
-            items(section.items, key = { it.Id }) { item ->
+            items(section.items.take(10), key = { it.Id }) { item ->
                 PosterCard(
                     item = item,
                     imageUrl = imageUrl,
                     onClick = { onItemClick(item) },
                     onOptionsClick = onItemOptions?.let { { it(item) } },
                 )
+            }
+            if (onTitleClick != null && section.items.size > 10) {
+                item {
+                    RowExpandButton(onClick = onTitleClick, height = PosterWidth.scaled() * 1.5f)
+                }
             }
         }
     }
@@ -116,17 +116,28 @@ fun RowExpandButton(onClick: () -> Unit, height: Dp, modifier: Modifier = Modifi
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         modifier = modifier.width(width).height(height),
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ViewList,
                 contentDescription = "View all",
                 tint = JellioText,
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(32.dp),
+            )
+            Text(
+                text = "View All",
+                style = MaterialTheme.typography.labelLarge,
+                color = JellioText,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
     }
 }
 
-private val RowExpandButtonWidth = 64.dp
+private val RowExpandButtonWidth = 120.dp
