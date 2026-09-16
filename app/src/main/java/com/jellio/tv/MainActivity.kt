@@ -440,9 +440,9 @@ private fun JellioTvApp(
             LaunchedEffect(route) {
                 sidebarForceCollapsed = true
                 snapshotFlow { sidebarHasRealFocus }.collect { hasFocus ->
-                    if (hasFocus) {
+                    if (hasFocus && sidebarForceCollapsed) {
                         focusManager.moveFocus(FocusDirection.Right)
-                    } else {
+                    } else if (!hasFocus) {
                         sidebarForceCollapsed = false
                     }
                 }
@@ -457,7 +457,7 @@ private fun JellioTvApp(
                     // navigating straight there, since no one real
                     // library speaks for the button itself.
                     if (clicked is JellioRoute.Library) {
-                        showLibraryPicker = true
+                        // The drawer handles expansion now, no overlay needed!
                     } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
                         // Real components/accountSwitcher.js's own real
                         // Profile button: opens the quick switcher
@@ -475,25 +475,12 @@ private fun JellioTvApp(
                 restoreFocusRequester = sidebarFocusRequester,
                 forceCollapsed = sidebarForceCollapsed,
                 onFocusChange = { sidebarHasRealFocus = it },
+                libraries = libraries,
+                onLibrarySelect = { library ->
+                    selectedLibrary = library
+                    switchTab(JellioRoute.Library)
+                },
             )
-            if (showLibraryPicker) {
-                LibraryPickerOverlay(
-                    // Already the real curated nav set (Movies/Shows/Anime,
-                    // JellioRepository.getLibraryNavEntries()'s own real
-                    // job), not filtered again here.
-                    libraries = libraries,
-                    onSelect = { library ->
-                        selectedLibrary = library
-                        switchTab(JellioRoute.Library)
-                        showLibraryPicker = false
-                    },
-                    onDismiss = {
-                        sidebarFocusRequester.requestFocus()
-                        showLibraryPicker = false
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
             if (showAccountSwitcher) {
                 AccountSwitcherOverlay(
                     session = session,
