@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,6 +34,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -222,6 +224,7 @@ fun StreamPickerOverlay(
     // once state actually leaves Loading rather than once on open,
     // since neither of those real targets exists yet during it.
     val initialFocusRequester = remember { FocusRequester() }
+    val resumeFocusRequester = remember { FocusRequester() }
     // Still attached to the first card below (and still the initial-
     // focus target when there's neither a Resume button nor more than
     // one language) even though nothing calls requestFocus() on it for
@@ -345,51 +348,20 @@ fun StreamPickerOverlay(
                     val languages = languageCounts.keys.sortedWith(
                         compareByDescending<String> { languageCounts[it] ?: 0 }.thenBy { languageName(it) },
                     )
+                    val chipFocusRequesters = remember(languages) {
+                        val map = mutableMapOf<String?, FocusRequester>()
+                        map[null] = FocusRequester()
+                        languages.forEach { map[it] = FocusRequester() }
+                        map
+                    }
                     val filteredSources = selectedLanguage?.let { code ->
                         currentState.sources.filter { sourceAudioLanguages(it).contains(code) }
                     } ?: currentState.sources
 
-                    Column {
-                        if (resumeTicks > 0) {
-                            Surface(
-                                onClick = {
-                                    val target = currentState.sources.find { it.Id == remembered } ?: currentState.sources.firstOrNull()
-                                    target?.let { onSelect(it) }
-                                },
-                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
-                                modifier = Modifier
-                                    .padding(top = 24.dp)
-                                    .focusRequester(initialFocusRequester)
-                                    .onFocusChanged { android.util.Log.d("StreamPickerDpad", "resume focus=${it.isFocused}") },
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
-                                    Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
-                                }
-                            }
-                        }
-                        if (languages.size > 1) {
-                            LanguageFilterChips(
-                                languages = languages,
-                                selected = selectedLanguage,
-                                onSelect = { selectedLanguage = it },
-                                firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
-                            )
-                        }
-                    }
                     android.util.Log.d(
                         "StreamPickerDpad",
                         "loaded sources=${currentState.sources.size} filtered=${filteredSources.size} " +
                             "resumeTicks=$resumeTicks languages=${languages.size}",
-                    )
-                    Text(
-                        text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
-                        color = JellioTextSecondary,
-                        modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                     )
                     // Real root cause, confirmed live over several
                     // rounds of Logcat tracing spanning two separate
@@ -427,6 +399,49 @@ fun StreamPickerOverlay(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f).focusRestorer(),
                     ) {
+                        item(key = "header_resume") {
+                            if (resumeTicks > 0) {
+                                Surface(
+                                    onClick = {
+                                        val target = currentState.sources.find { it.Id == remembered } ?: currentState.sources.firstOrNull()
+                                        target?.let { onSelect(it) }
+                                    },
+                                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
+                                    modifier = Modifier
+                                        .padding(top = 24.dp)
+                                        .focusRequester(initialFocusRequester)
+                                        .focusRequester(resumeFocusRequester)
+                                        .onFocusChanged { android.util.Log.d("StreamPickerDpad", "resume focus=${it.isFocused}") },
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
+                                        Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
+                                    }
+                                }
+                            }
+                        }
+                        item(key = "header_chips") {
+                            if (languages.size > 1) {
+                                LanguageFilterChips(
+                                    languages = languages,
+                                    selected = selectedLanguage,
+                                    onSelect = { selectedLanguage = it },
+                                    firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                                    chipFocusRequesters = chipFocusRequesters,
+                                )
+                            }
+                        }
+                        item(key = "header_text") {
+                            Text(
+                                text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
+                                color = JellioTextSecondary,
+                                modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
+                            )
+                        }
                         itemsIndexed(filteredSources, key = { index, source -> source.Id ?: index }) { index, source ->
                             SourceCard(
                                 source = source,
@@ -439,35 +454,13 @@ fun StreamPickerOverlay(
                                             firstCardHasFocus = it.hasFocus
                                             android.util.Log.d("StreamPickerDpad", "first card focus=${it.hasFocus}")
                                         }
-                                        // Real port of Nuvio's own
-                                        // StreamItem onUpKey (Stream
-                                        // Components.kt): a real
-                                        // Modifier.onKeyEvent{} attached
-                                        // directly to the focused node
-                                        // itself, not a separate
-                                        // Activity-level dispatchKeyEvent
-                                        // bridge - real feedback found
-                                        // that bridge left the reader
-                                        // stuck once Down actually
-                                        // started reaching the list (its
-                                        // own real pre-warm fix above),
-                                        // Up out of the list back to
-                                        // Resume/the first chip never
-                                        // firing regardless. Compose asks
-                                        // the currently focused node
-                                        // directly for its own real
-                                        // onKeyEvent before any default
-                                        // arrow-key search even runs, no
-                                        // separate cross-cutting object
-                                        // for it to fail to fire through.
-                                        .onKeyEvent { event ->
-                                            if (event.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN &&
-                                                event.key == Key.DirectionUp
-                                            ) {
-                                                initialFocusRequester.requestFocus()
-                                                true
+                                        .focusProperties {
+                                            up = if (languages.size > 1) {
+                                                chipFocusRequesters[selectedLanguage] ?: FocusRequester.Default
+                                            } else if (resumeTicks > 0) {
+                                                resumeFocusRequester
                                             } else {
-                                                false
+                                                FocusRequester.Default
                                             }
                                         }
                                 } else {
@@ -482,22 +475,29 @@ fun StreamPickerOverlay(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun LanguageFilterChips(
     languages: List<String>,
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
+    chipFocusRequesters: Map<String?, FocusRequester>,
 ) {
     val chips = buildList {
         add(null to "All")
         languages.forEach { code -> add(code to languageName(code)) }
     }
-    LazyRow(
+    Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(top = 20.dp),
+        modifier = Modifier
+            .padding(top = 20.dp)
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+            .focusProperties { 
+                up = FocusRequester.Cancel
+            },
     ) {
-        itemsIndexed(chips, key = { _, pair -> pair.first ?: "all" }) { index, pair ->
+        chips.forEachIndexed { index, pair ->
             val (code, label) = pair
             val isSelected = code == selected
             Surface(
@@ -509,11 +509,9 @@ private fun LanguageFilterChips(
                     focusedContainerColor = Color.White.copy(alpha = 0.18f),
                     focusedContentColor = JellioText,
                 ),
-                // Chip carried no scale override of its own, so TV
-                // Material3's default focus-grow expanded it past this
-                // row's own bounds on focus - same fix as SourceCard's.
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 modifier = Modifier
+                    .focusRequester(chipFocusRequesters[code]!!)
                     .let { if (index == 0 && firstChipFocusRequester != null) it.focusRequester(firstChipFocusRequester) else it }
                     .onFocusChanged {
                         if (index == 0) android.util.Log.d("StreamPickerDpad", "chip[0] focus=${it.isFocused}")
