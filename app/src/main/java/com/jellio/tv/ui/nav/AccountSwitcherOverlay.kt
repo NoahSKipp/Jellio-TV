@@ -182,6 +182,7 @@ fun AccountSwitcherOverlay(
                     columns = GridCells.Adaptive(minSize = 140.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     modifier = Modifier.weight(1f),
                 ) {
                     items(uiState.remembered, key = { "r:" + it.userId }) { profile ->
@@ -231,6 +232,12 @@ private fun SwitcherTile(
                 contentColor = JellioText,
                 focusedContainerColor = Color.White.copy(alpha = 0.18f),
                 focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = androidx.tv.material3.Border(
+                    border = androidx.compose.foundation.BorderStroke(3.dp, Color.White),
+                    shape = CircleShape
+                )
             ),
             modifier = Modifier.size(112.dp),
         ) {
