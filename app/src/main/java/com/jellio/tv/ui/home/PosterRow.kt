@@ -93,7 +93,7 @@ fun RowTitle(text: String, modifier: Modifier = Modifier) {
         )
         Box(
             modifier = Modifier
-                .padding(start = 48.dp, top = 8.dp, bottom = 12.dp)
+                .padding(start = 48.dp, top = 8.dp, bottom = 20.dp)
                 .width(38.dp)
                 .height(3.dp)
                 .background(JellioSecondary, RoundedCornerShape(999.dp)),

@@ -129,12 +129,12 @@ private fun ComingSoonCard(
                 Box(
                     modifier = Modifier
                         .padding(8.dp)
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.TopStart)
                         .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp)),
                 ) {
                     Text(
                         text = comingSoonDateLabel(entry),
-                        color = JellioText,
+                        color = com.jellio.tv.ui.theme.JellioRarityLegendary,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )

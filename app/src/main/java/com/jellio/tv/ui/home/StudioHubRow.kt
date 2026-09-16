@@ -1,6 +1,8 @@
 package com.jellio.tv.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
@@ -66,6 +68,7 @@ private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
     // real default focus scale (already on, never overridden the way
     // TopNavPill's own header explains that pill turning off), the
     // background swap on focus was the one real piece missing.
+    var hasError = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
@@ -76,32 +79,32 @@ private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         modifier = Modifier.width(tileWidth).height(tileHeight),
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Box(
+            modifier = Modifier.padding(12.dp).fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = logoUrl,
-                contentDescription = name,
-                contentScale = ContentScale.Fit,
-                // Real css/app.css's own .jellio-hub-tile-logo rule:
-                // filter: brightness(0) invert(1). Simple Icons ships
-                // these with whatever fill colour (or several, Peacock/
-                // Disney's own real files) the mark happens to carry,
-                // forced to a flat white silhouette there rather than
-                // trusted as-is - same real flatten here, SrcIn keeps
-                // the source alpha and replaces every opaque pixel with
-                // white regardless of its own real original colour.
-                colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
-                modifier = Modifier.size(width = tileWidth - 24.dp, height = tileHeight - 48.dp),
-            )
-            Text(
-                text = name,
-                color = JellioText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            if (hasError.value) {
+                Text(
+                    text = name,
+                    color = JellioText,
+                    style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                AsyncImage(
+                    model = logoUrl,
+                    contentDescription = name,
+                    contentScale = ContentScale.Fit,
+                    onState = { state -> 
+                        if (state is coil3.compose.AsyncImagePainter.State.Error) {
+                            hasError.value = true
+                        }
+                    },
+                    colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
+                    modifier = Modifier.size(width = tileWidth - 24.dp, height = tileHeight - 48.dp),
+                )
+            }
         }
     }
 }
