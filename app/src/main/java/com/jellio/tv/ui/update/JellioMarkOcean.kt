@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
 import kotlinx.coroutines.launch
 
 // Real, full port of jellio-mark-animated.svg, not an approximation of
@@ -200,6 +202,7 @@ fun JellioMarkOcean(modifier: Modifier = Modifier) {
                 scaleX = popScale.value
                 scaleY = popScale.value
                 alpha = popAlpha.value
+                compositingStrategy = CompositingStrategy.Offscreen
             },
     ) {
         val scale = size.width / ViewBoxSize
@@ -228,17 +231,15 @@ fun JellioMarkOcean(modifier: Modifier = Modifier) {
             style = Stroke(width = TriangleStrokeWidth * scale, join = StrokeJoin.Round, cap = StrokeCap.Round),
         )
 
-        clipPath(trianglePath) {
-            val radialBrush = Brush.radialGradient(
-                colorStops = *JellioMarkRadialGradientStops.map { it.offset to Color(it.color).copy(alpha = it.alpha) }.toTypedArray(),
-                center = Offset(112f * scale, 104f * scale),
-                radius = 104f * scale,
-            )
-            drawRect(brush = radialBrush)
+        val radialBrush = Brush.radialGradient(
+            colorStops = *JellioMarkRadialGradientStops.map { it.offset to Color(it.color).copy(alpha = it.alpha) }.toTypedArray(),
+            center = Offset(112f * scale, 104f * scale),
+            radius = 104f * scale,
+        )
+        drawRect(brush = radialBrush, blendMode = BlendMode.SrcAtop)
 
-            drawCaustics(clockMs, scale)
-            drawWakeDots(clockMs, scale)
-        }
+        drawCaustics(clockMs, scale)
+        drawWakeDots(clockMs, scale)
 
         drawJellyfish(clockMs, scale, path)
     }
@@ -253,7 +254,7 @@ private fun DrawScope.drawCaustics(clockMs: Float, scale: Float) {
         val ty = CausticTranslateY * scale * t
         translate(left = tx, top = ty) {
             rotate(degrees = c.rotationDeg, pivot = Offset(c.cx * scale, c.cy * scale)) {
-                drawOval(
+                drawOval(blendMode = BlendMode.SrcAtop, 
                     color = Color.White.copy(alpha = opacity),
                     topLeft = Offset((c.cx - c.rx) * scale, (c.cy - c.ry) * scale),
                     size = Size(c.rx * 2 * scale, c.ry * 2 * scale),
@@ -271,7 +272,7 @@ private fun DrawScope.drawWakeDots(clockMs: Float, scale: Float) {
         val dotScale = lerpStops(wakeScale(dot.kind), t)
         val tx = lerpStops(wakeTranslateX(dot.kind), t)
         val ty = lerpStops(wakeTranslateY(dot.kind), t)
-        drawCircle(
+        drawCircle(blendMode = BlendMode.SrcAtop, 
             color = Color.White.copy(alpha = opacity),
             radius = dot.r * scale * dotScale,
             center = Offset((dot.cx + tx) * scale, (dot.cy + ty) * scale),
