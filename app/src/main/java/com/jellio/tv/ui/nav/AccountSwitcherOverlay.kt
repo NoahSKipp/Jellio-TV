@@ -263,7 +263,8 @@ private fun SwitcherTile(
             color = JellioText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp).width(112.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp).fillMaxWidth(),
         )
     }
 }

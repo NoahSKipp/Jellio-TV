@@ -458,7 +458,7 @@ private fun JellioTvApp(
                     // navigating straight there, since no one real
                     // library speaks for the button itself.
                     if (clicked is JellioRoute.Library) {
-                        // The drawer handles expansion now, no overlay needed!
+                        showLibraryPicker = true
                     } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
                         // Real components/accountSwitcher.js's own real
                         // Profile button: opens the quick switcher
@@ -493,6 +493,20 @@ private fun JellioTvApp(
                     onOpenSettings = { switchTab(JellioRoute.Settings) },
                     onSignOut = { appViewModel.logout() },
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (showLibraryPicker) {
+                LibraryPickerOverlay(
+                    libraries = libraries,
+                    onDismiss = {
+                        sidebarFocusRequester.requestFocus()
+                        showLibraryPicker = false
+                    },
+                    onSelect = { library ->
+                        selectedLibrary = library
+                        showLibraryPicker = false
+                        switchTab(JellioRoute.Library)
+                    },
                 )
             }
         }
