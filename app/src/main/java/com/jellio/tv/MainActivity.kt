@@ -190,6 +190,7 @@ private fun AppBootGate(
 }
 
 @Composable
+@androidx.compose.foundation.ExperimentalFoundationApi
 private fun JellioTvApp(
     session: Session,
     appViewModel: AppViewModel,
