@@ -138,8 +138,6 @@ fun HeroSection(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, JellioBg),
-                        startY = 0f,
-                        endY = Float.POSITIVE_INFINITY,
                     ),
                 ),
         )

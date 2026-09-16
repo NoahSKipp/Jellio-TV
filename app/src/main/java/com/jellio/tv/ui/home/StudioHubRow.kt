@@ -73,6 +73,7 @@ private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
             containerColor = JellioBgElevated,
             focusedContainerColor = Color.White.copy(alpha = 0.12f),
         ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         modifier = Modifier.width(tileWidth).height(tileHeight),
     ) {
         Column(

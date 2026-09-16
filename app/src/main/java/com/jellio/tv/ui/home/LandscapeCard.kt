@@ -76,12 +76,7 @@ fun LandscapeRow(
             // row's own first card, and real feedback asked for it back
             // to plain text. RowExpandButton at the row's own start
             // instead, sized to this row's own real 16:9 card height.
-            if (onTitleClick != null) {
-                item {
-                    RowExpandButton(onClick = onTitleClick, height = LandscapeCardWidth.scaled() * 9f / 16f)
-                }
-            }
-            items(section.items, key = { it.Id }) { item ->
+            items(section.items.take(10), key = { it.Id }) { item ->
                 LandscapeCard(
                     item = item,
                     imageUrl = rawImageUrl,
@@ -90,6 +85,11 @@ fun LandscapeRow(
                     isRemoving = removingItemId == item.Id,
                     onShatterFinished = { onShatterFinished(item) },
                 )
+            }
+            if (onTitleClick != null && section.items.size > 10) {
+                item {
+                    RowExpandButton(onClick = onTitleClick, height = LandscapeCardWidth.scaled() * 9f / 16f)
+                }
             }
         }
     }
@@ -176,6 +176,7 @@ fun LandscapeCard(
         onLongClick = onOptionsClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         modifier = Modifier.width(landscapeCardWidth),
     ) {
         Box(modifier = Modifier.width(landscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
