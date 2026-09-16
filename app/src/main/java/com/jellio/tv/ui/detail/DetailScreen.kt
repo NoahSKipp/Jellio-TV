@@ -91,7 +91,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
-private val HeroHeight = 620.dp
+private val HeroHeight = 480.dp
 
 // Mirrors screens/detail.js's own real section order (hero, overview,
 // seasons/episodes for a series, cast, trailers) and its own real
