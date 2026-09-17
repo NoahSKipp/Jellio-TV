@@ -267,7 +267,7 @@ fun HeroSection(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
-                    .width(48.dp)
+                    .width(32.dp)
                     .focusRequester(leftArrowFocusRequester)
                     .focusProperties { right = viewDetailsFocusRequester },
             ) {
@@ -288,7 +288,7 @@ fun HeroSection(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
-                    .width(48.dp)
+                    .width(32.dp)
                     .focusRequester(rightArrowFocusRequester)
                     .focusProperties { left = viewDetailsFocusRequester },
             ) {
