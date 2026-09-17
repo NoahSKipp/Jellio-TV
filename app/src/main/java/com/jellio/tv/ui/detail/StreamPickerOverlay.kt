@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -284,7 +285,7 @@ fun StreamPickerOverlay(
 
     Box(
         modifier = modifier.fillMaxSize()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusGroup().focusProperties { exit = { FocusRequester.Cancel } }
             .background(JellioBg),
     ) {
         if (backdropUrl != null) {
