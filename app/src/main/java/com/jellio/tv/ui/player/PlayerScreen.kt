@@ -319,6 +319,8 @@ private fun PlayerSurface(
     var isPlaying by remember { mutableStateOf(true) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(startPositionTicks <= 0) }
     var isEnded by remember { mutableStateOf(false) }
+    var isBuffering by remember { mutableStateOf(true) }
+    var exoError by remember { mutableStateOf<String?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -375,8 +377,13 @@ private fun PlayerSurface(
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 playWhenReadyState = playWhenReady
             }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                exoError = error.message ?: "Unknown playback error"
+                isBuffering = false
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 isEnded = state == Player.STATE_ENDED
+                isBuffering = state == Player.STATE_BUFFERING || (state == Player.STATE_IDLE && exoError == null)
                 // Real port of screens/player.js's own 'ended' listener:
                 // needs no known duration at all, the strongest of the
                 // three real signals since ExoPlayer only ever reaches
@@ -693,6 +700,19 @@ private fun PlayerSurface(
             },
             modifier = Modifier.fillMaxSize(),
         )
+
+        if (exoError != null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "Playback Error", style = androidx.tv.material3.MaterialTheme.typography.titleLarge, color = JellioText)
+                    Text(text = exoError!!, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+        } else if (isBuffering) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = "Loading...", color = JellioTextSecondary)
+            }
+        }
 
         // Real port of screens/player.js's own pauseOverlay visibility
         // rule: hasReportedStart && !video.ended, !showResumePrompt on
