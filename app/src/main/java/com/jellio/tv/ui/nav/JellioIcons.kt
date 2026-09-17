@@ -86,12 +86,12 @@ val AnimeIconVector: ImageVector by lazy {
         name = "JellioAnime",
         defaultWidth = 24.dp,
         defaultHeight = 24.dp,
-        viewportWidth = 24f,
-        viewportHeight = 24f,
+        viewportWidth = 26f,
+        viewportHeight = 26f,
     ).apply {
         // Fox head
         addPath(
-            pathData = PathParser().parsePathString("M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 11 0 5.5-2.5 10-10 10S0 19.5 0 14c0-4 1.82-10.42 3.42-11 1.39-.58 4.64.26 6.42 2.26C10.65 5.09 11.33 5 12 5z").toNodes(),
+            pathData = PathParser().parsePathString("M 13 6 c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 11 0 5.5-2.5 10-10 10 S 1 20.5 1 15 c0-4 1.82-10.42 3.42-11 1.39-.58 4.64.26 6.42 2.26 C 11.65 6.09 12.33 6 13 6 z").toNodes(),
             stroke = SolidColor(Color.Black),
             strokeLineWidth = 1.5f,
             strokeLineCap = StrokeCap.Round,
@@ -99,7 +99,7 @@ val AnimeIconVector: ImageVector by lazy {
         )
         // Eyes
         addPath(
-            pathData = PathParser().parsePathString("M8 14v.5M16 14v.5").toNodes(),
+            pathData = PathParser().parsePathString("M 9 15 v.5 M 17 15 v.5").toNodes(),
             stroke = SolidColor(Color.Black),
             strokeLineWidth = 1.5f,
             strokeLineCap = StrokeCap.Round,
