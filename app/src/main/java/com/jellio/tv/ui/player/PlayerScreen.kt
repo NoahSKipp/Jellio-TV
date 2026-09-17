@@ -385,7 +385,7 @@ private fun PlayerSurface(
                 playWhenReadyState = playWhenReady
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                exoError = error.message ?: "Unknown playback error"
+                exoError = (error.message ?: "Unknown playback error") + (error.cause?.let { " - ${it.message}" } ?: "")
                 isBuffering = false
             }
             override fun onPlaybackStateChanged(state: Int) {
