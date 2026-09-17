@@ -172,6 +172,8 @@ data class BaseItemDto(
     val ParentBackdropImageTags: List<String>? = null,
     val ParentThumbItemId: String? = null,
     val ParentThumbImageTag: String? = null,
+    val ParentLogoItemId: String? = null,
+    val ParentLogoImageTag: String? = null,
     val IndexNumber: Int? = null,
     val ParentIndexNumber: Int? = null,
     val UserData: UserItemDataDto? = null,

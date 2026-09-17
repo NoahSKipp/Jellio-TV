@@ -38,6 +38,7 @@ data class SubtitleTrackUiState(
 // always seeking straight there with no way back to the real start.
 data class PauseOverlayInfo(
     val backdropUrl: String?,
+    val logoUrl: String?,
     val title: String,
     val rating: String?,
     val year: String?,
@@ -432,9 +433,15 @@ class PlayerViewModel @Inject constructor(
         val backdropUrl = tag?.let {
             repository.imageUrl(session.serverAddress, artId, it, if (backdropTag != null) "Backdrop" else "Primary", 1600)
         }
+        val logoTag = if (isEpisode) item.ParentLogoImageTag else item.ImageTags?.get("Logo")
+        val logoArtId = if (isEpisode && item.ParentLogoItemId != null) item.ParentLogoItemId else artId
+        val logoUrl = logoTag?.let {
+            repository.imageUrl(session.serverAddress, logoArtId, it, "Logo", 800)
+        }
         val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
         return PauseOverlayInfo(
             backdropUrl = backdropUrl,
+            logoUrl = logoUrl,
             title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
             rating = item.CommunityRating?.let { "%.1f ★".format(it) },
             year = item.ProductionYear?.toString(),
