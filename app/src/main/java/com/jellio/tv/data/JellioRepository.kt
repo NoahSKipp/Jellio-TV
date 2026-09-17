@@ -302,7 +302,7 @@ class JellioRepository @Inject constructor(
     // getting back a plain 401 no <img> tag / browser cookie session
     // ever hits.
     fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String =
-        "$serverAddress/Jellio/profile/banner/$userId?ApiKey=$accessToken&t=${System.currentTimeMillis()}"
+        "$serverAddress/Jellio/profile/banner/$userId?api_key=$accessToken&t=${System.currentTimeMillis()}"
 
     // Real port of runtime/auth.js's own requestPasswordReset(): a real
     // failure comes back true anyway, the same real leak-prevention
@@ -1014,7 +1014,7 @@ class JellioRepository @Inject constructor(
     // request, which never carries this app's own X-Emby-Authorization
     // header the way a Retrofit call does.
     fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
-        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?ApiKey=$accessToken"
+        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?api_key=$accessToken"
 
     // Real screens/settings.js's own navigateTo('#/dashboard'): that
     // file's own real hash just moves an already loaded jellyfin-web
@@ -1120,14 +1120,16 @@ class JellioRepository @Inject constructor(
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
-        val container = if (directPlay) mediaSource.Container ?: "mp4" else "mp4"
+        val rawContainer = mediaSource.Container ?: "mp4"
+        val parsedContainer = rawContainer.split(",").firstOrNull()?.trim() ?: "mp4"
+        val container = if (directPlay) parsedContainer else "mp4"
 
         val streamUrl = buildString {
             append(serverAddress)
             append("/Videos/").append(itemId).append("/stream.").append(container)
             append("?MediaSourceId=").append(resolvedMediaSourceId)
             append("&DeviceId=").append(deviceId)
-            append("&ApiKey=").append(token)
+            append("&api_key=").append(token)
             append("&StartTimeTicks=").append(startTimeTicks)
             response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
             if (directPlay) {
@@ -1174,7 +1176,7 @@ class JellioRepository @Inject constructor(
     // real tile sheet's own position, several real thumbnails packed
     // into one sheet, not a single thumbnail's own index.
     fun trickplayTileUrl(serverAddress: String, accessToken: String, itemId: String, mediaSourceId: String?, width: Int, tileIndex: Int): String =
-        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?ApiKey=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
+        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?api_key=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
 
     private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
         val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
@@ -1196,7 +1198,7 @@ class JellioRepository @Inject constructor(
         }
         val token = sessionManager.accessToken()
         val base = "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/Stream.vtt"
-        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token" else base
+        return if (!token.isNullOrEmpty()) "$base?api_key=$token" else base
     }
 
     private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
