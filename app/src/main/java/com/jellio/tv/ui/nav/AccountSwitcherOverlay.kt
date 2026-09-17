@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -98,7 +101,7 @@ fun AccountSwitcherOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.7f)
-                .fillMaxHeight(0.8f)
+                .wrapContentHeight()
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(32.dp)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = {}),
@@ -183,7 +186,7 @@ fun AccountSwitcherOverlay(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.heightIn(max = 300.dp),
                 ) {
                     items(uiState.remembered, key = { "r:" + it.userId }) { profile ->
                         SwitcherTile(
@@ -264,7 +267,8 @@ private fun SwitcherTile(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp).fillMaxWidth(),
+            modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
         )
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
     }
 }
