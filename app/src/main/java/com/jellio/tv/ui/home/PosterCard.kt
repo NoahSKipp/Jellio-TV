@@ -128,7 +128,7 @@ fun PosterCard(
                 // bar below already own the bottom of this card.
                 item.CommunityRating?.let { rating ->
                     Text(
-                        text = String.format(Locale.US, "%.1f", rating),
+                        text = String.format(Locale.US, "%.1f ★", rating),
                         color = JellioText,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier
@@ -150,7 +150,7 @@ fun PosterCard(
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = null,
-                        tint = JellioText,
+                        tint = JellioBg,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(6.dp)

@@ -251,6 +251,7 @@ fun DetailScreen(
                 val item = uiState.item!!
                 LazyColumn(
                     state = listState,
+                    contentPadding = PaddingValues(bottom = 48.dp),
                     modifier = Modifier.fillMaxSize().nestedScroll(blockScrollWhileHeroFocused).focusRestorer(),
                 ) {
                     item {
@@ -729,7 +730,10 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
                 Surface(
                     onClick = { onPersonClick(person.Id) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.12f)
+                    ),
                     modifier = Modifier.width(avatarWidth),
                 ) {
                     Column {
@@ -763,7 +767,7 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
 
 @Composable
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
-    Column(modifier = Modifier.padding(top = 24.dp, bottom = 48.dp)) {
+    Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = "Trailers", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val trailerCardWidth = 280.dp.scaled()
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

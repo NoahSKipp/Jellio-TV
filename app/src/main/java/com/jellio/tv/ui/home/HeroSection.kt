@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -254,17 +255,18 @@ fun HeroSection(
         if (items.size > 1) {
             Surface(
                 onClick = { index = (index - 1 + items.size) % items.size },
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                shape = ClickableSurfaceDefaults.shape(shape = androidx.compose.ui.graphics.RectangleShape),
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = Color.Black.copy(alpha = 0.35f),
                     contentColor = JellioText,
-                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.15f),
                     focusedContentColor = JellioText,
                 ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 86.dp)
-                    .size(44.dp)
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .width(48.dp)
                     .focusRequester(leftArrowFocusRequester)
                     .focusProperties { right = viewDetailsFocusRequester },
             ) {
@@ -274,17 +276,18 @@ fun HeroSection(
             }
             Surface(
                 onClick = { index = (index + 1) % items.size },
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                shape = ClickableSurfaceDefaults.shape(shape = androidx.compose.ui.graphics.RectangleShape),
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = Color.Black.copy(alpha = 0.35f),
                     contentColor = JellioText,
-                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.15f),
                     focusedContentColor = JellioText,
                 ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 86.dp)
-                    .size(44.dp)
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(48.dp)
                     .focusRequester(rightArrowFocusRequester)
                     .focusProperties { left = viewDetailsFocusRequester },
             ) {
