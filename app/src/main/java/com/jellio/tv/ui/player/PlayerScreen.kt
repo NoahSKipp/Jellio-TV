@@ -3,6 +3,7 @@ package com.jellio.tv.ui.player
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -562,6 +563,7 @@ private fun PlayerSurface(
         modifier = Modifier
             .fillMaxSize()
             .focusRequester(focusRequester)
+            .focusable()
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 if (showSubtitleMenu) {
