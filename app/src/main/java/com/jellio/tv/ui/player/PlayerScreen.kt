@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -708,13 +709,7 @@ private fun PlayerSurface(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Real port of screens/player.js's own pauseOverlay visibility
-        // rule: hasReportedStart && !video.ended, !showResumePrompt on
-        // top of that here since this player also gates real playback
-        // start behind that prompt (see the playWhenReady comment
-        // above), a state the web side's own always-autoplaying video
-        // element never had to account for.
-        val showPauseOverlay = pauseInfo != null && (isBuffering || (hasReportedStart && !playWhenReadyState)) && !showResumePrompt && !isEnded
+        val showPauseOverlay = pauseInfo != null && hasReportedStart && !playWhenReadyState && !showResumePrompt && !isEnded
         if (showPauseOverlay) {
             PauseOverlay(info = pauseInfo!!)
         }
@@ -726,6 +721,8 @@ private fun PlayerSurface(
                     Text(text = exoError!!, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
                 }
             }
+        } else if (isBuffering && pauseInfo != null) {
+            BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 BouncingJellioLogo()
@@ -1129,6 +1126,51 @@ private fun TrickplayPreview(frame: TrickplayFrame, timeLabel: String, modifier:
 // never was the series name). pauseInfo.backdropUrl already carries
 // seriesAwareArtworkUrl()'s own real fallback chain, computed once in
 // PlayerViewModel rather than here.
+
+@Composable
+private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (info.backdropUrl != null) {
+            AsyncImage(
+                model = info.backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // A very light gradient just to make controls readable if they are open
+            Box(modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.8f)),
+                    startY = 0f,
+                    endY = 1080f // Approximate 1080p height
+                )
+            ))
+        }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (info.logoUrl != null) {
+                val infiniteTransition = rememberInfiniteTransition(label = "bouncing_logo")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 0.95f,
+                    targetValue = 1.05f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "logo_scale"
+                )
+                AsyncImage(
+                    model = info.logoUrl,
+                    contentDescription = info.title,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth(0.4f).fillMaxHeight(0.4f).scale(scale)
+                )
+            } else {
+                BouncingJellioLogo()
+            }
+        }
+    }
+}
+
 @Composable
 private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
