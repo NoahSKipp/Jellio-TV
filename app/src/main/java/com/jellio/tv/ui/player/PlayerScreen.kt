@@ -47,6 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.focusGroup
@@ -170,7 +177,7 @@ fun PlayerScreen(
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                BouncingJellioLogo()
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -701,8 +708,19 @@ private fun PlayerSurface(
             modifier = Modifier.fillMaxSize(),
         )
 
+        // Real port of screens/player.js's own pauseOverlay visibility
+        // rule: hasReportedStart && !video.ended, !showResumePrompt on
+        // top of that here since this player also gates real playback
+        // start behind that prompt (see the playWhenReady comment
+        // above), a state the web side's own always-autoplaying video
+        // element never had to account for.
+        val showPauseOverlay = pauseInfo != null && (isBuffering || (hasReportedStart && !playWhenReadyState)) && !showResumePrompt && !isEnded
+        if (showPauseOverlay) {
+            PauseOverlay(info = pauseInfo!!)
+        }
+
         if (exoError != null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = "Playback Error", style = androidx.tv.material3.MaterialTheme.typography.titleLarge, color = JellioText)
                     Text(text = exoError!!, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
@@ -710,19 +728,8 @@ private fun PlayerSurface(
             }
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                BouncingJellioLogo()
             }
-        }
-
-        // Real port of screens/player.js's own pauseOverlay visibility
-        // rule: hasReportedStart && !video.ended, !showResumePrompt on
-        // top of that here since this player also gates real playback
-        // start behind that prompt (see the playWhenReady comment
-        // above), a state the web side's own always-autoplaying video
-        // element never had to account for.
-        val showPauseOverlay = pauseInfo != null && hasReportedStart && !showResumePrompt && !playWhenReadyState && !isEnded
-        if (showPauseOverlay) {
-            PauseOverlay(info = pauseInfo!!)
         }
 
         if (controlsVisible) {
@@ -1812,4 +1819,24 @@ private fun formatMs(ms: Long): String {
     } else {
         "%d:%02d".format(minutes, seconds)
     }
+}
+
+@Composable
+private fun BouncingJellioLogo(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "bouncing_logo")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logo_scale"
+    )
+    androidx.tv.material3.Icon(
+        painter = painterResource(id = com.jellio.tv.R.drawable.ic_jellio_mark),
+        contentDescription = "Loading",
+        tint = Color.White,
+        modifier = modifier.scale(scale).size(80.dp)
+    )
 }
