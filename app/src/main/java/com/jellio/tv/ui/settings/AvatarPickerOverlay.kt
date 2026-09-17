@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
@@ -126,7 +128,7 @@ fun AvatarPickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusGroup().focusProperties { exit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
         contentAlignment = Alignment.Center,

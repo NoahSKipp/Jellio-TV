@@ -47,6 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -963,7 +967,7 @@ private fun PlayerControls(
             // way that file's own CSS margin already places it.
             Row(
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp).onKeyEvent { it.key == androidx.compose.ui.input.key.Key.DirectionLeft || it.key == androidx.compose.ui.input.key.Key.DirectionRight },
             ) {
                 Box(
                     modifier = Modifier
@@ -1283,11 +1287,14 @@ private fun PlayerToast(message: String, modifier: Modifier = Modifier) {
 // from the subtitle drawer's own full-height panel shape), the exact
 // same six real PLAYBACK_SPEEDS options, the active one highlighted.
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1327,11 +1334,14 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
 // with nothing active just 404s quietly), then the exact same five
 // real SLEEP_TIMER_OPTIONS durations.
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1375,6 +1385,7 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
 // reader who has never picked a track yet has the MediaSource's own
 // real default active, not nothing).
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun AudioMenu(
     tracks: List<AudioTrackUiState>,
     selectedStreamIndex: Int?,
@@ -1386,6 +1397,8 @@ private fun AudioMenu(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1440,6 +1453,7 @@ private fun AudioMenu(
 // same real leaner shape that file's own mid-player sourcePanel has
 // against the fuller pre-playback picker.
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SourcePanel(
     sources: List<MediaSourceDto>,
     currentMediaSourceId: String?,
@@ -1450,6 +1464,8 @@ private fun SourcePanel(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1491,6 +1507,7 @@ private fun SourcePanel(
 // SeriesId behind it (a Movie's own episodesButton never leaves its
 // disabled state, see hasEpisodes above).
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun EpisodesPanel(
     seasons: List<BaseItemDto>,
     selectedSeasonId: String?,
@@ -1504,6 +1521,8 @@ private fun EpisodesPanel(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1607,6 +1626,7 @@ private fun EpisodeRow(episode: EpisodePanelEntry, isActive: Boolean, onClick: (
 // own renderSubtitleTrackList() uses, selecting one of those a real
 // burned-in transcode rather than a plain track switch.
 @Composable
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SubtitleMenu(
     tracks: List<SubtitleTrackUiState>,
     selectedIndex: Int?,
@@ -1620,6 +1640,8 @@ private fun SubtitleMenu(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusGroup()
+            .focusProperties { exit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
                 indication = null,
