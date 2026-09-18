@@ -197,6 +197,27 @@ data class GenreCountsDto(val Genres: List<GenreCountDto> = emptyList())
 
 @Immutable
 @JsonClass(generateAdapter = true)
+data class GenreSearchResultDto(
+    val Found: Boolean = false,
+    val Name: String? = null,
+    val Category: String? = null,
+    val IsStandard: Boolean = false,
+    val TmdbGenreId: Int? = null,
+    val KeywordId: Int? = null,
+    val OriginalLanguage: String? = null,
+    val MatchCount: Int? = null,
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CustomGenreItem(
+    val name: String,
+    val category: String? = null,
+    val enabled: Boolean = true,
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
 data class CommunityWatchingResponse(
     val Items: List<CommunityWatchingItem> = emptyList(),
 )

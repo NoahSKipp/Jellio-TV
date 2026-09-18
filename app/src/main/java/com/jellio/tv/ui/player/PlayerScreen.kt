@@ -651,6 +651,7 @@ internal fun PlayerSurface(
     var holdSeekKey by remember(streamUrl) { mutableStateOf<Key?>(null) }
     var holdSeekStartPos by remember(streamUrl) { mutableLongStateOf(0L) }
     var holdSeekStartTime by remember(streamUrl) { mutableLongStateOf(0L) }
+    var holdSeekLastTickTime by remember(streamUrl) { mutableLongStateOf(0L) }
     var wasPlayingBeforeHold by remember(streamUrl) { mutableStateOf(false) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember(player) {
@@ -1278,6 +1279,7 @@ internal fun PlayerSurface(
                         if (repeatCount == 0 && holdSeekKey != event.key) {
                             holdSeekKey = event.key
                             holdSeekStartTime = now
+                            holdSeekLastTickTime = now
                             holdSeekStartPos = positionMs
                             holdSeekTargetMs = null
                             holdSeekDeltaMs = 0L
@@ -1287,18 +1289,21 @@ internal fun PlayerSurface(
                                 wasPlayingBeforeHold = true
                                 player.pause()
                             }
-                            val elapsed = now - holdSeekStartTime
-                            val step = when {
-                                repeatCount > 40 || elapsed > 3500L -> 60_000L
-                                repeatCount > 20 || elapsed > 1800L -> 30_000L
-                                repeatCount > 5 || elapsed > 600L -> 15_000L
-                                else -> SEEK_STEP_MS
+                            // Throttle seek repeat events to a steady ~180ms cadence to prevent runaway skipping
+                            if (now - holdSeekLastTickTime >= 180L || holdSeekTargetMs == null) {
+                                holdSeekLastTickTime = now
+                                val elapsed = now - holdSeekStartTime
+                                val step = when {
+                                    elapsed > 5000L -> 30_000L
+                                    elapsed > 2000L -> 15_000L
+                                    else -> SEEK_STEP_MS
+                                }
+                                val base = holdSeekTargetMs ?: holdSeekStartPos
+                                val next = seekTarget(base, if (forward) step else -step, shownDurationMs)
+                                holdSeekTargetMs = next
+                                holdSeekDeltaMs += if (forward) step else -step
+                                seekFlash = SeekFlash(next, holdSeekDeltaMs, System.nanoTime())
                             }
-                            val base = holdSeekTargetMs ?: holdSeekStartPos
-                            val next = seekTarget(base, if (forward) step else -step, shownDurationMs)
-                            holdSeekTargetMs = next
-                            holdSeekDeltaMs += if (forward) step else -step
-                            seekFlash = SeekFlash(next, holdSeekDeltaMs, System.nanoTime())
                         }
                         return@onKeyEvent true
                     }

@@ -106,6 +106,24 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Localized Search Button", "Fixed custom genre search button in Recommendations settings to display Search across all languages."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.69.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Custom Genre Rows", "Search and add custom categories like C-Drama, K-Drama, or Cyberpunk from Recommendations settings directly into your Home rows."),
+            ChangelogFeature(Icons.Filled.Tune, "Streamlined Home Customization", "The Home customization trigger moved into Settings > Recommendations, navigating into edit mode without cluttering normal browsing."),
+            ChangelogFeature(Icons.Filled.Speed, "Calibrated Hold-to-Seek", "Long-pressing left or right to seek in the video player now follows a steady, natural acceleration curve without skipping past your content."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.4",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.4",

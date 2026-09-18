@@ -39,6 +39,18 @@ class SettingsViewModel @Inject constructor(
     private val _selectedGenres = MutableStateFlow<List<String>>(emptyList())
     val selectedGenres: StateFlow<List<String>> = _selectedGenres.asStateFlow()
 
+    private val _customGenres = MutableStateFlow<List<com.jellio.tv.data.model.CustomGenreItem>>(emptyList())
+    val customGenres: StateFlow<List<com.jellio.tv.data.model.CustomGenreItem>> = _customGenres.asStateFlow()
+
+    private val _genreSearchQuery = MutableStateFlow("")
+    val genreSearchQuery: StateFlow<String> = _genreSearchQuery.asStateFlow()
+
+    private val _genreSearchResult = MutableStateFlow<com.jellio.tv.data.model.GenreSearchResultDto?>(null)
+    val genreSearchResult: StateFlow<com.jellio.tv.data.model.GenreSearchResultDto?> = _genreSearchResult.asStateFlow()
+
+    private val _genreSearching = MutableStateFlow(false)
+    val genreSearching: StateFlow<Boolean> = _genreSearching.asStateFlow()
+
     private val _rememberStream = MutableStateFlow(true)
     val rememberStream: StateFlow<Boolean> = _rememberStream.asStateFlow()
 
@@ -268,6 +280,7 @@ class SettingsViewModel @Inject constructor(
             _communityRowEnabled.value = recommendationPreferences.isCommunityRowEnabled(userId)
             _excludedUserIds.value = recommendationPreferences.getCommunityExcludedUsers(userId)
             _selectedGenres.value = recommendationPreferences.getSelectedGenres(userId)
+            _customGenres.value = recommendationPreferences.getCustomGenres(userId)
 
             runCatching {
                 _communityUsers.value = repository.getCommunityUsers()
@@ -302,6 +315,42 @@ class SettingsViewModel @Inject constructor(
         _selectedGenres.value = emptyList()
         viewModelScope.launch {
             recommendationPreferences.setSelectedGenres(userId, emptyList())
+        }
+    }
+
+    fun searchGenre(query: String) {
+        _genreSearchQuery.value = query
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            _genreSearchResult.value = null
+            _genreSearching.value = false
+            return
+        }
+        _genreSearching.value = true
+        viewModelScope.launch {
+            val result = repository.searchGenreOrCategory(trimmed)
+            _genreSearchResult.value = result
+            _genreSearching.value = false
+        }
+    }
+
+    fun addCustomGenre(userId: String, item: com.jellio.tv.data.model.CustomGenreItem) {
+        viewModelScope.launch {
+            _customGenres.value = recommendationPreferences.addCustomGenre(userId, item)
+            _genreSearchResult.value = null
+            _genreSearchQuery.value = ""
+        }
+    }
+
+    fun removeCustomGenre(userId: String, name: String) {
+        viewModelScope.launch {
+            _customGenres.value = recommendationPreferences.removeCustomGenre(userId, name)
+        }
+    }
+
+    fun toggleCustomGenre(userId: String, name: String) {
+        viewModelScope.launch {
+            _customGenres.value = recommendationPreferences.toggleCustomGenre(userId, name)
         }
     }
 }
