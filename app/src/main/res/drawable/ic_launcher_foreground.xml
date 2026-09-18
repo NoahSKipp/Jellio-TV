@@ -57,10 +57,10 @@
                     </gradient>
                 </aapt:attr>
             </path>
-            <group>
-                <clip-path android:pathData="M98.1,89.2 L303.5,200 L98.1,318.6 Z" />
-                <path android:pathData="M0,0 L400,0 L400,400 L0,400 Z">
-                    <aapt:attr name="android:fillColor">
+            <path android:pathData="M98.1,89.2 L303.5,200 L98.1,318.6 Z"
+                android:strokeWidth="100.2"
+                android:strokeLineJoin="round">
+                <aapt:attr name="android:fillColor">
                         <gradient
                         android:type="radial"
                         android:centerX="112" android:centerY="104" android:gradientRadius="104">
@@ -69,8 +69,16 @@
                         <item android:offset="1" android:color="#001E93D6"/>
                     </gradient>
                     </aapt:attr>
-                </path>
-            </group>
+                <aapt:attr name="android:strokeColor">
+                        <gradient
+                        android:type="radial"
+                        android:centerX="112" android:centerY="104" android:gradientRadius="104">
+                        <item android:offset="0" android:color="#9E25C2E8"/>
+                        <item android:offset="0.55" android:color="#4220A8DE"/>
+                        <item android:offset="1" android:color="#001E93D6"/>
+                    </gradient>
+                    </aapt:attr>
+            </path>
             <!-- Real port of the animated svg's own jm-swim wrapper
                  (transform-origin: 175px 200px, transform-box: view-box):
                  a real pivot group of its own around the jellyfish's own
