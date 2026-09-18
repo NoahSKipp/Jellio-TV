@@ -15,9 +15,7 @@
              corners, not a separate corner radius anywhere), the radial
              glow clipped to it, and the jellyfish silhouette on top, same
              real geometry, same real 400x400 coordinate space. -->
-        <path android:pathData="M98.1,89.2 L303.5,200 L98.1,318.6 Z"
-            android:strokeWidth="100.2"
-            android:strokeLineJoin="round">
+        <path android:pathData="M48.00,89.20 A50.1,50.1 0 0,1 121.89,45.11 L327.29,155.91 A50.1,50.1 0 0,1 328.55,243.39 L123.15,361.99 A50.1,50.1 0 0,1 48.00,318.60 Z">
             <aapt:attr name="android:fillColor">
                 <gradient
                         android:type="linear"
@@ -32,24 +30,9 @@
                         <item android:offset="1" android:color="#FFC657E3"/>
                     </gradient>
             </aapt:attr>
-            <aapt:attr name="android:strokeColor">
-                <gradient
-                        android:type="linear"
-                        android:startX="48" android:startY="36"
-                        android:endX="306" android:endY="264">
-                        <item android:offset="0" android:color="#FF17A7DD"/>
-                        <item android:offset="0.14" android:color="#FF1A9AD7"/>
-                        <item android:offset="0.29" android:color="#FF2F74CD"/>
-                        <item android:offset="0.44" android:color="#FF445AD5"/>
-                        <item android:offset="0.62" android:color="#FF7A4BDD"/>
-                        <item android:offset="0.79" android:color="#FFB44EF4"/>
-                        <item android:offset="1" android:color="#FFC657E3"/>
-                    </gradient>
-            </aapt:attr>
+            
         </path>
-        <path android:pathData="M98.1,89.2 L303.5,200 L98.1,318.6 Z"
-                android:strokeWidth="100.2"
-                android:strokeLineJoin="round">
+        <path android:pathData="M48.00,89.20 A50.1,50.1 0 0,1 121.89,45.11 L327.29,155.91 A50.1,50.1 0 0,1 328.55,243.39 L123.15,361.99 A50.1,50.1 0 0,1 48.00,318.60 Z">
                 <aapt:attr name="android:fillColor">
                     <gradient
                         android:type="radial"
@@ -59,15 +42,7 @@
                         <item android:offset="1" android:color="#001E93D6"/>
                     </gradient>
                 </aapt:attr>
-                <aapt:attr name="android:strokeColor">
-                    <gradient
-                        android:type="radial"
-                        android:centerX="112" android:centerY="104" android:gradientRadius="104">
-                        <item android:offset="0" android:color="#9E25C2E8"/>
-                        <item android:offset="0.55" android:color="#4220A8DE"/>
-                        <item android:offset="1" android:color="#001E93D6"/>
-                    </gradient>
-                </aapt:attr>
+                
             </path>
         <!-- Real port of the animated svg's own jm-swim wrapper
              (transform-origin: 175px 200px, transform-box: view-box):
