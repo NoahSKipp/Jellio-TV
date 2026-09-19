@@ -114,7 +114,7 @@ fun LibraryFilterFieldOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .focusGroup().focusProperties { exit = { FocusRequester.Cancel } },
+            .focusGroup().focusProperties { onExit = { FocusRequester.Cancel } },
     ) {
         Box(
             modifier = Modifier

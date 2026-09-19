@@ -111,7 +111,7 @@ fun RowListModal(
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = onDismiss,
             )
-            .focusProperties { exit = { FocusRequester.Cancel } },
+            .focusProperties { onExit = { FocusRequester.Cancel } },
         contentAlignment = Alignment.Center,
     ) {
         Column(

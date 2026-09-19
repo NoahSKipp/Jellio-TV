@@ -94,7 +94,7 @@ fun AvatarPickerOverlay(
     // here ever requested initial D-pad focus on open, so a reader's
     // own next press just kept moving whatever screen sat behind this
     // real scrim instead of ever landing on a real tile in this
-    // overlay. focusProperties { exit = { FocusRequester.Cancel } }
+    // overlay. focusProperties { onExit = { FocusRequester.Cancel } }
     // below is that same file's own real fix for the second half of
     // that bug too: without it, focus could still wander back out past
     // this overlay's own edge once it did land inside.
@@ -128,7 +128,7 @@ fun AvatarPickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup().focusProperties { exit = { FocusRequester.Cancel } }
+            .focusGroup().focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
         contentAlignment = Alignment.Center,

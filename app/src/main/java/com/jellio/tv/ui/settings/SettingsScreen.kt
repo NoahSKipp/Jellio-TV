@@ -26,6 +26,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -87,6 +90,8 @@ fun SettingsScreen(
     // overlay handling further down needs it too, outside that Column's
     // own real scope.
     val changeAvatarFocusRequester = remember { FocusRequester() }
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
@@ -102,7 +107,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
@@ -115,7 +120,7 @@ fun SettingsScreen(
                     onClick = { viewModel.openAvatarPicker() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                    modifier = Modifier.focusRequester(changeAvatarFocusRequester),
+                    modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
                 ) {
                     Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
@@ -123,6 +128,7 @@ fun SettingsScreen(
                     onClick = onViewProfile,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                    modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
                 ) {
                     Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
@@ -276,7 +282,7 @@ private fun LanguagePickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
                 indication = null,

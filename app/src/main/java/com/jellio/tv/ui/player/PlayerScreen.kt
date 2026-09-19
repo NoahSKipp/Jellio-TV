@@ -1365,7 +1365,7 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1412,7 +1412,7 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1469,7 +1469,7 @@ private fun AudioMenu(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1536,7 +1536,7 @@ private fun SourcePanel(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1593,7 +1593,7 @@ private fun EpisodesPanel(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1712,7 +1712,7 @@ private fun SubtitleMenu(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
                 indication = null,

@@ -93,7 +93,7 @@ fun AccountSwitcherOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .focusProperties { exit = { FocusRequester.Cancel } }
+            .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
         contentAlignment = Alignment.Center,

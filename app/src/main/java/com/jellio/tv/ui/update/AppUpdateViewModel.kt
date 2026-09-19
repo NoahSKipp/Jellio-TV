@@ -126,11 +126,15 @@ class AppUpdateViewModel @Inject constructor(
                 context,
                 downloadReceiver,
                 IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-                ContextCompat.RECEIVER_NOT_EXPORTED,
+                ContextCompat.RECEIVER_EXPORTED,
             )
             receiverRegistered = true
         }
         val fileName = "jellio-tv-$version.apk"
+        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
+        if (apkFile.exists()) {
+            apkFile.delete()
+        }
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle("Jellio TV $version")
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
