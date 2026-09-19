@@ -63,7 +63,7 @@ fun UpdateToast(
                 .background(JellioBgElevated.copy(alpha = 0.98f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                 .padding(24.dp)
-                .focusProperties { exit = { FocusRequester.Cancel } },
+                .focusProperties { onExit = { FocusRequester.Cancel } },
         ) {
             Text(text = "Update available", style = MaterialTheme.typography.titleMedium, color = JellioText)
             Text(
