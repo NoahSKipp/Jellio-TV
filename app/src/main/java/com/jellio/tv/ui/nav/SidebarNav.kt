@@ -134,7 +134,13 @@ fun SidebarNav(
             }
             .focusProperties {
                 onEnter = {
-                    if (requestedFocusDirection == FocusDirection.Left) homeFocusRequester.requestFocus()
+                    if (focusable && enabled) {
+                        if (requestedFocusDirection == FocusDirection.Left) {
+                            (restoreFocusRequester ?: homeFocusRequester).requestFocus()
+                        }
+                    } else {
+                        FocusRequester.Cancel
+                    }
                 }
             }
             .focusGroup(),
@@ -152,13 +158,14 @@ fun SidebarNav(
         items.forEach { route ->
             val isSelfProfile = route is JellioRoute.Profile && route.userId == null
             val isLibrary = route is JellioRoute.Library
+            val matchesSelected = (route == selected) || (route is JellioRoute.Home && selected is JellioRoute.Home)
 
             SidebarItem(
                 icon = route.icon(),
                 iconScale = route.iconScale(),
                 label = if (isSelfProfile && !profileName.isNullOrBlank()) profileName else route.label(),
                 avatarUrl = if (isSelfProfile) profileAvatarUrl else null,
-                isSelected = route == selected,
+                isSelected = matchesSelected,
                 expanded = visuallyExpanded,
                 enabled = enabled,
                 onClick = {
@@ -168,10 +175,10 @@ fun SidebarNav(
                         onSelect(route)
                     }
                 },
-                focusRequester = if (route == selected) restoreFocusRequester else null,
+                focusRequester = if (matchesSelected) restoreFocusRequester else null,
                 homeFocusRequester = if (route == entryRoute) homeFocusRequester else null,
                 height = itemHeight,
-                focusable = focusable,
+                focusable = focusable && enabled,
             )
 
         }
@@ -235,7 +242,7 @@ private fun SidebarItem(
                 shape = RoundedCornerShape(14.dp),
             ),
         ),
-        modifier = Modifier.focusProperties { canFocus = focusable }.fillMaxWidth().height(height).let {
+        modifier = Modifier.focusProperties { canFocus = focusable && enabled }.fillMaxWidth().height(height).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it
         }.let {
             if (homeFocusRequester != null) it.focusRequester(homeFocusRequester) else it

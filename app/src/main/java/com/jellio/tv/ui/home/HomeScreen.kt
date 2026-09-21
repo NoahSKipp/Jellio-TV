@@ -1,9 +1,13 @@
 package com.jellio.tv.ui.home
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.jellio.tv.ui.common.dpadFastScroll
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +55,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -139,6 +145,10 @@ fun HomeScreen(
     }
     var editMode by remember(initialEditMode) { mutableStateOf(initialEditMode) }
 
+    BackHandler(enabled = editMode) {
+        editMode = false
+    }
+
     LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
         viewModel.load(session)
     }
@@ -204,11 +214,13 @@ fun HomeScreen(
                             .clipToBounds()
                             .focusRestorer()
                             .dpadFastScroll(listState) {
-                                // Focus lands on the first row that is fully in view.
-                                val visible = listState.layoutInfo.visibleItemsInfo
-                                val target = visible.firstOrNull { it.offset >= 0 && rowFocus.containsKey(it.key) }
-                                    ?: visible.firstOrNull { rowFocus.containsKey(it.key) }
-                                target?.let { runCatching { rowFocus[it.key]?.requestFocus() } }
+                                if (!editMode) {
+                                    // Focus lands on the first row that is fully in view.
+                                    val visible = listState.layoutInfo.visibleItemsInfo
+                                    val target = visible.firstOrNull { it.offset >= 0 && rowFocus.containsKey(it.key) }
+                                        ?: visible.firstOrNull { rowFocus.containsKey(it.key) }
+                                    target?.let { runCatching { rowFocus[it.key]?.requestFocus() } }
+                                }
                             },
                         // Room for the last rows to scroll up to the top, as in Nuvio.
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = rowsViewportHeight),
@@ -393,7 +405,13 @@ private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onRese
             Surface(
                 onClick = onReset,
                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.White.copy(alpha = 0.08f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White,
+                    focusedContentColor = JellioBg,
+                ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
                     Icon(imageVector = Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
@@ -407,7 +425,10 @@ private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onRese
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = if (editMode) JellioSecondary else Color.White.copy(alpha = 0.08f),
                 contentColor = if (editMode) JellioBg else JellioText,
+                focusedContainerColor = Color.White,
+                focusedContentColor = JellioBg,
             ),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
                 Icon(imageVector = Icons.Filled.Tune, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
@@ -440,8 +461,9 @@ private fun HomeRowEditor(
                 onMoveDown = onMoveDown,
                 onToggleHidden = onToggleHidden,
             )
+        } else if (!hidden) {
+            content()
         }
-        if (!hidden) content()
     }
 }
 
@@ -455,6 +477,7 @@ private fun HomeRowEditorBar(
     onMoveDown: () -> Unit,
     onToggleHidden: () -> Unit,
 ) {
+    var hasChildFocus by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -462,19 +485,41 @@ private fun HomeRowEditorBar(
             .fillMaxWidth()
             .padding(horizontal = 48.dp)
             .padding(top = 8.dp, bottom = 4.dp)
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+            .background(
+                if (hasChildFocus) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f),
+                RoundedCornerShape(12.dp),
+            )
+            .let {
+                if (hasChildFocus) it.border(BorderStroke(2.dp, Color.White), RoundedCornerShape(12.dp)) else it
+            }
+            .onFocusChanged { hasChildFocus = it.hasFocus }
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(
             text = displayName,
-            color = JellioTextSecondary,
+            color = if (hasChildFocus) JellioText else JellioTextSecondary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (hasChildFocus) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            HomeRowEditorButton(icon = Icons.Filled.ArrowUpward, enabled = canMoveUp, onClick = onMoveUp, contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_up"))
-            HomeRowEditorButton(icon = Icons.Filled.ArrowDownward, enabled = canMoveDown, onClick = onMoveDown, contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_down"))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HomeRowEditorButton(
+                icon = Icons.Filled.ArrowUpward,
+                enabled = canMoveUp,
+                onClick = onMoveUp,
+                contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_up"),
+            )
+            HomeRowEditorButton(
+                icon = Icons.Filled.ArrowDownward,
+                enabled = canMoveDown,
+                onClick = onMoveDown,
+                contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_down"),
+            )
             HomeRowEditorButton(
                 icon = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                 enabled = true,
@@ -501,11 +546,17 @@ private fun HomeRowEditorButton(
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = if (active) JellioSecondary else JellioTextSecondary,
+            focusedContainerColor = Color.White,
+            focusedContentColor = JellioBg,
         ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.15f),
         modifier = Modifier.padding(2.dp),
     ) {
-        Box(modifier = Modifier.padding(6.dp)) {
-            Icon(imageVector = icon, contentDescription = contentDescription, tint = if (active) JellioSecondary else JellioTextSecondary)
+        Box(modifier = Modifier.padding(8.dp)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+            )
         }
     }
 }

@@ -106,6 +106,23 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.8",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.8",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Navigation and Card Selection Hotfix", "Restored direct focus and selection on sidebar navigation items and home row media cards on startup."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.69.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Home Customization Focus Navigation", "Down navigation in customize mode now moves cleanly between row customization headers instead of skipping onto media cards."),
+            ChangelogFeature(Icons.Filled.Settings, "Settings Menu Focus Return", "Pressing left from settings options now reliably returns focus to the category menu instead of skipping to the global nav rail."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.6",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.6",
