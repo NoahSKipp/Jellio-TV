@@ -1,6 +1,7 @@
 package com.jellio.tv.data.model
 
 import androidx.compose.runtime.Immutable
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
@@ -609,6 +610,14 @@ data class ProfileDto(
     val IsPrivate: Boolean = false,
     val Bio: String? = null,
     val RemoveFromWatchlistAfterWatching: Boolean = true,
+    @Json(name = "selectedGenres") val selectedGenres: List<String>? = null,
+    @Json(name = "customGenres") val customGenres: List<CustomGenreItem>? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class ProfileRecommendationsRequest(
+    @Json(name = "selectedGenres") val selectedGenres: List<String>?,
+    @Json(name = "customGenres") val customGenres: List<CustomGenreItem>?,
 )
 
 @JsonClass(generateAdapter = true)

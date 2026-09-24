@@ -17,6 +17,7 @@ import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackInfoResponseDto
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.ProfileDto
+import com.jellio.tv.data.model.ProfileRecommendationsRequest
 import com.jellio.tv.data.model.PublicSystemInfoDto
 import com.jellio.tv.data.model.RealWatchRequest
 import com.jellio.tv.data.model.ReportDurationRequest
@@ -488,6 +489,9 @@ interface JellyfinApi {
 
     @GET("Jellio/profile/settings")
     suspend fun getProfileSettings(): ProfileDto
+
+    @POST("Jellio/profile/recommendations")
+    suspend fun saveProfileRecommendations(@Body body: ProfileRecommendationsRequest): ProfileDto
 
     @POST("Jellio/profile/watchlist-auto-remove")
     suspend fun setWatchlistAutoRemove(@Body request: WatchlistAutoRemoveRequest)

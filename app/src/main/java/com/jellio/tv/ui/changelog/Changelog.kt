@@ -106,6 +106,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.70.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.70.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Custom Genre Management & Hold to Delete", "Long-press any custom genre row to remove it with modal confirmation, and enable matching library genres directly from search."),
+            ChangelogFeature(Icons.Filled.Sync, "Profile Recommendations Sync", "Custom genre rows and genre recommendation selections now sync seamlessly with your Jellio profile across all devices."),
+            ChangelogFeature(Icons.Filled.Tv, "1-Click Library Genre Activation", "Search now detects standard library genres like Telenovela and Soap, providing a direct 1-click button to add them to your Home rows."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.8",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.8",

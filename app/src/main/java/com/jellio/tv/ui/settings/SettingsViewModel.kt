@@ -283,10 +283,53 @@ class SettingsViewModel @Inject constructor(
             _customGenres.value = recommendationPreferences.getCustomGenres(userId)
 
             runCatching {
+                val profile = repository.getProfileSettings()
+                var pushNeeded = false
+                var toPushSelected = profile.selectedGenres
+                var toPushCustom = profile.customGenres
+
+                if (profile.selectedGenres != null) {
+                    recommendationPreferences.setSelectedGenres(userId, profile.selectedGenres)
+                    _selectedGenres.value = profile.selectedGenres
+                } else if (_selectedGenres.value.isNotEmpty()) {
+                    pushNeeded = true
+                    toPushSelected = _selectedGenres.value
+                }
+
+                if (profile.customGenres != null) {
+                    recommendationPreferences.setCustomGenres(userId, profile.customGenres)
+                    _customGenres.value = profile.customGenres
+                } else if (_customGenres.value.isNotEmpty()) {
+                    pushNeeded = true
+                    toPushCustom = _customGenres.value
+                }
+
+                if (pushNeeded) {
+                    runCatching {
+                        repository.saveProfileRecommendations(
+                            selectedGenres = toPushSelected,
+                            customGenres = toPushCustom,
+                        )
+                    }
+                }
+            }
+
+            runCatching {
                 _communityUsers.value = repository.getCommunityUsers()
             }
             runCatching {
                 _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sortedBy { com.jellio.tv.ui.i18n.genreDisplayName(it) }
+            }
+        }
+    }
+
+    private fun syncRecommendationsToServer() {
+        viewModelScope.launch {
+            runCatching {
+                repository.saveProfileRecommendations(
+                    selectedGenres = _selectedGenres.value,
+                    customGenres = _customGenres.value,
+                )
             }
         }
     }
@@ -308,6 +351,7 @@ class SettingsViewModel @Inject constructor(
     fun toggleSelectedGenre(userId: String, genre: String) {
         viewModelScope.launch {
             _selectedGenres.value = recommendationPreferences.toggleSelectedGenre(userId, genre)
+            syncRecommendationsToServer()
         }
     }
 
@@ -315,6 +359,7 @@ class SettingsViewModel @Inject constructor(
         _selectedGenres.value = emptyList()
         viewModelScope.launch {
             recommendationPreferences.setSelectedGenres(userId, emptyList())
+            syncRecommendationsToServer()
         }
     }
 
@@ -339,18 +384,21 @@ class SettingsViewModel @Inject constructor(
             _customGenres.value = recommendationPreferences.addCustomGenre(userId, item)
             _genreSearchResult.value = null
             _genreSearchQuery.value = ""
+            syncRecommendationsToServer()
         }
     }
 
     fun removeCustomGenre(userId: String, name: String) {
         viewModelScope.launch {
             _customGenres.value = recommendationPreferences.removeCustomGenre(userId, name)
+            syncRecommendationsToServer()
         }
     }
 
     fun toggleCustomGenre(userId: String, name: String) {
         viewModelScope.launch {
             _customGenres.value = recommendationPreferences.toggleCustomGenre(userId, name)
+            syncRecommendationsToServer()
         }
     }
 }

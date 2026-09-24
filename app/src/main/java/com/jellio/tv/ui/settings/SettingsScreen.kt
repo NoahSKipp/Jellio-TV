@@ -113,6 +113,10 @@ import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.delay
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.ManualCheckResult
@@ -391,6 +395,7 @@ fun SettingsScreen(
                     val genreSearching by viewModel.genreSearching.collectAsState()
                     var customGenreInput by remember { mutableStateOf("") }
                     var customGenreFeedback by remember { mutableStateOf<String?>(null) }
+                    var genreToDelete by remember { mutableStateOf<String?>(null) }
 
                     SettingsSection(
                         title = string("home_customize"),
@@ -528,14 +533,14 @@ fun SettingsScreen(
                                     onClick = {
                                         val query = customGenreInput.trim()
                                         if (query.isBlank()) return@Surface
-                                        val inStandard = allGenres.any { it.equals(query, ignoreCase = true) }
-                                        if (inStandard) {
-                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.get("settings_custom_genres_exists")
+                                        val matchedEnabled = selectedGenres.find { it.equals(query, ignoreCase = true) }
+                                        if (matchedEnabled != null) {
+                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.format("settings_custom_genres_enabled_exists", matchedEnabled)
                                             return@Surface
                                         }
-                                        val inCustom = customGenres.any { it.name.equals(query, ignoreCase = true) }
-                                        if (inCustom) {
-                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.get("settings_custom_genres_exists")
+                                        val matchedCustom = customGenres.find { it.name.equals(query, ignoreCase = true) }
+                                        if (matchedCustom != null) {
+                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.format("settings_custom_genres_custom_exists", matchedCustom.name)
                                             return@Surface
                                         }
                                         viewModel.searchGenre(query)
@@ -567,20 +572,55 @@ fun SettingsScreen(
                                 val res = genreSearchResult!!
                                 if (res.Found && !res.Name.isNullOrBlank()) {
                                     val displayName = res.Name
-                                    val isAlreadyStandard = res.IsStandard || allGenres.any { it.equals(displayName, ignoreCase = true) }
-                                    val isAlreadyCustom = customGenres.any { it.name.equals(displayName, ignoreCase = true) }
+                                    val matchedEnabled = selectedGenres.find { it.equals(displayName, ignoreCase = true) }
+                                    val matchedCustom = customGenres.find { it.name.equals(displayName, ignoreCase = true) }
+                                    val isStandard = res.IsStandard || allGenres.any { it.equals(displayName, ignoreCase = true) }
+                                    val standardName = allGenres.find { it.equals(displayName, ignoreCase = true) } ?: displayName
 
                                     Column(modifier = Modifier.padding(top = 12.dp)) {
-                                        Text(
-                                            text = if (isAlreadyStandard || isAlreadyCustom) {
-                                                string("settings_custom_genres_exists")
-                                            } else {
-                                                formatString("settings_custom_genres_found", displayName)
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isAlreadyStandard || isAlreadyCustom) JellioTextSecondary else JellioSecondary,
-                                        )
-                                        if (!isAlreadyStandard && !isAlreadyCustom) {
+                                        if (matchedEnabled != null) {
+                                            Text(
+                                                text = formatString("settings_custom_genres_enabled_exists", matchedEnabled),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = JellioTextSecondary,
+                                            )
+                                        } else if (matchedCustom != null) {
+                                            Text(
+                                                text = formatString("settings_custom_genres_custom_exists", matchedCustom.name),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = JellioTextSecondary,
+                                            )
+                                        } else if (isStandard) {
+                                            Text(
+                                                text = formatString("settings_custom_genres_standard_available", standardName),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = JellioSecondary,
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Surface(
+                                                onClick = {
+                                                    viewModel.toggleSelectedGenre(session.userId, standardName)
+                                                    customGenreInput = ""
+                                                    customGenreFeedback = null
+                                                },
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = JellioSecondary,
+                                                    contentColor = JellioBg,
+                                                ),
+                                            ) {
+                                                Text(
+                                                    text = formatString("settings_custom_genres_enable_standard_btn", standardName),
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = formatString("settings_custom_genres_found", displayName),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = JellioSecondary,
+                                            )
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Surface(
                                                 onClick = {
@@ -624,27 +664,118 @@ fun SettingsScreen(
                                     modifier = Modifier.padding(bottom = 8.dp),
                                 )
                                 customGenres.forEach { custom ->
-                                    SettingsRowSurface(onClick = { viewModel.toggleCustomGenre(session.userId, custom.name) }) {
+                                    val statusDesc = if (custom.enabled) string("settings_genres_included") else string("settings_genres_excluded")
+                                    val holdHint = string("settings_custom_genres_hold_to_delete")
+                                    SettingsRowSurface(
+                                        onClick = { viewModel.toggleCustomGenre(session.userId, custom.name) },
+                                        onLongClick = { genreToDelete = custom.name },
+                                    ) {
                                         SettingsRowText(
                                             label = custom.name,
-                                            description = if (custom.enabled) string("settings_genres_included") else string("settings_genres_excluded"),
+                                            description = "$statusDesc · $holdHint",
                                             color = if (custom.enabled) JellioSecondary else JellioText,
                                         )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            SettingsSwitch(checked = custom.enabled)
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                        SettingsSwitch(checked = custom.enabled)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    genreToDelete?.let { name ->
+                        val cancelFocus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) {
+                            repeat(5) {
+                                if (runCatching { cancelFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+                                delay(50)
+                            }
+                        }
+                        Dialog(
+                            onDismissRequest = { genreToDelete = null },
+                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.65f))
+                            ) {
+                                Surface(
+                                    shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(16.dp)),
+                                    colors = ClickableSurfaceDefaults.colors(
+                                        containerColor = JellioBgElevated,
+                                        contentColor = JellioText,
+                                    ),
+                                    modifier = Modifier
+                                        .width(420.dp)
+                                        .padding(24.dp),
+                                    onClick = {},
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(20.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            text = string("settings_custom_genres_delete_title"),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = JellioText,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = formatString("settings_custom_genres_delete_prompt", name),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = JellioTextSecondary,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
                                             Surface(
-                                                onClick = { viewModel.removeCustomGenre(session.userId, custom.name) },
-                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
+                                                onClick = { genreToDelete = null },
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
                                                 colors = ClickableSurfaceDefaults.colors(
-                                                    containerColor = Color.White.copy(alpha = 0.08f),
-                                                    contentColor = Color.Red.copy(alpha = 0.8f),
+                                                    containerColor = Color.White.copy(alpha = 0.1f),
+                                                    contentColor = JellioText,
+                                                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
                                                 ),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .focusRequester(cancelFocus),
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.DeleteOutline,
-                                                    contentDescription = string("settings_custom_genres_remove"),
-                                                    modifier = Modifier.padding(6.dp).size(18.dp),
+                                                Text(
+                                                    text = string("action_cancel"),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    modifier = Modifier
+                                                        .padding(vertical = 10.dp)
+                                                        .fillMaxWidth(),
+                                                    textAlign = TextAlign.Center,
+                                                )
+                                            }
+                                            Surface(
+                                                onClick = {
+                                                    viewModel.removeCustomGenre(session.userId, name)
+                                                    genreToDelete = null
+                                                },
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = DangerColor.copy(alpha = 0.2f),
+                                                    contentColor = DangerColor,
+                                                    focusedContainerColor = DangerColor,
+                                                    focusedContentColor = Color.White,
+                                                ),
+                                                modifier = Modifier.weight(1f),
+                                            ) {
+                                                Text(
+                                                    text = string("action_delete"),
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier
+                                                        .padding(vertical = 10.dp)
+                                                        .fillMaxWidth(),
+                                                    textAlign = TextAlign.Center,
                                                 )
                                             }
                                         }
@@ -1116,6 +1247,7 @@ private fun SettingsDivider() {
 private fun SettingsRowSurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     danger: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -1123,6 +1255,7 @@ private fun SettingsRowSurface(
     val activeCategoryFocus = LocalActiveCategoryFocus.current
     Surface(
         onClick = onClick,
+        onLongClick = onLongClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,

@@ -1608,6 +1608,16 @@ class JellioRepository @Inject constructor(
 
     suspend fun getMyProfile(): ProfileDto = getProfileSettings()
 
+    suspend fun saveProfileRecommendations(
+        selectedGenres: List<String>?,
+        customGenres: List<com.jellio.tv.data.model.CustomGenreItem>?,
+    ): ProfileDto = api.saveProfileRecommendations(
+        com.jellio.tv.data.model.ProfileRecommendationsRequest(
+            selectedGenres = selectedGenres,
+            customGenres = customGenres,
+        )
+    )
+
     suspend fun setProfilePrivacy(isPrivate: Boolean) {
         api.setProfilePrivacy(SetPrivacyRequest(isPrivate))
     }
