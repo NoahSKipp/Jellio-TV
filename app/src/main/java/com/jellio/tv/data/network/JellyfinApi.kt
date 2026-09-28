@@ -217,6 +217,9 @@ interface JellyfinApi {
     @DELETE("Jellio/now-playing/live")
     suspend fun stopLiveWatching(): retrofit2.Response<Unit>
 
+    @GET("Jellio/now-playing")
+    suspend fun getNowPlaying(): List<com.jellio.tv.data.model.NowPlayingSessionDto>
+
     @GET("Jellio/LiveHealth")
     suspend fun getLiveHealth(): Map<String, com.jellio.tv.data.model.LiveChannelStatusDto>
 

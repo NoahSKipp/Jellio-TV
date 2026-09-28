@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Settings
@@ -29,6 +30,7 @@ sealed interface JellioRoute {
     data class Player(val itemId: String, val mediaSourceId: String? = null, val startPositionTicks: Long? = null) : JellioRoute
     data object LiveTv : JellioRoute
     data class LivePlayer(val channelId: String) : JellioRoute
+    data object NowPlaying : JellioRoute
 }
 
 fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<JellioRoute> = buildList {
@@ -40,6 +42,7 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
         else add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
     }
     add(JellioRoute.Feed)
+    add(JellioRoute.NowPlaying)
 }
 
 fun JellioRoute.icon(): ImageVector = when (this) {
@@ -60,6 +63,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     }
     JellioRoute.Settings -> Icons.Filled.Settings
     JellioRoute.LiveTv -> Icons.Filled.LiveTv
+    JellioRoute.NowPlaying -> Icons.Filled.GraphicEq
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> Icons.Filled.Home
 }
 
@@ -79,6 +83,7 @@ fun JellioRoute.label(): String = when (this) {
     is JellioRoute.LibraryTab -> com.jellio.tv.ui.i18n.libraryDisplayName(name, collectionType)
     JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
     JellioRoute.LiveTv -> com.jellio.tv.ui.i18n.Strings.get("nav_live_tv")
+    JellioRoute.NowPlaying -> com.jellio.tv.ui.i18n.Strings.get("nav_now_playing")
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""
 }
 

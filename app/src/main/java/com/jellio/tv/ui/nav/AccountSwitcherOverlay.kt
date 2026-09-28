@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
@@ -74,6 +75,7 @@ fun AccountSwitcherOverlay(
     onSignOut: () -> Unit,
     onOpenGroupWatch: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
+    onOpenNowPlaying: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AccountSwitcherViewModel = hiltViewModel(),
 ) {
@@ -172,6 +174,22 @@ fun AccountSwitcherOverlay(
                             androidx.tv.material3.Icon(
                                 imageVector = Icons.Filled.Notifications,
                                 contentDescription = com.jellio.tv.ui.i18n.string("notifications_title"),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
+                            )
+                        }
+                        Surface(
+                            onClick = { onDismiss(); onOpenNowPlaying() },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = JellioBg,
+                                contentColor = JellioText,
+                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                                focusedContentColor = JellioText,
+                            ),
+                        ) {
+                            androidx.tv.material3.Icon(
+                                imageVector = Icons.Filled.GraphicEq,
+                                contentDescription = com.jellio.tv.ui.i18n.string("now_playing_title"),
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
                             )
                         }

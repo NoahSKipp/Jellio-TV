@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,8 +46,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
@@ -86,6 +89,7 @@ fun SidebarNav(
     onFocusChange: (Boolean) -> Unit = {},
     libraries: List<com.jellio.tv.data.model.BaseItemDto>? = null,
     onLibrarySelect: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
+    nowPlayingCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -159,12 +163,14 @@ fun SidebarNav(
             val isSelfProfile = route is JellioRoute.Profile && route.userId == null
             val isLibrary = route is JellioRoute.Library
             val matchesSelected = (route == selected) || (route is JellioRoute.Home && selected is JellioRoute.Home)
+            val isNowPlaying = route is JellioRoute.NowPlaying
 
             SidebarItem(
                 icon = route.icon(),
                 iconScale = route.iconScale(),
                 label = if (isSelfProfile && !profileName.isNullOrBlank()) profileName else route.label(),
                 avatarUrl = if (isSelfProfile) profileAvatarUrl else null,
+                badgeCount = if (isNowPlaying) nowPlayingCount else 0,
                 isSelected = matchesSelected,
                 expanded = visuallyExpanded,
                 enabled = enabled,
@@ -198,6 +204,7 @@ private fun SidebarItem(
     homeFocusRequester: FocusRequester? = null,
     iconScale: Float = 1f,
     avatarUrl: String? = null,
+    badgeCount: Int = 0,
     height: androidx.compose.ui.unit.Dp = SidebarItemHeight,
     focusable: Boolean = true,
 ) {
@@ -261,23 +268,66 @@ private fun SidebarItem(
                         modifier = Modifier.size(minOf(SidebarIconSize.scaled() * 1.35f, height - 8.dp)).clip(CircleShape),
                     )
                 } else {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = if (!expanded) label else null,
-                        tint = LocalContentColor.current,
-                        modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = if (!expanded) label else null,
+                            tint = LocalContentColor.current,
+                            modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
+                        )
+                        if (badgeCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(start = 14.dp, bottom = 12.dp)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF22C55E)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = if (badgeCount > 9) "9+" else badgeCount.toString(),
+                                    color = Color.Black,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            Box(modifier = Modifier.width(labelWidth).clipToBounds()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .width(labelWidth)
+                    .clipToBounds()
+                    .alpha(labelAlpha)
+                    .padding(end = 16.dp),
+            ) {
                 Text(
                     text = label,
                     color = LocalContentColor.current,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.alpha(labelAlpha).padding(end = 16.dp),
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                if (badgeCount > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF22C55E).copy(alpha = 0.2f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = badgeCount.toString(),
+                            color = Color(0xFF22C55E),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
             }
         }
     }

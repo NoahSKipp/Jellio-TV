@@ -72,6 +72,18 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val deepLinkItemId = mutableStateOf<String?>(null)
     private var isPlayerActive: Boolean = false
+    var onMenuPressed: (() -> Unit)? = null
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
+            val handler = onMenuPressed
+            if (handler != null) {
+                handler.invoke()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
@@ -262,6 +274,10 @@ private fun JellioTvApp(
     LaunchedEffect(session.userId) { showAccountSwitcher = false }
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
+    var showNowPlayingDrawer by remember { mutableStateOf(false) }
+    val nowPlayingSessions by appViewModel.nowPlayingManager.sessions.collectAsState()
+    val nowPlayingActiveCount by appViewModel.nowPlayingManager.activeCount.collectAsState()
+    val nowPlayingLocalPaused by appViewModel.nowPlayingManager.localPaused.collectAsState()
     var showChangelog by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(false) }
     var initialAudioLang by remember { mutableStateOf<String?>(null) }
@@ -298,6 +314,17 @@ private fun JellioTvApp(
     var sidebarHasRealFocus by remember { mutableStateOf(false) }
     var sidebarForceCollapsed by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+
+    androidx.compose.runtime.DisposableEffect(route, showNowPlayingDrawer) {
+        (context as? MainActivity)?.onMenuPressed = {
+            if (!route.isImmersive()) {
+                showNowPlayingDrawer = !showNowPlayingDrawer
+            }
+        }
+        onDispose {
+            (context as? MainActivity)?.onMenuPressed = null
+        }
+    }
 
     fun switchTab(target: JellioRoute) {
         routeStack = listOf(target)
@@ -416,6 +443,7 @@ private fun JellioTvApp(
                     }
                 },
                 onPlay = onPlay,
+                onOpenNowPlaying = { showNowPlayingDrawer = true },
                 onPlayManually = { item ->
                     scope.launch {
                         when (val action = appViewModel.resolvePlayAction(session, item, forceChoice = true)) {
@@ -542,6 +570,7 @@ private fun JellioTvApp(
                     onBack = { routeStack = routeStack.dropLast(1) },
                 )
             }
+            JellioRoute.NowPlaying -> Unit
         }
         }
 
@@ -571,9 +600,12 @@ private fun JellioTvApp(
                 items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
-                focusable = !homeEditMode && !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding),
+                focusable = !homeEditMode && !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding || showNowPlayingDrawer),
+                nowPlayingCount = nowPlayingActiveCount,
                 onSelect = { clicked ->
-                    if (clicked is JellioRoute.Library) {
+                    if (clicked is JellioRoute.NowPlaying) {
+                        showNowPlayingDrawer = true
+                    } else if (clicked is JellioRoute.Library) {
                         showLibraryPicker = true
                     } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
                         showAccountSwitcher = true
@@ -608,6 +640,7 @@ private fun JellioTvApp(
                     onSignOut = { appViewModel.logout() },
                     onOpenGroupWatch = { showGroupWatch = true },
                     onOpenNotifications = { showNotifications = true },
+                    onOpenNowPlaying = { showNowPlayingDrawer = true },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -671,6 +704,46 @@ private fun JellioTvApp(
                         com.jellio.tv.ui.changelog.ChangelogPrefs.markSeen(context, changelogReleaseToDisplay.version)
                         showChangelog = false
                     },
+                )
+            }
+            if (showNowPlayingDrawer) {
+                com.jellio.tv.ui.nowplaying.NowPlayingDrawer(
+                    session = session,
+                    sessions = nowPlayingSessions,
+                    localPaused = nowPlayingLocalPaused,
+                    onDismiss = {
+                        showNowPlayingDrawer = false
+                        runCatching { sidebarFocusRequester.requestFocus() }
+                    },
+                    onHandoff = { sess ->
+                        showNowPlayingDrawer = false
+                        sess.Item?.Id?.let { itemId ->
+                            playItem(itemId, startPositionTicks = sess.PositionTicks)
+                        }
+                    },
+                    onNavigateToDetail = { itemId ->
+                        showNowPlayingDrawer = false
+                        onNavigateToDetail(itemId)
+                    },
+                    onTuneIn = { channelId ->
+                        showNowPlayingDrawer = false
+                        push(JellioRoute.LivePlayer(channelId))
+                    },
+                    onJoinWatchParty = { sess ->
+                        showNowPlayingDrawer = false
+                        showGroupWatch = true
+                    },
+                    onResumeLocal = {
+                        showNowPlayingDrawer = false
+                        nowPlayingLocalPaused?.let { paused ->
+                            playItem(paused.itemId, startPositionTicks = paused.positionTicks)
+                        }
+                    },
+                    onDismissLocal = {
+                        appViewModel.nowPlayingManager.setLocalPaused(null)
+                    },
+                    rawImageUrl = memoizedRawImageUrl,
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }

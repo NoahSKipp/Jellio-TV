@@ -90,11 +90,15 @@ fun HomeScreen(
     onEditModeChange: (Boolean) -> Unit = {},
     onPlay: (BaseItemDto) -> Unit,
     onPlayManually: (BaseItemDto) -> Unit,
+    onOpenNowPlaying: () -> Unit = {},
     modifier: Modifier = Modifier,
     initialEditMode: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val nowPlayingSessions by viewModel.nowPlayingSessions.collectAsState()
+    val nowPlayingActiveCount by viewModel.nowPlayingActiveCount.collectAsState()
+    val nowPlayingLocalPaused by viewModel.nowPlayingLocalPaused.collectAsState()
     val listState = com.jellio.tv.ui.common.rememberTvColumnState()
     // The seasonal scenes hold their frame while the rows scroll.
     LaunchedEffect(listState) {
@@ -195,6 +199,16 @@ fun HomeScreen(
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
                         .height(topFixtureHeight + HeaderOverlap),
+                )
+
+                com.jellio.tv.ui.nowplaying.NowPlayingPill(
+                    activeCount = nowPlayingActiveCount,
+                    topSession = nowPlayingSessions.firstOrNull(),
+                    localPaused = nowPlayingLocalPaused,
+                    onClick = onOpenNowPlaying,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 28.dp, end = 40.dp),
                 )
 
                 // Scrollable rows in the bottom viewport

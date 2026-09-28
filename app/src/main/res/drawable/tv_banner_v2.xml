@@ -5,16 +5,17 @@
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
-    <!-- The launcher icon's indigo, with rounded corners. -->
-    <path android:pathData="M22,0h276a22,22 0 0,1 22,22v136a22,22 0 0,1 -22,22h-276a22,22 0 0,1 -22,-22v-136a22,22 0 0,1 22,-22z">
+    <!-- The launcher banner rich purple-pink gradient, full 16:9 canvas. -->
+    <path android:pathData="M0,0h320v180h-320z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="radial"
                 android:centerX="160"
                 android:centerY="84"
                 android:gradientRadius="190">
-                <item android:offset="0" android:color="#FF464C6E" />
-                <item android:offset="1" android:color="#FF2C3047" />
+                <item android:offset="0" android:color="#FF5B2C8C" />
+                <item android:offset="0.55" android:color="#FF3A1A60" />
+                <item android:offset="1" android:color="#FF1F0F35" />
             </gradient>
         </aapt:attr>
     </path>

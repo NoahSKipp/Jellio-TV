@@ -124,7 +124,11 @@ class HomeViewModel @Inject constructor(
     private val watchNextSyncer: WatchNextSyncer,
     private val recommendationPreferences: RecommendationPreferences,
     private val rowSnapshotStore: RowSnapshotStore,
+    val nowPlayingManager: com.jellio.tv.data.nowplaying.NowPlayingManager,
 ) : ViewModel() {
+    val nowPlayingSessions = nowPlayingManager.sessions
+    val nowPlayingActiveCount = nowPlayingManager.activeCount
+    val nowPlayingLocalPaused = nowPlayingManager.localPaused
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -175,6 +179,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun load(session: Session) {
+        nowPlayingManager.startPolling(session)
         val loadKey = "${session.userId}:${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}"
         val isReturningVisit = loadedForUserId == loadKey
         loadedForUserId = loadKey

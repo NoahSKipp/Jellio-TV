@@ -36,6 +36,7 @@ class AppViewModel @Inject constructor(
     private val streamPreferences: StreamPreferences,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
     val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
+    val nowPlayingManager: com.jellio.tv.data.nowplaying.NowPlayingManager,
 ) : ViewModel() {
     val authState: StateFlow<AuthState> = repository.sessionFlow
         .map { session -> if (session != null) AuthState.LoggedIn(session) else AuthState.LoggedOut }
