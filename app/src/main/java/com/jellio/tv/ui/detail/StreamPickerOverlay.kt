@@ -3,6 +3,7 @@ package com.jellio.tv.ui.detail
 import kotlinx.coroutines.async
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -221,6 +223,7 @@ fun StreamPickerOverlay(
     var remembered by remember { mutableStateOf<String?>(null) }
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
     var selectedQuality by remember { mutableStateOf<String?>(null) }
+    var selectedEdition by remember { mutableStateOf<String?>(null) }
     var readyInfo by remember { mutableStateOf<com.jellio.tv.data.streams.ReadyInfo?>(null) }
     val initialFocusRequester = remember { FocusRequester() }
     val resumeFocusRequester = remember { FocusRequester() }
@@ -444,12 +447,21 @@ fun StreamPickerOverlay(
                         qualities.forEach { map[it] = FocusRequester() }
                         map
                     }
+                    val editions = remember(currentState.sources) { EditionParser.getAvailableEditions(currentState.sources) }
+                    val showEditions = editions.size > 1
+                    val editionFocusRequesters = remember(editions) {
+                        val map = mutableMapOf<String?, FocusRequester>()
+                        map[null] = FocusRequester()
+                        editions.forEach { map[it] = FocusRequester() }
+                        map
+                    }
                     val showLanguages = languages.size > 1
                     val showQualities = qualities.size > 1
-                    // Language and quality combine: a source has to match both.
+                    // Language, quality, and edition combine: a source has to match all active filters.
                     val filteredSources = currentState.sources.filter { source ->
                         (selectedLanguage == null || sourceAudioLanguages(source).contains(selectedLanguage)) &&
-                            (selectedQuality == null || sourceQuality(source) == selectedQuality)
+                            (selectedQuality == null || sourceQuality(source) == selectedQuality) &&
+                            (selectedEdition == null || EditionParser.detectSourceEdition(source, currentState.sources) == selectedEdition)
                     }
 
                     android.util.Log.d(
@@ -488,16 +500,29 @@ fun StreamPickerOverlay(
                                 }
                             }
                         }
+                        item(key = "header_edition_chips") {
+                            if (showEditions) {
+                                FilterChipRow(
+                                    chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.string("stream_all")) + editions.map { it to it },
+                                    selected = selectedEdition,
+                                    onSelect = { selectedEdition = it },
+                                    firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                                    chipFocusRequesters = editionFocusRequesters,
+                                    upTarget = if (resumeTicks > 0) resumeFocusRequester else null,
+                                    topPadding = 20.dp,
+                                )
+                            }
+                        }
                         item(key = "header_chips") {
                             if (showLanguages) {
                                 FilterChipRow(
                                     chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.string("stream_all")) + languages.map { it to languageName(it) },
                                     selected = selectedLanguage,
                                     onSelect = { selectedLanguage = it },
-                                    firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
+                                    firstChipFocusRequester = if (resumeTicks <= 0 && !showEditions) initialFocusRequester else null,
                                     chipFocusRequesters = chipFocusRequesters,
-                                    // Up from the badges goes back to Resume from.
-                                    upTarget = if (resumeTicks > 0) resumeFocusRequester else null,
+                                    upTarget = if (showEditions) editionFocusRequesters[selectedEdition] else if (resumeTicks > 0) resumeFocusRequester else null,
+                                    topPadding = if (showEditions) 12.dp else 20.dp,
                                 )
                             }
                         }
@@ -507,10 +532,10 @@ fun StreamPickerOverlay(
                                     chips = listOf<Pair<String?, String>>(null to "All") + qualities.map { it to it },
                                     selected = selectedQuality,
                                     onSelect = { selectedQuality = it },
-                                    firstChipFocusRequester = if (resumeTicks <= 0 && !showLanguages) initialFocusRequester else null,
+                                    firstChipFocusRequester = if (resumeTicks <= 0 && !showEditions && !showLanguages) initialFocusRequester else null,
                                     chipFocusRequesters = qualityFocusRequesters,
-                                    upTarget = if (showLanguages) chipFocusRequesters[selectedLanguage] else if (resumeTicks > 0) resumeFocusRequester else null,
-                                    topPadding = if (showLanguages) 12.dp else 20.dp,
+                                    upTarget = if (showLanguages) chipFocusRequesters[selectedLanguage] else if (showEditions) editionFocusRequesters[selectedEdition] else if (resumeTicks > 0) resumeFocusRequester else null,
+                                    topPadding = if (showLanguages || showEditions) 12.dp else 20.dp,
                                 )
                             }
                         }
@@ -660,6 +685,20 @@ internal fun SourceCard(
         Column(modifier = Modifier.padding(12.dp)) {
             if (recentlyFailed) {
                 Text(text = com.jellio.tv.ui.i18n.string("stream_bad_flag"), color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
+            }
+            val editionTag = EditionParser.rawEditionTag(source)
+            if (editionTag != null) {
+                Text(
+                    text = editionTag,
+                    color = Color(0xFFF472B6),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .background(Color(0xFF9333EA).copy(alpha = 0.25f), RoundedCornerShape(999.dp))
+                        .border(1.dp, Color(0xFFEC4899).copy(alpha = 0.5f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
             }
             if (classification != null) {
                 OutlookBadge(com.jellio.tv.data.playback.playbackOutlook(classification, policy.policy))

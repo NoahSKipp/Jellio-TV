@@ -73,6 +73,12 @@ class DetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
+    private val _availableEditions = MutableStateFlow<List<String>>(emptyList())
+    val availableEditions: StateFlow<List<String>> = _availableEditions.asStateFlow()
+
+    private val _selectedEdition = MutableStateFlow<String?>(null)
+    val selectedEdition: StateFlow<String?> = _selectedEdition.asStateFlow()
+
     private var loadedItemId: String? = null
     private var ratingTargetId: String? = null
     private var loadJob: Job? = null
@@ -96,6 +102,8 @@ class DetailViewModel @Inject constructor(
         playPrefetchJob = null
         seriesPlayDeferred?.cancel()
         seriesPlayDeferred = null
+        _availableEditions.value = emptyList()
+        _selectedEdition.value = null
     }
 
     private fun isCurrentSeries(seriesId: String, ownerItemId: String? = loadedItemId): Boolean =
@@ -491,6 +499,10 @@ class DetailViewModel @Inject constructor(
                 markTodayItemHasStream(itemId, hasStream)
             }
             warmSecondSource(session, itemId, sources.getOrNull().orEmpty(), openedAt)
+            val list = sources.getOrNull().orEmpty()
+            val available = EditionParser.getAvailableEditions(list)
+            _availableEditions.value = available
+            _selectedEdition.value = available.firstOrNull()
             _uiState.value = _uiState.value.copy(
                 findingStreams = false,
                 streamVerifiedTick = _uiState.value.streamVerifiedTick + 1,
@@ -523,13 +535,24 @@ class DetailViewModel @Inject constructor(
     suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
         runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
 
+    fun selectEdition(edition: String) {
+        if (_selectedEdition.value != edition) {
+            _selectedEdition.value = edition
+        }
+    }
+
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
+        val edition = _selectedEdition.value
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
             if (remembered != null) {
                 val sources = getMediaSources(session, item.Id)
-                if (sources.any { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }) {
-                    return PlayAction.Direct(item.Id, remembered)
+                val rememberedSource = sources.firstOrNull { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }
+                if (rememberedSource != null) {
+                    val editionMatches = edition == null || EditionParser.detectSourceEdition(rememberedSource, sources) == edition
+                    if (editionMatches) {
+                        return PlayAction.Direct(item.Id, remembered)
+                    }
                 }
             }
         }

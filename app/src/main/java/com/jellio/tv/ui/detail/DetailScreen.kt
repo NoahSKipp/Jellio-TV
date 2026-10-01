@@ -152,6 +152,8 @@ fun DetailScreen(
     viewModel: DetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val availableEditions by viewModel.availableEditions.collectAsState()
+    val selectedEdition by viewModel.selectedEdition.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
@@ -234,6 +236,9 @@ fun DetailScreen(
                                     session = session,
                                     item = item,
                                     state = uiState,
+                                    availableEditions = availableEditions,
+                                    selectedEdition = selectedEdition,
+                                    onSelectEdition = { viewModel.selectEdition(it) },
                                     onRetryDetails = { viewModel.retry(session, itemId) },
                                     onPlayFocusChanged = { viewModel.onPlayFocusChanged(session, it) },
                                     imageUrl = imageUrl,
@@ -411,6 +416,9 @@ private fun DetailHero(
     onDislike: () -> Unit,
     onRetryDetails: (() -> Unit)? = null,
     onPlayFocusChanged: (Boolean) -> Unit = {},
+    availableEditions: List<String> = emptyList(),
+    selectedEdition: String? = null,
+    onSelectEdition: (String) -> Unit = {},
 ) {
     val season = state.selectedSeason?.takeIf { item.Type == "Series" }
     // Backdrops, Thumb, then the poster blurred; a failed load moves on to the
@@ -544,6 +552,46 @@ private fun DetailHero(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 16.dp),
                 )
+            }
+
+            if (availableEditions.size > 1) {
+                Row(
+                    modifier = Modifier.padding(top = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    availableEditions.forEach { edition ->
+                        val isSelected = edition == selectedEdition
+                        Surface(
+                            onClick = { onSelectEdition(edition) },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = if (isSelected) JellioSecondary.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.08f),
+                                contentColor = if (isSelected) Color.White else JellioTextSecondary,
+                                focusedContainerColor = JellioSecondary,
+                                focusedContentColor = Color.White,
+                            ),
+                            border = ClickableSurfaceDefaults.border(
+                                border = Border(
+                                    border = BorderStroke(1.dp, if (isSelected) JellioSecondary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.15f)),
+                                    shape = RoundedCornerShape(999.dp),
+                                ),
+                                focusedBorder = Border(
+                                    border = BorderStroke(2.dp, Color.White),
+                                    shape = RoundedCornerShape(999.dp),
+                                ),
+                            ),
+                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
+                        ) {
+                            Text(
+                                text = edition,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
             }
 
             var actionsExpanded by remember(item.Id) { mutableStateOf(false) }

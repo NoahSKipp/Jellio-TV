@@ -584,10 +584,14 @@ internal fun SourcePanel(
     val needsReencode = remember(sources) {
         sources.filter { policy.avoiding && policy.needsReencode(it) }.mapNotNull { it.Id }.toSet()
     }
-    // Same language and quality chips as the stream picker before playback,
+    // Same edition, language, and quality chips as the stream picker before playback,
     // combinable the same way.
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
     var selectedQuality by remember { mutableStateOf<String?>(null) }
+    var selectedEdition by remember { mutableStateOf<String?>(null) }
+    val editions = remember(sources) { com.jellio.tv.ui.detail.EditionParser.getAvailableEditions(sources) }
+    val showEditions = editions.size > 1
+    val editionFocus = remember(editions) { (listOf<String?>(null) + editions).associateWith { FocusRequester() } }
     val languages = remember(sources) {
         val counts = linkedMapOf<String, Int>()
         sources.forEach { source -> sourceAudioLanguages(source).forEach { code -> counts[code] = (counts[code] ?: 0) + 1 } }
@@ -603,7 +607,8 @@ internal fun SourcePanel(
     val showQualities = qualities.size > 1
     val filtered = sources.filter { source ->
         (selectedLanguage == null || sourceAudioLanguages(source).contains(selectedLanguage)) &&
-            (selectedQuality == null || sourceQuality(source) == selectedQuality)
+            (selectedQuality == null || sourceQuality(source) == selectedQuality) &&
+            (selectedEdition == null || com.jellio.tv.ui.detail.EditionParser.detectSourceEdition(source, sources) == selectedEdition)
     }.sortedBy { if (it.Id in needsReencode) 1 else 0 }
     Box(
         modifier = Modifier
@@ -626,6 +631,17 @@ internal fun SourcePanel(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 4.dp),
             ) {
+                if (showEditions) {
+                    item(key = "editions") {
+                        FilterChipRow(
+                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + editions.map { it to it },
+                            selected = selectedEdition,
+                            onSelect = { selectedEdition = it },
+                            chipFocusRequesters = editionFocus,
+                            topPadding = 12.dp,
+                        )
+                    }
+                }
                 if (showLanguages) {
                     item(key = "languages") {
                         FilterChipRow(
@@ -633,7 +649,8 @@ internal fun SourcePanel(
                             selected = selectedLanguage,
                             onSelect = { selectedLanguage = it },
                             chipFocusRequesters = languageFocus,
-                            topPadding = 12.dp,
+                            upTarget = if (showEditions) editionFocus[selectedEdition] else null,
+                            topPadding = if (showEditions) 0.dp else 12.dp,
                         )
                     }
                 }
@@ -644,8 +661,8 @@ internal fun SourcePanel(
                             selected = selectedQuality,
                             onSelect = { selectedQuality = it },
                             chipFocusRequesters = qualityFocus,
-                            upTarget = if (showLanguages) languageFocus[selectedLanguage] else null,
-                            topPadding = if (showLanguages) 0.dp else 12.dp,
+                            upTarget = if (showLanguages) languageFocus[selectedLanguage] else if (showEditions) editionFocus[selectedEdition] else null,
+                            topPadding = if (showLanguages || showEditions) 0.dp else 12.dp,
                         )
                     }
                 }

@@ -101,12 +101,23 @@ fun SearchScreen(
         }
     }
 
-    val isVoiceSupported = remember(context) {
-        runCatching {
-            android.speech.SpeechRecognizer.isRecognitionAvailable(context) ||
-                context.packageManager.queryIntentActivities(voiceIntent, 0).isNotEmpty()
-        }.getOrDefault(false)
+    val isAmazonDevice = remember {
+        android.os.Build.MANUFACTURER.equals("Amazon", ignoreCase = true) ||
+            android.os.Build.BRAND.equals("Amazon", ignoreCase = true)
     }
+
+    val isVoiceSupported = remember(context, isAmazonDevice) {
+        if (isAmazonDevice) {
+            false
+        } else {
+            runCatching {
+                android.speech.SpeechRecognizer.isRecognitionAvailable(context) &&
+                    context.packageManager.queryIntentActivities(voiceIntent, 0).isNotEmpty()
+            }.getOrDefault(false)
+        }
+    }
+
+    var isEditingQuery by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -150,7 +161,9 @@ fun SearchScreen(
                             ).show()
                         }
                     } else {
-                        // Graceful Firestick fallback: guides user on remote dictation instead of crashing
+                        // On Firestick / devices without Google Speech Services:
+                        // Open the search field keyboard and guide the user to hold the remote mic button
+                        isEditingQuery = true
                         Toast.makeText(
                             context,
                             Strings.get("search_voice_firestick_hint"),
@@ -187,6 +200,8 @@ fun SearchScreen(
                 value = uiState.query,
                 onValueChange = { viewModel.onQueryChange(session, it) },
                 label = com.jellio.tv.ui.i18n.string("search_placeholder"),
+                isEditing = isEditingQuery,
+                onEditingChange = { isEditingQuery = it },
                 modifier = Modifier.width(480.dp),
             )
 
@@ -306,14 +321,15 @@ private fun TvSearchField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    isEditing: Boolean,
+    onEditingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isEditing by remember { mutableStateOf(false) }
     val fieldSurfaceFocusRequester = remember { FocusRequester() }
     val inputFocusRequester = remember { FocusRequester() }
 
     BackHandler(enabled = isEditing) {
-        isEditing = false
+        onEditingChange(false)
         runCatching { fieldSurfaceFocusRequester.requestFocus() }
     }
 
@@ -336,11 +352,11 @@ private fun TvSearchField(
             ),
             keyboardActions = KeyboardActions(
                 onSearch = {
-                    isEditing = false
+                    onEditingChange(false)
                     runCatching { fieldSurfaceFocusRequester.requestFocus() }
                 },
                 onDone = {
-                    isEditing = false
+                    onEditingChange(false)
                     runCatching { fieldSurfaceFocusRequester.requestFocus() }
                 },
             ),
@@ -370,7 +386,7 @@ private fun TvSearchField(
         )
     } else {
         Surface(
-            onClick = { isEditing = true },
+            onClick = { onEditingChange(true) },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
             scale = ClickableSurfaceDefaults.scale(
                 focusedScale = 1.02f,
