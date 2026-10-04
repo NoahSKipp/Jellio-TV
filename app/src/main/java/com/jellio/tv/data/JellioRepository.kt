@@ -285,9 +285,10 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300): String {
+    fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300, accessToken: String? = null): String {
         val base = "$serverAddress/Users/$userId/Images/Primary?maxWidth=$maxWidth"
-        return if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+        val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+        return if (!accessToken.isNullOrEmpty()) "$withTag&api_key=$accessToken" else withTag
     }
 
     // Real Controllers/ProfileBannerController.cs's own GET {userId}:
@@ -1201,6 +1202,24 @@ class JellioRepository @Inject constructor(
         return if (!token.isNullOrEmpty()) "$base?api_key=$token" else base
     }
 
+    private fun canDirectPlayAudio(codec: String?): Boolean {
+        val c = codec?.lowercase() ?: return false
+        if (c in setOf("aac", "mp3", "opus", "vorbis", "flac")) return true
+        val mimeType = when (c) {
+            "ac3" -> "audio/ac3"
+            "eac3" -> "audio/eac3"
+            else -> return false // DTS, TrueHD, etc. have no native software decoder in Android/Media3
+        }
+        return try {
+            val list = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+            list.codecInfos.any { info ->
+                !info.isEncoder && info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
         if (mediaSource.SupportsDirectPlay == false && mediaSource.SupportsDirectStream == false) return false
         val container = mediaSource.Container?.lowercase() ?: return false
@@ -1209,7 +1228,7 @@ class JellioRepository @Inject constructor(
         val video = streams.firstOrNull { it.Type == "Video" }
         val audio = streams.firstOrNull { it.Type == "Audio" }
         if (video != null && video.Codec?.lowercase() !in DIRECT_PLAY_VIDEO_CODECS) return false
-        if (audio != null && audio.Codec?.lowercase() !in DIRECT_PLAY_AUDIO_CODECS) return false
+        if (audio != null && !canDirectPlayAudio(audio.Codec)) return false
         return true
     }
 
@@ -1231,18 +1250,16 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    // No auth header on image requests yet (real gap, tracked, not
-    // hidden): most self-hosted Jellyfin instances leave image
-    // serving open, but a hardened one may not, and this app's own
-    // Coil setup does not attach the session token to these requests.
     fun imageUrl(
         serverAddress: String,
         itemId: String,
         tag: String?,
         imageType: String = "Primary",
         maxWidth: Int = 400,
+        accessToken: String? = null,
     ): String {
         val base = "$serverAddress/Items/$itemId/Images/$imageType?maxWidth=$maxWidth"
-        return if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+        val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+        return if (!accessToken.isNullOrEmpty()) "$withTag&api_key=$accessToken" else withTag
     }
 }

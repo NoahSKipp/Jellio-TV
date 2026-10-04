@@ -50,7 +50,7 @@ class WatchNextSyncer @Inject constructor(
 
     private fun posterUri(session: Session, item: BaseItemDto): Uri? {
         val tag = item.ImageTags?.get("Primary") ?: return null
-        return Uri.parse(repository.imageUrl(session.serverAddress, item.Id, tag, "Primary", 400))
+        return Uri.parse(repository.imageUrl(session.serverAddress, item.Id, tag, "Primary", 400, session.accessToken))
     }
 
     private fun displayTitle(item: BaseItemDto): String =

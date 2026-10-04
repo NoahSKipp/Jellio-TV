@@ -27,17 +27,19 @@ android {
         // upgrade). Falls back to 1 for a local dev build with no
         // real CI run behind it.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()) ?: 1
-        versionName = "0.19.0"
+        versionName = "0.19.1"
     }
 
-    val signingKeystore = System.getenv("SIGNING_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }?.let { file(it) }
+    val signingKeystore = (System.getenv("SIGNING_KEYSTORE_FILE") ?: System.getenv("SIGNING_KEYSTORE_PATH"))
+        ?.takeIf { it.isNotBlank() }?.let { file(it) }
+        ?: file("/home/noahsk/jellio-tv.keystore").takeIf { it.exists() }
     signingConfigs {
         if (signingKeystore != null && signingKeystore.exists()) {
             create("sideload") {
                 storeFile = signingKeystore
                 storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "jellio"
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: System.getenv("SIGNING_STORE_PASSWORD")
             }
         }
     }
@@ -48,6 +50,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("sideload")?.let { signingConfig = it }
         }
     }
 

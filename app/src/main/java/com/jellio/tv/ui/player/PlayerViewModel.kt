@@ -409,7 +409,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {
         val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
-        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400) }
+        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken) }
         val title = if (episode.IndexNumber != null && episode.ParentIndexNumber != null) {
             "S${episode.ParentIndexNumber} E${episode.IndexNumber} · ${episode.Name.orEmpty()}"
         } else {
@@ -431,12 +431,12 @@ class PlayerViewModel @Inject constructor(
         val primaryTag = if (isEpisode) item.SeriesPrimaryImageTag else item.ImageTags?.get("Primary")
         val tag = backdropTag ?: primaryTag
         val backdropUrl = tag?.let {
-            repository.imageUrl(session.serverAddress, artId, it, if (backdropTag != null) "Backdrop" else "Primary", 1600)
+            repository.imageUrl(session.serverAddress, artId, it, if (backdropTag != null) "Backdrop" else "Primary", 1600, session.accessToken)
         }
         val logoTag = if (isEpisode) item.ParentLogoImageTag else item.ImageTags?.get("Logo")
         val logoArtId = if (isEpisode && item.ParentLogoItemId != null) item.ParentLogoItemId else artId
         val logoUrl = logoTag?.let {
-            repository.imageUrl(session.serverAddress, logoArtId, it, "Logo", 800)
+            repository.imageUrl(session.serverAddress, logoArtId, it, "Logo", 800, session.accessToken)
         }
         val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
         return PauseOverlayInfo(
@@ -755,7 +755,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun buildEpisodePanelEntry(session: Session, episode: BaseItemDto): EpisodePanelEntry {
         val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
-        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400) }
+        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken) }
         val hasCode = episode.ParentIndexNumber != null && episode.IndexNumber != null
         return EpisodePanelEntry(
             itemId = episode.Id,

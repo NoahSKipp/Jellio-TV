@@ -99,5 +99,5 @@ class AccountSwitcherViewModel @Inject constructor(
     }
 
     fun avatarUrl(session: Session, userId: String, tag: String?): String =
-        repository.userImageUrl(session.serverAddress, userId, tag)
+        repository.userImageUrl(session.serverAddress, userId, tag, accessToken = session.accessToken)
 }
