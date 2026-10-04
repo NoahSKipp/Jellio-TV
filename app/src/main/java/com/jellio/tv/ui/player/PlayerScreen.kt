@@ -75,6 +75,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -313,7 +314,13 @@ private fun PlayerSurface(
             .setSubtitleConfigurations(subtitleConfigs)
             .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setSubtitle(subtitle).build())
             .build()
-        ExoPlayer.Builder(context).build().apply {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+        ExoPlayer.Builder(context)
+            .setAudioAttributes(audioAttributes, true)
+            .build().apply {
             setMediaItem(mediaItem)
             // Real port of screens/player.js's own hasResumePosition
             // gate: autoplay stays off until the reader actually picks
@@ -410,6 +417,22 @@ private fun PlayerSurface(
                     onMarkRealWatchComplete()
                 }
             }
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                if (directPlay && tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
+                    val targetIndex = selectedAudioStreamIndex ?: defaultAudioStreamIndex
+                    val ordinal = audioTracks.indexOfFirst { it.streamIndex == targetIndex }
+                    if (ordinal >= 0) {
+                        val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+                        val group = audioGroups.getOrNull(ordinal)
+                        if (group != null && group.isSupported) {
+                            val params = player.trackSelectionParameters.buildUpon()
+                            params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                            params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
+                            player.trackSelectionParameters = params.build()
+                        }
+                    }
+                }
+            }
         }
         player.addListener(listener)
         onDispose {
@@ -462,6 +485,7 @@ private fun PlayerSurface(
         if (ordinal < 0) return@LaunchedEffect
         val audioGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
         val group = audioGroups.getOrNull(ordinal) ?: return@LaunchedEffect
+        if (!group.isSupported) return@LaunchedEffect
         val params = player.trackSelectionParameters.buildUpon()
         params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
         params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
@@ -676,9 +700,7 @@ private fun PlayerSurface(
                         true
                     }
                     Key.DirectionCenter, Key.Enter, Key.MediaPlayPause -> {
-                        if (controlsVisible) {
-                            if (player.isPlaying) player.pause() else player.play()
-                        }
+                        if (player.isPlaying) player.pause() else player.play()
                         controlsVisible = true
                         scrubFrame = null
                         scrubPositionMs = null
@@ -944,16 +966,33 @@ private fun PlayerControls(
             }
         }
 
-        Box(
-            modifier = Modifier.align(Alignment.Center).size(96.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape),
-            contentAlignment = Alignment.Center,
+        val playPauseFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            playPauseFocusRequester.requestFocus()
+        }
+
+        Surface(
+            onClick = onPlayPause,
+            shape = ClickableSurfaceDefaults.shape(CircleShape),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = Color.Black.copy(alpha = 0.45f),
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContentColor = JellioText,
+            ),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(96.dp)
+                .focusRequester(playPauseFocusRequester),
         ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                tint = JellioText,
-                modifier = Modifier.size(48.dp),
-            )
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint = JellioText,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
         }
 
         Column(

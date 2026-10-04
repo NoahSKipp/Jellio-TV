@@ -85,7 +85,7 @@ class AppViewModel @Inject constructor(
         val backdropTag = item.BackdropImageTags?.firstOrNull()
         val resolvedType = if (imageType == "Backdrop" && backdropTag == null) "Primary" else imageType
         val tag = if (resolvedType == "Backdrop") backdropTag else item.ImageTags?.get(resolvedType)
-        return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth)
+        return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth, session.accessToken)
     }
 
     // The general form imageUrl() above builds on top of: an arbitrary
@@ -95,14 +95,14 @@ class AppViewModel @Inject constructor(
     // fallback, a real backdrop borrowed from a different item (an
     // episode's own series) than the one this hero is actually showing.
     fun rawImageUrl(session: Session, itemId: String, tag: String?, imageType: String, maxWidth: Int): String =
-        repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth)
+        repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth, session.accessToken)
 
     // Real port of runtime/api.js's own getUserImageUrl(): screens/
     // feed.js and screens/profile.js's own avatar images, tag left
     // null when the caller (a feed row) has no PrimaryImageTag handy,
     // same real behaviour that file's own call already has.
     fun userImageUrl(session: Session, userId: String, tag: String?, maxWidth: Int): String =
-        repository.userImageUrl(session.serverAddress, userId, tag, maxWidth)
+        repository.userImageUrl(session.serverAddress, userId, tag, maxWidth, session.accessToken)
 
     fun bannerUrl(session: Session, userId: String): String =
         repository.bannerUrl(session.serverAddress, session.accessToken, userId)
