@@ -77,10 +77,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
@@ -309,6 +311,7 @@ private fun PlayerSurface(
         val mediaItem = MediaItem.Builder()
             .setUri(streamUrl)
             .setSubtitleConfigurations(subtitleConfigs)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setSubtitle(subtitle).build())
             .build()
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(mediaItem)
@@ -322,6 +325,11 @@ private fun PlayerSurface(
             playWhenReady = startPositionTicks <= 0
             prepare()
         }
+    }
+
+    DisposableEffect(player) {
+        val mediaSession = MediaSession.Builder(context, player).build()
+        onDispose { mediaSession.release() }
     }
 
     var isPlaying by remember { mutableStateOf(true) }
