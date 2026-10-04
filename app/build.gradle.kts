@@ -30,7 +30,22 @@ android {
         versionName = "0.19.0"
     }
 
+    val signingKeystore = System.getenv("SIGNING_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }?.let { file(it) }
+    signingConfigs {
+        if (signingKeystore != null && signingKeystore.exists()) {
+            create("sideload") {
+                storeFile = signingKeystore
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfigs.findByName("sideload")?.let { signingConfig = it }
+        }
         release {
             isMinifyEnabled = false
         }
