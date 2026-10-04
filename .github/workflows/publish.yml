@@ -29,8 +29,21 @@ jobs:
       # secrets configured yet): still a real, directly installable
       # sideload APK, same real build type Nuvio's own README points
       # people at for building from source.
+      - name: Restore signing key
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/jellio-tv.keystore"
+            echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/jellio-tv.keystore" >> "$GITHUB_ENV"
+          fi
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
       - name: Rename and checksum APK
         run: |
