@@ -786,6 +786,7 @@ fun SettingsScreen(
                     }
                 }
                 SettingsCategory.DISPLAY -> {
+                val displayContext = androidx.compose.ui.platform.LocalContext.current
                 SettingsSection(title = string("settings_cat_display"), icon = Icons.Filled.Tv) {
                     val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
                     SettingsPickerRow(
@@ -801,6 +802,16 @@ fun SettingsScreen(
                         label = string("settings_overscan"),
                         value = if (overscan == 0) string("settings_overscan_fullscreen") else formatString("settings_overscan_inset", overscan),
                         onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
+                    )
+                    SettingsDivider()
+                    val currentShortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
+                    SettingsPickerRow(
+                        label = string("settings_quick_hub_shortcut"),
+                        value = string(currentShortcut.labelKey),
+                        onClick = {
+                            val next = currentShortcut.next()
+                            com.jellio.tv.data.prefs.QuickHubPreferences.setShortcut(displayContext, next)
+                        },
                     )
                 }
                 }

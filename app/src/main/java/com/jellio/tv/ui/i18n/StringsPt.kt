@@ -908,5 +908,14 @@ internal object StringsPt {
         m["playback_err_stopped_desc"] = "Algo interrompeu a transmissão. Tente novamente ou escolha outra fonte."
         m["playback_err_cant_start_title"] = "Não foi possível iniciar a reprodução"
         m["playback_err_cant_start_desc"] = "Tente novamente em instantes ou escolha outra fonte em Fontes."
+        m["quick_hub_title"] = "Hub Rápido"
+        m["quick_hub_tab_now_playing"] = "A reproduzir"
+        m["quick_hub_tab_notifications"] = "Notificações"
+        m["settings_quick_hub_shortcut"] = "Atalho do Hub Rápido"
+        m["settings_quick_hub_shortcut_desc"] = "Botão do controle para abrir o Hub Rápido"
+        m["settings_quick_hub_shortcut_menu"] = "Pressionar e segurar Menu"
+        m["settings_quick_hub_shortcut_play_pause"] = "Pressionar e segurar Reproduzir / Pausar"
+        m["settings_quick_hub_shortcut_center"] = "Pressionar e segurar OK / Selecionar"
+        m["settings_quick_hub_shortcut_none"] = "Desativado"
     }
 }

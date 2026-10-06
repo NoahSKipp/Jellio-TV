@@ -908,5 +908,14 @@ internal object StringsIt {
         m["playback_err_stopped_desc"] = "Qualcosa ha interrotto la riproduzione. Riprova o scegli un'altra sorgente."
         m["playback_err_cant_start_title"] = "Impossibile avviare la riproduzione"
         m["playback_err_cant_start_desc"] = "Riprova tra un momento o scegli un'altra sorgente da Fonti."
+        m["quick_hub_title"] = "Hub Rapide"
+        m["quick_hub_tab_now_playing"] = "In riproduzione"
+        m["quick_hub_tab_notifications"] = "Notifiche"
+        m["settings_quick_hub_shortcut"] = "Scorciatoia Hub Rapido"
+        m["settings_quick_hub_shortcut_desc"] = "Pulsante del telecomando per aprire l'Hub Rapido"
+        m["settings_quick_hub_shortcut_menu"] = "Pressione prolungata Menu"
+        m["settings_quick_hub_shortcut_play_pause"] = "Pressione prolungata Riproduci / Pausa"
+        m["settings_quick_hub_shortcut_center"] = "Pressione prolungata OK / Seleziona"
+        m["settings_quick_hub_shortcut_none"] = "Disabilitato"
     }
 }

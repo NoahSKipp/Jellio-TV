@@ -908,5 +908,14 @@ internal object StringsEn {
         m["playback_err_stopped_desc"] = "Something interrupted the stream. Try again, or pick another source."
         m["playback_err_cant_start_title"] = "Couldn't start playback"
         m["playback_err_cant_start_desc"] = "Try again in a moment, or pick another stream from Sources."
+        m["quick_hub_title"] = "Quick Hub"
+        m["quick_hub_tab_now_playing"] = "Now Playing"
+        m["quick_hub_tab_notifications"] = "Notifications"
+        m["settings_quick_hub_shortcut"] = "Quick Hub Shortcut"
+        m["settings_quick_hub_shortcut_desc"] = "Remote button to toggle the Quick Hub drawer"
+        m["settings_quick_hub_shortcut_menu"] = "Long Press Menu"
+        m["settings_quick_hub_shortcut_play_pause"] = "Long Press Play / Pause"
+        m["settings_quick_hub_shortcut_center"] = "Long Press OK / Select"
+        m["settings_quick_hub_shortcut_none"] = "Disabled"
     }
 }

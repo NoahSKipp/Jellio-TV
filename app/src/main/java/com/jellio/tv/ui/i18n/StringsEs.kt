@@ -908,5 +908,14 @@ internal object StringsEs {
         m["playback_err_stopped_desc"] = "Algo interrumpió la transmisión. Inténtalo de nuevo o elige otra fuente."
         m["playback_err_cant_start_title"] = "No se pudo iniciar la reproducción"
         m["playback_err_cant_start_desc"] = "Inténtalo de nuevo en un momento o elige otra fuente de Fuentes."
+        m["quick_hub_title"] = "Centro Rápido"
+        m["quick_hub_tab_now_playing"] = "Reproduciendo"
+        m["quick_hub_tab_notifications"] = "Notificaciones"
+        m["settings_quick_hub_shortcut"] = "Acceso directo Centro Rápido"
+        m["settings_quick_hub_shortcut_desc"] = "Botón del mando para abrir o cerrar el Centro Rápido"
+        m["settings_quick_hub_shortcut_menu"] = "Pulsación larga Menú"
+        m["settings_quick_hub_shortcut_play_pause"] = "Pulsación larga Reproducir / Pausa"
+        m["settings_quick_hub_shortcut_center"] = "Pulsación larga OK / Seleccionar"
+        m["settings_quick_hub_shortcut_none"] = "Desactivado"
     }
 }

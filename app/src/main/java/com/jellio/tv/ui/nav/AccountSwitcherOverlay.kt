@@ -162,38 +162,6 @@ fun AccountSwitcherOverlay(
                             Text(text = com.jellio.tv.ui.i18n.string("nav_group_watch"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
-                            onClick = { onDismiss(); onOpenNotifications() },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(
-                                containerColor = JellioBg,
-                                contentColor = JellioText,
-                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
-                                focusedContentColor = JellioText,
-                            ),
-                        ) {
-                            androidx.tv.material3.Icon(
-                                imageVector = Icons.Filled.Notifications,
-                                contentDescription = com.jellio.tv.ui.i18n.string("notifications_title"),
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
-                            )
-                        }
-                        Surface(
-                            onClick = { onDismiss(); onOpenNowPlaying() },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(
-                                containerColor = JellioBg,
-                                contentColor = JellioText,
-                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
-                                focusedContentColor = JellioText,
-                            ),
-                        ) {
-                            androidx.tv.material3.Icon(
-                                imageVector = Icons.Filled.GraphicEq,
-                                contentDescription = com.jellio.tv.ui.i18n.string("now_playing_title"),
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
-                            )
-                        }
-                        Surface(
                             onClick = onSignOut,
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = com.jellio.tv.ui.common.dangerButtonColors(),

@@ -50,7 +50,7 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
 }
 
 // The same lines components/notifications.js's messageFor/subtitleFor show.
-private fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
+internal fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.format("live_link_dead_notice", n.Name.orEmpty())
     "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.format("live_link_removed_notice", n.Name.orEmpty(), n.Detail.orEmpty())
     "announcement" -> n.Name.orEmpty()
@@ -65,7 +65,7 @@ private fun partyNoticeWhen(date: String?): String {
     return java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(java.util.Date(at))
 }
 
-private fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
+internal fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.get("live_link_dead_sub")
     "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.get("live_link_section")
     "announcement" -> com.jellio.tv.ui.i18n.Strings.get("notify_from_server")

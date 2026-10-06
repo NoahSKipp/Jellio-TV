@@ -908,5 +908,14 @@ internal object StringsFr {
         m["playback_err_stopped_desc"] = "Quelque chose a interrompu la lecture. Réessayez ou choisissez une autre source."
         m["playback_err_cant_start_title"] = "Impossible de démarrer la lecture"
         m["playback_err_cant_start_desc"] = "Réessayez dans un instant ou choisissez une autre source dans Sources."
+        m["quick_hub_title"] = "Hub Rapide"
+        m["quick_hub_tab_now_playing"] = "En lecture"
+        m["quick_hub_tab_notifications"] = "Notifications"
+        m["settings_quick_hub_shortcut"] = "Raccourci Hub Rapide"
+        m["settings_quick_hub_shortcut_desc"] = "Bouton de la télécommande pour ouvrir le Hub Rapide"
+        m["settings_quick_hub_shortcut_menu"] = "Appui long Menu"
+        m["settings_quick_hub_shortcut_play_pause"] = "Appui long Lecture / Pause"
+        m["settings_quick_hub_shortcut_center"] = "Appui long OK / Sélectionner"
+        m["settings_quick_hub_shortcut_none"] = "Désactivé"
     }
 }

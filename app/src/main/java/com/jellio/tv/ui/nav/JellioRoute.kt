@@ -42,7 +42,6 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
         else add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
     }
     add(JellioRoute.Feed)
-    add(JellioRoute.NowPlaying)
 }
 
 fun JellioRoute.icon(): ImageVector = when (this) {

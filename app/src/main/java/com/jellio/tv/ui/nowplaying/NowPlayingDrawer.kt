@@ -35,12 +35,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
+import com.jellio.tv.ui.groupwatch.InviteRow
+import com.jellio.tv.ui.notify.NotificationsViewModel
+import com.jellio.tv.ui.notify.messageFor
+import com.jellio.tv.ui.notify.subtitleFor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -80,6 +91,11 @@ private val DrawerCyan = Color(0xFF17A7DD)
 private val DrawerMagenta = Color(0xFFC657E3)
 private val DrawerWidth = 430.dp
 
+enum class QuickHubTab {
+    NOW_PLAYING,
+    NOTIFICATIONS,
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NowPlayingDrawer(
@@ -95,11 +111,25 @@ fun NowPlayingDrawer(
     onDismissLocal: () -> Unit,
     rawImageUrl: (String, String?, String, Int) -> String,
     modifier: Modifier = Modifier,
+    initialTab: QuickHubTab = QuickHubTab.NOW_PLAYING,
+    onOpenLiveTv: () -> Unit = {},
+    onOpenGroupWatch: () -> Unit = {},
+    notificationsViewModel: NotificationsViewModel = hiltViewModel(),
+    groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onDismiss)
 
+    LaunchedEffect(Unit) { notificationsViewModel.load() }
+    val notifications by notificationsViewModel.items.collectAsState()
+    val invites by groupWatchViewModel.invites.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(initialTab) }
+
+    val nowPlayingCount = sessions.size + (if (localPaused != null) 1 else 0)
+    val notificationsCount = invites.size + (notifications?.count { !it.Read } ?: 0)
+
     val firstItemFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedTab) {
         kotlinx.coroutines.delay(100)
         runCatching { firstItemFocus.requestFocus() }
     }
@@ -140,7 +170,7 @@ fun NowPlayingDrawer(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -151,7 +181,7 @@ fun NowPlayingDrawer(
                                 .background(Brush.linearGradient(listOf(DrawerCyan, DrawerMagenta))),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.GraphicEq,
+                                imageVector = if (selectedTab == QuickHubTab.NOW_PLAYING) Icons.Filled.GraphicEq else Icons.Filled.Notifications,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp),
@@ -160,15 +190,21 @@ fun NowPlayingDrawer(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = Strings.get("now_playing_title"),
+                                text = Strings.get("quick_hub_title"),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = JellioText,
                             )
-                            val count = sessions.size + (if (localPaused != null) 1 else 0)
                             Text(
-                                text = when (count) {
-                                    1 -> Strings.get("now_playing_active_stream")
-                                    else -> Strings.format("now_playing_active_streams", count)
+                                text = when (selectedTab) {
+                                    QuickHubTab.NOW_PLAYING -> when (nowPlayingCount) {
+                                        1 -> Strings.get("now_playing_active_stream")
+                                        else -> Strings.format("now_playing_active_streams", nowPlayingCount)
+                                    }
+                                    QuickHubTab.NOTIFICATIONS -> when (notificationsCount) {
+                                        0 -> Strings.get("notifications_nothing_new")
+                                        1 -> "1 unread"
+                                        else -> "$notificationsCount unread"
+                                    }
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DrawerCyan,
@@ -198,58 +234,273 @@ fun NowPlayingDrawer(
                     }
                 }
 
-                // Drawer Body
-                val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
-                if (totalCount == 0) {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
+                // Tab Switcher Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    val isNowPlayingSelected = selectedTab == QuickHubTab.NOW_PLAYING
+                    Surface(
+                        onClick = { selectedTab = QuickHubTab.NOW_PLAYING },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = if (isNowPlayingSelected) DrawerCyan.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                            contentColor = if (isNowPlayingSelected) Color.White else JellioTextSecondary,
+                            focusedContainerColor = DrawerCyan.copy(alpha = 0.35f),
+                            focusedContentColor = Color.White,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            border = if (isNowPlayingSelected) Border(BorderStroke(1.5.dp, DrawerCyan.copy(alpha = 0.6f))) else Border.None,
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                        ) {
                             Icon(
-                                imageVector = Icons.Filled.Tv,
+                                imageVector = Icons.Filled.GraphicEq,
                                 contentDescription = null,
-                                tint = JellioTextSecondary.copy(alpha = 0.6f),
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(16.dp),
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = Strings.get("now_playing_empty"),
-                                color = JellioTextSecondary,
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = Strings.get("quick_hub_tab_now_playing"),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isNowPlayingSelected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                            if (nowPlayingCount > 0) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isNowPlayingSelected) DrawerCyan else Color.White.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = nowPlayingCount.toString(),
+                                        color = if (isNowPlayingSelected) Color.Black else Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
                         }
                     }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp),
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+
+                    val isNotificationsSelected = selectedTab == QuickHubTab.NOTIFICATIONS
+                    Surface(
+                        onClick = { selectedTab = QuickHubTab.NOTIFICATIONS },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = if (isNotificationsSelected) DrawerCyan.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                            contentColor = if (isNotificationsSelected) Color.White else JellioTextSecondary,
+                            focusedContainerColor = DrawerCyan.copy(alpha = 0.35f),
+                            focusedContentColor = Color.White,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            border = if (isNotificationsSelected) Border(BorderStroke(1.5.dp, DrawerCyan.copy(alpha = 0.6f))) else Border.None,
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        // 1. Local Paused Media Card (if any)
-                        if (localPaused != null) {
-                            item(key = "local_paused") {
-                                LocalPausedCard(
-                                    media = localPaused,
-                                    onResume = onResumeLocal,
-                                    onDismiss = onDismissLocal,
-                                    focusRequester = firstItemFocus,
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Notifications,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = Strings.get("quick_hub_tab_notifications"),
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isNotificationsSelected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (notificationsCount > 0) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isNotificationsSelected) DrawerCyan else Color(0xFFE50914)),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = notificationsCount.toString(),
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Drawer Body
+                if (selectedTab == QuickHubTab.NOW_PLAYING) {
+                    val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
+                    if (totalCount == 0) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Filled.Tv,
+                                    contentDescription = null,
+                                    tint = JellioTextSecondary.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(48.dp),
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = Strings.get("now_playing_empty"),
+                                    color = JellioTextSecondary,
+                                    style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
                         }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        ) {
+                            // 1. Local Paused Media Card (if any)
+                            if (localPaused != null) {
+                                item(key = "local_paused") {
+                                    LocalPausedCard(
+                                        media = localPaused,
+                                        onResume = onResumeLocal,
+                                        onDismiss = onDismissLocal,
+                                        focusRequester = firstItemFocus,
+                                    )
+                                }
+                            }
 
-                        // 2. Remote Sessions
-                        items(sessions, key = { it.Id ?: it.hashCode().toString() }) { sess ->
-                            val isFirst = (localPaused == null && sessions.firstOrNull() == sess)
-                            SessionCard(
-                                session = sess,
-                                onHandoff = { onHandoff(sess) },
-                                onTuneIn = { channelId -> onTuneIn(channelId) },
-                                onJoinParty = { onJoinWatchParty(sess) },
-                                onDetails = { itemId -> onNavigateToDetail(itemId) },
-                                rawImageUrl = rawImageUrl,
-                                focusRequester = if (isFirst) firstItemFocus else null,
-                            )
+                            // 2. Remote Sessions
+                            items(sessions, key = { it.Id ?: it.hashCode().toString() }) { sess ->
+                                val isFirst = (localPaused == null && sessions.firstOrNull() == sess)
+                                SessionCard(
+                                    session = sess,
+                                    onHandoff = { onHandoff(sess) },
+                                    onTuneIn = { channelId -> onTuneIn(channelId) },
+                                    onJoinParty = { onJoinWatchParty(sess) },
+                                    onDetails = { itemId -> onNavigateToDetail(itemId) },
+                                    rawImageUrl = rawImageUrl,
+                                    focusRequester = if (isFirst) firstItemFocus else null,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val notifList = notifications
+                    val isEmpty = invites.isEmpty() && (notifList == null || notifList.isEmpty())
+                    if (isEmpty) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Filled.Notifications,
+                                    contentDescription = null,
+                                    tint = JellioTextSecondary.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(48.dp),
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = Strings.get("notifications_nothing_new"),
+                                    color = JellioTextSecondary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        ) {
+                            // Group watch invites
+                            items(invites, key = { "invite_${it.Id}" }) { invite ->
+                                val isFirst = invites.firstOrNull() == invite
+                                Box(modifier = if (isFirst) Modifier.focusRequester(firstItemFocus) else Modifier) {
+                                    InviteRow(
+                                        invite = invite,
+                                        onJoin = {
+                                            groupWatchViewModel.joinInvite(invite)
+                                            onDismiss()
+                                        },
+                                        onDismiss = { groupWatchViewModel.dismissInvite(invite) },
+                                    )
+                                }
+                            }
+
+                            // Notification cards
+                            if (notifList != null) {
+                                items(notifList, key = { it.Id ?: it.hashCode().toString() }) { n ->
+                                    val isFirst = invites.isEmpty() && notifList.firstOrNull() == n
+                                    val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
+                                    Surface(
+                                        onClick = {
+                                            if (n.Kind == "streamlink" || n.Kind == "streamlink_removed") {
+                                                onDismiss()
+                                                onOpenLiveTv()
+                                            } else if (n.Kind == "party_scheduled" || n.Kind == "party_starting") {
+                                                onDismiss()
+                                                onOpenGroupWatch()
+                                            } else if (itemId != null) {
+                                                onDismiss()
+                                                onNavigateToDetail(itemId)
+                                            }
+                                        },
+                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                                        colors = ClickableSurfaceDefaults.colors(
+                                            containerColor = Color.White.copy(alpha = if (n.Read) 0.04f else 0.1f),
+                                            contentColor = JellioText,
+                                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                            focusedContentColor = JellioText,
+                                        ),
+                                        border = ClickableSurfaceDefaults.border(
+                                            border = Border.None,
+                                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .then(if (isFirst) Modifier.focusRequester(firstItemFocus) else Modifier),
+                                    ) {
+                                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                                            Text(
+                                                text = messageFor(n),
+                                                color = JellioText,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = subtitleFor(n),
+                                                color = JellioTextSecondary,
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

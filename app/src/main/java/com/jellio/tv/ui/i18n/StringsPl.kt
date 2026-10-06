@@ -908,5 +908,14 @@ internal object StringsPl {
         m["playback_err_stopped_desc"] = "Coś przerwało odtwarzanie. Spróbuj ponownie lub wybierz inne źródło."
         m["playback_err_cant_start_title"] = "Nie udało się rozpocząć odtwarzania"
         m["playback_err_cant_start_desc"] = "Spróbuj ponownie za chwilę lub wybierz inne źródło z menu Źródła."
+        m["quick_hub_title"] = "Szybkie Centrum"
+        m["quick_hub_tab_now_playing"] = "Teraz odtwarzane"
+        m["quick_hub_tab_notifications"] = "Powiadomienia"
+        m["settings_quick_hub_shortcut"] = "Skrót do Szybkiego Centrum"
+        m["settings_quick_hub_shortcut_desc"] = "Przycisk pilota do otwierania Szybkiego Centrum"
+        m["settings_quick_hub_shortcut_menu"] = "Długie naciśnięcie Menu"
+        m["settings_quick_hub_shortcut_play_pause"] = "Długie naciśnięcie Odtwórz / Pauza"
+        m["settings_quick_hub_shortcut_center"] = "Długie naciśnięcie OK / Wybierz"
+        m["settings_quick_hub_shortcut_none"] = "Wyłączone"
     }
 }

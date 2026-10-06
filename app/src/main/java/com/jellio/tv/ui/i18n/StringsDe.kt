@@ -908,5 +908,14 @@ internal object StringsDe {
         m["playback_err_stopped_desc"] = "Etwas hat den Stream unterbrochen. Versuche es erneut oder wähle eine andere Quelle."
         m["playback_err_cant_start_title"] = "Wiedergabe konnte nicht gestartet werden"
         m["playback_err_cant_start_desc"] = "Versuche es gleich noch einmal oder wähle eine andere Quelle unter Quellen."
+        m["quick_hub_title"] = "Quick-Hub"
+        m["quick_hub_tab_now_playing"] = "Wiedergabe"
+        m["quick_hub_tab_notifications"] = "Benachrichtigungen"
+        m["settings_quick_hub_shortcut"] = "Quick-Hub Tastenkürzel"
+        m["settings_quick_hub_shortcut_desc"] = "Fernbedienungstaste zum Umschalten des Quick-Hubs"
+        m["settings_quick_hub_shortcut_menu"] = "Langer Druck Menü"
+        m["settings_quick_hub_shortcut_play_pause"] = "Langer Druck Wiedergabe / Pause"
+        m["settings_quick_hub_shortcut_center"] = "Langer Druck OK / Auswählen"
+        m["settings_quick_hub_shortcut_none"] = "Deaktiviert"
     }
 }

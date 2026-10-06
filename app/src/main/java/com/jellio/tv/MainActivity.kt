@@ -62,6 +62,7 @@ import com.jellio.tv.ui.theme.scaled
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -73,16 +74,65 @@ class MainActivity : ComponentActivity() {
     private val deepLinkItemId = mutableStateOf<String?>(null)
     private var isPlayerActive: Boolean = false
     var onMenuPressed: (() -> Unit)? = null
+    var onQuickHubShortcut: (() -> Unit)? = null
+
+    private var longPressJob: kotlinx.coroutines.Job? = null
+    private var longPressKeyCode: Int? = null
+    private var longPressConsumed: Boolean = false
+
+    private fun targetKeyCodeForShortcut(shortcut: com.jellio.tv.data.prefs.QuickHubShortcut): Int? = when (shortcut) {
+        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_PLAY_PAUSE -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_MENU -> android.view.KeyEvent.KEYCODE_MENU
+        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_CENTER -> android.view.KeyEvent.KEYCODE_DPAD_CENTER
+        com.jellio.tv.data.prefs.QuickHubShortcut.NONE -> null
+    }
 
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_MENU) {
-            val handler = onMenuPressed
-            if (handler != null) {
-                handler.invoke()
+        val shortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
+        val targetKey = targetKeyCodeForShortcut(shortcut)
+        if (targetKey != null && keyCode == targetKey && event?.repeatCount == 0) {
+            event.startTracking()
+            longPressKeyCode = keyCode
+            longPressConsumed = false
+            longPressJob?.cancel()
+            longPressJob = lifecycleScope.launch {
+                kotlinx.coroutines.delay(500)
+                longPressConsumed = true
+                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+            }
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
+                return super.onKeyDown(keyCode, event)
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        val shortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
+        val targetKey = targetKeyCodeForShortcut(shortcut)
+        if (targetKey != null && keyCode == targetKey) {
+            longPressJob?.cancel()
+            if (!longPressConsumed) {
+                longPressConsumed = true
+                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+            }
+            return true
+        }
+        return super.onKeyLongPress(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == longPressKeyCode) {
+            longPressJob?.cancel()
+            longPressJob = null
+            longPressKeyCode = null
+            if (longPressConsumed) {
+                longPressConsumed = false
                 return true
             }
         }
-        return super.onKeyDown(keyCode, event)
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onUserLeaveHint() {
@@ -100,6 +150,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         com.jellio.tv.ui.perf.MotionPolicy.init(this)
         com.jellio.tv.data.prefs.DisplayPreferences.init(this)
+        com.jellio.tv.data.prefs.QuickHubPreferences.init(this)
         com.jellio.tv.ui.player.PlayerPrefs.init(this)
         com.jellio.tv.ui.player.BadStreams.init(this)
         com.jellio.tv.ui.onboarding.OnboardingPrefs.init(this)
@@ -275,6 +326,7 @@ private fun JellioTvApp(
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showNowPlayingDrawer by remember { mutableStateOf(false) }
+    var quickHubInitialTab by remember { mutableStateOf(com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING) }
     val nowPlayingSessions by appViewModel.nowPlayingManager.sessions.collectAsState()
     val nowPlayingActiveCount by appViewModel.nowPlayingManager.activeCount.collectAsState()
     val nowPlayingLocalPaused by appViewModel.nowPlayingManager.localPaused.collectAsState()
@@ -316,13 +368,18 @@ private fun JellioTvApp(
     val focusManager = LocalFocusManager.current
 
     androidx.compose.runtime.DisposableEffect(route, showNowPlayingDrawer) {
-        (context as? MainActivity)?.onMenuPressed = {
+        val act = (context as? MainActivity)
+        val toggleHandler = {
             if (!route.isImmersive()) {
+                quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
                 showNowPlayingDrawer = !showNowPlayingDrawer
             }
         }
+        act?.onQuickHubShortcut = toggleHandler
+        act?.onMenuPressed = toggleHandler
         onDispose {
-            (context as? MainActivity)?.onMenuPressed = null
+            act?.onQuickHubShortcut = null
+            act?.onMenuPressed = null
         }
     }
 
@@ -443,7 +500,10 @@ private fun JellioTvApp(
                     }
                 },
                 onPlay = onPlay,
-                onOpenNowPlaying = { showNowPlayingDrawer = true },
+                onOpenNowPlaying = {
+                    quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
+                    showNowPlayingDrawer = true
+                },
                 onPlayManually = { item ->
                     scope.launch {
                         when (val action = appViewModel.resolvePlayAction(session, item, forceChoice = true)) {
@@ -711,6 +771,7 @@ private fun JellioTvApp(
                     session = session,
                     sessions = nowPlayingSessions,
                     localPaused = nowPlayingLocalPaused,
+                    initialTab = quickHubInitialTab,
                     onDismiss = {
                         showNowPlayingDrawer = false
                         runCatching { sidebarFocusRequester.requestFocus() }
@@ -741,6 +802,14 @@ private fun JellioTvApp(
                     },
                     onDismissLocal = {
                         appViewModel.nowPlayingManager.setLocalPaused(null)
+                    },
+                    onOpenLiveTv = {
+                        showNowPlayingDrawer = false
+                        switchTab(JellioRoute.LiveTv)
+                    },
+                    onOpenGroupWatch = {
+                        showNowPlayingDrawer = false
+                        showGroupWatch = true
                     },
                     rawImageUrl = memoizedRawImageUrl,
                     modifier = Modifier.fillMaxSize(),
