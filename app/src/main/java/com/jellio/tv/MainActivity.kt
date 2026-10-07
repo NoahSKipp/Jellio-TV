@@ -51,6 +51,7 @@ import com.jellio.tv.ui.player.PlayerScreen
 import com.jellio.tv.ui.profile.ProfileScreen
 import com.jellio.tv.ui.search.SearchScreen
 import com.jellio.tv.ui.seasonal.SeasonalEffectsOverlay
+import com.jellio.tv.ui.seasonal.SeasonalSkyOverlay
 import com.jellio.tv.ui.seasonal.SeasonalEffectsViewModel
 import com.jellio.tv.ui.service.ServiceScreen
 import com.jellio.tv.ui.settings.SettingsScreen
@@ -426,6 +427,10 @@ private fun JellioTvApp(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        }
+
+        if (!route.isImmersive()) {
+            SeasonalSkyOverlay(themeKey = seasonalTheme, modifier = Modifier.fillMaxSize())
         }
 
         if (!route.isImmersive()) {
