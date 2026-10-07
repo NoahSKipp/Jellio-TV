@@ -555,18 +555,18 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
         // real dark-fill/bright-text pair every other real selectable
         // text row in this app already uses instead.
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else JellioBgElevated,
+            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.22f) else JellioBgElevated,
             contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
             focusedContentColor = JellioText,
         ),
-        // Real bug found live, on a real screenshot: this card's own
-        // real tags/language line ran close enough to its own edge that
-        // TV Material3's own default focus grow pushed it past this
-        // card's own clipped bounds on focus, reading as "badges cut
-        // off on the side when selected" - same real class of fix as
-        // ui/library/LibraryFilterFieldOverlay.kt's own header covers.
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(2.5.dp, Color.White),
+                shape = RoundedCornerShape(12.dp)
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
         modifier = modifier.fillMaxWidth(),
     ) {
         // Real feedback live: shrunk from 16dp/2dp/6dp/4dp so more of

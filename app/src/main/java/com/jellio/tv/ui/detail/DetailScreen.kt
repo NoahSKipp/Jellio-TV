@@ -6,6 +6,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -68,6 +69,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -78,6 +80,7 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.PersonDto
 import com.jellio.tv.data.model.TrailerDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -491,6 +494,8 @@ private fun DetailHero(
                 item.CommunityRating?.let { Text(text = "%.1f ★".format(it), color = JellioTextSecondary) }
             }
 
+            MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))
+
             item.Genres?.takeIf { it.isNotEmpty() }?.let {
                 Text(text = it.joinToString(", "), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
             }
@@ -521,7 +526,19 @@ private fun DetailHero(
                     onClick = onPlay,
                     enabled = !state.resolvingPlay,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioText, contentColor = JellioBg),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = JellioText,
+                        contentColor = JellioBg,
+                        focusedContainerColor = Color.White,
+                        focusedContentColor = JellioBg,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        ),
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     modifier = Modifier.focusRequester(playButtonFocusRequester),
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -589,7 +606,16 @@ private fun IconActionButton(
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (active) JellioText.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.1f),
             contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.35f),
+            focusedContentColor = Color.White,
         ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.5.dp, Color.White),
+                shape = CircleShape,
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
         modifier = Modifier.size(56.dp),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -617,31 +643,19 @@ private fun SeasonsSection(
                 Surface(
                     onClick = { onSelectSeason(season.Id) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    // Real bug found live against a real screenshot: a
-                    // translucent white fill (JellioText.copy(alpha =
-                    // 0.18f)) behind the same real white JellioText it
-                    // was tinting read as barely-there, near-illegible
-                    // once this tab was both selected and focused (the
-                    // real screenshot's own Season 01), since neither
-                    // was set explicitly here and ClickableSurfaceDefaults.
-                    // colors() fell back to its own real default focused
-                    // pair rather than this tab's own real selected one
-                    // the moment it also had real focus. This is a plain
-                    // ClickableSurfaceDefaults surface, not a selectable
-                    // one (selected here is this tab's own real boolean,
-                    // not Surface's own selected param SelectableSurfaceDefaults
-                    // alone accepts), so containerColor/contentColor
-                    // already fold that state in; focusedContainerColor/
-                    // focusedContentColor just needed to be a real solid,
-                    // opposite-luminance pair too instead of defaulting,
-                    // same real pairing ui/library/LibraryScreen.kt's own
-                    // FilterChip already uses.
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (selected) JellioSecondary else JellioBgElevated,
                         contentColor = if (selected) JellioBg else JellioText,
                         focusedContainerColor = JellioSecondary,
                         focusedContentColor = JellioBg,
                     ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        ),
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                 ) {
                     Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
@@ -684,7 +698,19 @@ private fun EpisodeCard(
             onClick = onClick,
             onLongClick = onOptionsClick,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = JellioBgElevated,
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.5.dp, Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                ),
+            ),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             modifier = Modifier.width(cardWidth),
         ) {
             Column {
@@ -732,8 +758,15 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.12f)
+                        focusedContainerColor = Color.White.copy(alpha = 0.25f),
                     ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                        ),
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     modifier = Modifier.width(avatarWidth),
                 ) {
                     Column {
@@ -776,7 +809,19 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                 Surface(
                     onClick = { onOpen(url) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = JellioBgElevated,
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                        ),
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     modifier = Modifier.width(trailerCardWidth),
                 ) {
                     Column {

@@ -4,8 +4,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -281,12 +283,22 @@ private fun SidebarItem(
         colors = SelectableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = JellioTextSecondary,
-            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContainerColor = Color.White.copy(alpha = 0.25f),
             focusedContentColor = JellioText,
             selectedContainerColor = Color.White.copy(alpha = 0.12f),
             selectedContentColor = JellioText,
-            focusedSelectedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedSelectedContainerColor = Color.White.copy(alpha = 0.25f),
             focusedSelectedContentColor = JellioText,
+        ),
+        border = SelectableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(14.dp),
+            ),
+            focusedSelectedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(14.dp),
+            ),
         ),
         modifier = Modifier.fillMaxWidth().height(SidebarItemHeight.scaled()).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it

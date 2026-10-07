@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -184,6 +186,12 @@ fun SettingsScreen(
             onClick = onLogout,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.5.dp, Color.White),
+                    shape = RoundedCornerShape(999.dp),
+                )
+            ),
             modifier = Modifier.padding(top = 32.dp),
         ) {
             Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
@@ -241,7 +249,18 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(12.dp),
+            )
+        ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
@@ -334,6 +353,14 @@ private fun LanguagePickerRow(
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
             contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(8.dp),
+            )
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).let {
@@ -381,7 +408,18 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
             onClick = { viewModel.updatePassword(session, current, next, confirm) },
             enabled = !isUpdating,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = JellioBgElevated,
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.dp, Color.White),
+                    shape = RoundedCornerShape(999.dp),
+                )
+            ),
             modifier = Modifier.padding(top = 16.dp),
         ) {
             Text(text = if (isUpdating) "Updating..." else "Update password", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
@@ -450,7 +488,18 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
             onClick = { viewModel.checkForUpdateManually() },
             enabled = result != ManualCheckResult.Checking,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = JellioBgElevated,
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.dp, Color.White),
+                    shape = RoundedCornerShape(999.dp),
+                )
+            ),
         ) {
             Text(text = "Check for Updates", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
         }
@@ -476,6 +525,12 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     enabled = !updateState.downloading,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
                 ) {
                     Text(
                         text = if (updateState.downloading) "Downloading..." else "Install",
@@ -497,7 +552,18 @@ private fun SettingsToggleRow(label: String, description: String, checked: Boole
     Surface(
         onClick = onToggle,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(12.dp),
+            )
+        ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

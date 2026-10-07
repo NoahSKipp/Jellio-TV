@@ -113,6 +113,12 @@ data class MediaStreamDto(
     // an image based track (PGS, VobSub) has no WebVTT form, nothing
     // a side-loaded text track can render, only a burned in transcode
     // can show one at all.
+    val Width: Int? = null,
+    val VideoRange: String? = null,
+    val VideoRangeType: String? = null,
+    val Title: String? = null,
+    val Profile: String? = null,
+    val IsDefault: Boolean? = null,
     val IsTextSubtitleStream: Boolean? = null,
     val DisplayTitle: String? = null,
     val DeliveryMethod: String? = null,
@@ -180,6 +186,7 @@ data class BaseItemDto(
     val RunTimeTicks: Long? = null,
     val ProviderIds: Map<String, String>? = null,
     val MediaSources: List<MediaSourceDto>? = null,
+    val MediaStreams: List<MediaStreamDto>? = null,
     // Width keyed within each real MediaSourceId key, real runtime/
     // api.js's own pickTrickplayInfo() shape: only ever real for a
     // title Jellyfin's own background task already generated one for,
