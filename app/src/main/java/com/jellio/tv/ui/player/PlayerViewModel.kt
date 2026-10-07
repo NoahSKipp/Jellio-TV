@@ -99,6 +99,7 @@ data class TrickplayFrame(
 data class AudioTrackUiState(
     val streamIndex: Int,
     val label: String,
+    val language: String? = null,
 )
 
 // Real port of screens/player.js's own activeSkipSegment() return
@@ -531,7 +532,7 @@ class PlayerViewModel @Inject constructor(
     private fun buildAudioTracks(mediaSource: MediaSourceDto): List<AudioTrackUiState> =
         repository.getAudioStreams(mediaSource).mapNotNull { stream ->
             val index = stream.Index ?: return@mapNotNull null
-            AudioTrackUiState(index, audioStreamLabel(stream))
+            AudioTrackUiState(index, audioStreamLabel(stream), stream.Language)
         }
 
     private fun audioStreamLabel(stream: MediaStreamDto): String {
@@ -570,22 +571,15 @@ class PlayerViewModel @Inject constructor(
                     mediaSourceIdParam,
                     currentPositionTicks,
                     burnInSubtitleStreamIndex = streamIndex,
-                    // Real screens/player.js's own selectBurnedInSubtitle()
-                    // passes its own currentAudioStreamIndex into this
-                    // same real negotiation too, same real persistence
-                    // restart() above already carries.
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
-                // A different source's own real subtitle track list has
-                // no guarantee of matching the one this screen already
-                // built (screens/player.js's own real reasoning for
-                // rebuilding its subtitle menu after every reload).
                 val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
                 _uiState.value = _uiState.value.copy(
                     isSwitchingSubtitle = false,
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
+                    resumePercent = null,
                     selectedSubtitleIndex = streamIndex,
                     subtitleTracks = subtitleTracks,
                     directPlay = target.directPlay,
@@ -604,46 +598,27 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/player.js's own switchAudioTrack() - but
-    // only when the source currently playing is itself a forced
-    // transcode already. player.js has no other option: a bare
-    // <video> element only ever gets whichever one audio track the
-    // server actually decoded into the stream, so picking a different
-    // embedded track has always meant asking the server for a fresh
-    // one. A native Media3/ExoPlayer decode, direct playing the whole
-    // container, already has every embedded audio track demuxed and
-    // available locally - real bug found live tracing Gelato/Jellio's
-    // own playback path: this app was forcing that exact same real
-    // transcode-and-reload unconditionally too, even though nothing
-    // about picking a different track already inside the same real
-    // file needs the server involved at all. See PlayerScreen.kt's own
-    // LaunchedEffect(player, selectedAudioStreamIndex, directPlay) for
-    // the actual local ExoPlayer TrackSelectionOverride this now
-    // triggers instead, matching subtitle switching's own real
-    // no-reload path just above.
+    // Port of screens/player.js's switchAudioTrack(): triggers a fresh
+    // PlaybackInfo negotiation with Jellyfin for the requested AudioStreamIndex,
+    // reloading the stream at currentPositionTicks with the server transcoding/remuxing
+    // or direct-playing the selected audio track.
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
-        if (_uiState.value.directPlay) {
-            _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
-            showToast("Switched to $label")
-            return
-        }
-        // Real port of that file's own audio menu click handler: a
-        // toast the instant the tap is received, before the real
-        // negotiation even starts, same real reasoning that handler's
-        // own comment documents (real feedback that a switch never
-        // seemed to reach the server at all turned "did the request
-        // even leave the browser" into something a reader could answer
-        // just by watching the screen).
         showToast("Switching to $label…")
         viewModelScope.launch {
             try {
+                val currentSubIndex = _uiState.value.selectedSubtitleIndex
+                val isBurnedIn = currentSubIndex != null &&
+                    _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == currentSubIndex }?.isTextBased == false
+                val burnInSub = if (isBurnedIn) currentSubIndex else null
+
                 val target = repository.resolvePlayback(
                     session.userId,
                     id,
                     mediaSourceIdParam,
                     currentPositionTicks,
+                    burnInSubtitleStreamIndex = burnInSub,
                     audioStreamIndex = streamIndex,
                 )
                 val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
@@ -652,7 +627,8 @@ class PlayerViewModel @Inject constructor(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
-                    selectedSubtitleIndex = null,
+                    resumePercent = null,
+                    selectedSubtitleIndex = currentSubIndex,
                     subtitleTracks = subtitleTracks,
                     selectedAudioStreamIndex = streamIndex,
                     audioTracks = audioTracks,
@@ -672,18 +648,8 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/player.js's own switchSource(source): a
-    // fresh real PlaybackInfo negotiation against the picked source's
-    // own Id, with NO real AudioStreamIndex/SubtitleStreamIndex carried
-    // over, same real reasoning that function's own comment documents
-    // (currentAudioStreamIndex = null; activeSubtitleStreamIndex =
-    // null right there): a different source's own real track layout has
-    // no guaranteed relationship to whichever indices were active on
-    // the one it replaces. Also updates mediaSourceIdParam itself so
-    // every later re-negotiation (restart, a subsequent audio or
-    // subtitle switch) targets this newly picked source rather than the
-    // one playback actually opened on, mirroring that file's own single
-    // shared `mediaSource` variable every later call already reads.
+    // Port of screens/player.js's switchSource(source): a fresh PlaybackInfo
+    // negotiation against the picked source's Id at currentPositionTicks.
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
         val id = itemId ?: return
         if (source.Id == _uiState.value.mediaSourceId) return
@@ -702,6 +668,7 @@ class PlayerViewModel @Inject constructor(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
+                    resumePercent = null,
                     selectedSubtitleIndex = null,
                     subtitleTracks = subtitleTracks,
                     selectedAudioStreamIndex = null,
