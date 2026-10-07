@@ -1,5 +1,6 @@
 package com.jellio.tv.di
 
+import com.jellio.tv.BuildConfig
 import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
@@ -125,7 +126,9 @@ object NetworkModule {
         .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
-        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+        .apply {
+            if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+        }
         .apply {
             try {
                 val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
