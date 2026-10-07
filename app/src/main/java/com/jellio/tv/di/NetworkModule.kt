@@ -22,6 +22,20 @@ import javax.inject.Singleton
 
 private const val PLACEHOLDER_BASE_URL = "http://localhost/"
 
+fun normalizeServerAddress(raw: String): String {
+    val trimmed = raw.trim().trimEnd('/')
+    if (trimmed.isEmpty()) return trimmed
+    if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+        return trimmed
+    }
+    val lower = trimmed.lowercase()
+    return if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || lower.startsWith("172.16.") || lower.startsWith("localhost")) {
+        "http://$trimmed"
+    } else {
+        "https://$trimmed"
+    }
+}
+
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 private annotation class BaseUrlInterceptor
@@ -47,21 +61,34 @@ object NetworkModule {
     fun provideBaseUrlInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val original = chain.request()
-            val target = runBlocking { sessionManager.serverAddress() }?.toHttpUrlOrNull()
-            val request = if (target != null) {
-                original.newBuilder()
-                    .url(
-                        original.url.newBuilder()
-                            .scheme(target.scheme)
-                            .host(target.host)
-                            .port(target.port)
-                            .build(),
-                    )
-                    .build()
-            } else {
-                original
+            val raw = sessionManager.getCachedServerAddress() ?: runBlocking { sessionManager.serverAddress() }
+            if (raw.isNullOrBlank()) {
+                throw java.io.IOException("No server address configured. Enter your Jellyfin server address.")
             }
-            chain.proceed(request)
+            val normalized = normalizeServerAddress(raw)
+            val target = normalized.toHttpUrlOrNull()
+                ?: throw java.io.IOException("Invalid server address: '$raw'. Please check your server URL.")
+
+            val newUrlBuilder = original.url.newBuilder()
+                .scheme(target.scheme)
+                .host(target.host)
+                .port(target.port)
+
+            val targetPathSegments = target.pathSegments.filter { it.isNotEmpty() }
+            if (targetPathSegments.isNotEmpty()) {
+                val originalPathSegments = original.url.pathSegments
+                newUrlBuilder.encodedPath("")
+                for (segment in targetPathSegments) {
+                    newUrlBuilder.addPathSegment(segment)
+                }
+                for (segment in originalPathSegments) {
+                    if (segment.isNotEmpty()) {
+                        newUrlBuilder.addPathSegment(segment)
+                    }
+                }
+            }
+
+            chain.proceed(original.newBuilder().url(newUrlBuilder.build()).build())
         }
 
     // Real "Authorization" header, not X-Emby-Token: AuthorizationContext.cs's
@@ -79,8 +106,8 @@ object NetworkModule {
     @AuthInterceptor
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
-            val token = runBlocking { sessionManager.accessToken() }
-            val deviceId = runBlocking { sessionManager.deviceId() }
+            val token = sessionManager.getCachedAccessToken() ?: runBlocking { sessionManager.accessToken() }
+            val deviceId = sessionManager.getCachedDeviceId() ?: runBlocking { sessionManager.deviceId() }
             val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
             val request = chain.request().newBuilder().addHeader("Authorization", header).build()
             chain.proceed(request)

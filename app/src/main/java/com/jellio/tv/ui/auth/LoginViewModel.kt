@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 enum class LoginMode { CHECKING, SERVER_ENTRY, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN }
 
-data class RememberedProfile(val userId: String, val name: String, val primaryImageTag: String?)
+data class RememberedProfile(val userId: String, val name: String, val primaryImageTag: String?, val accessToken: String? = null)
 
 data class LoginUiState(
     val mode: LoginMode = LoginMode.CHECKING,
@@ -97,7 +97,7 @@ class LoginViewModel @Inject constructor(
             // only real way back in over a request that never even
             // reached the server.
             val remembered = repository.getRememberedUsers(serverAddress).map { (userId, entry) ->
-                RememberedProfile(userId, entry.name, entry.primaryImageTag)
+                RememberedProfile(userId, entry.name, entry.primaryImageTag, entry.accessToken)
             }
             var publicUsers = emptyList<UserDto>()
             var liveRemembered = remembered
@@ -133,7 +133,7 @@ class LoginViewModel @Inject constructor(
     // exact same real PROFILE_PICKER/MANUAL decision backToProfiles()
     // makes on a device that already knew its server.
     fun submitServerAddress(serverAddress: String) {
-        val normalized = serverAddress.trim().trimEnd('/')
+        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         if (normalized.isEmpty()) {
             _uiState.value = _uiState.value.copy(error = "Enter your server address")
             return
@@ -195,7 +195,10 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    fun avatarUrl(userId: String, tag: String?): String = repository.userImageUrl(_uiState.value.serverAddress, userId, tag)
+    fun avatarUrl(userId: String, tag: String?): String {
+        val token = _uiState.value.remembered.firstOrNull { it.userId == userId }?.accessToken
+        return repository.userImageUrl(_uiState.value.serverAddress, userId, tag, accessToken = token)
+    }
 
     fun showManualForm() {
         _uiState.value = _uiState.value.copy(mode = LoginMode.MANUAL, manualPrefillUsername = "", error = null)

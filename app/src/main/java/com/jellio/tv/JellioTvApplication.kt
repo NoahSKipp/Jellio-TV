@@ -5,10 +5,16 @@ import android.os.Build
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
+import coil3.util.DebugLogger
+import com.jellio.tv.data.network.APP_VERSION
+import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.session.SessionManager
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -51,18 +57,19 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val sessionManager = entryPoint.sessionManager()
 
         val imageOkHttpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
             .addInterceptor { chain ->
                 val original = chain.request()
-                val token = runBlocking { sessionManager.accessToken() }
-                val request = if (!token.isNullOrEmpty()) {
-                    original.newBuilder()
-                        .header("X-Emby-Token", token)
-                        .header("Authorization", "MediaBrowser Token=\"$token\"")
-                        .build()
-                } else {
-                    original
+                val token = sessionManager.getCachedAccessToken() ?: runBlocking { sessionManager.accessToken() }
+                val deviceId = sessionManager.getCachedDeviceId() ?: runBlocking { sessionManager.deviceId() }
+                val requestBuilder = original.newBuilder()
+
+                if (!token.isNullOrEmpty()) {
+                    requestBuilder.header("X-Emby-Token", token)
+                    requestBuilder.header("Authorization", buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token))
                 }
-                chain.proceed(request)
+                chain.proceed(requestBuilder.build())
             }
             .build()
 
@@ -76,6 +83,18 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                 }
                 add(SvgDecoder.Factory())
             }
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(250L * 1024 * 1024)
+                    .build()
+            }
+            .logger(DebugLogger())
             .build()
     }
 }
