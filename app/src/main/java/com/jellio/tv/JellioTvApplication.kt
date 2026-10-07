@@ -109,7 +109,7 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(250L * 1024 * 1024)
                     .build()
             }
-            .logger(DebugLogger())
+            .apply { if (BuildConfig.DEBUG) logger(DebugLogger()) }
             .build()
     }
 }
