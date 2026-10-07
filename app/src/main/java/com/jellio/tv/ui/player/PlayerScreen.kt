@@ -306,6 +306,9 @@ private fun PlayerSurface(
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
+    var resumePromptDismissed by remember { mutableStateOf(false) }
+    val showResumePrompt = resumePercent != null && !resumePromptDismissed
+
     // Every real text based subtitle track declared as a real
     // MediaItem.SubtitleConfiguration from this very first prepare()
     // call, not added later: Media3 requires a full setMediaSource
@@ -348,14 +351,10 @@ private fun PlayerSurface(
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
             setMediaItem(mediaItem)
-            // Real port of screens/player.js's own hasResumePosition
-            // gate: autoplay stays off until the reader actually picks
-            // Resume or Start Over on the prompt below, the paused frame
-            // at the saved position showing through behind that choice
-            // instead of playback already running underneath it. A fresh
-            // item with no saved position keeps starting immediately,
-            // same as before this existed.
-            playWhenReady = startPositionTicks <= 0
+            if (startPositionTicks > 0) {
+                seekTo(startPositionTicks / TICKS_PER_MS)
+            }
+            playWhenReady = !showResumePrompt
             prepare()
         }
     }
@@ -366,7 +365,7 @@ private fun PlayerSurface(
     }
 
     var isPlaying by remember { mutableStateOf(true) }
-    var playWhenReadyState by remember(streamUrl) { mutableStateOf(startPositionTicks <= 0) }
+    var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
     var exoError by remember { mutableStateOf<String?>(null) }
@@ -388,9 +387,8 @@ private fun PlayerSurface(
     var showEpisodesPanel by remember { mutableStateOf(false) }
     var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
     var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
-    var showResumePrompt by remember(streamUrl) { mutableStateOf(startPositionTicks > 0) }
-    var hasReportedStart by remember { mutableStateOf(false) }
-    var seekedToResume by remember { mutableStateOf(false) }
+    var hasReportedStart by remember(player) { mutableStateOf(false) }
+    var seekedToResume by remember(player) { mutableStateOf(false) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
     var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
@@ -444,19 +442,8 @@ private fun PlayerSurface(
                 }
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                if (directPlay && tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
-                    val targetIndex = selectedAudioStreamIndex ?: defaultAudioStreamIndex
-                    val ordinal = audioTracks.indexOfFirst { it.streamIndex == targetIndex }
-                    if (ordinal >= 0) {
-                        val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
-                        val group = audioGroups.getOrNull(ordinal)
-                        if (group != null && group.isSupported) {
-                            val params = player.trackSelectionParameters.buildUpon()
-                            params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                            params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
-                            player.trackSelectionParameters = params.build()
-                        }
-                    }
+                if (directPlay) {
+                    selectAudioTrack(player, audioTracks, selectedAudioStreamIndex, defaultAudioStreamIndex)
                 }
             }
         }
@@ -490,32 +477,9 @@ private fun PlayerSurface(
         player.trackSelectionParameters = params.build()
     }
 
-    // PlayerViewModel.switchAudioTrack()'s own header explains why this
-    // only ever runs when directPlay is true: a Direct Play source
-    // already has every embedded audio track demuxed locally by
-    // ExoPlayer, no reload needed, same real no-reload shape the text
-    // track override just above already has. Jellyfin's own audio
-    // MediaStreams carry no id ExoPlayer's own demuxed Format could
-    // match against the way subtitle tracks do above (those get an
-    // explicit .setId() when this file's own MediaItem.Builder attaches
-    // them) - matched here by ordinal position among this source's own
-    // audio-only MediaStreams instead (audioTracks is already built in
-    // that same real order), which holds as long as Gelato/Jellyfin
-    // lists a container's own audio tracks in the same order the
-    // container itself declares them, the same order ExoPlayer's own
-    // demuxer discovers them in.
     LaunchedEffect(player, selectedAudioStreamIndex, directPlay) {
         if (!directPlay) return@LaunchedEffect
-        val targetIndex = selectedAudioStreamIndex ?: defaultAudioStreamIndex
-        val ordinal = audioTracks.indexOfFirst { it.streamIndex == targetIndex }
-        if (ordinal < 0) return@LaunchedEffect
-        val audioGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
-        val group = audioGroups.getOrNull(ordinal) ?: return@LaunchedEffect
-        if (!group.isSupported) return@LaunchedEffect
-        val params = player.trackSelectionParameters.buildUpon()
-        params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-        params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
-        player.trackSelectionParameters = params.build()
+        selectAudioTrack(player, audioTracks, selectedAudioStreamIndex, defaultAudioStreamIndex)
     }
 
     LaunchedEffect(player, startPositionTicks) {
@@ -942,11 +906,11 @@ private fun PlayerSurface(
             ResumePrompt(
                 percent = resumePercent,
                 onResume = {
-                    showResumePrompt = false
+                    resumePromptDismissed = true
                     player.play()
                 },
                 onRestart = {
-                    showResumePrompt = false
+                    resumePromptDismissed = true
                     onRestart()
                 },
             )
@@ -1498,58 +1462,52 @@ private fun PlayerToast(message: String, modifier: Modifier = Modifier) {
     }
 }
 
-// Real port of screens/player.js's own speed popover: a real small
-// anchored popover (that file's own .jellio-player-popover, distinct
-// from the subtitle drawer's own full-height panel shape), the exact
-// same six real PLAYBACK_SPEEDS options, the active one highlighted.
+// Speed drawer matching SubtitleMenu and AudioMenu right drawers.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
-    val firstItemFocusRequester = remember { FocusRequester() }
+    val focusRequesters = remember { PLAYBACK_SPEEDS.map { FocusRequester() } }
+    val activeIndex = PLAYBACK_SPEEDS.indexOfFirst { it == selectedSpeed }.coerceAtLeast(0)
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(60)
-        runCatching { firstItemFocusRequester.requestFocus() }
+        runCatching {
+            focusRequesters.getOrNull(activeIndex)?.requestFocus() ?: focusRequesters.firstOrNull()?.requestFocus()
+        }
     }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectTapGestures { onDismiss() }
             },
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 104.dp, end = 48.dp)
-                .width(160.dp)
-                .background(JellioBgElevated, RoundedCornerShape(12.dp))
-                .padding(vertical = 8.dp),
+                .width(280.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(vertical = 48.dp),
         ) {
-            PLAYBACK_SPEEDS.forEachIndexed { index, speed ->
-                Surface(
-                    onClick = { onSelect(speed) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (speed == selectedSpeed) Color.White.copy(alpha = 0.18f) else Color.Transparent,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.dp, Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                        )
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                        .let { if (index == 0) it.focusRequester(firstItemFocusRequester) else it },
-                ) {
-                    Text(
-                        text = formatSpeed(speed),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            Text(
+                text = "Playback Speed",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                itemsIndexed(PLAYBACK_SPEEDS) { index, speed ->
+                    val req = focusRequesters.getOrNull(index) ?: remember { FocusRequester() }
+                    SubtitleMenuRow(
+                        label = formatSpeed(speed),
+                        isSelected = speed == selectedSpeed,
+                        onClick = {
+                            onSelect(speed)
+                            onDismiss()
+                        },
+                        modifier = Modifier.focusRequester(req),
                     )
                 }
             }
@@ -1557,10 +1515,7 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
     }
 }
 
-// Real port of screens/player.js's own sleep timer popover: "Cancel
-// timer" first (shown unconditionally there too, a real cancel call
-// with nothing active just 404s quietly), then the exact same five
-// real SLEEP_TIMER_OPTIONS durations.
+// Sleep timer drawer matching SubtitleMenu and AudioMenu right drawers.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
@@ -1573,71 +1528,90 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectTapGestures { onDismiss() }
             },
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 104.dp, end = 48.dp)
-                .width(180.dp)
-                .background(JellioBgElevated, RoundedCornerShape(12.dp))
-                .padding(vertical = 8.dp),
+                .width(280.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(vertical = 48.dp),
         ) {
-            Surface(
-                onClick = onCancel,
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                colors = ClickableSurfaceDefaults.colors(
-                    containerColor = Color.Transparent,
-                    contentColor = JellioText,
-                    focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                    focusedContentColor = JellioText,
-                ),
-                border = ClickableSurfaceDefaults.border(
-                    focusedBorder = Border(
-                        border = BorderStroke(2.dp, Color.White),
-                        shape = RoundedCornerShape(8.dp),
+            Text(
+                text = "Sleep Timer",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                item {
+                    SubtitleMenuRow(
+                        label = "Cancel timer",
+                        isSelected = false,
+                        onClick = {
+                            onCancel()
+                            onDismiss()
+                        },
+                        modifier = Modifier.focusRequester(firstItemFocusRequester),
                     )
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                    .focusRequester(firstItemFocusRequester),
-            ) {
-                Text(text = "Cancel timer", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
-            }
-            SLEEP_TIMER_OPTIONS.forEach { minutes ->
-                Surface(
-                    onClick = { onSelect(minutes) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = Color.Transparent,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.dp, Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                        )
-                    ),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(text = "$minutes min", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
+                }
+                items(SLEEP_TIMER_OPTIONS) { minutes ->
+                    SubtitleMenuRow(
+                        label = "$minutes min",
+                        isSelected = false,
+                        onClick = {
+                            onSelect(minutes)
+                            onDismiss()
+                        },
+                    )
                 }
             }
         }
     }
 }
 
-// Real port of screens/player.js's own rebuildAudioMenu(): every real
-// audio track this source carries, the active one highlighted off
-// selectedStreamIndex when set, otherwise off defaultStreamIndex, same
-// real fallback that function's own isActive check documents (a
-// reader who has never picked a track yet has the MediaSource's own
-// real default active, not nothing).
+private fun selectAudioTrack(
+    player: Player,
+    audioTracks: List<AudioTrackUiState>,
+    targetIndex: Int?,
+    defaultIndex: Int?,
+) {
+    val targetStreamIndex = targetIndex ?: defaultIndex ?: return
+    val targetTrack = audioTracks.firstOrNull { it.streamIndex == targetStreamIndex } ?: return
+    val ordinal = audioTracks.indexOf(targetTrack)
+    if (ordinal < 0) return
+
+    val tracks = player.currentTracks
+    val allAudioCandidates = mutableListOf<Pair<androidx.media3.common.Tracks.Group, Int>>()
+    for (group in tracks.groups) {
+        if (group.type == C.TRACK_TYPE_AUDIO) {
+            for (i in 0 until group.length) {
+                allAudioCandidates.add(Pair(group, i))
+            }
+        }
+    }
+    if (allAudioCandidates.isEmpty()) return
+
+    val match = allAudioCandidates.firstOrNull { (group, i) ->
+        val format = group.getTrackFormat(i)
+        val lang = format.language
+        lang != null && targetTrack.language != null && lang.equals(targetTrack.language, ignoreCase = true)
+    } ?: allAudioCandidates.getOrNull(ordinal)
+
+    if (match != null && match.first.isTrackSupported(match.second)) {
+        val params = player.trackSelectionParameters.buildUpon()
+        params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+        params.setOverrideForType(TrackSelectionOverride(match.first.mediaTrackGroup, match.second))
+        player.trackSelectionParameters = params.build()
+    }
+}
+
+// Audio menu right drawer matching SubtitleMenu: lists all audio tracks with
+// auto-focus on the active track and high-contrast TV selection.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun AudioMenu(
@@ -1648,57 +1622,55 @@ private fun AudioMenu(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
-    val firstFocusRequester = remember { FocusRequester() }
+    val focusRequesters = remember(tracks) { tracks.map { FocusRequester() } }
+    val activeIndex = tracks.indexOfFirst {
+        if (selectedStreamIndex == null) it.streamIndex == defaultStreamIndex else it.streamIndex == selectedStreamIndex
+    }.coerceAtLeast(0)
+
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(60)
-        runCatching { firstFocusRequester.requestFocus() }
+        runCatching {
+            focusRequesters.getOrNull(activeIndex)?.requestFocus() ?: focusRequesters.firstOrNull()?.requestFocus()
+        }
     }
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectTapGestures { onDismiss() }
             },
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 104.dp, end = 48.dp)
-                .widthIn(min = 220.dp, max = 320.dp)
-                .background(JellioBgElevated, RoundedCornerShape(12.dp))
-                .padding(vertical = 8.dp),
+                .width(360.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(vertical = 48.dp),
         ) {
-            tracks.forEachIndexed { index, track ->
-                val isActive = if (selectedStreamIndex == null) {
-                    track.streamIndex == defaultStreamIndex
-                } else {
-                    track.streamIndex == selectedStreamIndex
-                }
-                Surface(
-                    onClick = { if (!isActive) onSelect(track.streamIndex) else onDismiss() },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (isActive) Color.White.copy(alpha = 0.18f) else Color.Transparent,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.dp, Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                        )
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                        .let { if (index == 0) it.focusRequester(firstFocusRequester) else it },
-                ) {
-                    Text(
-                        text = track.label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            Text(
+                text = "Audio",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                itemsIndexed(tracks) { index, track ->
+                    val isActive = if (selectedStreamIndex == null) {
+                        track.streamIndex == defaultStreamIndex
+                    } else {
+                        track.streamIndex == selectedStreamIndex
+                    }
+                    val req = focusRequesters.getOrNull(index) ?: remember { FocusRequester() }
+                    SubtitleMenuRow(
+                        label = track.label,
+                        isSelected = isActive,
+                        onClick = {
+                            if (!isActive) onSelect(track.streamIndex)
+                            onDismiss()
+                        },
+                        modifier = Modifier.focusRequester(req),
                     )
                 }
             }
@@ -1706,14 +1678,7 @@ private fun AudioMenu(
     }
 }
 
-// Real port of screens/player.js's own Sources side panel
-// (rebuildSourceMenu()): the exact same real SourceCard this app's own
-// pre-playback StreamPickerOverlow already renders (that file's own
-// comment documents reusing components/streamPicker.js's own
-// buildSourceCard() here rather than a second, plainer list), leaner
-// than that full overlay itself, no resume button or language filter,
-// same real leaner shape that file's own mid-player sourcePanel has
-// against the fuller pre-playback picker.
+// Sources side panel right drawer.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SourcePanel(
@@ -1731,29 +1696,30 @@ private fun SourcePanel(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectTapGestures { onDismiss() }
             },
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 104.dp, end = 48.dp)
-                .widthIn(min = 320.dp, max = 420.dp)
-                .heightIn(max = 520.dp)
-                .background(JellioBgElevated, RoundedCornerShape(12.dp))
-                .padding(16.dp),
+                .width(420.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
             Text(text = "Sources", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 16.dp),
             ) {
                 itemsIndexed(sources, key = { _, it -> it.Id ?: it.hashCode() }) { index, source ->
                     SourceCard(
                         source = source,
                         onClick = {
-                            if (source.Id != currentMediaSourceId) onSelect(source) else onDismiss()
+                            if (source.Id != currentMediaSourceId) onSelect(source)
+                            onDismiss()
                         },
                         isActive = source.Id == currentMediaSourceId,
                         modifier = if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier,
@@ -1764,12 +1730,7 @@ private fun SourcePanel(
     }
 }
 
-// Real port of screens/player.js's own Episodes side panel: season
-// tabs (buildEpisodeRow's own Specials-last isSpecialsSeason() order,
-// applied once in PlayerViewModel rather than here) plus that season's
-// own episode list, only ever shown for a real Episode with a real
-// SeriesId behind it (a Movie's own episodesButton never leaves its
-// disabled state, see hasEpisodes above).
+// Episodes side panel right drawer: season tabs plus episode list.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun EpisodesPanel(
@@ -1790,23 +1751,23 @@ private fun EpisodesPanel(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectTapGestures { onDismiss() }
             },
-        contentAlignment = Alignment.TopEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
             modifier = Modifier
-                .padding(top = 104.dp, end = 48.dp)
-                .widthIn(min = 380.dp, max = 480.dp)
-                .heightIn(max = 560.dp)
-                .background(JellioBgElevated, RoundedCornerShape(12.dp))
-                .padding(16.dp),
+                .width(440.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
             Text(text = "Episodes", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 16.dp),
             ) {
                 items(seasons, key = { it.Id }) { season ->
                     val isActive = season.Id == selectedSeasonId
@@ -1832,7 +1793,7 @@ private fun EpisodesPanel(
             }
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 16.dp),
             ) {
                 itemsIndexed(episodes, key = { _, it -> it.itemId }) { index, episode ->
                     EpisodeRow(
