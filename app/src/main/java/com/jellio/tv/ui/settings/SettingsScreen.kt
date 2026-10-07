@@ -46,7 +46,15 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import androidx.compose.ui.platform.LocalContext
+import coil3.SingletonImageLoader
+import coil3.network.HttpException
+import coil3.request.CachePolicy
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import com.jellio.tv.BuildConfig
+import com.jellio.tv.di.normalizeServerAddress
 import com.jellio.tv.data.model.LanguageOption
 import com.jellio.tv.data.model.LANGUAGE_OPTIONS
 import com.jellio.tv.data.model.languageName
@@ -180,6 +188,7 @@ fun SettingsScreen(
         SettingsSection(title = "About") {
             SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
             UpdateCheckRow(viewModel = appUpdateViewModel)
+            ImageCheckRow(session = session)
         }
 
         Surface(
@@ -538,6 +547,66 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     )
                 }
             }
+        }
+    }
+}
+
+// Loads the signed-in user's avatar through the same image loader every
+// poster uses, bypassing both caches, and reports exactly what came back.
+@Composable
+private fun ImageCheckRow(session: Session) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var result by remember { mutableStateOf<String?>(null) }
+    val base = normalizeServerAddress(session.serverAddress)
+
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Surface(
+            onClick = {
+                result = "Testing..."
+                scope.launch {
+                    val url = "$base/Users/${session.userId}/Images/Primary?maxWidth=96&api_key=${session.accessToken}"
+                    val started = System.currentTimeMillis()
+                    val request = ImageRequest.Builder(context)
+                        .data(url)
+                        .memoryCachePolicy(CachePolicy.DISABLED)
+                        .diskCachePolicy(CachePolicy.DISABLED)
+                        .build()
+                    val outcome = SingletonImageLoader.get(context).execute(request)
+                    val took = System.currentTimeMillis() - started
+                    result = when (outcome) {
+                        is SuccessResult -> "Images load fine (${outcome.image.width}x${outcome.image.height}, ${took} ms)."
+                        is ErrorResult -> {
+                            val error = outcome.throwable
+                            val detail = error.message?.take(160) ?: "no message"
+                            if (error is HttpException && error.response.code == 404) {
+                                "Server reached in ${took} ms (no avatar set, which is fine)."
+                            } else {
+                                "Failed after ${took} ms: ${error::class.simpleName}: $detail"
+                            }
+                        }
+                    }
+                }
+            },
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = JellioBgElevated,
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.dp, Color.White),
+                    shape = RoundedCornerShape(999.dp),
+                )
+            ),
+        ) {
+            Text(text = "Test image loading", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        }
+        result?.let {
+            Text(text = "Image host: $base", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+            Text(text = it, color = JellioText, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
