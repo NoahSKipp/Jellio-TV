@@ -452,7 +452,18 @@ private fun JellioTvApp(
                 sidebarForceCollapsed = true
                 snapshotFlow { sidebarHasRealFocus }.collect { hasFocus ->
                     if (hasFocus && sidebarForceCollapsed) {
-                        focusManager.moveFocus(FocusDirection.Right)
+                        // A screen still loading has nothing to take focus
+                        // yet, so keep trying for a moment. One that stays
+                        // empty (an empty Watchlist) leaves focus here, so
+                        // the rail opens rather than holding focus hidden.
+                        var moved = focusManager.moveFocus(FocusDirection.Right)
+                        var tries = 0
+                        while (!moved && tries < 16 && sidebarHasRealFocus) {
+                            delay(150)
+                            moved = !sidebarHasRealFocus || focusManager.moveFocus(FocusDirection.Right)
+                            tries++
+                        }
+                        if (!moved) sidebarForceCollapsed = false
                     } else if (!hasFocus) {
                         sidebarForceCollapsed = false
                     }
