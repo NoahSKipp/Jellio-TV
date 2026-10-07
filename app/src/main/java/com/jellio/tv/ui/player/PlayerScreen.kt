@@ -5,13 +5,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -759,11 +764,13 @@ private fun PlayerSurface(
             }
         }
 
+        val anyMenuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel
         if (controlsVisible) {
             PlayerControls(
                 title = title,
                 subtitle = subtitle,
                 isPlaying = isPlaying,
+                enabled = !anyMenuOpen,
                 positionMs = positionMs,
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
@@ -950,6 +957,7 @@ private fun PlayerControls(
     scrubPositionMs: Long?,
     speedLabel: String,
     sleepTimerActive: Boolean,
+    enabled: Boolean = true,
     onPlayPause: () -> Unit,
     onOpenSubtitleMenu: () -> Unit,
     onOpenSpeedMenu: () -> Unit,
@@ -958,7 +966,7 @@ private fun PlayerControls(
     onOpenSourceMenu: () -> Unit,
     onOpenEpisodesMenu: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().focusProperties { canFocus = enabled }) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
             Text(text = title, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             if (subtitle.isNotEmpty()) {
@@ -967,8 +975,10 @@ private fun PlayerControls(
         }
 
         val playPauseFocusRequester = remember { FocusRequester() }
-        LaunchedEffect(Unit) {
-            playPauseFocusRequester.requestFocus()
+        LaunchedEffect(enabled) {
+            if (enabled) {
+                playPauseFocusRequester.requestFocus()
+            }
         }
 
         Surface(
@@ -977,8 +987,14 @@ private fun PlayerControls(
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = Color.Black.copy(alpha = 0.45f),
                 contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                focusedContainerColor = Color.White.copy(alpha = 0.35f),
                 focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(3.dp, Color.White),
+                    shape = CircleShape,
+                )
             ),
             modifier = Modifier
                 .align(Alignment.Center)
@@ -1109,8 +1125,14 @@ private fun PlayerPillButton(icon: androidx.compose.ui.graphics.vector.ImageVect
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = if (active) JellioSecondary else JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
             focusedContentColor = if (active) JellioSecondary else JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(999.dp),
+            )
         ),
     ) {
         Column(
@@ -1311,14 +1333,36 @@ private fun UpNextOverlay(
                 Surface(
                     onClick = onPlayNow,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = JellioSecondary,
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.35f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
                 ) {
                     Text(text = "Play now ($secondsRemaining)", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onDismiss,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.12f),
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
                 ) {
                     Text(text = "Dismiss", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
@@ -1335,7 +1379,18 @@ private fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modi
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.White.copy(alpha = 0.12f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.32f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.5.dp, Color.White),
+                shape = RoundedCornerShape(999.dp),
+            )
+        ),
         modifier = modifier,
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
@@ -1369,7 +1424,18 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                 Surface(
                     onClick = onResume,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = JellioSecondary,
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.35f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
                     modifier = Modifier.focusRequester(resumeFocusRequester),
                 ) {
                     Text(text = "Resume", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
@@ -1377,7 +1443,18 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                 Surface(
                     onClick = onRestart,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.12f), contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.12f),
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
                 ) {
                     Text(text = "Start Over", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
@@ -1408,16 +1485,17 @@ private fun PlayerToast(message: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
+    val firstItemFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstItemFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.TopEnd,
     ) {
         Column(
@@ -1427,15 +1505,26 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
                 .background(JellioBgElevated, RoundedCornerShape(12.dp))
                 .padding(vertical = 8.dp),
         ) {
-            PLAYBACK_SPEEDS.forEach { speed ->
+            PLAYBACK_SPEEDS.forEachIndexed { index, speed ->
                 Surface(
                     onClick = { onSelect(speed) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (speed == selectedSpeed) Color.White.copy(alpha = 0.18f) else Color.Transparent,
                         contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
                     ),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .let { if (index == 0) it.focusRequester(firstItemFocusRequester) else it },
                 ) {
                     Text(
                         text = formatSpeed(speed),
@@ -1455,16 +1544,17 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
+    val firstItemFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstItemFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.TopEnd,
     ) {
         Column(
@@ -1477,8 +1567,22 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
             Surface(
                 onClick = onCancel,
                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.Transparent,
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                    focusedContentColor = JellioText,
+                ),
+                border = ClickableSurfaceDefaults.border(
+                    focusedBorder = Border(
+                        border = BorderStroke(2.dp, Color.White),
+                        shape = RoundedCornerShape(8.dp),
+                    )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .focusRequester(firstItemFocusRequester),
             ) {
                 Text(text = "Cancel timer", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
             }
@@ -1486,7 +1590,18 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
                 Surface(
                     onClick = { onSelect(minutes) },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                    ),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
                 ) {
                     Text(text = "$minutes min", modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp))
@@ -1512,16 +1627,17 @@ private fun AudioMenu(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.TopEnd,
     ) {
         Column(
@@ -1531,24 +1647,31 @@ private fun AudioMenu(
                 .background(JellioBgElevated, RoundedCornerShape(12.dp))
                 .padding(vertical = 8.dp),
         ) {
-            tracks.forEach { track ->
+            tracks.forEachIndexed { index, track ->
                 val isActive = if (selectedStreamIndex == null) {
                     track.streamIndex == defaultStreamIndex
                 } else {
                     track.streamIndex == selectedStreamIndex
                 }
                 Surface(
-                    // Real port of that file's own isActive early
-                    // return: picking the track already playing just
-                    // closes the popover there too, no real
-                    // re-negotiation worth firing over a no-op switch.
                     onClick = { if (!isActive) onSelect(track.streamIndex) else onDismiss() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (isActive) Color.White.copy(alpha = 0.18f) else Color.Transparent,
                         contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
                     ),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .let { if (index == 0) it.focusRequester(firstFocusRequester) else it },
                 ) {
                     Text(
                         text = track.label,
@@ -1579,16 +1702,17 @@ private fun SourcePanel(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.TopEnd,
     ) {
         Column(
@@ -1604,13 +1728,14 @@ private fun SourcePanel(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 12.dp),
             ) {
-                items(sources, key = { it.Id ?: it.hashCode() }) { source ->
+                itemsIndexed(sources, key = { _, it -> it.Id ?: it.hashCode() }) { index, source ->
                     SourceCard(
                         source = source,
                         onClick = {
                             if (source.Id != currentMediaSourceId) onSelect(source) else onDismiss()
                         },
                         isActive = source.Id == currentMediaSourceId,
+                        modifier = if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier,
                     )
                 }
             }
@@ -1636,16 +1761,17 @@ private fun EpisodesPanel(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.TopEnd,
     ) {
         Column(
@@ -1669,6 +1795,14 @@ private fun EpisodesPanel(
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = if (isActive) JellioSecondary else Color.White.copy(alpha = 0.08f),
                             contentColor = if (isActive) JellioBg else JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                            focusedContentColor = JellioText,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, Color.White),
+                                shape = RoundedCornerShape(999.dp),
+                            )
                         ),
                     ) {
                         Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
@@ -1679,8 +1813,13 @@ private fun EpisodesPanel(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 12.dp),
             ) {
-                items(episodes, key = { it.itemId }) { episode ->
-                    EpisodeRow(episode = episode, isActive = episode.itemId == currentItemId, onClick = { onSelectEpisode(episode.itemId) })
+                itemsIndexed(episodes, key = { _, it -> it.itemId }) { index, episode ->
+                    EpisodeRow(
+                        episode = episode,
+                        isActive = episode.itemId == currentItemId,
+                        onClick = { onSelectEpisode(episode.itemId) },
+                        modifier = if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier,
+                    )
                 }
             }
         }
@@ -1688,14 +1827,28 @@ private fun EpisodesPanel(
 }
 
 @Composable
-private fun EpisodeRow(episode: EpisodePanelEntry, isActive: Boolean, onClick: () -> Unit) {
+private fun EpisodeRow(
+    episode: EpisodePanelEntry,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(10.dp),
+            )
+        ),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(modifier = Modifier.padding(10.dp)) {
             Box(modifier = Modifier.width(120.dp).height(68.dp).background(Color.Black, RoundedCornerShape(8.dp))) {
@@ -1755,17 +1908,18 @@ private fun SubtitleMenu(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
+    val firstFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { firstFocusRequester.requestFocus() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusGroup()
-            .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
         contentAlignment = Alignment.CenterEnd,
     ) {
         Column(
@@ -1782,7 +1936,14 @@ private fun SubtitleMenu(
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
             )
             LazyColumn {
-                item { SubtitleMenuRow(label = "Off", isSelected = selectedIndex == null, onClick = { onSelect(null) }) }
+                item {
+                    SubtitleMenuRow(
+                        label = "Off",
+                        isSelected = selectedIndex == null,
+                        onClick = { onSelect(null) },
+                        modifier = Modifier.focusRequester(firstFocusRequester),
+                    )
+                }
                 items(tracks) { track ->
                     SubtitleMenuRow(label = track.label, isSelected = selectedIndex == track.streamIndex, onClick = { onSelect(track) })
                 }
@@ -1828,6 +1989,14 @@ private fun SubtitleStyleGroup(label: String, options: List<Pair<String, String>
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = if (value == selected) Color.White.copy(alpha = 0.18f) else JellioBg,
                         contentColor = JellioText,
+                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                        focusedContentColor = JellioText,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
                     ),
                 ) {
                     Text(
@@ -1879,15 +2048,23 @@ private fun subtitleFractionalTextSize(style: SubtitleStyle): Float {
 }
 
 @Composable
-private fun SubtitleMenuRow(label: String, isSelected: Boolean, onClick: () -> Unit) {
+private fun SubtitleMenuRow(label: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
             contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
         ),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(8.dp),
+            )
+        ),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Text(
             text = label,

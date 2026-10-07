@@ -13,6 +13,7 @@ import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.watchnext.WatchNextSyncer
+import com.jellio.tv.ui.seasonal.activeSeasonalTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -86,6 +87,37 @@ private const val MAX_ANIME_CATALOG_ROWS = 1
 
 private const val GENRE_ROWS = 4
 private const val GENRE_ROW_LIMIT = 24
+
+private data class SeasonalSpec(
+    val title: String,
+    val genres: List<String>,
+    val searchTerms: List<String>,
+)
+
+// Matches Jellio Web runtime/seasonalRecommendations.js SEASONS_SPEC:
+// Maps active theme to its seasonal title, genres, and holiday terms.
+private val SEASONS_SPEC = mapOf(
+    "halloween" to SeasonalSpec(
+        title = "Spooky Season",
+        genres = listOf("Horror", "Mystery"),
+        searchTerms = listOf("Halloween", "Spooky", "Ghost", "Haunted", "Witch", "Vampire", "Zombie"),
+    ),
+    "christmas" to SeasonalSpec(
+        title = "Holiday Favorites",
+        genres = listOf("Holiday", "Christmas", "Family"),
+        searchTerms = listOf("Christmas", "Holiday", "Santa", "Noel", "Xmas"),
+    ),
+    "newyear" to SeasonalSpec(
+        title = "New Year Celebrations",
+        genres = listOf("Comedy", "Music", "Musical"),
+        searchTerms = listOf("New Year", "Countdown", "Celebration", "Party"),
+    ),
+    "valentine" to SeasonalSpec(
+        title = "Romance & Date Night",
+        genres = listOf("Romance"),
+        searchTerms = listOf("Valentine", "Love", "Romance", "Romantic"),
+    ),
+)
 
 // Catalogs worth leading with, in this order. Anything unlisted keeps
 // its own alphabetical order behind them.
@@ -172,6 +204,7 @@ class HomeViewModel @Inject constructor(
                     val comingSoonDeferred = async { runCatching { repository.getCalendarEntries().take(COMING_SOON_LIMIT) }.getOrDefault(emptyList()) }
                     val collectionsDeferred = async { runCatching { repository.getCollections(session.userId) }.getOrDefault(emptyList()) }
                     val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
+                    val configDeferred = async { runCatching { repository.getJellioConfig() }.getOrNull() }
                     val customizationDeferred = async { runCatching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
 
                     val continueWatching = continueWatchingDeferred.await()
@@ -185,7 +218,21 @@ class HomeViewModel @Inject constructor(
                     val comingSoon = comingSoonDeferred.await()
                     val collections = collectionsDeferred.await()
                     val user = userDeferred.await()
+                    val config = configDeferred.await()
                     val customization = customizationDeferred.await()
+
+                    val activeTheme = activeSeasonalTheme(Calendar.getInstance(), config)
+                    val seasonalDeferred = if (activeTheme != null && SEASONS_SPEC.containsKey(activeTheme)) {
+                        val spec = SEASONS_SPEC.getValue(activeTheme)
+                        async {
+                            runCatching {
+                                val raw = repository.getSeasonalItems(session.userId, spec.genres, spec.searchTerms, 60)
+                                spec.title to raw
+                            }.getOrNull()
+                        }
+                    } else {
+                        null
+                    }
 
                     val studioHubs = groupByService(collections).keys.sorted()
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
@@ -219,6 +266,19 @@ class HomeViewModel @Inject constructor(
                     val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
                     val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
 
+                    val seasonalResult = seasonalDeferred?.await()
+                    val seasonalSection = seasonalResult?.let { (title, rawItems) ->
+                        val eligible = rawItems.filter { it.UserData?.Played != true && !exclude.contains(it.Id) }
+                        eligible.forEach { exclude.add(it.Id) }
+                        if (eligible.isNotEmpty()) {
+                            HomeSection(
+                                title = title,
+                                items = eligible.take(24),
+                                key = "seasonal:$activeTheme",
+                            )
+                        } else null
+                    }
+
                     // Real port of screens/home.js's own real
                     // wrapRowForCustomization() call order: Continue
                     // Watching, Up Next, Coming Soon, Streaming
@@ -234,7 +294,22 @@ class HomeViewModel @Inject constructor(
                         }
                         if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
-                        recommendationRows.forEach { add(PosterHomeRow(it.copy(key = "rec:${it.title}"))) }
+
+                        // Ported from runtime/recommend.js:
+                        // Seasonal recommendation row (e.g. "Spooky Season", "Holiday Favorites")
+                        // sits directly below "Top Picks for You".
+                        var seasonalInserted = false
+                        recommendationRows.forEach { rec ->
+                            add(PosterHomeRow(rec.copy(key = "rec:${rec.title}")))
+                            if (rec.title == "Top Picks for You" && seasonalSection != null && !seasonalInserted) {
+                                add(PosterHomeRow(seasonalSection))
+                                seasonalInserted = true
+                            }
+                        }
+                        if (seasonalSection != null && !seasonalInserted) {
+                            add(PosterHomeRow(seasonalSection))
+                        }
+
                         catalogRows.forEach { add(PosterHomeRow(it)) }
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
@@ -295,7 +370,8 @@ class HomeViewModel @Inject constructor(
                 row
             }
         }
-        _uiState.value = state.copy(rows = updatedRows)
+        val updatedHero = state.heroItems.map { if (it.Id == itemId) transform(it) else it }
+        _uiState.value = state.copy(rows = updatedRows, heroItems = updatedHero)
     }
 
     // Real port of components/cardOptionsMenu.js's own toggleWatched()

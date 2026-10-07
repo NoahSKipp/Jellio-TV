@@ -357,7 +357,13 @@ fun HomeScreen(
                             },
                         ) {
                             CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
-                                HeroSection(items = uiState.heroItems, imageUrl = imageUrl, onViewDetails = onItemClick)
+                                HeroSection(
+                                    items = uiState.heroItems,
+                                    imageUrl = imageUrl,
+                                    onPlay = { item -> onPlayDirect(item.Id, null) },
+                                    onToggleWatchlist = { item -> viewModel.toggleWatchlist(session, item) },
+                                    onViewDetails = onItemClick,
+                                )
                             }
                         }
                     }

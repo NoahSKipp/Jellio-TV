@@ -33,6 +33,7 @@ import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -640,6 +641,63 @@ class JellioRepository @Inject constructor(
             searchTerm = term,
             fields = "PrimaryImageAspectRatio",
         ).Items
+    }
+
+    // Ported from Jellio Web runtime/api.js's own getSeasonalItems():
+    // Queries items matching seasonal genres (e.g. Horror, Mystery) sorted by rating,
+    // plus items matching search terms (e.g. Halloween, Spooky), then merges and dedupes.
+    suspend fun getSeasonalItems(
+        userId: String,
+        genres: List<String>,
+        searchTerms: List<String>,
+        limit: Int = 60,
+    ): List<BaseItemDto> = coroutineScope {
+        val jobs = mutableListOf<Deferred<List<BaseItemDto>>>()
+        if (genres.isNotEmpty()) {
+            jobs.add(
+                async {
+                    runCatching {
+                        api.getItems(
+                            userId = userId,
+                            recursive = true,
+                            includeItemTypes = "Movie,Series",
+                            genres = genres.joinToString("|"),
+                            limit = limit,
+                            fields = "$ITEM_FIELDS,Genres,ProductionYear,CommunityRating",
+                            sortBy = "CommunityRating",
+                            sortOrder = "Descending",
+                        ).Items
+                    }.getOrDefault(emptyList())
+                }
+            )
+        }
+        searchTerms.take(2).forEach { term ->
+            jobs.add(
+                async {
+                    runCatching {
+                        api.getItems(
+                            userId = userId,
+                            recursive = true,
+                            includeItemTypes = "Movie,Series",
+                            searchTerm = term,
+                            limit = 25,
+                            fields = "$ITEM_FIELDS,Genres,ProductionYear,CommunityRating",
+                        ).Items
+                    }.getOrDefault(emptyList())
+                }
+            )
+        }
+        val results = jobs.awaitAll()
+        val combined = mutableListOf<BaseItemDto>()
+        val seen = mutableSetOf<String>()
+        for (list in results) {
+            for (item in list) {
+                if (seen.add(item.Id)) {
+                    combined.add(item)
+                }
+            }
+        }
+        combined
     }
 
     // Split halves of searchItems above, fired independently by
