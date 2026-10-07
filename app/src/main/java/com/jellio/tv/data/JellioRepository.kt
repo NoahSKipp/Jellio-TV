@@ -207,7 +207,7 @@ class JellioRepository @Inject constructor(
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
 
     suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
-        val normalized = serverAddress.trim().trimEnd('/')
+        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         if (normalized.isEmpty()) {
             return LoginResult.Failure("Enter your server address")
         }
@@ -235,15 +235,15 @@ class JellioRepository @Inject constructor(
     // watching?" grid the next time this device opens the login screen
     // for the same real server.
     suspend fun getRememberedUsers(serverAddress: String): Map<String, RememberedUserEntry> =
-        rememberedUsersStore.getRememberedUsers(serverAddress)
+        rememberedUsersStore.getRememberedUsers(com.jellio.tv.di.normalizeServerAddress(serverAddress))
 
     suspend fun forgetRememberedUser(serverAddress: String, userId: String) {
-        rememberedUsersStore.forgetUser(serverAddress, userId)
+        rememberedUsersStore.forgetUser(com.jellio.tv.di.normalizeServerAddress(serverAddress), userId)
     }
 
     private suspend fun rememberUser(serverAddress: String, userId: String, accessToken: String, name: String, primaryImageTag: String?) {
         rememberedUsersStore.rememberUser(
-            serverAddress,
+            com.jellio.tv.di.normalizeServerAddress(serverAddress),
             userId,
             RememberedUserEntry(accessToken, name, primaryImageTag, System.currentTimeMillis()),
         )
@@ -260,7 +260,8 @@ class JellioRepository @Inject constructor(
     // over a server that is just briefly unreachable, same real
     // distinction runtime/auth.js's own getPublicUsers() now draws.
     suspend fun getPublicUsers(serverAddress: String): List<UserDto> {
-        sessionManager.saveServerAddress(serverAddress)
+        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
+        sessionManager.saveServerAddress(normalized)
         return api.getPublicUsers()
     }
 
@@ -270,23 +271,25 @@ class JellioRepository @Inject constructor(
     // token rather than silently committing a session the very next
     // request would fail.
     suspend fun quickSignIn(serverAddress: String, userId: String): LoginResult {
-        val entry = rememberedUsersStore.getRememberedUsers(serverAddress)[userId]
+        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
+        val entry = rememberedUsersStore.getRememberedUsers(normalized)[userId]
             ?: return LoginResult.Failure("No remembered sign-in for this profile")
-        sessionManager.saveServerAddress(serverAddress)
+        sessionManager.saveServerAddress(normalized)
         return try {
             val user = api.getUserWithToken(entry.accessToken, userId)
             clearCache()
-            sessionManager.saveSession(serverAddress, entry.accessToken, user.Id, user.Name)
-            rememberUser(serverAddress, user.Id, entry.accessToken, user.Name, user.PrimaryImageTag)
+            sessionManager.saveSession(normalized, entry.accessToken, user.Id, user.Name)
+            rememberUser(normalized, user.Id, entry.accessToken, user.Name, user.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
-            rememberedUsersStore.forgetUser(serverAddress, userId)
+            rememberedUsersStore.forgetUser(normalized, userId)
             LoginResult.Failure("That saved sign-in no longer works. Sign in again.")
         }
     }
 
     fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300, accessToken: String? = null): String {
-        val base = "$serverAddress/Users/$userId/Images/Primary?maxWidth=$maxWidth"
+        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
+        val base = "$cleanServer/Users/$userId/Images/Primary?maxWidth=$maxWidth"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
         return if (!accessToken.isNullOrEmpty()) "$withTag&api_key=$accessToken" else withTag
     }
@@ -302,8 +305,10 @@ class JellioRepository @Inject constructor(
     // loaded at all on device without it, Coil's own image request
     // getting back a plain 401 no <img> tag / browser cookie session
     // ever hits.
-    fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String =
-        "$serverAddress/Jellio/profile/banner/$userId?api_key=$accessToken&t=${System.currentTimeMillis()}"
+    fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String {
+        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
+        return "$cleanServer/Jellio/profile/banner/$userId?api_key=$accessToken&t=${System.currentTimeMillis()}"
+    }
 
     // Real port of runtime/auth.js's own requestPasswordReset(): a real
     // failure comes back true anyway, the same real leak-prevention
@@ -1258,7 +1263,8 @@ class JellioRepository @Inject constructor(
         maxWidth: Int = 400,
         accessToken: String? = null,
     ): String {
-        val base = "$serverAddress/Items/$itemId/Images/$imageType?maxWidth=$maxWidth"
+        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
+        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
         return if (!accessToken.isNullOrEmpty()) "$withTag&api_key=$accessToken" else withTag
     }

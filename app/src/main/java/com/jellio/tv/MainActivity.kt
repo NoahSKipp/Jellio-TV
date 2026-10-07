@@ -109,20 +109,40 @@ private fun JellioTvRoot(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
     appViewModel: AppViewModel = hiltViewModel(),
+    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
-    when (val state = appViewModel.authState.collectAsState().value) {
-        // A DataStore-backed sessionFlow always eventually emits, but
-        // there is a real async gap before its first value: an empty
-        // Box here for one frame beats a false flash of the sign in
-        // screen for a reader who is actually already signed in.
-        AuthState.Loading -> Box(Modifier.fillMaxSize()) {}
-        AuthState.LoggedOut -> LoginScreen(modifier = Modifier.fillMaxSize())
-        is AuthState.LoggedIn -> AppBootGate(
-            session = state.session,
-            appViewModel = appViewModel,
-            deepLinkItemId = deepLinkItemId,
-            onDeepLinkConsumed = onDeepLinkConsumed,
-        )
+    // Check for updates at the root level so logged-out users, users on the
+    // login screen, and logged-in users alike receive update prompts immediately.
+    LaunchedEffect(Unit) {
+        appUpdateViewModel.checkForUpdate()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (val state = appViewModel.authState.collectAsState().value) {
+            // A DataStore-backed sessionFlow always eventually emits, but
+            // there is a real async gap before its first value: an empty
+            // Box here for one frame beats a false flash of the sign in
+            // screen for a reader who is actually already signed in.
+            AuthState.Loading -> Box(Modifier.fillMaxSize()) {}
+            AuthState.LoggedOut -> LoginScreen(modifier = Modifier.fillMaxSize())
+            is AuthState.LoggedIn -> AppBootGate(
+                session = state.session,
+                appViewModel = appViewModel,
+                deepLinkItemId = deepLinkItemId,
+                onDeepLinkConsumed = onDeepLinkConsumed,
+            )
+        }
+
+        val updateState by appUpdateViewModel.uiState.collectAsState()
+        updateState.availableVersion?.let { version ->
+            UpdateToast(
+                version = version,
+                downloading = updateState.downloading,
+                onDownload = { appUpdateViewModel.download() },
+                onDismiss = { appUpdateViewModel.dismiss() },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -145,7 +165,6 @@ private fun AppBootGate(
     onDeepLinkConsumed: () -> Unit,
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
-    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
@@ -159,11 +178,6 @@ private fun AppBootGate(
         minSplashTimeElapsed = true
     }
     LaunchedEffect(session.userId) { homeViewModel.load(session) }
-    // Checked here rather than inside JellioTvApp: this fires exactly
-    // once per real app open the same way this whole gate does, not
-    // once per LaunchedEffect(session.userId) key change were it any
-    // deeper in a tree that recomposes across tab switches.
-    LaunchedEffect(session.userId) { appUpdateViewModel.checkForUpdate() }
     // Real speculative value, not a real parity port: which library a
     // reader opens first is real screen state no server or web source
     // predicts ahead of the real tap, this just warms the same real
@@ -197,10 +211,6 @@ private fun JellioTvApp(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
-    // AppBootGate's own hiltViewModel() call already kicked off
-    // checkForUpdate(); this call resolves to that exact same
-    // Activity-scoped instance, just to render whatever it found.
-    appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     // A plain real back stack rather than Navigation Compose: the
     // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
@@ -535,17 +545,6 @@ private fun JellioTvApp(
                     onPlayDirect(pickerItem.Id, mediaSourceId)
                 },
                 onDismiss = { streamPickerItem = null },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-
-        val updateState by appUpdateViewModel.uiState.collectAsState()
-        updateState.availableVersion?.let { version ->
-            UpdateToast(
-                version = version,
-                downloading = updateState.downloading,
-                onDownload = { appUpdateViewModel.download() },
-                onDismiss = { appUpdateViewModel.dismiss() },
                 modifier = Modifier.fillMaxSize(),
             )
         }
