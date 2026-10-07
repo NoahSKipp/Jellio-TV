@@ -203,7 +203,7 @@ fun SidebarNav(
             }
             .focusProperties {
                 onEnter = {
-                    if (requestedDirection == FocusDirection.Left) homeFocusRequester.requestFocus()
+                    if (requestedFocusDirection == FocusDirection.Left) homeFocusRequester.requestFocus()
                 }
             }
             .focusGroup(),
