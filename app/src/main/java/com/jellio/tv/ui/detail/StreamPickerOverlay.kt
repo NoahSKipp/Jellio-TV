@@ -63,6 +63,34 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // MediaSourceInfo), skipping that file's own remember-my-stream/
 // language-filter chrome for now: a real but secondary layer over the
 // same real core job, picking one of Gelato's own resolved sources.
+private val QUALITY_ORDER = listOf("4K", "QHD", "FHD", "HD", "SD")
+private val QUALITY_NAME_PATTERNS = listOf(
+    "4K" to Regex("(^|[^a-z0-9])(2160p|4k|uhd)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+    "QHD" to Regex("(^|[^a-z0-9])1440p([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+    "FHD" to Regex("(^|[^a-z0-9])(1080[pi]|fhd)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+    "HD" to Regex("(^|[^a-z0-9])720p([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+    "SD" to Regex("(^|[^a-z0-9])(576p|480p|360p|sd|dvdrip)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+)
+
+// Same buckets as streamPicker.js's sourceQuality(): probed video size
+// first, then the release name, since most unplayed sources are unprobed.
+internal fun sourceQuality(source: MediaSourceDto): String? {
+    val video = source.MediaStreams?.firstOrNull { it.Type == "Video" }
+    val height = video?.Height ?: 0
+    val width = video?.Width ?: 0
+    if (height > 0 || width > 0) {
+        return when {
+            height >= 2000 || width >= 3200 -> "4K"
+            height >= 1300 || width >= 2400 -> "QHD"
+            height >= 900 || width >= 1800 -> "FHD"
+            height >= 650 || width >= 1200 -> "HD"
+            else -> "SD"
+        }
+    }
+    val name = source.Name ?: return null
+    return QUALITY_NAME_PATTERNS.firstOrNull { it.second.containsMatchIn(name) }?.first
+}
+
 internal fun sourceResolutionLabel(source: MediaSourceDto): String {
     val height = source.MediaStreams?.firstOrNull { it.Type == "Video" }?.Height ?: return ""
     return if (height >= 2000) "4K" else "${height}p"
@@ -210,6 +238,7 @@ fun StreamPickerOverlay(
     var reloadKey by remember { mutableIntStateOf(0) }
     var remembered by remember { mutableStateOf<String?>(null) }
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
+    var selectedQuality by remember { mutableStateOf<String?>(null) }
     // Real bug found live testing on device, same real class every
     // other overlay in this app already had to fix: nothing here ever
     // requested initial D-pad focus, and nothing stopped focus
@@ -280,7 +309,10 @@ fun StreamPickerOverlay(
         }
     }
     LaunchedEffect(item.Id) { remembered = rememberedSourceId() }
-    LaunchedEffect(item.Id) { selectedLanguage = null }
+    LaunchedEffect(item.Id) {
+        selectedLanguage = null
+        selectedQuality = null
+    }
     BackHandler(onBack = onDismiss)
 
     Box(
@@ -355,9 +387,23 @@ fun StreamPickerOverlay(
                         languages.forEach { map[it] = FocusRequester() }
                         map
                     }
-                    val filteredSources = selectedLanguage?.let { code ->
-                        currentState.sources.filter { sourceAudioLanguages(it).contains(code) }
-                    } ?: currentState.sources
+                    val qualities = remember(currentState.sources) {
+                        val present = currentState.sources.mapNotNull { sourceQuality(it) }.toSet()
+                        QUALITY_ORDER.filter { it in present }
+                    }
+                    val qualityFocusRequesters = remember(qualities) {
+                        val map = mutableMapOf<String?, FocusRequester>()
+                        map[null] = FocusRequester()
+                        qualities.forEach { map[it] = FocusRequester() }
+                        map
+                    }
+                    val showLanguages = languages.size > 1
+                    val showQualities = qualities.size > 1
+                    // Language and quality combine: a source has to match both.
+                    val filteredSources = currentState.sources.filter { source ->
+                        (selectedLanguage == null || sourceAudioLanguages(source).contains(selectedLanguage)) &&
+                            (selectedQuality == null || sourceQuality(source) == selectedQuality)
+                    }
 
                     android.util.Log.d(
                         "StreamPickerDpad",
@@ -426,9 +472,9 @@ fun StreamPickerOverlay(
                             }
                         }
                         item(key = "header_chips") {
-                            if (languages.size > 1) {
-                                LanguageFilterChips(
-                                    languages = languages,
+                            if (showLanguages) {
+                                FilterChipRow(
+                                    chips = listOf<Pair<String?, String>>(null to "All") + languages.map { it to languageName(it) },
                                     selected = selectedLanguage,
                                     onSelect = { selectedLanguage = it },
                                     firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
@@ -436,9 +482,22 @@ fun StreamPickerOverlay(
                                 )
                             }
                         }
+                        item(key = "header_quality_chips") {
+                            if (showQualities) {
+                                FilterChipRow(
+                                    chips = listOf<Pair<String?, String>>(null to "All") + qualities.map { it to it },
+                                    selected = selectedQuality,
+                                    onSelect = { selectedQuality = it },
+                                    firstChipFocusRequester = if (resumeTicks <= 0 && !showLanguages) initialFocusRequester else null,
+                                    chipFocusRequesters = qualityFocusRequesters,
+                                    upTarget = if (showLanguages) chipFocusRequesters[selectedLanguage] else null,
+                                    topPadding = if (showLanguages) 12.dp else 20.dp,
+                                )
+                            }
+                        }
                         item(key = "header_text") {
                             Text(
-                                text = "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
+                                text = if (filteredSources.isEmpty()) "No streams match these filters" else "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
                                 color = JellioTextSecondary,
                                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                             )
@@ -450,13 +509,15 @@ fun StreamPickerOverlay(
                                 modifier = if (index == 0) {
                                     Modifier
                                         .focusRequester(firstSourceCardFocusRequester)
-                                        .let { if (resumeTicks <= 0 && languages.size <= 1) it.focusRequester(initialFocusRequester) else it }
+                                        .let { if (resumeTicks <= 0 && !showLanguages && !showQualities) it.focusRequester(initialFocusRequester) else it }
                                         .onFocusChanged {
                                             firstCardHasFocus = it.hasFocus
                                             android.util.Log.d("StreamPickerDpad", "first card focus=${it.hasFocus}")
                                         }
                                         .focusProperties {
-                                            up = if (languages.size > 1) {
+                                            up = if (showQualities) {
+                                                qualityFocusRequesters[selectedQuality] ?: FocusRequester.Default
+                                            } else if (showLanguages) {
                                                 chipFocusRequesters[selectedLanguage] ?: FocusRequester.Default
                                             } else if (resumeTicks > 0) {
                                                 resumeFocusRequester
@@ -478,24 +539,22 @@ fun StreamPickerOverlay(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun LanguageFilterChips(
-    languages: List<String>,
+private fun FilterChipRow(
+    chips: List<Pair<String?, String>>,
     selected: String?,
     onSelect: (String?) -> Unit,
     firstChipFocusRequester: FocusRequester? = null,
     chipFocusRequesters: Map<String?, FocusRequester>,
+    upTarget: FocusRequester? = null,
+    topPadding: androidx.compose.ui.unit.Dp = 20.dp,
 ) {
-    val chips = buildList {
-        add(null to "All")
-        languages.forEach { code -> add(code to languageName(code)) }
-    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
-            .padding(top = 20.dp)
+            .padding(top = topPadding)
             .horizontalScroll(androidx.compose.foundation.rememberScrollState())
-            .focusProperties { 
-                up = FocusRequester.Cancel
+            .focusProperties {
+                up = upTarget ?: FocusRequester.Cancel
             },
     ) {
         chips.forEachIndexed { index, pair ->
@@ -584,7 +643,7 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
                 Text(text = description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 1.dp))
             }
             val tags = listOfNotNull(
-                sourceResolutionLabel(source).ifEmpty { null },
+                sourceResolutionLabel(source).ifEmpty { sourceQuality(source) },
                 sourceBitrateLabel(source).ifEmpty { null },
                 formatFileSize(source.Size).ifEmpty { null },
                 source.Container?.uppercase(),
