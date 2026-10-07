@@ -61,7 +61,7 @@ object NetworkModule {
     fun provideBaseUrlInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val original = chain.request()
-            val raw = sessionManager.getCachedServerAddress() ?: runBlocking { sessionManager.serverAddress() }
+            val raw = sessionManager.getCachedServerAddress()
             if (raw.isNullOrBlank()) {
                 throw java.io.IOException("No server address configured. Enter your Jellyfin server address.")
             }
@@ -106,8 +106,8 @@ object NetworkModule {
     @AuthInterceptor
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
-            val token = sessionManager.getCachedAccessToken() ?: runBlocking { sessionManager.accessToken() }
-            val deviceId = sessionManager.getCachedDeviceId() ?: runBlocking { sessionManager.deviceId() }
+            val token = sessionManager.getCachedAccessToken()
+            val deviceId = sessionManager.getCachedDeviceId()
             val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
             val request = chain.request().newBuilder().addHeader("Authorization", header).build()
             chain.proceed(request)
@@ -119,9 +119,26 @@ object NetworkModule {
         @BaseUrlInterceptor baseUrlInterceptor: Interceptor,
         @AuthInterceptor authInterceptor: Interceptor,
     ): OkHttpClient = OkHttpClient.Builder()
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
+        .apply {
+            try {
+                val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                })
+                val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+                sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+                sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+                hostnameVerifier { _, _ -> true }
+            } catch (_: Exception) {}
+        }
         .build()
 
     @Provides

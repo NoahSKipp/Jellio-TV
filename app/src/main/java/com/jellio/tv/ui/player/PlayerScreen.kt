@@ -87,8 +87,12 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
+import com.jellio.tv.data.network.APP_VERSION
+import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
@@ -194,6 +198,7 @@ fun PlayerScreen(
                 }
             }
             uiState.streamUrl != null -> PlayerSurface(
+                session = session,
                 streamUrl = uiState.streamUrl!!,
                 startPositionTicks = uiState.startPositionTicks,
                 resumePercent = uiState.resumePercent,
@@ -253,6 +258,7 @@ fun PlayerScreen(
 
 @Composable
 private fun PlayerSurface(
+    session: Session,
     streamUrl: String,
     startPositionTicks: Long,
     resumePercent: Int?,
@@ -323,7 +329,22 @@ private fun PlayerSurface(
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
             .build()
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Jellio-TV/$APP_VERSION")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(20000)
+            .setDefaultRequestProperties(
+                buildMap {
+                    put("X-Emby-Token", session.accessToken)
+                    put("Authorization", buildEmbyAuthorizationHeader("AndroidTV", APP_VERSION, session.accessToken))
+                }
+            )
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
         ExoPlayer.Builder(context)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
             setMediaItem(mediaItem)

@@ -208,7 +208,6 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(blockScrollWhileHeroFocused)
-                        .padding(top = 32.dp)
                         .focusRestorer(),
                 ) {
                     item {
@@ -389,7 +388,7 @@ fun HomeScreen(
                             editMode = editMode,
                             onToggleEdit = { editMode = !editMode },
                             onReset = { viewModel.resetCustomization() },
-                            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(start = 48.dp, top = if (uiState.greeting.isEmpty()) 16.dp else 0.dp, bottom = 8.dp),
                         )
                     }
                     items(visibleRows, key = { it.key }) { row ->
