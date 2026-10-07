@@ -44,34 +44,48 @@ class SessionManager @Inject constructor(
         val DEVICE_ID = stringPreferencesKey("device_id")
     }
 
-    @Volatile
-    private var cachedServerAddress: String? = null
+    private val syncPrefs = context.getSharedPreferences("jellio_session_sync", Context.MODE_PRIVATE)
 
     @Volatile
-    private var cachedAccessToken: String? = null
+    private var cachedServerAddress: String? = syncPrefs.getString("server_address", null)
 
     @Volatile
-    private var cachedDeviceId: String? = null
+    private var cachedAccessToken: String? = syncPrefs.getString("access_token", null)
+
+    @Volatile
+    private var cachedDeviceId: String = syncPrefs.getString("device_id", null) ?: run {
+        val generated = UUID.randomUUID().toString()
+        syncPrefs.edit().putString("device_id", generated).apply()
+        generated
+    }
 
     init {
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             context.dataStore.data.collect { prefs ->
-                cachedServerAddress = prefs[Keys.SERVER_ADDRESS]
-                cachedAccessToken = prefs[Keys.ACCESS_TOKEN]
-                cachedDeviceId = prefs[Keys.DEVICE_ID]
+                val server = prefs[Keys.SERVER_ADDRESS] ?: cachedServerAddress
+                val token = prefs[Keys.ACCESS_TOKEN] ?: cachedAccessToken
+                val device = prefs[Keys.DEVICE_ID] ?: cachedDeviceId
+                cachedServerAddress = server
+                cachedAccessToken = token
+                cachedDeviceId = device
+                syncPrefs.edit()
+                    .putString("server_address", server)
+                    .putString("access_token", token)
+                    .putString("device_id", device)
+                    .apply()
             }
         }
     }
 
-    fun getCachedServerAddress(): String? = cachedServerAddress
-    fun getCachedAccessToken(): String? = cachedAccessToken
-    fun getCachedDeviceId(): String? = cachedDeviceId
+    fun getCachedServerAddress(): String? = cachedServerAddress ?: syncPrefs.getString("server_address", null)
+    fun getCachedAccessToken(): String? = cachedAccessToken ?: syncPrefs.getString("access_token", null)
+    fun getCachedDeviceId(): String = cachedDeviceId
 
     val sessionFlow: Flow<Session?> = context.dataStore.data.map { prefs ->
-        val serverAddress = prefs[Keys.SERVER_ADDRESS]
-        val accessToken = prefs[Keys.ACCESS_TOKEN]
-        val userId = prefs[Keys.USER_ID]
-        val userName = prefs[Keys.USER_NAME]
+        val serverAddress = prefs[Keys.SERVER_ADDRESS] ?: cachedServerAddress
+        val accessToken = prefs[Keys.ACCESS_TOKEN] ?: cachedAccessToken
+        val userId = prefs[Keys.USER_ID] ?: syncPrefs.getString("user_id", null)
+        val userName = prefs[Keys.USER_NAME] ?: syncPrefs.getString("user_name", null)
         if (serverAddress != null && accessToken != null && userId != null && userName != null) {
             Session(serverAddress, accessToken, userId, userName)
         } else {
@@ -79,41 +93,30 @@ class SessionManager @Inject constructor(
         }
     }.distinctUntilChanged()
 
-    // Read by NetworkModule's own interceptors, which run on OkHttp's
-    // dispatcher threads rather than a coroutine scope: DataStore
-    // caches the parsed Preferences in memory after its first real
-    // disk read, so this suspend call is fast on every call after
-    // that, not a fresh disk hit each time.
     suspend fun serverAddress(): String? {
         cachedServerAddress?.let { return it }
-        val value = context.dataStore.data.map { it[Keys.SERVER_ADDRESS] }.first()
+        val value = syncPrefs.getString("server_address", null)
+            ?: context.dataStore.data.map { it[Keys.SERVER_ADDRESS] }.first()
         cachedServerAddress = value
         return value
     }
 
     suspend fun accessToken(): String? {
         cachedAccessToken?.let { return it }
-        val value = context.dataStore.data.map { it[Keys.ACCESS_TOKEN] }.first()
+        val value = syncPrefs.getString("access_token", null)
+            ?: context.dataStore.data.map { it[Keys.ACCESS_TOKEN] }.first()
         cachedAccessToken = value
         return value
     }
 
     suspend fun deviceId(): String {
-        cachedDeviceId?.let { return it }
-        val existing = context.dataStore.data.map { it[Keys.DEVICE_ID] }.first()
-        if (existing != null) {
-            cachedDeviceId = existing
-            return existing
-        }
-        val generated = UUID.randomUUID().toString()
-        context.dataStore.edit { it[Keys.DEVICE_ID] = generated }
-        cachedDeviceId = generated
-        return generated
+        return cachedDeviceId
     }
 
     suspend fun saveServerAddress(serverAddress: String) {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         cachedServerAddress = normalized
+        syncPrefs.edit().putString("server_address", normalized).apply()
         context.dataStore.edit { it[Keys.SERVER_ADDRESS] = normalized }
     }
 
@@ -121,20 +124,29 @@ class SessionManager @Inject constructor(
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         cachedServerAddress = normalized
         cachedAccessToken = accessToken
+        syncPrefs.edit()
+            .putString("server_address", normalized)
+            .putString("access_token", accessToken)
+            .putString("user_id", userId)
+            .putString("user_name", userName)
+            .putString("device_id", cachedDeviceId)
+            .apply()
         context.dataStore.edit { prefs ->
             prefs[Keys.SERVER_ADDRESS] = normalized
             prefs[Keys.ACCESS_TOKEN] = accessToken
             prefs[Keys.USER_ID] = userId
             prefs[Keys.USER_NAME] = userName
+            prefs[Keys.DEVICE_ID] = cachedDeviceId
         }
     }
 
-    // Drops the token/identity, keeps the server address: the reader
-    // is signing out of an account, not un-configuring which server
-    // this box talks to, same real distinction auth.js's own sign out
-    // draws.
     suspend fun clearSession() {
         cachedAccessToken = null
+        syncPrefs.edit()
+            .remove("access_token")
+            .remove("user_id")
+            .remove("user_name")
+            .apply()
         context.dataStore.edit { prefs ->
             prefs.remove(Keys.ACCESS_TOKEN)
             prefs.remove(Keys.USER_ID)
