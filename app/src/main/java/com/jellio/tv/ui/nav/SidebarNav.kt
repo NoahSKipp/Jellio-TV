@@ -34,7 +34,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -139,6 +142,9 @@ fun SidebarNav(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val visuallyExpanded = expanded && !forceCollapsed
+    // Pressing Left into the rail always lands on Home, wherever on
+    // screen it was pressed from.
+    val homeFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(visuallyExpanded) {
         if (!visuallyExpanded) {
@@ -194,7 +200,13 @@ fun SidebarNav(
             .onFocusChanged { state ->
                 expanded = state.hasFocus
                 onFocusChange(state.hasFocus)
-            },
+            }
+            .focusProperties {
+                onEnter = {
+                    if (requestedDirection == FocusDirection.Left) homeFocusRequester.requestFocus()
+                }
+            }
+            .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items.forEach { route ->
@@ -231,6 +243,7 @@ fun SidebarNav(
                     }
                 },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
+                homeFocusRequester = if (route == JellioRoute.Home) homeFocusRequester else null,
             )
 
         }
@@ -251,6 +264,7 @@ private fun SidebarItem(
     onClick: () -> Unit,
     enabled: Boolean = true,
     focusRequester: FocusRequester? = null,
+    homeFocusRequester: FocusRequester? = null,
     iconScale: Float = 1f,
     // Real components/sidebar.js's own buildProfileButton(): the
     // reader's own real avatar in place of a generic icon, for this
@@ -302,6 +316,8 @@ private fun SidebarItem(
         ),
         modifier = Modifier.fillMaxWidth().height(SidebarItemHeight.scaled()).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it
+        }.let {
+            if (homeFocusRequester != null) it.focusRequester(homeFocusRequester) else it
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
