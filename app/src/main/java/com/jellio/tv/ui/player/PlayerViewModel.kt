@@ -131,6 +131,7 @@ fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double
 data class PlayerUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
+    val errorDetail: String? = null,
     val streamUrl: String? = null,
     val mediaSourceId: String? = null,
     val startPositionTicks: Long = 0,
@@ -258,6 +259,12 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    fun retry(session: Session) {
+        val id = itemId ?: return
+        loadedItemId = null
+        load(session, id, mediaSourceIdParam)
+    }
+
     fun load(session: Session, itemId: String, mediaSourceId: String?) {
         val key = itemId + "|" + mediaSourceId
         if (loadedItemId == key) return
@@ -268,9 +275,16 @@ class PlayerViewModel @Inject constructor(
             _uiState.value = PlayerUiState(isLoading = true)
             try {
                 val item = repository.getItemDetails(session.userId, itemId)
+                val isEpisode = item.Type == "Episode" && item.SeriesName != null
+                // The title's own backdrop and logo go up while the stream
+                // is still being prepared, not a blank screen.
+                _uiState.value = PlayerUiState(
+                    isLoading = true,
+                    title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
+                    pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
+                )
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
                 val target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
-                val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
                     "S${item.ParentIndexNumber} E${item.IndexNumber} · "
                 } else {
@@ -403,7 +417,14 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             } catch (err: Exception) {
-                _uiState.value = PlayerUiState(isLoading = false, error = err.message ?: "Could not start playback")
+                val problem = friendlyPlaybackError(err)
+                _uiState.value = PlayerUiState(
+                    isLoading = false,
+                    error = problem.title,
+                    errorDetail = problem.detail,
+                    title = _uiState.value.title,
+                    pauseInfo = _uiState.value.pauseInfo,
+                )
             }
         }
     }

@@ -189,13 +189,18 @@ fun PlayerScreen(
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                BouncingJellioLogo()
-            }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: "Could not start playback", color = JellioText)
+            // Same as the web player: the title's backdrop with its logo
+            // gently pulsing while the stream is prepared.
+            uiState.isLoading -> uiState.pauseInfo?.let { BufferingOverlay(info = it) }
+            uiState.error != null -> Box(Modifier.fillMaxSize()) {
+                uiState.pauseInfo?.backdropUrl?.let {
+                    AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
+                PlaybackErrorPanel(
+                    problem = PlaybackProblem(uiState.error ?: "Couldn't start playback", uiState.errorDetail.orEmpty()),
+                    onRetry = { viewModel.retry(session) },
+                    onBack = onBack,
+                )
             }
             uiState.streamUrl != null -> PlayerSurface(
                 session = session,
@@ -368,7 +373,7 @@ private fun PlayerSurface(
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
-    var exoError by remember { mutableStateOf<String?>(null) }
+    var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
@@ -425,7 +430,7 @@ private fun PlayerSurface(
                 playWhenReadyState = playWhenReady
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                exoError = (error.message ?: "Unknown playback error") + (error.cause?.let { " - ${it.message}" } ?: "")
+                exoError = friendlyPlaybackError(error)
                 isBuffering = false
             }
             override fun onPlaybackStateChanged(state: Int) {
@@ -734,18 +739,23 @@ private fun PlayerSurface(
             PauseOverlay(info = pauseInfo!!)
         }
 
-        if (exoError != null) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "Playback Error", style = androidx.tv.material3.MaterialTheme.typography.titleLarge, color = JellioText)
-                    Text(text = exoError!!, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
-                }
-            }
+        val problem = exoError
+        if (problem != null) {
+            PlaybackErrorPanel(
+                problem = problem,
+                onRetry = {
+                    exoError = null
+                    isBuffering = true
+                    player.prepare()
+                    player.play()
+                },
+                onBack = onBack,
+            )
         } else if (isBuffering && pauseInfo != null) {
             BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                BouncingJellioLogo()
+                PulsingTitle(text = title.ifBlank { "Loading" })
             }
         }
 
@@ -1219,7 +1229,7 @@ private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifi
                     modifier = Modifier.fillMaxWidth(0.4f).fillMaxHeight(0.4f).scale(scale)
                 )
             } else {
-                BouncingJellioLogo()
+                PulsingTitle(text = info.title.ifBlank { "Loading" })
             }
         }
     }
@@ -2069,22 +2079,24 @@ private fun formatMs(ms: Long): String {
     }
 }
 
+// Stands in for a title with no logo image: its name, pulsing slowly
+// the way the logo does.
 @Composable
-private fun BouncingJellioLogo(modifier: Modifier = Modifier) {
-    val infiniteTransition = rememberInfiniteTransition(label = "bouncing_logo")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
+private fun PulsingTitle(text: String, modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulsing_title")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
         ),
-        label = "logo_scale"
+        label = "title_alpha",
     )
-    androidx.tv.material3.Icon(
-        painter = painterResource(id = com.jellio.tv.R.drawable.ic_jellio_mark),
-        contentDescription = "Loading",
-        tint = Color.White,
-        modifier = modifier.scale(scale).size(80.dp)
+    Text(
+        text = text,
+        color = JellioText.copy(alpha = alpha),
+        style = androidx.tv.material3.MaterialTheme.typography.displaySmall,
+        modifier = modifier.padding(horizontal = 48.dp),
     )
 }
