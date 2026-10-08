@@ -159,6 +159,8 @@ private fun seekTarget(positionMs: Long, deltaMs: Long, durationMs: Long): Long 
     return if (durationMs > 0) target.coerceAtMost(durationMs) else target
 }
 
+private data class SeekFlash(val target: Long, val totalMs: Long, val stamp: Long)
+
 private fun formatSpeed(speed: Float): String {
     val whole = speed.toInt()
     return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
@@ -410,6 +412,7 @@ private fun PlayerSurface(
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var stopAtEnd by remember { mutableStateOf(false) }
+    var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
@@ -757,17 +760,14 @@ private fun PlayerSurface(
                     Key.DirectionLeft, Key.DirectionRight, Key.MediaRewind, Key.MediaFastForward -> {
                         val isMedia = event.key == Key.MediaRewind || event.key == Key.MediaFastForward
                         if (controlsVisible && !isMedia) return@onKeyEvent false
-                        controlsVisible = true
+                        // Controls hidden: just jump, with a small badge saying
+                        // where to, rather than bringing the whole overlay up.
                         val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
-                        val newPos = seekTarget(positionMs, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, durationMs)
+                        val base = seekFlash?.target ?: positionMs
+                        val newPos = seekTarget(base, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, durationMs)
                         seekToReal(newPos)
-                        // Real port of screens/player.js's own
-                        // showScrubPreview(): a preview of the seek's own
-                        // landing spot, right after each seek.
-                        if (hasTrickplay) {
-                            scrubPositionMs = newPos
-                            scrubFrame = onComputeTrickplayFrame(newPos)
-                        }
+                        val total = (seekFlash?.totalMs ?: 0L) + if (forward) SEEK_STEP_MS else -SEEK_STEP_MS
+                        seekFlash = SeekFlash(newPos, total, System.nanoTime())
                         true
                     }
                     Key.MediaPlayPause -> {
@@ -844,6 +844,31 @@ private fun PlayerSurface(
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 PulsingTitle(text = title.ifBlank { "Loading" })
+            }
+        }
+
+        // The quick-jump badge: shown for a moment after the last press,
+        // adding up repeated presses (+30s after three).
+        seekFlash?.let { flash ->
+            LaunchedEffect(flash.stamp) {
+                delay(1200)
+                seekFlash = null
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(JellioBgElevated.copy(alpha = 0.9f))
+                    .padding(horizontal = 22.dp, vertical = 10.dp),
+            ) {
+                val seconds = flash.totalMs / 1000
+                Text(
+                    text = (if (seconds >= 0) "+${seconds}s" else "${seconds}s") + "  ·  " + formatMs(flash.target) +
+                        if (durationMs > 0) " / " + formatMs(durationMs) else "",
+                    color = JellioText,
+                    style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
+                )
             }
         }
 
