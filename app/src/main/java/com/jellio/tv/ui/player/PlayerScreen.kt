@@ -154,10 +154,9 @@ private val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 // Where a relative seek lands. The player often doesn't know a stream's
 // length yet (C.TIME_UNSET, a transcode still starting), and clamping to
 // that sent every skip back to the start; only a known length caps it.
-private fun seekTarget(player: Player, deltaMs: Long): Long {
-    val target = (player.currentPosition + deltaMs).coerceAtLeast(0L)
-    val duration = player.duration
-    return if (duration > 0) target.coerceAtMost(duration) else target
+private fun seekTarget(positionMs: Long, deltaMs: Long, durationMs: Long): Long {
+    val target = (positionMs + deltaMs).coerceAtLeast(0L)
+    return if (durationMs > 0) target.coerceAtMost(durationMs) else target
 }
 
 private fun formatSpeed(speed: Float): String {
@@ -286,6 +285,7 @@ fun PlayerScreen(
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },
                 onShowToast = { message -> viewModel.showToast(message) },
                 switchingTo = uiState.switchingTo,
+                onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
                 onSwitchSettled = { viewModel.clearSwitching() },
             )
         }
@@ -341,6 +341,7 @@ private fun PlayerSurface(
     onShowToast: (String) -> Unit,
     switchingTo: String?,
     onSwitchSettled: () -> Unit,
+    onSeekReload: (Long) -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -390,7 +391,9 @@ private fun PlayerSurface(
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
             setMediaItem(mediaItem)
-            if (startPositionTicks > 0) {
+            // A transcode already starts at startPositionTicks (the URL's
+            // StartTimeTicks); only a direct-play file needs the seek.
+            if (startPositionTicks > 0 && directPlay) {
                 seekTo(startPositionTicks / TICKS_PER_MS)
             }
             playWhenReady = !showResumePrompt
@@ -412,6 +415,30 @@ private fun PlayerSurface(
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
+
+    // Where in the title the stream's own time zero is: 0 for direct play,
+    // the start position for a transcode that began encoding there.
+    val streamOffsetMs = if (directPlay) 0L else startPositionTicks / TICKS_PER_MS
+    fun realPositionMs(): Long = streamOffsetMs + player.currentPosition
+
+    // A seek to a point in the title. Direct play just seeks; a transcode
+    // restarts from there, after a short pause so a run of skips becomes
+    // one reload.
+    var pendingReloadMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
+    fun seekToReal(targetMs: Long) {
+        if (directPlay) {
+            player.seekTo(targetMs.coerceAtLeast(0L))
+        } else {
+            pendingReloadMs = targetMs.coerceAtLeast(0L)
+            positionMs = pendingReloadMs!!
+        }
+    }
+    LaunchedEffect(pendingReloadMs) {
+        val target = pendingReloadMs ?: return@LaunchedEffect
+        delay(700)
+        onSeekReload(target * TICKS_PER_MS)
+    }
+
     var controlsVisible by remember { mutableStateOf(true) }
     // Bumped on every key press, so the controls stay up while the remote
     // is in use.
@@ -481,7 +508,7 @@ private fun PlayerSurface(
                 // STATE_ENDED once this real stream has genuinely run
                 // out of data to play.
                 if (isEnded) {
-                    onReportRealDuration(player.currentPosition / 1000.0)
+                    onReportRealDuration(realPositionMs() / 1000.0)
                     onMarkRealWatchComplete()
                 }
             }
@@ -494,7 +521,7 @@ private fun PlayerSurface(
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            onReportStopped(player.currentPosition * TICKS_PER_MS)
+            onReportStopped((streamOffsetMs + player.currentPosition) * TICKS_PER_MS)
             player.release()
         }
     }
@@ -529,15 +556,15 @@ private fun PlayerSurface(
     LaunchedEffect(player, startPositionTicks) {
         while (isActive) {
             if (player.duration > 0 && player.playbackState != Player.STATE_IDLE) {
-                durationMs = player.duration
+                durationMs = streamOffsetMs + player.duration
                 // Real port of screens/player.js's own
                 // reconcileDuration(): ExoPlayer's own real duration,
                 // the strongest of the three real signals
                 // reportRealDurationIfUseful() takes since it is the
                 // real total, not a lower bound off wherever playback
                 // happens to be right now.
-                onReportRealDuration(durationMs / 1000.0)
-                if (!seekedToResume && startPositionTicks > 0) {
+                if (directPlay) onReportRealDuration(durationMs / 1000.0)
+                if (!seekedToResume && startPositionTicks > 0 && directPlay) {
                     seekedToResume = true
                     player.seekTo(startPositionTicks / TICKS_PER_MS)
                 }
@@ -549,10 +576,10 @@ private fun PlayerSurface(
                 // started playing yet.
                 if (!hasReportedStart && isPlaying) {
                     hasReportedStart = true
-                    onReportStart(player.currentPosition * TICKS_PER_MS)
+                    onReportStart(realPositionMs() * TICKS_PER_MS)
                 }
             }
-            positionMs = player.currentPosition
+            if (pendingReloadMs == null) positionMs = realPositionMs()
             // Real port of screens/player.js's own timeupdate-driven
             // REAL_WATCH_COMPLETION_THRESHOLD check: rides durationMs
             // (only ever set once ExoPlayer's own real duration is
@@ -628,7 +655,7 @@ private fun PlayerSurface(
         while (isActive) {
             delay(PROGRESS_REPORT_INTERVAL_MS)
             if (hasReportedStart) {
-                onReportProgress(player.currentPosition * TICKS_PER_MS, !player.isPlaying)
+                onReportProgress(realPositionMs() * TICKS_PER_MS, !player.isPlaying)
             }
         }
     }
@@ -744,8 +771,8 @@ private fun PlayerSurface(
                         if (controlsVisible && !isMedia) return@onKeyEvent false
                         controlsVisible = true
                         val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
-                        val newPos = seekTarget(player, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS)
-                        player.seekTo(newPos)
+                        val newPos = seekTarget(positionMs, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, durationMs)
+                        seekToReal(newPos)
                         // Real port of screens/player.js's own
                         // showScrubPreview(): a preview of the seek's own
                         // landing spot, right after each seek.
@@ -871,14 +898,14 @@ private fun PlayerSurface(
                 sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onSkip = { deltaMs ->
-                    player.seekTo(seekTarget(player, deltaMs))
+                    seekToReal(seekTarget(positionMs, deltaMs, durationMs))
                 },
                 onScrub = { target ->
                     scrubPositionMs = target
                     scrubFrame = if (hasTrickplay) onComputeTrickplayFrame(target) else null
                 },
                 onScrubEnd = { target ->
-                    if (target != null) player.seekTo(target)
+                    if (target != null) seekToReal(target)
                     scrubFrame = null
                     scrubPositionMs = null
                 },
@@ -907,7 +934,7 @@ private fun PlayerSurface(
                 defaultStreamIndex = defaultAudioStreamIndex,
                 onSelect = { streamIndex ->
                     showAudioMenu = false
-                    onSelectAudioTrack(streamIndex, player.currentPosition * TICKS_PER_MS)
+                    onSelectAudioTrack(streamIndex, realPositionMs() * TICKS_PER_MS)
                 },
                 onDismiss = { showAudioMenu = false },
             )
@@ -924,7 +951,7 @@ private fun PlayerSurface(
                 currentMediaSourceId = currentMediaSourceId,
                 onSelect = { source ->
                     showSourcePanel = false
-                    onSelectSource(source, player.currentPosition * TICKS_PER_MS)
+                    onSelectSource(source, realPositionMs() * TICKS_PER_MS)
                 },
                 onDismiss = { showSourcePanel = false },
             )
@@ -1000,14 +1027,14 @@ private fun PlayerSurface(
             val segment = activeSkip ?: return@LaunchedEffect
             if (PlayerPrefs.autoSkipIntro && segment.label == "Skip Intro" && autoSkippedTo != segment.targetSeconds) {
                 autoSkippedTo = segment.targetSeconds
-                player.seekTo((segment.targetSeconds * 1000).toLong())
+                seekToReal((segment.targetSeconds * 1000).toLong())
                 onShowToast("Skipped intro")
             }
         }
         if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
             SkipSegmentButton(
                 label = activeSkip.label,
-                onClick = { player.seekTo((activeSkip.targetSeconds * 1000).toLong()) },
+                onClick = { seekToReal((activeSkip.targetSeconds * 1000).toLong()) },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
             )
         }
@@ -1028,7 +1055,7 @@ private fun PlayerSurface(
                 selectedIndex = selectedSubtitleIndex,
                 onSelect = { track ->
                     showSubtitleMenu = false
-                    onSelectSubtitle(track, player.currentPosition * TICKS_PER_MS)
+                    onSelectSubtitle(track, realPositionMs() * TICKS_PER_MS)
                 },
                 subtitleStyle = subtitleStyle,
                 onSetSubtitleSize = onSetSubtitleSize,

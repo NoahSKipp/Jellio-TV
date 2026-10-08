@@ -633,6 +633,14 @@ class PlayerViewModel @Inject constructor(
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
+        // Direct play carries every audio track already: the player swaps
+        // to it in place (PlayerScreen's selectAudioTrack effect), no
+        // reload, no restart.
+        if (_uiState.value.directPlay) {
+            _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
+            showToast("Audio: $label")
+            return
+        }
         showToast("Switching to $label…")
         viewModelScope.launch {
             try {
@@ -678,6 +686,36 @@ class PlayerViewModel @Inject constructor(
 
     // Port of screens/player.js's switchSource(source): a fresh PlaybackInfo
     // negotiation against the picked source's Id at currentPositionTicks.
+    // A transcoded stream can only start where the server begins encoding,
+    // so seeking in one restarts it from the new position, as
+    // screens/player.js does; same source, audio and burned-in subtitles.
+    fun reloadAt(session: Session, positionTicks: Long) {
+        val id = itemId ?: return
+        viewModelScope.launch {
+            try {
+                val currentSubIndex = _uiState.value.selectedSubtitleIndex
+                val isBurnedIn = currentSubIndex != null &&
+                    _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == currentSubIndex }?.isTextBased == false
+                val target = repository.resolvePlayback(
+                    session.userId,
+                    id,
+                    mediaSourceIdParam,
+                    positionTicks,
+                    burnInSubtitleStreamIndex = if (isBurnedIn) currentSubIndex else null,
+                    audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
+                )
+                _uiState.value = _uiState.value.copy(
+                    streamUrl = target.streamUrl,
+                    startPositionTicks = target.startPositionTicks,
+                    resumePercent = null,
+                    directPlay = target.directPlay,
+                )
+            } catch (err: Exception) {
+                showToast("Couldn't jump there. Try again.")
+            }
+        }
+    }
+
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
         val id = itemId ?: return
         if (source.Id == _uiState.value.mediaSourceId) return

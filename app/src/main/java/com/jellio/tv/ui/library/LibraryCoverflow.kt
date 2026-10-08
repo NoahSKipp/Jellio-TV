@@ -37,6 +37,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -151,63 +160,18 @@ fun LibraryCoverflow(
 ) {
     if (items.size < COVERFLOW_MIN_SLIDES) return
     var index by remember(items) { mutableIntStateOf(0) }
-    // Real bug found live: shrinking this stage's own real vertical
-    // gap to its own content below (LibraryScreen.kt's own header on
-    // that exact round) made this rail's own filter fields spatially
-    // closer to View Details than either arrow now sits, so Compose's
-    // own default Left/Right search started landing there instead of
-    // this stage's own real chevrons - and since that field lives
-    // outside this composable's own NoOpBringIntoViewSpec suppression,
-    // landing on it fired Compose's own default per-child bring-into-
-    // view request for real, scrolling this list down and cutting off
-    // whatever real editorial/badge text sits above this stage. Explicit
-    // real focus targets on View Details below answer Left/Right
-    // itself rather than leaving it to that same real distance
-    // heuristic, closing both off at once.
-    val leftArrowFocusRequester = remember { FocusRequester() }
-    val rightArrowFocusRequester = remember { FocusRequester() }
-    // Real bug found live, on a real screen recording: View Details'
-    // own real focusProperties above only ever answers Left/Right
-    // starting FROM it, the other real direction (an arrow's own
-    // Left/Right heading TOWARDS it) was still left to Compose's own
-    // default spatial search - and that same real search occasionally
-    // lands on this rail's own filter fields below instead (this
-    // file's own header up top on exactly why), scrolling this list
-    // and cutting off whatever real editorial/badge text sits above
-    // this stage, read live as a real jitter every time this reader
-    // actually switched between an arrow and View Details rather than
-    // only sometimes. A real focus target on View Details itself
-    // closes the other direction the exact same way.
-    val viewDetailsFocusRequester = remember { FocusRequester() }
+    var stageFocused by remember { mutableStateOf(false) }
 
-    LaunchedEffect(items) {
-        while (true) {
-            delay(ADVANCE_MS)
-            index = (index + 1) % items.size
-        }
+    // Advances on its own, restarting the wait after every manual step.
+    LaunchedEffect(items, index) {
+        delay(ADVANCE_MS)
+        index = (index + 1) % items.size
     }
 
-    // Real bug found live, on a real screenshot: entering this screen
-    // with a real Right press off the sidebar's own Library row let
-    // Compose's own default spatial search pick whichever real
-    // focusable was the closest vertical match, and this stage's own
-    // real arrows/View Details sit far above that row while
-    // LibraryScreen.kt's own real filter fields sit much closer to it
-    // - landing there instead, with the exact same real scroll-down
-    // consequence this file's own header above already covers. An
-    // imperative requestFocus() call here (this fix's own first real
-    // attempt) raced that same in-flight real spatial search instead
-    // of replacing it, landing this list in a real worse spot than
-    // either one alone. focusProperties { enter } is the real
-    // declarative answer instead: the focus system calls this the
-    // moment it is about to move focus into this subtree from
-    // anywhere outside it, before any real default search runs at
-    // all, so this stage always answers every real entry itself, no
-    // race to lose.
+    // One selectable stage, like the home hero: Left/Right step through the
+    // slides (and keep focus here), OK opens the one in front.
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .focusProperties { enter = { leftArrowFocusRequester } },
+        modifier = modifier.fillMaxWidth(),
     ) {
         if (editorial != null) {
             Column(modifier = Modifier.widthIn(max = 520.dp).padding(start = 48.dp, top = 16.dp, end = 24.dp, bottom = 8.dp)) {
@@ -235,7 +199,30 @@ fun LibraryCoverflow(
 
         val slideWidth = SlideWidth.scaled()
         val slideHeight = SlideHeight.scaled()
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(CoverflowStageHeight.scaled()), contentAlignment = Alignment.Center) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(CoverflowStageHeight.scaled())
+                .onFocusChanged { stageFocused = it.isFocused }
+                .onPreviewKeyEvent { event ->
+                    when (event.key) {
+                        Key.DirectionLeft, Key.DirectionRight -> {
+                            if (event.type == KeyEventType.KeyDown) {
+                                val step = if (event.key == Key.DirectionRight) 1 else -1
+                                index = (index + step + items.size) % items.size
+                            }
+                            true
+                        }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            if (event.type == KeyEventType.KeyUp) onViewDetails(items[index])
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                .focusable(),
+            contentAlignment = Alignment.Center,
+        ) {
             val slideWidthPx = with(LocalDensity.current) { slideWidth.toPx() }
             items.forEachIndexed { i, item ->
                 val offset = shortestOffset(i, index, items.size)
@@ -247,81 +234,8 @@ fun LibraryCoverflow(
                         slideWidth = slideWidth,
                         slideHeight = slideHeight,
                         imageUrl = imageUrl,
-                        onViewDetails = onViewDetails,
-                        leftArrowFocusRequester = leftArrowFocusRequester,
-                        rightArrowFocusRequester = rightArrowFocusRequester,
-                        viewDetailsFocusRequester = viewDetailsFocusRequester,
+                        focused = stageFocused,
                     )
-                }
-            }
-            // Real HeroSection.kt's own header on this exact fix: real
-            // feedback found these two chevrons missing here too, same
-            // real D-pad equivalent of components/libraryCoverflow.js's
-            // own mouse-click prevButton/nextButton, docked against
-            // this stage's own edges rather than the hero's.
-            //
-            // Real bug found live, on a real screenshot: both chevrons
-            // really were in this real tree the whole time, just
-            // invisible, and worse, invisibly focusable. CoverflowSlide's
-            // own real zIndex (5f, 6f for whichever slide is current)
-            // outranks a plain Surface's own real default (0f)
-            // regardless of composition order, so the current slide's
-            // own real full-bleed image painted over both buttons
-            // completely. A real zIndex higher than either of those
-            // wins this back.
-            //
-            // Real bug found live, on a real screenshot ("Movies" vs
-            // "Shows" side by side): centering these against this
-            // stage's own full real height put them level with its own
-            // middle, while View Details sits bottom-aligned inside
-            // CoverflowSlide's own info column instead (20dp from this
-            // same stage's own real bottom edge, since stage height now
-            // matches slide height exactly) - "Movies" only happened to
-            // read close enough not to notice, every other real library
-            // did not. Bottom-aligned here instead, with a real padding
-            // matching that same 20dp plus half this real 44dp circle,
-            // so both land at the exact same real height regardless of
-            // library.
-            Surface(
-                onClick = { index = (index - 1 + items.size) % items.size },
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(
-                    containerColor = Color.Black.copy(alpha = 0.35f),
-                    contentColor = JellioText,
-                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
-                    focusedContentColor = JellioText,
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 20.dp)
-                    .size(44.dp)
-                    .zIndex(10f)
-                    .focusRequester(leftArrowFocusRequester)
-                    .focusProperties { right = viewDetailsFocusRequester },
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Filled.ChevronLeft, contentDescription = "Previous")
-                }
-            }
-            Surface(
-                onClick = { index = (index + 1) % items.size },
-                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(
-                    containerColor = Color.Black.copy(alpha = 0.35f),
-                    contentColor = JellioText,
-                    focusedContainerColor = Color.White.copy(alpha = 0.25f),
-                    focusedContentColor = JellioText,
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 20.dp)
-                    .size(44.dp)
-                    .zIndex(10f)
-                    .focusRequester(rightArrowFocusRequester)
-                    .focusProperties { left = viewDetailsFocusRequester },
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = "Next")
                 }
             }
         }
@@ -358,10 +272,7 @@ private fun CoverflowSlide(
     slideWidth: Dp,
     slideHeight: Dp,
     imageUrl: (BaseItemDto, String, Int) -> String,
-    onViewDetails: (BaseItemDto) -> Unit,
-    leftArrowFocusRequester: FocusRequester,
-    rightArrowFocusRequester: FocusRequester,
-    viewDetailsFocusRequester: FocusRequester,
+    focused: Boolean,
 ) {
     val isCurrent = offset == 0
     val translateX by animateFloatAsState(
@@ -390,7 +301,10 @@ private fun CoverflowSlide(
                 scaleY = scale
             }
             .zIndex(if (isCurrent) 6f else 5f)
-            .clip(RoundedCornerShape(16.dp)),
+            .clip(RoundedCornerShape(16.dp))
+            .then(
+                if (isCurrent && focused) Modifier.border(3.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(16.dp)) else Modifier,
+            ),
     ) {
         AsyncImage(
             model = imageUrl(item, "Backdrop", 960),
@@ -419,39 +333,13 @@ private fun CoverflowSlide(
             if (meta.isNotEmpty()) {
                 Text(text = meta, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
-            // Only the current slide's own button is ever mounted: the
-            // neighbours already sit at infoAlpha 0, but a Surface stays
-            // focusable even at zero alpha, so D-pad focus could still
-            // land on an invisible button off to either side.
-            if (isCurrent) {
-                Surface(
-                    onClick = { onViewDetails(item) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = Color.White.copy(alpha = 0.12f),
-                        contentColor = JellioText,
-                    ),
-                    // Real header above on why this doesn't just leave
-                    // Left/Right to Compose's own default spatial
-                    // search: explicit real targets here always answer
-                    // to this stage's own chevrons, regardless of
-                    // whatever sits below this list's own item now.
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .focusRequester(viewDetailsFocusRequester)
-                        .focusProperties {
-                            left = leftArrowFocusRequester
-                            right = rightArrowFocusRequester
-                        },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(imageVector = Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text(text = "View Details", modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
+            if (isCurrent && focused) {
+                Text(
+                    text = "◀ ▶ browse · OK for details",
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
             }
         }
     }
