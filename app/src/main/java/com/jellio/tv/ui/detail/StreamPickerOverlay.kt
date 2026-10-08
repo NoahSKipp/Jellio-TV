@@ -63,7 +63,7 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // MediaSourceInfo), skipping that file's own remember-my-stream/
 // language-filter chrome for now: a real but secondary layer over the
 // same real core job, picking one of Gelato's own resolved sources.
-private val QUALITY_ORDER = listOf("4K", "QHD", "FHD", "HD", "SD")
+internal val QUALITY_ORDER = listOf("4K", "QHD", "FHD", "HD", "SD")
 private val QUALITY_NAME_PATTERNS = listOf(
     "4K" to Regex("(^|[^a-z0-9])(2160p|4k|uhd)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
     "QHD" to Regex("(^|[^a-z0-9])1440p([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
@@ -539,7 +539,7 @@ fun StreamPickerOverlay(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun FilterChipRow(
+internal fun FilterChipRow(
     chips: List<Pair<String?, String>>,
     selected: String?,
     onSelect: (String?) -> Unit,
