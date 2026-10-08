@@ -225,6 +225,9 @@ interface JellyfinApi {
     // non-private user's own watch activity and badge unlocks merged
     // and re-sorted by OccurredAtUtc, that controller's own header
     // confirmed before porting this.
+    @GET("Jellio/now-playing")
+    suspend fun getNowPlaying(): List<com.jellio.tv.data.model.NowPlayingSessionDto>
+
     @GET("Jellio/feed")
     suspend fun getFeed(): List<FeedEntryDto>
 

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -39,6 +40,7 @@ sealed interface JellioRoute {
     data object Calendar : JellioRoute
     data object Library : JellioRoute
     data object Feed : JellioRoute
+    data object NowPlaying : JellioRoute
     data object Settings : JellioRoute
     data class Detail(val itemId: String) : JellioRoute
     data class Person(val personId: String) : JellioRoute
@@ -74,6 +76,7 @@ val JellioNavItems: List<JellioRoute> = listOf(
     JellioRoute.Search,
     JellioRoute.Watchlist,
     JellioRoute.Feed,
+    JellioRoute.NowPlaying,
     JellioRoute.Calendar,
     JellioRoute.Library,
 )
@@ -93,6 +96,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // mismatches against this exact icon.
     JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
+    JellioRoute.NowPlaying -> Icons.Filled.LiveTv
     JellioRoute.Settings -> Icons.Filled.Settings
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
 }
@@ -139,6 +143,7 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Calendar -> "Calendar"
     JellioRoute.Library -> "Library"
     JellioRoute.Feed -> "Feed"
+    JellioRoute.NowPlaying -> "Watching now"
     JellioRoute.Settings -> "Settings"
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""
 }

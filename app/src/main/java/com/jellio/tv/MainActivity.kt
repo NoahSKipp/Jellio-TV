@@ -326,6 +326,11 @@ private fun JellioTvApp(
                 onLogout = { appViewModel.logout() },
                 modifier = Modifier.fillMaxSize(),
             )
+            JellioRoute.NowPlaying -> com.jellio.tv.ui.nowplaying.NowPlayingScreen(
+                imageUrl = { itemId, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, null, imageType, maxWidth) },
+                onOpen = onNavigateToDetail,
+                modifier = Modifier.fillMaxSize(),
+            )
             JellioRoute.Feed -> FeedScreen(
                 imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
                 userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
