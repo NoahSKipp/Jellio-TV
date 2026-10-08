@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
@@ -73,6 +75,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -377,6 +381,9 @@ private fun PlayerSurface(
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }
     var controlsVisible by remember { mutableStateOf(true) }
+    // Bumped on every key press, so the controls stay up while the remote
+    // is in use.
+    var interaction by remember { mutableStateOf(0) }
     var showSubtitleMenu by remember { mutableStateOf(false) }
     // Not keyed on streamUrl, unlike showResumePrompt/upNextShown
     // above: a subtitle switch or Start Over rebuilds the real player
@@ -571,7 +578,7 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel, showEpisodesPanel) {
+    LaunchedEffect(controlsVisible, isPlaying, interaction, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel, showEpisodesPanel) {
         if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel && !showEpisodesPanel) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
@@ -585,6 +592,8 @@ private fun PlayerSurface(
         if (!controlsVisible) {
             scrubFrame = null
             scrubPositionMs = null
+            // The focused button just left; keep the remote on the player.
+            focusRequester.requestFocus()
         }
     }
 
@@ -606,6 +615,10 @@ private fun PlayerSurface(
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
+            .onPreviewKeyEvent {
+                interaction++
+                false
+            }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
                 if (showSubtitleMenu) {
@@ -663,38 +676,38 @@ private fun PlayerSurface(
                     }
                     return@onKeyEvent false
                 }
+                // With the controls up the D-pad moves between them (the seek
+                // bar scrubs on its own); hidden, Left/Right seek straight
+                // away and any other key brings them up.
                 when (event.key) {
                     Key.Back -> {
-                        onBack()
+                        if (controlsVisible) controlsVisible = false else onBack()
                         true
                     }
-                    Key.DirectionLeft, Key.MediaRewind -> {
+                    Key.DirectionLeft, Key.DirectionRight, Key.MediaRewind, Key.MediaFastForward -> {
+                        val isMedia = event.key == Key.MediaRewind || event.key == Key.MediaFastForward
+                        if (controlsVisible && !isMedia) return@onKeyEvent false
                         controlsVisible = true
-                        val newPos = (player.currentPosition - SEEK_STEP_MS).coerceAtLeast(0)
+                        val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
+                        val newPos = (player.currentPosition + if (forward) SEEK_STEP_MS else -SEEK_STEP_MS)
+                            .coerceIn(0L, player.duration.coerceAtLeast(0L))
                         player.seekTo(newPos)
                         // Real port of screens/player.js's own
-                        // showScrubPreview(): that file's own mousemove
-                        // listener has no equivalent input on a D-pad
-                        // remote, so a preview of the seek's own real
-                        // landing spot is shown here instead, right
-                        // after each seek this key already commits.
+                        // showScrubPreview(): a preview of the seek's own
+                        // landing spot, right after each seek.
                         if (hasTrickplay) {
                             scrubPositionMs = newPos
                             scrubFrame = onComputeTrickplayFrame(newPos)
                         }
                         true
                     }
-                    Key.DirectionRight, Key.MediaFastForward -> {
+                    Key.MediaPlayPause -> {
+                        if (player.isPlaying) player.pause() else player.play()
                         controlsVisible = true
-                        val newPos = (player.currentPosition + SEEK_STEP_MS).coerceAtMost(player.duration.coerceAtLeast(0))
-                        player.seekTo(newPos)
-                        if (hasTrickplay) {
-                            scrubPositionMs = newPos
-                            scrubFrame = onComputeTrickplayFrame(newPos)
-                        }
                         true
                     }
-                    Key.DirectionCenter, Key.Enter, Key.MediaPlayPause -> {
+                    Key.DirectionCenter, Key.Enter -> {
+                        if (controlsVisible) return@onKeyEvent false
                         if (player.isPlaying) player.pause() else player.play()
                         controlsVisible = true
                         scrubFrame = null
@@ -702,6 +715,7 @@ private fun PlayerSurface(
                         true
                     }
                     Key.DirectionUp, Key.DirectionDown -> {
+                        if (controlsVisible) return@onKeyEvent false
                         controlsVisible = true
                         true
                     }
@@ -777,6 +791,18 @@ private fun PlayerSurface(
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
+                onSkip = { deltaMs ->
+                    player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, player.duration.coerceAtLeast(0L)))
+                },
+                onScrub = { target ->
+                    scrubPositionMs = target
+                    scrubFrame = if (hasTrickplay) onComputeTrickplayFrame(target) else null
+                },
+                onScrubEnd = { target ->
+                    if (target != null) player.seekTo(target)
+                    scrubFrame = null
+                    scrubPositionMs = null
+                },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
                 onOpenSpeedMenu = { showSpeedMenu = true },
                 onOpenSleepMenu = { showSleepMenu = true },
@@ -954,6 +980,9 @@ private fun PlayerControls(
     sleepTimerActive: Boolean,
     enabled: Boolean = true,
     onPlayPause: () -> Unit,
+    onSkip: (Long) -> Unit,
+    onScrub: (Long) -> Unit,
+    onScrubEnd: (Long?) -> Unit,
     onOpenSubtitleMenu: () -> Unit,
     onOpenSpeedMenu: () -> Unit,
     onOpenSleepMenu: () -> Unit,
@@ -976,34 +1005,22 @@ private fun PlayerControls(
             }
         }
 
-        Surface(
-            onClick = onPlayPause,
-            shape = ClickableSurfaceDefaults.shape(CircleShape),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color.Black.copy(alpha = 0.45f),
-                contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                focusedContentColor = JellioText,
-            ),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(3.dp, Color.White),
-                    shape = CircleShape,
-                )
-            ),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(96.dp)
-                .focusRequester(playPauseFocusRequester),
+        // Real port of screens/player.js's own transport row: back 10
+        // seconds, play/pause, forward 10 seconds.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(36.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.align(Alignment.Center),
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = JellioText,
-                    modifier = Modifier.size(48.dp),
-                )
-            }
+            TransportButton(icon = Icons.Filled.Replay10, label = "Back 10 seconds", size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
+            TransportButton(
+                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                label = if (isPlaying) "Pause" else "Play",
+                size = 96.dp,
+                onClick = onPlayPause,
+                modifier = Modifier.focusRequester(playPauseFocusRequester),
+            )
+            TransportButton(icon = Icons.Filled.Forward10, label = "Forward 10 seconds", size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
         }
 
         Column(
@@ -1028,16 +1045,13 @@ private fun PlayerControls(
                     )
                 }
             }
-            val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
-            Box(modifier = Modifier.fillMaxWidth().height(4.dp).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp))) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(progress).height(4.dp).background(JellioText, RoundedCornerShape(2.dp)),
-                )
-            }
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text(text = formatMs(positionMs), color = JellioTextSecondary)
-                Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
-            }
+            SeekBar(
+                positionMs = positionMs,
+                durationMs = durationMs,
+                onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
+                onPlayPause = onPlayPause,
+            )
 
             // Real port of css/app.css's own .jellio-player-pill /
             // screens/player.js's own buildPillButton(): real feedback
@@ -1051,7 +1065,7 @@ private fun PlayerControls(
             // way that file's own CSS margin already places it.
             Row(
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp).onKeyEvent { it.key == androidx.compose.ui.input.key.Key.DirectionLeft || it.key == androidx.compose.ui.input.key.Key.DirectionRight },
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
             ) {
                 Box(
                     modifier = Modifier
@@ -1107,6 +1121,139 @@ private fun PlayerControls(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransportButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    size: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Black.copy(alpha = 0.45f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.35f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(3.dp, Color.White),
+                shape = CircleShape,
+            )
+        ),
+        modifier = modifier.size(size),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(imageVector = icon, contentDescription = label, tint = JellioText, modifier = Modifier.size(size / 2))
+        }
+    }
+}
+
+// The seek bar as its own stop for the remote: Left/Right move a target
+// (further the longer they're held), the picture under it previews the
+// spot, and letting go jumps there. Up/Down leave it as usual.
+@Composable
+private fun SeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    onScrub: (Long) -> Unit,
+    onScrubEnd: (Long?) -> Unit,
+    onPlayPause: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    var target by remember { mutableStateOf<Long?>(null) }
+    val shown = target ?: positionMs
+    val progress = if (durationMs > 0) (shown.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onFocusChanged {
+                focused = it.isFocused
+                if (!it.isFocused && target != null) {
+                    target = null
+                    onScrubEnd(null)
+                }
+            }
+            .onPreviewKeyEvent { event ->
+                when (event.key) {
+                    Key.DirectionLeft, Key.DirectionRight -> {
+                        if (durationMs <= 0) return@onPreviewKeyEvent true
+                        if (event.type == KeyEventType.KeyDown) {
+                            val held = event.nativeKeyEvent.repeatCount
+                            val step = when {
+                                held > 40 -> 60_000L
+                                held > 15 -> 30_000L
+                                else -> SEEK_STEP_MS
+                            }
+                            val next = ((target ?: positionMs) + if (event.key == Key.DirectionRight) step else -step).coerceIn(0L, durationMs)
+                            target = next
+                            onScrub(next)
+                        } else if (event.type == KeyEventType.KeyUp) {
+                            val landing = target
+                            target = null
+                            onScrubEnd(landing)
+                        }
+                        true
+                    }
+                    Key.DirectionCenter, Key.Enter -> {
+                        if (event.type == KeyEventType.KeyUp) {
+                            val landing = target
+                            if (landing != null) {
+                                target = null
+                                onScrubEnd(landing)
+                            } else {
+                                onPlayPause()
+                            }
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .focusable(),
+    ) {
+        val barHeight = if (focused) 8.dp else 4.dp
+        Box(
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier.fillMaxWidth().height(20.dp),
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().height(barHeight).background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(4.dp))) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(barHeight)
+                        .background(if (focused) JellioSecondary else JellioText, RoundedCornerShape(4.dp)),
+                )
+            }
+            if (focused) {
+                Box(modifier = Modifier.fillMaxWidth(progress), contentAlignment = Alignment.CenterEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .background(Color.White, CircleShape),
+                    )
+                }
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Text(text = formatMs(shown), color = if (target != null) JellioText else JellioTextSecondary)
+            Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
+            if (focused && target == null) {
+                Text(
+                    text = "   ◀ ▶ to scrub",
+                    color = JellioTextSecondary,
+                    style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.align(Alignment.CenterVertically),
+                )
             }
         }
     }
