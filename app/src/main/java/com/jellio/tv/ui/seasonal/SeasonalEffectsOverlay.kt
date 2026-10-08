@@ -22,6 +22,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import com.jellio.tv.ui.perf.MotionLevel
+import com.jellio.tv.ui.perf.MotionPolicy
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -88,20 +90,31 @@ private fun cycle(t: Float, duration: Float, offset: Float): Float {
     return v - floor(v)
 }
 
+// Off when the system or the reader turned motion off (Settings, or the
+// device check in MotionPolicy picked it).
 @Composable
-private fun animationsOff(): Boolean {
-    val context = LocalContext.current
-    return remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
-}
+private fun animationsOff(): Boolean = MotionPolicy.level == MotionLevel.STILL
 
+// The scenes' time. Every frame on capable devices; on REDUCED it only
+// moves on about 24 times a second, so the full-screen redraw behind the
+// page costs well under half as much.
 @Composable
 private fun rememberClock(): MutableLongState {
     val clock = remember { mutableLongStateOf(0L) }
-    LaunchedEffect(Unit) {
+    val level = MotionPolicy.level
+    LaunchedEffect(level) {
         val start = withFrameNanos { it }
-        while (true) withFrameNanos { clock.longValue = it - start }
+        val stepNanos = if (level == MotionLevel.REDUCED) 1_000_000_000L / 24 else 0L
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                val t = now - start
+                if (t - last >= stepNanos) {
+                    last = t
+                    clock.longValue = t
+                }
+            }
+        }
     }
     return clock
 }
@@ -166,10 +179,25 @@ private class Eyes(val x: Float, val y: Float, val color: Color, val duration: F
 
 @Composable
 private fun HalloweenScene() {
-    val fog = rememberInfiniteTransition(label = "fog")
-    val fogShift by fog.animateFloat(-0.03f, 0.03f, infiniteRepeatable(tween(24000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "fogShift")
-    val dread by fog.animateFloat(0.65f, 0.88f, infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "dread")
-    val moonGlow by fog.animateFloat(0.72f, 0.9f, infiniteRepeatable(tween(4500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "moon")
+    // On REDUCED the fog, dread and moon glow hold still: an infinite
+    // transition asks for every frame even when the scenes don't.
+    val reduced = MotionPolicy.level == MotionLevel.REDUCED
+    val fogShiftState: androidx.compose.runtime.State<Float>
+    val dreadState: androidx.compose.runtime.State<Float>
+    val moonGlowState: androidx.compose.runtime.State<Float>
+    if (reduced) {
+        fogShiftState = remember { mutableStateOf(0f) }
+        dreadState = remember { mutableStateOf(0.76f) }
+        moonGlowState = remember { mutableStateOf(0.82f) }
+    } else {
+        val fog = rememberInfiniteTransition(label = "fog")
+        fogShiftState = fog.animateFloat(-0.03f, 0.03f, infiniteRepeatable(tween(24000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "fogShift")
+        dreadState = fog.animateFloat(0.65f, 0.88f, infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "dread")
+        moonGlowState = fog.animateFloat(0.72f, 0.9f, infiniteRepeatable(tween(4500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "moon")
+    }
+    val fogShift by fogShiftState
+    val dread by dreadState
+    val moonGlow by moonGlowState
 
     // The moon and the cobwebs never move: drawn once.
     Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = moonGlow }) { drawMoon() }

@@ -55,6 +55,9 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.jellio.tv.BuildConfig
 import com.jellio.tv.di.normalizeServerAddress
+import com.jellio.tv.ui.perf.MotionLevel
+import com.jellio.tv.ui.perf.MotionPolicy
+import com.jellio.tv.ui.player.PlayerPrefs
 import com.jellio.tv.data.model.LanguageOption
 import com.jellio.tv.data.model.LANGUAGE_OPTIONS
 import com.jellio.tv.data.model.languageName
@@ -152,6 +155,14 @@ fun SettingsScreen(
                 checked = rememberStream,
                 onToggle = { viewModel.setRememberStream(!rememberStream) },
             )
+            val playerContext = LocalContext.current
+            Spacer(modifier = Modifier.height(12.dp))
+            SettingsToggleRow(
+                label = "Auto-skip intros",
+                description = "Jump past an episode's intro by itself when the server knows where it is.",
+                checked = PlayerPrefs.autoSkipIntro,
+                onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
+            )
         }
 
         SettingsSection(title = "Language") {
@@ -183,6 +194,10 @@ fun SettingsScreen(
 
         SettingsSection(title = "Sleep Timer") {
             SleepTimerSection(viewModel = viewModel)
+        }
+
+        SettingsSection(title = "Display") {
+            MotionRow()
         }
 
         SettingsSection(title = "About") {
@@ -609,6 +624,63 @@ private fun ImageCheckRow(session: Session) {
         result?.let {
             Text(text = "Image host: $base", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
             Text(text = it, color = JellioText, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+// Seasonal animations: Auto picks from the device check, the rest force
+// it. Pressing cycles through the four.
+@Composable
+private fun MotionRow() {
+    val context = LocalContext.current
+    val preference = MotionPolicy.preference
+    val profile = MotionPolicy.profile
+    val options = listOf("auto", "full", "reduced", "off")
+    fun labelOf(value: String) = when (value) {
+        "full" -> "Full"
+        "reduced" -> "Reduced"
+        "off" -> "Off"
+        else -> "Auto (" + when (profile?.suggested) {
+            MotionLevel.REDUCED -> "Reduced"
+            MotionLevel.STILL -> "Off"
+            else -> "Full"
+        } + ")"
+    }
+    Surface(
+        onClick = {
+            val next = options[(options.indexOf(preference).coerceAtLeast(0) + 1) % options.size]
+            MotionPolicy.setPreference(context, next)
+        },
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(12.dp),
+            )
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(text = "Seasonal animations", color = JellioText)
+                Text(
+                    text = "Reduced redraws less often and keeps menus smoother on slower devices. " +
+                        (profile?.let { "This device: " + it.describe() + "." } ?: ""),
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+            Text(text = labelOf(preference), color = JellioText, style = MaterialTheme.typography.titleSmall)
         }
     }
 }
