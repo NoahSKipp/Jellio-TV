@@ -135,7 +135,7 @@ private fun leadIndex(name: String?): Int {
 // a real name (a catalog's own configured title).
 private fun titleFor(name: String?, kind: String): String {
     if (name == null || !GENERIC_NAME.matches(name)) return name ?: ""
-    return if (kind == "tvshows") "$name Series" else "$name Movies"
+    return if (kind == "tvshows") "$name Shows" else "$name Movies"
 }
 
 // Real port of screens/home.js's own buildHomeSections(), the same
@@ -305,7 +305,7 @@ class HomeViewModel @Inject constructor(
                             add(PosterHomeRow(HomeSection("Watchlist Movies", watchlistMovies, key = "watchlist-movies")))
                         }
                         if (watchlistSeries.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Watchlist Series", watchlistSeries, key = "watchlist-series")))
+                            add(PosterHomeRow(HomeSection("Watchlist Shows", watchlistSeries, key = "watchlist-shows")))
                         }
                         if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))

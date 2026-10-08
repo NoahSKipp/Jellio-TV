@@ -163,7 +163,7 @@ private fun ServiceFilterChips(genres: List<String>, selected: String, onSelect:
     val chips = buildList {
         add(ALL_FILTER to "All")
         add("movies" to "Movies")
-        add("tvshows" to "Series")
+        add("tvshows" to "Shows")
         genres.forEach { genre -> add("genre:$genre" to genre) }
     }
     LazyRow(

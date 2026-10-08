@@ -61,5 +61,5 @@ fun rowTitle(collection: BaseItemDto, service: String, kind: String): String {
     if (!(collection.Name ?: "").equals(service, ignoreCase = true)) {
         return collection.Name ?: ""
     }
-    return if (kind == "tvshows") "Series on $service" else "Movies on $service"
+    return if (kind == "tvshows") "Shows on $service" else "Movies on $service"
 }
