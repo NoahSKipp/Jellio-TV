@@ -978,6 +978,8 @@ class JellioRepository @Inject constructor(
     // state, matching screens/feed.js's own try/catch), not this layer.
     suspend fun getFeed(): List<FeedEntryDto> = api.getFeed()
 
+    suspend fun getNowPlaying(): List<com.jellio.tv.data.model.NowPlayingSessionDto> = api.getNowPlaying()
+
     // Plain passthroughs, same real reason getFeed above is:
     // ProfileViewModel's own load() decides what a failure means (a
     // real retry state, matching screens/profile.js's own try/catch),
