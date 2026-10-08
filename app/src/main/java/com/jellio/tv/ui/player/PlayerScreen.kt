@@ -513,6 +513,7 @@ private fun PlayerSurface(
                 }
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                applySubtitleSelection(player, selectedSubtitleIndex)
                 if (directPlay) {
                     selectAudioTrack(player, audioTracks, selectedAudioStreamIndex, defaultAudioStreamIndex)
                 }
@@ -529,23 +530,10 @@ private fun PlayerSurface(
     // Off, or a specific real text track: a plain real track selection
     // override, no reload, since every text track was already declared
     // on the MediaItem above before prepare() ever ran.
+    // Applied again once the tracks are known (onTracksChanged): right
+    // after prepare() there are none yet, and the choice used to be lost.
     LaunchedEffect(player, selectedSubtitleIndex) {
-        val params = player.trackSelectionParameters.buildUpon()
-        params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
-        if (selectedSubtitleIndex == null) {
-            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-        } else {
-            params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            val targetId = selectedSubtitleIndex.toString()
-            val group = player.currentTracks.groups.firstOrNull { group ->
-                group.type == C.TRACK_TYPE_TEXT && (0 until group.length).any { i -> group.getTrackFormat(i).id == targetId }
-            }
-            if (group != null) {
-                val trackIndex = (0 until group.length).first { i -> group.getTrackFormat(i).id == targetId }
-                params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
-            }
-        }
-        player.trackSelectionParameters = params.build()
+        applySubtitleSelection(player, selectedSubtitleIndex)
     }
 
     LaunchedEffect(player, selectedAudioStreamIndex, directPlay) {
@@ -821,6 +809,11 @@ private fun PlayerSurface(
             // factory alone so a style change already in flight applies
             // without recreating the PlayerView mid playback.
             update = { view ->
+                // A stream switch, Start over or a transcode reload builds a
+                // new player; the view has to follow it, or the old,
+                // released one stays on screen frozen while the new one
+                // plays only sound.
+                if (view.player !== player) view.player = player
                 view.subtitleView?.let { subtitleView ->
                     subtitleView.setStyle(subtitleCaptionStyle(subtitleStyle))
                     subtitleView.setFractionalTextSize(subtitleFractionalTextSize(subtitleStyle))
@@ -1897,29 +1890,56 @@ private fun selectAudioTrack(
     val ordinal = audioTracks.indexOf(targetTrack)
     if (ordinal < 0) return
 
-    val tracks = player.currentTracks
-    val allAudioCandidates = mutableListOf<Pair<androidx.media3.common.Tracks.Group, Int>>()
-    for (group in tracks.groups) {
+    val candidates = mutableListOf<Pair<androidx.media3.common.Tracks.Group, Int>>()
+    for (group in player.currentTracks.groups) {
         if (group.type == C.TRACK_TYPE_AUDIO) {
-            for (i in 0 until group.length) {
-                allAudioCandidates.add(Pair(group, i))
-            }
+            for (i in 0 until group.length) candidates.add(group to i)
         }
     }
-    if (allAudioCandidates.isEmpty()) return
+    if (candidates.isEmpty()) return
 
-    val match = allAudioCandidates.firstOrNull { (group, i) ->
-        val format = group.getTrackFormat(i)
-        val lang = format.language
-        lang != null && targetTrack.language != null && lang.equals(targetTrack.language, ignoreCase = true)
-    } ?: allAudioCandidates.getOrNull(ordinal)
+    // Jellyfin lists audio in file order and so does the player, so the
+    // position is the best guide; the language ("ger" on the server, "de"
+    // in the player, compared normalised) breaks ties and catches a
+    // reordered list.
+    val wanted = normalizeLanguage(targetTrack.language)
+    fun languageOf(pair: Pair<androidx.media3.common.Tracks.Group, Int>) = normalizeLanguage(pair.first.getTrackFormat(pair.second).language)
+    val byPosition = candidates.getOrNull(ordinal)
+    val match = when {
+        byPosition != null && (wanted == null || languageOf(byPosition) == null || languageOf(byPosition) == wanted) -> byPosition
+        wanted != null -> candidates.firstOrNull { languageOf(it) == wanted } ?: byPosition
+        else -> byPosition
+    } ?: return
+    if (!match.first.isTrackSupported(match.second)) return
 
-    if (match != null && match.first.isTrackSupported(match.second)) {
-        val params = player.trackSelectionParameters.buildUpon()
-        params.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-        params.setOverrideForType(TrackSelectionOverride(match.first.mediaTrackGroup, match.second))
-        player.trackSelectionParameters = params.build()
+    val override = TrackSelectionOverride(match.first.mediaTrackGroup, match.second)
+    if (player.trackSelectionParameters.overrides[match.first.mediaTrackGroup] == override) return
+    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+        .setOverrideForType(override)
+        .build()
+}
+
+// Off, or one text track. Side-loaded subtitle tracks can carry their id
+// with a prefix ("1:3"), so the stream index is matched at the end too.
+private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?) {
+    val params = player.trackSelectionParameters.buildUpon()
+    params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+    if (selectedSubtitleIndex == null) {
+        params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+    } else {
+        params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+        val targetId = selectedSubtitleIndex.toString()
+        fun matches(id: String?) = id != null && (id == targetId || id.endsWith(":$targetId"))
+        for (group in player.currentTracks.groups) {
+            if (group.type != C.TRACK_TYPE_TEXT) continue
+            val trackIndex = (0 until group.length).firstOrNull { i -> matches(group.getTrackFormat(i).id) } ?: continue
+            params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+            break
+        }
     }
+    val built = params.build()
+    if (built != player.trackSelectionParameters) player.trackSelectionParameters = built
 }
 
 // Audio menu right drawer matching SubtitleMenu: lists all audio tracks with

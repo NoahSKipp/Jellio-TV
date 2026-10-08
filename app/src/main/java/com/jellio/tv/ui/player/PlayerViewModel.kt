@@ -291,14 +291,22 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
-                val target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
+                val audioPreference = repository.getAudioLanguagePreference(session.userId)
+                audioLanguagePreference = audioPreference
+                var target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
+                // The reader's audio language wins over the file's default
+                // when the file has it; a transcode has to be asked for it.
+                val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
+                if (preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
+                    target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
+                }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
                     "S${item.ParentIndexNumber} E${item.IndexNumber} · "
                 } else {
                     ""
                 }
 
-                val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource)
+                val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 }?.roundToInt()
 
@@ -319,6 +327,7 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
+                    selectedAudioStreamIndex = preferredAudio,
                     directPlay = target.directPlay,
                 )
 
@@ -506,7 +515,7 @@ class PlayerViewModel @Inject constructor(
                     0,
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
@@ -539,7 +548,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private suspend fun buildSubtitleTracks(itemId: String, mediaSource: MediaSourceDto): List<SubtitleTrackUiState> {
+    private suspend fun buildSubtitleTracks(itemId: String, mediaSource: MediaSourceDto, offsetTicks: Long = 0): List<SubtitleTrackUiState> {
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
         return mediaSource.MediaStreams
             ?.filter { it.Type == "Subtitle" }
@@ -548,13 +557,21 @@ class PlayerViewModel @Inject constructor(
                 val isText = stream.IsTextSubtitleStream == true
                 val label = stream.DisplayTitle ?: stream.Language ?: "Subtitle"
                 val url = if (isText) {
-                    runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream) }.getOrNull()
+                    runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
                 } else {
                     null
                 }
                 SubtitleTrackUiState(index, if (isText) label else "$label (image)", isText, url)
             }
             ?: emptyList()
+    }
+
+    private var audioLanguagePreference: String? = null
+
+    // The first audio stream in the reader's preferred language, if any.
+    private fun preferredAudioIndex(mediaSource: MediaSourceDto, preference: String?): Int? {
+        val wanted = normalizeLanguage(preference) ?: return null
+        return repository.getAudioStreams(mediaSource).firstOrNull { normalizeLanguage(it.Language) == wanted }?.Index
     }
 
     private fun buildAudioTracks(mediaSource: MediaSourceDto): List<AudioTrackUiState> =
@@ -601,7 +618,7 @@ class PlayerViewModel @Inject constructor(
                     burnInSubtitleStreamIndex = streamIndex,
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 _uiState.value = _uiState.value.copy(
                     isSwitchingSubtitle = false,
                     streamUrl = target.streamUrl,
@@ -657,7 +674,7 @@ class PlayerViewModel @Inject constructor(
                     burnInSubtitleStreamIndex = burnInSub,
                     audioStreamIndex = streamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
@@ -709,6 +726,7 @@ class PlayerViewModel @Inject constructor(
                     startPositionTicks = target.startPositionTicks,
                     resumePercent = null,
                     directPlay = target.directPlay,
+                    subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks),
                 )
             } catch (err: Exception) {
                 showToast("Couldn't jump there. Try again.")
@@ -729,7 +747,7 @@ class PlayerViewModel @Inject constructor(
                     currentPositionTicks,
                 )
                 mediaSourceIdParam = target.mediaSource.Id
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource)
+                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
@@ -945,4 +963,13 @@ class PlayerViewModel @Inject constructor(
 private fun parseSleepTimerEndTimeMs(endTimeUtc: String?): Long? {
     endTimeUtc ?: return null
     return runCatching { java.time.Instant.parse(endTimeUtc).toEpochMilli() }.getOrNull()
+}
+
+// "ger", "deu", "de" and "German" all mean the same language: compared as
+// ISO 639-2 codes so the server's and the player's spellings match.
+internal fun normalizeLanguage(code: String?): String? {
+    val raw = code?.trim()?.lowercase()?.ifBlank { null } ?: return null
+    val aliases = mapOf("ger" to "deu", "fre" to "fra", "dut" to "nld", "chi" to "zho", "cze" to "ces", "gre" to "ell", "per" to "fas", "rum" to "ron", "slo" to "slk", "wel" to "cym", "arm" to "hye", "baq" to "eus", "geo" to "kat", "ice" to "isl", "mac" to "mkd", "may" to "msa", "bur" to "mya", "alb" to "sqi", "tib" to "bod")
+    aliases[raw]?.let { return it }
+    return runCatching { java.util.Locale.forLanguageTag(raw.substringBefore('-')).isO3Language }.getOrNull()?.ifBlank { null } ?: raw
 }
