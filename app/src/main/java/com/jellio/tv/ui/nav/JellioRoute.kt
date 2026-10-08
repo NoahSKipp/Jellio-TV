@@ -5,10 +5,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -102,11 +98,13 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // mismatches against this exact icon.
     JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
+    // The same icons Jellio web draws (components/navShared.js SVG_ICONS),
+    // ported in JellioIcons.kt.
     is JellioRoute.LibraryTab -> when {
-        Regex("anime", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Filled.AutoAwesome
-        collectionType == "movies" -> Icons.Filled.Movie
-        collectionType == "tvshows" -> Icons.Filled.Tv
-        else -> Icons.Filled.VideoLibrary
+        Regex("anime", RegexOption.IGNORE_CASE).containsMatchIn(name) -> AnimeIconVector
+        collectionType == "movies" -> MovieIconVector
+        collectionType == "tvshows" -> TvShowsIconVector
+        else -> LibraryIconVector
     }
     JellioRoute.Settings -> Icons.Filled.Settings
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
