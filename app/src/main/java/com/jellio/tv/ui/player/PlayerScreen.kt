@@ -363,6 +363,7 @@ private fun PlayerSurface(
                 .setMimeType(MimeTypes.TEXT_VTT)
                 .setId(track.streamIndex.toString())
                 .setLabel(track.label)
+                .setLanguage(track.language)
                 .build()
         }
         val mediaItem = MediaItem.Builder()
@@ -412,6 +413,14 @@ private fun PlayerSurface(
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var stopAtEnd by remember { mutableStateOf(false) }
+    var subtitleMissingReported by remember { mutableStateOf(false) }
+    val selectedSubtitleLanguage = subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.language
+    // The player's listener lives as long as the player; these keep it
+    // reading the current choices, not the ones from when it was made.
+    val currentSubtitleIndex by androidx.compose.runtime.rememberUpdatedState(selectedSubtitleIndex)
+    val currentSubtitleLanguage by androidx.compose.runtime.rememberUpdatedState(selectedSubtitleLanguage)
+    val currentAudioIndex by androidx.compose.runtime.rememberUpdatedState(selectedAudioStreamIndex)
+    val currentAudioTracks by androidx.compose.runtime.rememberUpdatedState(audioTracks)
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
@@ -516,13 +525,37 @@ private fun PlayerSurface(
                 }
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                applySubtitleSelection(player, selectedSubtitleIndex)
+                val found = applySubtitleSelection(player, currentSubtitleIndex, currentSubtitleLanguage)
+                // Picked, the stream has its tracks, and none of them is it:
+                // say so instead of quietly showing nothing.
+                if (currentSubtitleIndex != null && !found && !subtitleMissingReported &&
+                    tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO || it.type == C.TRACK_TYPE_AUDIO }
+                ) {
+                    subtitleMissingReported = true
+                    onShowToast("That subtitle track isn't in this stream")
+                }
                 if (directPlay) {
-                    selectAudioTrack(player, audioTracks, selectedAudioStreamIndex, defaultAudioStreamIndex)
+                    selectAudioTrack(player, currentAudioTracks, currentAudioIndex, defaultAudioStreamIndex)
                 }
             }
         }
         player.addListener(listener)
+        // A side-loaded subtitle file that fails to download used to fail
+        // silently; this shows what the server answered.
+        val loadErrors = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onLoadError(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo,
+                mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+                error: java.io.IOException,
+                wasCanceled: Boolean,
+            ) {
+                if (mediaLoadData.trackType != C.TRACK_TYPE_TEXT || wasCanceled) return
+                val status = (error as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
+                onShowToast(if (status != null) "Subtitles couldn't load (server said $status)" else "Subtitles couldn't load")
+            }
+        }
+        player.addAnalyticsListener(loadErrors)
         onDispose {
             player.removeListener(listener)
             onReportStopped((streamOffsetMs + player.currentPosition) * TICKS_PER_MS)
@@ -536,7 +569,8 @@ private fun PlayerSurface(
     // Applied again once the tracks are known (onTracksChanged): right
     // after prepare() there are none yet, and the choice used to be lost.
     LaunchedEffect(player, selectedSubtitleIndex) {
-        applySubtitleSelection(player, selectedSubtitleIndex)
+        subtitleMissingReported = false
+        applySubtitleSelection(player, selectedSubtitleIndex, selectedSubtitleLanguage)
     }
 
     LaunchedEffect(player, selectedAudioStreamIndex, directPlay) {
@@ -1946,25 +1980,42 @@ private fun selectAudioTrack(
 }
 
 // Off, or one text track. Side-loaded subtitle tracks can carry their id
-// with a prefix ("1:3"), so the stream index is matched at the end too.
-private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?) {
+// with a prefix ("1:3"), so the stream index is matched at the end too;
+// failing that, a text track in the same language. Returns whether the
+// chosen track was found (true when subtitles are off).
+private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?, language: String?): Boolean {
     val params = player.trackSelectionParameters.buildUpon()
     params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+    var found = selectedSubtitleIndex == null
     if (selectedSubtitleIndex == null) {
         params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
     } else {
         params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
         val targetId = selectedSubtitleIndex.toString()
         fun matches(id: String?) = id != null && (id == targetId || id.endsWith(":$targetId"))
-        for (group in player.currentTracks.groups) {
-            if (group.type != C.TRACK_TYPE_TEXT) continue
-            val trackIndex = (0 until group.length).firstOrNull { i -> matches(group.getTrackFormat(i).id) } ?: continue
-            params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
+        val textGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        var choice: Pair<androidx.media3.common.Tracks.Group, Int>? = null
+        for (group in textGroups) {
+            val i = (0 until group.length).firstOrNull { matches(group.getTrackFormat(it).id) } ?: continue
+            choice = group to i
             break
+        }
+        val wanted = normalizeLanguage(language)
+        if (choice == null && wanted != null) {
+            for (group in textGroups) {
+                val i = (0 until group.length).firstOrNull { normalizeLanguage(group.getTrackFormat(it).language) == wanted } ?: continue
+                choice = group to i
+                break
+            }
+        }
+        if (choice != null) {
+            params.setOverrideForType(TrackSelectionOverride(choice.first.mediaTrackGroup, choice.second))
+            found = true
         }
     }
     val built = params.build()
     if (built != player.trackSelectionParameters) player.trackSelectionParameters = built
+    return found
 }
 
 // Audio menu right drawer matching SubtitleMenu: lists all audio tracks with
