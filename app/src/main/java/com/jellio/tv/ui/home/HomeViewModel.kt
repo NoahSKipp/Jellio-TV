@@ -83,7 +83,7 @@ private const val MIN_CATALOG_ITEMS = 3
 // The anime library has a page of its own carrying every AniList
 // catalog. One of them here is a taste of it, more than one is that
 // page again in the wrong place.
-private const val MAX_ANIME_CATALOG_ROWS = 1
+private const val MAX_ANIME_CATALOG_ROWS = 0
 
 private const val GENRE_ROWS = 4
 private const val GENRE_ROW_LIMIT = 24
@@ -206,6 +206,8 @@ class HomeViewModel @Inject constructor(
                     val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
                     val configDeferred = async { runCatching { repository.getJellioConfig() }.getOrNull() }
                     val customizationDeferred = async { runCatching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
+                    val animeIdsDeferred = async { repository.getAnimeIds() }
+                    val watchlistDeferred = async { runCatching { repository.getWatchlistItems(session.userId) }.getOrDefault(emptyList()) }
 
                     val continueWatching = continueWatchingDeferred.await()
                     // Fired, not awaited: Google TV's own home Watch
@@ -214,8 +216,11 @@ class HomeViewModel @Inject constructor(
                     // to wait on before it can render.
                     launch { runCatching { watchNextSyncer.sync(session, continueWatching) } }
                     val upNext = upNextDeferred.await()
-                    val heroCandidates = heroCandidatesDeferred.await()
-                    val comingSoon = comingSoonDeferred.await()
+                    // Anime stays in the Anime library: out of the hero, Coming
+                    // Soon and (through exclude below) every discovery row.
+                    animeIds = animeIdsDeferred.await()
+                    val heroCandidates = heroCandidatesDeferred.await().filterNot { isAnime(it) }
+                    val comingSoon = comingSoonDeferred.await().filterNot { normalizeId(it.ItemId) in animeIds }
                     val collections = collectionsDeferred.await()
                     val user = userDeferred.await()
                     val config = configDeferred.await()
@@ -254,7 +259,7 @@ class HomeViewModel @Inject constructor(
                     // on the other two at all, so all three fire together
                     // next, same real port of that file's own second
                     // Promise.all.
-                    val exclude = mutableSetOf<String>()
+                    val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
                     val recommendationDeferred = async { runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList()) }
                     val catalogDataDeferred = async { runCatching { fetchCatalogRowData(session.userId, collections) }.getOrDefault(emptyList()) }
                     val genreDataDeferred = async { runCatching { fetchGenreRowData(session.userId) }.getOrDefault(emptyList()) }
@@ -285,12 +290,22 @@ class HomeViewModel @Inject constructor(
                     // Services, then every recommendation/catalog/genre
                     // row, same real sequence that file's own header
                     // comments document at each real call site.
+                    val watchlist = watchlistDeferred.await()
                     val rows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
                         }
                         if (upNext.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
+                        }
+                        // The Watchlist, split by kind, in place of its own nav button.
+                        val watchlistMovies = watchlist.filter { it.Type == "Movie" }
+                        val watchlistSeries = watchlist.filter { it.Type == "Series" }
+                        if (watchlistMovies.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Watchlist Movies", watchlistMovies, key = "watchlist-movies")))
+                        }
+                        if (watchlistSeries.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Watchlist Series", watchlistSeries, key = "watchlist-series")))
                         }
                         if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
@@ -534,7 +549,7 @@ class HomeViewModel @Inject constructor(
                     HomeSection(
                         title = entry.title,
                         items = deduped,
-                        fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT) },
+                        fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
                         key = "catalog:${entry.collectionId}",
                     ),
                 )
@@ -542,6 +557,13 @@ class HomeViewModel @Inject constructor(
         }
         return sections
     }
+
+    private var animeIds: Set<String> = emptySet()
+
+    private fun normalizeId(id: String?): String = id.orEmpty().replace("-", "").lowercase()
+
+    private fun isAnime(item: BaseItemDto): Boolean =
+        animeIds.isNotEmpty() && (normalizeId(item.Id) in animeIds || (item.SeriesId != null && normalizeId(item.SeriesId) in animeIds))
 
     private data class GenreRowEntry(val genre: String, val items: List<BaseItemDto>)
 
@@ -579,7 +601,7 @@ class HomeViewModel @Inject constructor(
                     HomeSection(
                         title = entry.genre,
                         items = deduped,
-                        fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT) },
+                        fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
                         key = "genre:${entry.genre}",
                     ),
                 )

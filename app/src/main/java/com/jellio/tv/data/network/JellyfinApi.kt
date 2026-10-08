@@ -96,6 +96,16 @@ interface JellyfinApi {
     @GET("Users/{userId}/Views")
     suspend fun getUserViews(@Path("userId") userId: String): ItemsResultDto
 
+    // Every genre a library's items carry (GenresController).
+    @GET("Genres")
+    suspend fun getGenres(
+        @Query("UserId") userId: String,
+        @Query("ParentId") parentId: String? = null,
+        @Query("IncludeItemTypes") includeItemTypes: String? = null,
+        @Query("SortBy") sortBy: String = "SortName",
+        @Query("Recursive") recursive: Boolean = true,
+    ): ItemsResultDto
+
     @GET("Users/{userId}/Items")
     suspend fun getItems(
         @Path("userId") userId: String,
@@ -225,6 +235,9 @@ interface JellyfinApi {
     // non-private user's own watch activity and badge unlocks merged
     // and re-sorted by OccurredAtUtc, that controller's own header
     // confirmed before porting this.
+    @GET("Jellio/anime/ids")
+    suspend fun getAnimeIds(): com.jellio.tv.data.model.AnimeIdsDto
+
     @GET("Jellio/now-playing")
     suspend fun getNowPlaying(): List<com.jellio.tv.data.model.NowPlayingSessionDto>
 

@@ -45,9 +45,6 @@ private const val ANIME_EMPTY_MESSAGE =
 data class LibrarySortOption(val value: String, val label: String)
 
 val LIBRARY_SORT_OPTIONS = listOf(
-    LibrarySortOption("DateCreated:Descending", "Recently added"),
-    LibrarySortOption("SortName:Ascending", "Name (A-Z)"),
-    LibrarySortOption("SortName:Descending", "Name (Z-A)"),
     LibrarySortOption("CommunityRating:Descending", "Top rated"),
     LibrarySortOption("PremiereDate:Descending", "Newest release"),
 )
@@ -139,15 +136,18 @@ class LibraryViewModel @Inject constructor(
         // comment), so this is the only library kind with any real
         // overlap to worry about: real feedback's own direct ask was
         // "if possible show no anime at all in the Shows hub".
-        val excludeIdsDeferred = async {
-            if (library.CollectionType == "tvshows") repository.getAnimeItemIds(session.userId) else emptySet()
+        // Anime stays in the Anime library, out of Movies and Shows alike.
+        val excludeIdsDeferred = async { repository.getAnimeIds() }
+        val allGenresDeferred = async {
+            runCatching { repository.getAllGenres(session.userId, library.Id, itemType) }.getOrDefault(emptyList())
         }
         val coverflowItemsDeferred = async {
             runCatching { repository.getHeroCandidates(session.userId, limit = 8, parentId = library.Id) }.getOrDefault(emptyList())
         }
+        val defaultSort = LIBRARY_SORT_OPTIONS.first().value.split(":")
         val mainItemsDeferred = async {
             runCatching {
-                repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = "DateCreated", sortOrder = "Descending")
+                repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = defaultSort[0], sortOrder = defaultSort[1])
             }.getOrDefault(emptyList())
         }
         val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
@@ -162,8 +162,9 @@ class LibraryViewModel @Inject constructor(
         }
 
         val excludeIds = excludeIdsDeferred.await()
-        val coverflowItems = coverflowItemsDeferred.await().filterNot { excludeIds.contains(it.Id) }
-        val mainItems = mainItemsDeferred.await().filterNot { excludeIds.contains(it.Id) }
+        animeIds = excludeIds
+        val coverflowItems = coverflowItemsDeferred.await().filterNot { isAnime(it) }
+        val mainItems = mainItemsDeferred.await().filterNot { isAnime(it) }
 
         // Real port of screens/library.js's own buildRow(...,
         // fetchAll) calls for the main row and each genre row: neither
@@ -180,20 +181,20 @@ class LibraryViewModel @Inject constructor(
                     library.Id,
                     limit = ROW_LIST_LIMIT,
                     includeItemTypes = itemType,
-                    sortBy = "DateCreated",
-                    sortOrder = "Descending",
-                )
+                    sortBy = defaultSort[0],
+                    sortOrder = defaultSort[1],
+                ).filterNot { isAnime(it) }
             },
         )
         val sections = mutableListOf<HomeSection>()
         genreItemsDeferred.forEach { (genre, deferred) ->
-            val items = deferred.await().filterNot { excludeIds.contains(it.Id) }
+            val items = deferred.await().filterNot { isAnime(it) }
             if (items.isNotEmpty()) {
                 sections.add(
                     HomeSection(
                         genre,
                         items,
-                        fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT) },
+                        fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
                     ),
                 )
             }
@@ -215,11 +216,17 @@ class LibraryViewModel @Inject constructor(
             coverflowItems = coverflowItems,
             editorial = editorial,
             mainRow = mainRow,
-            genreOptions = genres,
+            // Every genre the library has, not just the few with rows.
+            genreOptions = allGenresDeferred.await().ifEmpty { genres },
             sections = sections,
             canDeleteItems = canDeleteDeferred.await(),
         )
     }
+
+    private var animeIds: Set<String> = emptySet()
+
+    private fun isAnime(item: BaseItemDto): Boolean =
+        animeIds.isNotEmpty() && item.Id.replace("-", "").lowercase() in animeIds
 
     private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.label ?: "Browse"
 
@@ -242,18 +249,19 @@ class LibraryViewModel @Inject constructor(
     private fun reloadMainRow(session: Session, library: BaseItemDto, sort: String, genre: String?) {
         val itemType = currentItemType ?: return
         val parts = sort.split(":")
-        val sortBy = parts.getOrElse(0) { "DateCreated" }
+        val sortBy = parts.getOrElse(0) { "CommunityRating" }
         val sortOrder = parts.getOrElse(1) { "Descending" }
         viewModelScope.launch {
             val items = runCatching {
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)
-            }.getOrDefault(emptyList())
+            }.getOrDefault(emptyList()).filterNot { isAnime(it) }
             _uiState.value = _uiState.value.copy(
                 mainRow = HomeSection(
                     genre ?: sortLabel(sort),
                     items,
                     fetchAll = {
                         repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIST_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)
+                            .filterNot { isAnime(it) }
                     },
                 ),
             )

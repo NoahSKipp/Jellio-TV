@@ -40,7 +40,7 @@ import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
 import com.jellio.tv.ui.library.LibraryViewModel
 import com.jellio.tv.ui.nav.AccountSwitcherOverlay
-import com.jellio.tv.ui.nav.JellioNavItems
+import com.jellio.tv.ui.nav.jellioNavItems
 import com.jellio.tv.ui.nav.JellioRoute
 import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.SidebarNav
@@ -381,6 +381,20 @@ private fun JellioTvApp(
                 onItemClick = onNavigateToDetail,
                 modifier = Modifier.fillMaxSize(),
             )
+            is JellioRoute.LibraryTab -> {
+                val library = libraries.firstOrNull { it.Id == current.libraryId && (it.Name ?: "Library") == current.name }
+                if (library != null) {
+                    androidx.compose.runtime.key(current.libraryId + current.name) {
+                        LibraryScreen(
+                            session = session,
+                            library = library,
+                            imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                            onItemClick = { item -> onNavigateToDetail(item.Id) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
             JellioRoute.Library -> {
                 val library = selectedLibrary
                 if (library != null) {
@@ -482,7 +496,7 @@ private fun JellioTvApp(
                 }
             }
             SidebarNav(
-                items = JellioNavItems,
+                items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
                 onSelect = { clicked ->

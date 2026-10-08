@@ -6,6 +6,10 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -41,6 +45,9 @@ sealed interface JellioRoute {
     data object Library : JellioRoute
     data object Feed : JellioRoute
     data object NowPlaying : JellioRoute
+    // One library as its own rail button (the Anime entry shares the
+    // Shows library's id, so the name tells them apart).
+    data class LibraryTab(val libraryId: String, val name: String, val collectionType: String?) : JellioRoute
     data object Settings : JellioRoute
     data class Detail(val itemId: String) : JellioRoute
     data class Person(val personId: String) : JellioRoute
@@ -70,16 +77,18 @@ sealed interface JellioRoute {
 // account switcher popover (its own header above already explains)
 // already opens a Settings button into - removed here rather than
 // leaving two real rail entries for one real screen.
-val JellioNavItems: List<JellioRoute> = listOf(
-    JellioRoute.Profile(),
-    JellioRoute.Home,
-    JellioRoute.Search,
-    JellioRoute.Watchlist,
-    JellioRoute.Library,
-    JellioRoute.Feed,
-    JellioRoute.NowPlaying,
-    JellioRoute.Calendar,
-)
+// Watchlist and Calendar live on Home as rows now; every library is a
+// button of its own between Search and Feed.
+fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<JellioRoute> = buildList {
+    add(JellioRoute.Profile())
+    add(JellioRoute.Home)
+    add(JellioRoute.Search)
+    libraries.forEach { library ->
+        add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
+    }
+    add(JellioRoute.Feed)
+    add(JellioRoute.NowPlaying)
+}
 
 fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Profile -> Icons.Filled.AccountCircle
@@ -97,6 +106,12 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
     JellioRoute.NowPlaying -> Icons.Filled.LiveTv
+    is JellioRoute.LibraryTab -> when {
+        Regex("anime", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Filled.AutoAwesome
+        collectionType == "movies" -> Icons.Filled.Movie
+        collectionType == "tvshows" -> Icons.Filled.Tv
+        else -> Icons.Filled.VideoLibrary
+    }
     JellioRoute.Settings -> Icons.Filled.Settings
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
 }
@@ -144,6 +159,7 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Library -> "Libraries"
     JellioRoute.Feed -> "Feed"
     JellioRoute.NowPlaying -> "Watching now"
+    is JellioRoute.LibraryTab -> name
     JellioRoute.Settings -> "Settings"
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""
 }
