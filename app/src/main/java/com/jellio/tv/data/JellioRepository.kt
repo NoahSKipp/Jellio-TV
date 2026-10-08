@@ -431,6 +431,15 @@ class JellioRepository @Inject constructor(
     // AIOStreams: "movie", "series", or "anime". A real signal
     // straight from Gelato, not a guess off a name a reader can
     // rename freely.
+    // Controllers/AnimeController.cs: every title in an anime catalog, so
+    // anime stays in the Anime library and out of Home and the Movies and
+    // Shows pages. Empty when the server can't say, so nothing is hidden
+    // by mistake.
+    suspend fun getAnimeIds(): Set<String> =
+        runCatching {
+            cache.get("anime-ids", CACHE_TTL_MS) { api.getAnimeIds().Ids.map { it.replace("-", "").lowercase() }.toSet() }
+        }.getOrDefault(emptySet())
+
     fun isAnimeCollection(collection: BaseItemDto): Boolean {
         val stremio = collection.ProviderIds?.get("Stremio") ?: collection.ProviderIds?.get("stremio")
         if (!stremio.isNullOrEmpty()) {
@@ -617,6 +626,12 @@ class JellioRepository @Inject constructor(
             .map { it.key }
             .take(limit)
     }
+
+    // The whole genre list for a library, A to Z, for the genre picker.
+    suspend fun getAllGenres(userId: String, parentId: String?, itemType: String): List<String> =
+        api.getGenres(userId = userId, parentId = parentId, includeItemTypes = itemType).Items
+            .mapNotNull { it.Name?.trim()?.ifBlank { null } }
+            .distinct()
 
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
         api.getItems(

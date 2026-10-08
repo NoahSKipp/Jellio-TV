@@ -268,6 +268,9 @@ data class UpdatePasswordRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class AnimeIdsDto(val Ids: List<String> = emptyList())
+
+@JsonClass(generateAdapter = true)
 data class CalendarEntryDto(
     val ItemId: String,
     val Name: String? = null,
