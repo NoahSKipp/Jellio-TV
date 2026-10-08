@@ -5,7 +5,6 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
-import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
@@ -44,7 +43,6 @@ sealed interface JellioRoute {
     data object Calendar : JellioRoute
     data object Library : JellioRoute
     data object Feed : JellioRoute
-    data object NowPlaying : JellioRoute
     // One library as its own rail button (the Anime entry shares the
     // Shows library's id, so the name tells them apart).
     data class LibraryTab(val libraryId: String, val name: String, val collectionType: String?) : JellioRoute
@@ -87,7 +85,6 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
         add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
     }
     add(JellioRoute.Feed)
-    add(JellioRoute.NowPlaying)
 }
 
 fun JellioRoute.icon(): ImageVector = when (this) {
@@ -105,7 +102,6 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // mismatches against this exact icon.
     JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
-    JellioRoute.NowPlaying -> Icons.Filled.LiveTv
     is JellioRoute.LibraryTab -> when {
         Regex("anime", RegexOption.IGNORE_CASE).containsMatchIn(name) -> Icons.Filled.AutoAwesome
         collectionType == "movies" -> Icons.Filled.Movie
@@ -158,7 +154,6 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Calendar -> "Calendar"
     JellioRoute.Library -> "Libraries"
     JellioRoute.Feed -> "Feed"
-    JellioRoute.NowPlaying -> "Watching now"
     is JellioRoute.LibraryTab -> name
     JellioRoute.Settings -> "Settings"
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""

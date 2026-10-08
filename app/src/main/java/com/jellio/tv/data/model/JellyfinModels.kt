@@ -419,34 +419,6 @@ data class RealWatchRequest(val ItemId: String)
 @JsonClass(generateAdapter = true)
 data class ReportDurationRequest(val ItemId: String, val DurationTicks: Long)
 
-// Controllers/NowPlayingController.cs: one row of who is watching,
-// listening to or reading what right now, and on which device.
-@JsonClass(generateAdapter = true)
-data class NowPlayingSessionDto(
-    val Id: String,
-    val UserName: String? = null,
-    val DeviceName: String? = null,
-    val Client: String? = null,
-    val Activity: String? = null,
-    val IsPaused: Boolean = false,
-    val PositionTicks: Long? = null,
-    val Item: NowPlayingItemDto,
-)
-
-@JsonClass(generateAdapter = true)
-data class NowPlayingItemDto(
-    val Id: String? = null,
-    val Name: String? = null,
-    val Type: String? = null,
-    val SeriesId: String? = null,
-    val SeriesName: String? = null,
-    val Album: String? = null,
-    val AlbumId: String? = null,
-    val ParentIndexNumber: Int? = null,
-    val IndexNumber: Int? = null,
-    val RunTimeTicks: Long? = null,
-)
-
 @JsonClass(generateAdapter = true)
 data class FeedEntryDto(
     val UserId: String,
