@@ -114,7 +114,12 @@ import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.subtitleBackgroundOption
 import com.jellio.tv.data.model.subtitleSizeOption
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.detail.FilterChipRow
+import com.jellio.tv.ui.detail.QUALITY_ORDER
 import com.jellio.tv.ui.detail.SourceCard
+import com.jellio.tv.ui.detail.sourceAudioLanguages
+import com.jellio.tv.ui.detail.sourceQuality
+import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -154,6 +159,16 @@ private fun formatSpeed(speed: Float): String {
 // Real screens/player.js's own SLEEP_TIMER_OPTIONS: the same five real
 // durations its own sleep popover offers.
 private val SLEEP_TIMER_OPTIONS = listOf(15, 30, 45, 60, 90)
+
+// screens/player.js's EPISODE_SLEEP_TIMER_OPTIONS: stop after this many
+// episodes instead of after some minutes.
+private val EPISODE_SLEEP_TIMER_OPTIONS = listOf(1, 2, 3, 5)
+
+// Episodes left before the episode sleep timer stops playback. Lives
+// outside the player screen because each next episode opens a fresh one.
+private object EpisodeSleepTimer {
+    var remaining by androidx.compose.runtime.mutableStateOf<Int?>(null)
+}
 
 // Real port of screens/player.js's own shouldShowUpNextNow(), ported
 // from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
@@ -260,6 +275,7 @@ fun PlayerScreen(
                 onPlayNext = onPlayNext,
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },
+                onShowToast = { message -> viewModel.showToast(message) },
             )
         }
     }
@@ -311,6 +327,7 @@ private fun PlayerSurface(
     onPlayNext: (String) -> Unit,
     onStartSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
+    onShowToast: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -376,6 +393,7 @@ private fun PlayerSurface(
     var isPlaying by remember { mutableStateOf(true) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
+    var stopAtEnd by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
@@ -538,6 +556,17 @@ private fun PlayerSurface(
             if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
                 if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
+                    // The episode sleep timer counts this boundary; on the
+                    // last one there's no Up Next, playback stops at the end.
+                    EpisodeSleepTimer.remaining?.let { left ->
+                        if (left <= 1) {
+                            EpisodeSleepTimer.remaining = null
+                            upNextDismissed = true
+                            stopAtEnd = true
+                        } else {
+                            EpisodeSleepTimer.remaining = left - 1
+                        }
+                    }
                     // Real port of screens/player.js's own showUpNext():
                     // playNextEpisode()/the countdown below can navigate
                     // straight to the next episode's own screen before
@@ -559,14 +588,26 @@ private fun PlayerSurface(
     // LaunchedEffect's own key changing (upNextShown flips back to
     // false only via a fresh streamUrl, matching that file's own
     // window.clearInterval calls on playNextEpisode/hideUpNext).
-    LaunchedEffect(upNextShown) {
-        if (!upNextShown) return@LaunchedEffect
+    LaunchedEffect(upNextShown, upNextDismissed) {
+        // Dismissed means stay on this episode, so no countdown either.
+        if (!upNextShown || upNextDismissed) return@LaunchedEffect
         upNextCountdown = UPNEXT_COUNTDOWN_SECONDS
         while (upNextCountdown > 0) {
             delay(1000)
             upNextCountdown -= 1
         }
         upNextInfo?.let { onPlayNext(it.itemId) }
+    }
+
+    // The episode sleep timer ran out: leave the player once this one ends
+    // (a film, with no Up Next, counts as its one episode).
+    LaunchedEffect(isEnded) {
+        if (!isEnded) return@LaunchedEffect
+        if (!stopAtEnd && upNextInfo == null && EpisodeSleepTimer.remaining != null) {
+            EpisodeSleepTimer.remaining = null
+            stopAtEnd = true
+        }
+        if (stopAtEnd) onBack()
     }
 
     LaunchedEffect(player) {
@@ -789,7 +830,7 @@ private fun PlayerSurface(
                 scrubFrame = scrubFrame,
                 scrubPositionMs = scrubPositionMs,
                 speedLabel = formatSpeed(playbackSpeed),
-                sleepTimerActive = sleepTimerEndTimeMs != null,
+                sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onSkip = { deltaMs ->
                     player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, player.duration.coerceAtLeast(0L)))
@@ -884,12 +925,22 @@ private fun PlayerSurface(
 
         if (showSleepMenu) {
             SleepMenu(
+                activeEpisodes = EpisodeSleepTimer.remaining,
+                minutesActive = sleepTimerEndTimeMs != null,
                 onSelect = { minutes ->
                     showSleepMenu = false
+                    EpisodeSleepTimer.remaining = null
                     onStartSleepTimer(minutes)
+                },
+                onSelectEpisodes = { count ->
+                    showSleepMenu = false
+                    if (sleepTimerEndTimeMs != null) onCancelSleepTimer()
+                    EpisodeSleepTimer.remaining = count
+                    onShowToast(if (count == 1) "Stopping after this episode" else "Stopping after $count episodes")
                 },
                 onCancel = {
                     showSleepMenu = false
+                    EpisodeSleepTimer.remaining = null
                     onCancelSleepTimer()
                 },
                 onDismiss = { showSleepMenu = false },
@@ -1674,8 +1725,25 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
 
 // Sleep timer drawer matching SubtitleMenu and AudioMenu right drawers.
 @Composable
+private fun SleepMenuHeading(text: String) {
+    Text(
+        text = text,
+        color = JellioTextSecondary,
+        style = androidx.tv.material3.MaterialTheme.typography.labelMedium,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 6.dp),
+    )
+}
+
+@Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
-private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: () -> Unit) {
+private fun SleepMenu(
+    activeEpisodes: Int?,
+    minutesActive: Boolean,
+    onSelect: (Int) -> Unit,
+    onSelectEpisodes: (Int) -> Unit,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     BackHandler(onBack = onDismiss)
     val firstItemFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -1716,12 +1784,24 @@ private fun SleepMenu(onSelect: (Int) -> Unit, onCancel: () -> Unit, onDismiss: 
                         modifier = Modifier.focusRequester(firstItemFocusRequester),
                     )
                 }
+                item { SleepMenuHeading(if (minutesActive) "Stop after (running)" else "Stop after") }
                 items(SLEEP_TIMER_OPTIONS) { minutes ->
                     SubtitleMenuRow(
                         label = "$minutes min",
                         isSelected = false,
                         onClick = {
                             onSelect(minutes)
+                            onDismiss()
+                        },
+                    )
+                }
+                item { SleepMenuHeading("Or stop after") }
+                items(EPISODE_SLEEP_TIMER_OPTIONS) { count ->
+                    SubtitleMenuRow(
+                        label = if (count == 1) "This episode" else "$count episodes",
+                        isSelected = activeEpisodes == count,
+                        onClick = {
+                            onSelectEpisodes(count)
                             onDismiss()
                         },
                     )
@@ -1850,6 +1930,27 @@ private fun SourcePanel(
         kotlinx.coroutines.delay(60)
         runCatching { firstFocusRequester.requestFocus() }
     }
+    // Same language and quality chips as the stream picker before playback,
+    // combinable the same way.
+    var selectedLanguage by remember { mutableStateOf<String?>(null) }
+    var selectedQuality by remember { mutableStateOf<String?>(null) }
+    val languages = remember(sources) {
+        val counts = linkedMapOf<String, Int>()
+        sources.forEach { source -> sourceAudioLanguages(source).forEach { code -> counts[code] = (counts[code] ?: 0) + 1 } }
+        counts.keys.sortedWith(compareByDescending<String> { counts[it] ?: 0 }.thenBy { languageName(it) })
+    }
+    val qualities = remember(sources) {
+        val present = sources.mapNotNull { sourceQuality(it) }.toSet()
+        QUALITY_ORDER.filter { it in present }
+    }
+    val languageFocus = remember(languages) { (listOf<String?>(null) + languages).associateWith { FocusRequester() } }
+    val qualityFocus = remember(qualities) { (listOf<String?>(null) + qualities).associateWith { FocusRequester() } }
+    val showLanguages = languages.size > 1
+    val showQualities = qualities.size > 1
+    val filtered = sources.filter { source ->
+        (selectedLanguage == null || sourceAudioLanguages(source).contains(selectedLanguage)) &&
+            (selectedQuality == null || sourceQuality(source) == selectedQuality)
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1861,7 +1962,7 @@ private fun SourcePanel(
     ) {
         Column(
             modifier = Modifier
-                .width(420.dp)
+                .width(460.dp)
                 .fillMaxSize()
                 .background(JellioBgElevated)
                 .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
@@ -1869,9 +1970,39 @@ private fun SourcePanel(
             Text(text = "Sources", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = 4.dp),
             ) {
-                itemsIndexed(sources, key = { _, it -> it.Id ?: it.hashCode() }) { index, source ->
+                if (showLanguages) {
+                    item(key = "languages") {
+                        FilterChipRow(
+                            chips = listOf<Pair<String?, String>>(null to "All") + languages.map { it to languageName(it) },
+                            selected = selectedLanguage,
+                            onSelect = { selectedLanguage = it },
+                            chipFocusRequesters = languageFocus,
+                            topPadding = 12.dp,
+                        )
+                    }
+                }
+                if (showQualities) {
+                    item(key = "qualities") {
+                        FilterChipRow(
+                            chips = listOf<Pair<String?, String>>(null to "All") + qualities.map { it to it },
+                            selected = selectedQuality,
+                            onSelect = { selectedQuality = it },
+                            chipFocusRequesters = qualityFocus,
+                            upTarget = if (showLanguages) languageFocus[selectedLanguage] else null,
+                            topPadding = if (showLanguages) 0.dp else 12.dp,
+                        )
+                    }
+                }
+                item(key = "count") {
+                    Text(
+                        text = if (filtered.isEmpty()) "No streams match these filters" else "${filtered.size} stream${if (filtered.size == 1) "" else "s"}",
+                        color = JellioTextSecondary,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                itemsIndexed(filtered, key = { _, it -> it.Id ?: it.hashCode() }) { index, source ->
                     SourceCard(
                         source = source,
                         onClick = {

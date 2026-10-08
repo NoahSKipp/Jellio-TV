@@ -244,7 +244,7 @@ class PlayerViewModel @Inject constructor(
     private var trickplayMediaSourceId: String? = null
     private var toastSeq = 0L
 
-    private fun showToast(message: String) {
+    fun showToast(message: String) {
         toastSeq++
         _uiState.value = _uiState.value.copy(toastMessage = message, toastId = toastSeq)
     }
