@@ -30,6 +30,7 @@ data class SubtitleTrackUiState(
     val label: String,
     val isTextBased: Boolean,
     val url: String?,
+    val language: String? = null,
 )
 
 // Real port of screens/player.js's own buildResumePrompt()/
@@ -561,7 +562,7 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     null
                 }
-                SubtitleTrackUiState(index, if (isText) label else "$label (image)", isText, url)
+                SubtitleTrackUiState(index, if (isText) label else "$label (image)", isText, url, stream.Language)
             }
             ?: emptyList()
     }
