@@ -628,6 +628,10 @@ class JellioRepository @Inject constructor(
     }
 
     // The whole genre list for a library, A to Z, for the genre picker.
+    // The reader's chosen audio language (Settings > Language), e.g. "ger".
+    suspend fun getAudioLanguagePreference(userId: String): String? =
+        runCatching { getUser(userId)?.Configuration?.AudioLanguagePreference }.getOrNull()?.trim()?.ifBlank { null }
+
     suspend fun getAllGenres(userId: String, parentId: String?, itemType: String): List<String> =
         api.getGenres(userId = userId, parentId = parentId, includeItemTypes = itemType).Items
             .mapNotNull { it.Name?.trim()?.ifBlank { null } }
@@ -1271,13 +1275,20 @@ class JellioRepository @Inject constructor(
     // external stream (DeliveryMethod == "External") carries its own
     // DeliveryUrl instead, absolute when IsExternalUrl is set,
     // otherwise still relative to this same server.
-    suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto): String {
+    // offsetTicks: where a transcode began. Its clock starts at zero there,
+    // so the server shifts the cues by the same amount
+    // (Subtitles/{index}/{startPositionTicks}/Stream.vtt).
+    suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto, offsetTicks: Long = 0): String {
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         if (stream.DeliveryMethod == "External" && !stream.DeliveryUrl.isNullOrEmpty()) {
             return if (stream.IsExternalUrl == true) stream.DeliveryUrl else serverAddress + stream.DeliveryUrl
         }
         val token = sessionManager.accessToken()
-        val base = "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/Stream.vtt"
+        val base = if (offsetTicks > 0) {
+            "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/$offsetTicks/Stream.vtt"
+        } else {
+            "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/Stream.vtt"
+        }
         return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
     }
 
