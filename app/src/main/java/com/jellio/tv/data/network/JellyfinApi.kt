@@ -238,9 +238,6 @@ interface JellyfinApi {
     @GET("Jellio/anime/ids")
     suspend fun getAnimeIds(): com.jellio.tv.data.model.AnimeIdsDto
 
-    @GET("Jellio/now-playing")
-    suspend fun getNowPlaying(): List<com.jellio.tv.data.model.NowPlayingSessionDto>
-
     @GET("Jellio/feed")
     suspend fun getFeed(): List<FeedEntryDto>
 

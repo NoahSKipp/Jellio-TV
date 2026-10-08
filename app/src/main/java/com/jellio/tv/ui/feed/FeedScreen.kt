@@ -94,8 +94,9 @@ fun FeedScreen(
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
             else -> {
-                val presentTypes = uiState.entries.map { feedType(it) }.toSet()
-                val visible = uiState.entries.filter { feedType(it) !in hiddenTypes }
+                val tvEntries = uiState.entries.filter { feedType(it) !in READING_TYPES }
+                val presentTypes = tvEntries.map { feedType(it) }.toSet()
+                val visible = tvEntries.filter { feedType(it) !in hiddenTypes }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(top = 32.dp).focusRestorer(),
@@ -146,14 +147,15 @@ fun FeedScreen(
 
 private data class FeedType(val key: String, val label: String)
 
+// The TV has no books, manga or audiobooks, so their feed entries never
+// show here (see READING_TYPES).
 private val FEED_TYPES = listOf(
     FeedType("movies", "Movies"),
     FeedType("shows", "Shows"),
-    FeedType("books", "Books"),
-    FeedType("manga", "Manga"),
-    FeedType("audiobooks", "Audiobooks"),
     FeedType("badges", "Badges"),
 )
+
+private val READING_TYPES = setOf("books", "manga", "audiobooks")
 
 private fun feedType(entry: FeedEntryDto): String = when {
     entry.Kind == "Badge" -> "badges"
@@ -164,12 +166,11 @@ private fun feedType(entry: FeedEntryDto): String = when {
     else -> "movies"
 }
 
-// Which feed types are switched off. On the TV the reading and listening
-// ones start off, so the feed opens on movies and shows.
+// Which feed types are switched off; all on to begin with.
 private object FeedFilterPrefs {
     private const val PREFS = "jellio_feed"
     private const val KEY = "hidden_types"
-    private val DEFAULT_HIDDEN = setOf("books", "manga", "audiobooks")
+    private val DEFAULT_HIDDEN = emptySet<String>()
 
     fun load(context: android.content.Context): Set<String> =
         context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getStringSet(KEY, null)?.toSet() ?: DEFAULT_HIDDEN
