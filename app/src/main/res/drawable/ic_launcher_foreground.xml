@@ -13,12 +13,15 @@
     <group
         android:pivotX="200"
         android:pivotY="200"
-        android:scaleX="0.58"
-        android:scaleY="0.58">
+        android:scaleX="0.46"
+        android:scaleY="0.46">
+        <!-- A play triangle looks centered when its weight is, not its
+             bounding box: nudged right so it sits like Nuvio's mark. -->
         <group
             android:name="jellio_mark_root"
             android:pivotX="200"
-            android:pivotY="200">
+            android:pivotY="200"
+            android:translateX="18">
             <!-- Real port of jellio-mark-animated.svg's own static frame: the
                  triangle+stroke (fill AND stroke both the same gradient, the
                  round join is what actually produces this shape's own rounded
