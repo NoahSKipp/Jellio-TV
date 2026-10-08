@@ -47,7 +47,7 @@ class SessionManager @Inject constructor(
     private val syncPrefs = context.getSharedPreferences("jellio_session_sync", Context.MODE_PRIVATE)
 
     @Volatile
-    private var cachedServerAddress: String? = syncPrefs.getString("server_address", null)
+    private var cachedServerAddress: String? = clean(syncPrefs.getString("server_address", null))
 
     @Volatile
     private var cachedAccessToken: String? = syncPrefs.getString("access_token", null)
@@ -62,7 +62,7 @@ class SessionManager @Inject constructor(
     init {
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             context.dataStore.data.collect { prefs ->
-                val server = prefs[Keys.SERVER_ADDRESS] ?: cachedServerAddress
+                val server = clean(prefs[Keys.SERVER_ADDRESS]) ?: cachedServerAddress
                 val token = prefs[Keys.ACCESS_TOKEN] ?: cachedAccessToken
                 val device = prefs[Keys.DEVICE_ID] ?: cachedDeviceId
                 cachedServerAddress = server
@@ -77,12 +77,12 @@ class SessionManager @Inject constructor(
         }
     }
 
-    fun getCachedServerAddress(): String? = cachedServerAddress ?: syncPrefs.getString("server_address", null)
+    fun getCachedServerAddress(): String? = cachedServerAddress ?: clean(syncPrefs.getString("server_address", null))
     fun getCachedAccessToken(): String? = cachedAccessToken ?: syncPrefs.getString("access_token", null)
     fun getCachedDeviceId(): String = cachedDeviceId
 
     val sessionFlow: Flow<Session?> = context.dataStore.data.map { prefs ->
-        val serverAddress = prefs[Keys.SERVER_ADDRESS] ?: cachedServerAddress
+        val serverAddress = clean(prefs[Keys.SERVER_ADDRESS]) ?: cachedServerAddress
         val accessToken = prefs[Keys.ACCESS_TOKEN] ?: cachedAccessToken
         val userId = prefs[Keys.USER_ID] ?: syncPrefs.getString("user_id", null)
         val userName = prefs[Keys.USER_NAME] ?: syncPrefs.getString("user_name", null)
@@ -95,8 +95,10 @@ class SessionManager @Inject constructor(
 
     suspend fun serverAddress(): String? {
         cachedServerAddress?.let { return it }
-        val value = syncPrefs.getString("server_address", null)
-            ?: context.dataStore.data.map { it[Keys.SERVER_ADDRESS] }.first()
+        val value = clean(
+            syncPrefs.getString("server_address", null)
+                ?: context.dataStore.data.map { it[Keys.SERVER_ADDRESS] }.first(),
+        )
         cachedServerAddress = value
         return value
     }
@@ -112,6 +114,10 @@ class SessionManager @Inject constructor(
     suspend fun deviceId(): String {
         return cachedDeviceId
     }
+
+    // Addresses saved before normalizeServerAddress lowercased the scheme
+    // (an "HTTPS://" one broke every image) are cleaned up as they're read.
+    private fun clean(address: String?): String? = address?.let { com.jellio.tv.di.normalizeServerAddress(it) }
 
     suspend fun saveServerAddress(serverAddress: String) {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)

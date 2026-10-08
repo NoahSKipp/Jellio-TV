@@ -578,7 +578,9 @@ private fun ImageCheckRow(session: Session) {
                         is SuccessResult -> "Images load fine (${outcome.image.width}x${outcome.image.height}, ${took} ms)."
                         is ErrorResult -> {
                             val error = outcome.throwable
-                            val detail = error.message?.take(160) ?: "no message"
+                            val detail = error.message
+                                ?.replace(session.accessToken, "…")
+                                ?.take(160) ?: "no message"
                             if (error is HttpException && error.response.code == 404) {
                                 "Server reached in ${took} ms (no avatar set, which is fine)."
                             } else {

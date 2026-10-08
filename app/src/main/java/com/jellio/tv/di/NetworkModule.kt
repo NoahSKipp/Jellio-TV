@@ -26,15 +26,20 @@ private const val PLACEHOLDER_BASE_URL = "http://localhost/"
 fun normalizeServerAddress(raw: String): String {
     val trimmed = raw.trim().trimEnd('/')
     if (trimmed.isEmpty()) return trimmed
-    if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-        return trimmed
-    }
-    val lower = trimmed.lowercase()
-    return if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || lower.startsWith("172.16.") || lower.startsWith("localhost")) {
-        "http://$trimmed"
+    val withScheme = if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+        trimmed
     } else {
-        "https://$trimmed"
+        val lower = trimmed.lowercase()
+        if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || lower.startsWith("172.16.") || lower.startsWith("localhost")) {
+            "http://$trimmed"
+        } else {
+            "https://$trimmed"
+        }
     }
+    // A TV keyboard happily capitalises the first letter ("HTTPS://..."),
+    // which the API client tolerates but the image loader doesn't: it only
+    // fetches lowercase http/https URLs. HttpUrl lowercases scheme and host.
+    return withScheme.toHttpUrlOrNull()?.toString()?.trimEnd('/') ?: withScheme
 }
 
 @Qualifier
