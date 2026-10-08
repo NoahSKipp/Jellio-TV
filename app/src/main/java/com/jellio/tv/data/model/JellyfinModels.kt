@@ -267,6 +267,16 @@ data class UpdatePasswordRequest(
     val NewPw: String,
 )
 
+// Controllers/NotificationsController.cs: a reader's notifications; an
+// admin's announcement is Kind "announcement" with its text in Name.
+@JsonClass(generateAdapter = true)
+data class JellioNotificationDto(
+    val Id: String,
+    val Name: String? = null,
+    val Kind: String? = null,
+    val CreatedUtc: String? = null,
+)
+
 @JsonClass(generateAdapter = true)
 data class AnimeIdsDto(val Ids: List<String> = emptyList())
 

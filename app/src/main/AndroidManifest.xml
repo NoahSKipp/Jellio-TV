@@ -10,6 +10,7 @@
         android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- AppUpdateViewModel's own real install step: DownloadManager
          writes the fetched APK, this is the launch of the system

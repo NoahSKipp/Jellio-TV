@@ -399,6 +399,8 @@ private fun PlayerSurface(
             if (startPositionTicks > 0 && directPlay) {
                 seekTo(startPositionTicks / TICKS_PER_MS)
             }
+            // Keeps the device and its Wi-Fi awake while playing.
+            setWakeMode(C.WAKE_MODE_NETWORK)
             playWhenReady = !showResumePrompt
             prepare()
         }
@@ -424,6 +426,15 @@ private fun PlayerSurface(
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
+
+    // While something plays (or is loading to play), the screen stays on:
+    // the Fire TV and Google TV screensaver and inactivity timers watch
+    // this flag, since a remote isn't touched during a film.
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(isPlaying, isBuffering) {
+        hostView.keepScreenOn = isPlaying || isBuffering
+        onDispose { hostView.keepScreenOn = false }
+    }
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(0L) }

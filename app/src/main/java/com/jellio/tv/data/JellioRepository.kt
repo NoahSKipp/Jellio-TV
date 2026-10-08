@@ -435,6 +435,8 @@ class JellioRepository @Inject constructor(
     // anime stays in the Anime library and out of Home and the Movies and
     // Shows pages. Empty when the server can't say, so nothing is hidden
     // by mistake.
+    suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto> = api.getJellioNotifications()
+
     suspend fun getAnimeIds(): Set<String> =
         runCatching {
             cache.get("anime-ids", CACHE_TTL_MS) { api.getAnimeIds().Ids.map { it.replace("-", "").lowercase() }.toSet() }
