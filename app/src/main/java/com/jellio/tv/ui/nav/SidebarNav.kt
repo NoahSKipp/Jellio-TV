@@ -144,7 +144,10 @@ fun SidebarNav(
     val visuallyExpanded = expanded && !forceCollapsed
     // Pressing Left into the rail always lands on Home, wherever on
     // screen it was pressed from.
+    // Where focus lands when the remote moves left into the rail: the
+    // screen currently open, or Home when that screen isn't in the rail.
     val homeFocusRequester = remember { FocusRequester() }
+    val entryRoute = if (items.contains(selected)) selected else JellioRoute.Home
 
     LaunchedEffect(visuallyExpanded) {
         if (!visuallyExpanded) {
@@ -243,7 +246,7 @@ fun SidebarNav(
                     }
                 },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
-                homeFocusRequester = if (route == JellioRoute.Home) homeFocusRequester else null,
+                homeFocusRequester = if (route == entryRoute) homeFocusRequester else null,
             )
 
         }

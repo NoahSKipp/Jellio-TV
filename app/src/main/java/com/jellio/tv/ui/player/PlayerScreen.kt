@@ -151,6 +151,15 @@ private val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 // (1 + 'x' === '1x'), Kotlin's own Float.toString() does not (1f
 // stringifies as "1.0"), so a whole speed is special cased here to
 // match that exact same real label instead.
+// Where a relative seek lands. The player often doesn't know a stream's
+// length yet (C.TIME_UNSET, a transcode still starting), and clamping to
+// that sent every skip back to the start; only a known length caps it.
+private fun seekTarget(player: Player, deltaMs: Long): Long {
+    val target = (player.currentPosition + deltaMs).coerceAtLeast(0L)
+    val duration = player.duration
+    return if (duration > 0) target.coerceAtMost(duration) else target
+}
+
 private fun formatSpeed(speed: Float): String {
     val whole = speed.toInt()
     return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
@@ -276,6 +285,8 @@ fun PlayerScreen(
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },
                 onShowToast = { message -> viewModel.showToast(message) },
+                switchingTo = uiState.switchingTo,
+                onSwitchSettled = { viewModel.clearSwitching() },
             )
         }
     }
@@ -328,6 +339,8 @@ private fun PlayerSurface(
     onStartSleepTimer: (Int) -> Unit,
     onCancelSleepTimer: () -> Unit,
     onShowToast: (String) -> Unit,
+    switchingTo: String?,
+    onSwitchSettled: () -> Unit,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -731,8 +744,7 @@ private fun PlayerSurface(
                         if (controlsVisible && !isMedia) return@onKeyEvent false
                         controlsVisible = true
                         val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
-                        val newPos = (player.currentPosition + if (forward) SEEK_STEP_MS else -SEEK_STEP_MS)
-                            .coerceIn(0L, player.duration.coerceAtLeast(0L))
+                        val newPos = seekTarget(player, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS)
                         player.seekTo(newPos)
                         // Real port of screens/player.js's own
                         // showScrubPreview(): a preview of the seek's own
@@ -815,6 +827,31 @@ private fun PlayerSurface(
             }
         }
 
+        // Switching streams: say so until the new one is actually playing.
+        if (switchingTo != null) {
+            LaunchedEffect(switchingTo, isBuffering, isPlaying) {
+                if (!isBuffering && isPlaying) {
+                    delay(300)
+                    onSwitchSettled()
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(JellioBgElevated.copy(alpha = 0.92f))
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = "Switching to $switchingTo…",
+                    color = JellioText,
+                    style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                )
+            }
+        }
+
         val anyMenuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel
         if (controlsVisible) {
             PlayerControls(
@@ -834,7 +871,7 @@ private fun PlayerSurface(
                 sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
                 onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
                 onSkip = { deltaMs ->
-                    player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, player.duration.coerceAtLeast(0L)))
+                    player.seekTo(seekTarget(player, deltaMs))
                 },
                 onScrub = { target ->
                     scrubPositionMs = target
