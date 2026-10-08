@@ -25,6 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Arrangement
+import com.jellio.tv.ui.theme.JellioSecondary
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +67,8 @@ fun FeedScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var hiddenTypes by remember { mutableStateOf(FeedFilterPrefs.load(context)) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -90,6 +94,8 @@ fun FeedScreen(
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
             else -> {
+                val presentTypes = uiState.entries.map { feedType(it) }.toSet()
+                val visible = uiState.entries.filter { feedType(it) !in hiddenTypes }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(top = 32.dp).focusRestorer(),
@@ -98,10 +104,33 @@ fun FeedScreen(
                         Text(
                             text = "Feed",
                             style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(start = 48.dp, bottom = 24.dp),
+                            modifier = Modifier.padding(start = 48.dp, bottom = 16.dp),
                         )
                     }
-                    items(uiState.entries) { entry ->
+                    item {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = 16.dp),
+                        ) {
+                            FEED_TYPES.filter { it.key in presentTypes }.forEach { type ->
+                                val off = type.key in hiddenTypes
+                                FeedFilterChip(label = type.label, off = off, onClick = {
+                                    hiddenTypes = if (off) hiddenTypes - type.key else hiddenTypes + type.key
+                                    FeedFilterPrefs.save(context, hiddenTypes)
+                                })
+                            }
+                        }
+                    }
+                    if (visible.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Nothing to show with these filters.",
+                                color = JellioTextSecondary,
+                                modifier = Modifier.padding(start = 48.dp, top = 8.dp),
+                            )
+                        }
+                    }
+                    items(visible) { entry ->
                         FeedRow(
                             entry = entry,
                             imageUrl = imageUrl,
@@ -112,6 +141,73 @@ fun FeedScreen(
                 }
             }
         }
+    }
+}
+
+private data class FeedType(val key: String, val label: String)
+
+private val FEED_TYPES = listOf(
+    FeedType("movies", "Movies"),
+    FeedType("shows", "Shows"),
+    FeedType("books", "Books"),
+    FeedType("manga", "Manga"),
+    FeedType("audiobooks", "Audiobooks"),
+    FeedType("badges", "Badges"),
+)
+
+private fun feedType(entry: FeedEntryDto): String = when {
+    entry.Kind == "Badge" -> "badges"
+    entry.ItemType == "Episode" || entry.ItemType == "Series" || entry.ItemType == "Season" -> "shows"
+    entry.ItemType == "Book" -> "books"
+    entry.ItemType == "Manga" -> "manga"
+    entry.ItemType == "AudioBook" -> "audiobooks"
+    else -> "movies"
+}
+
+// Which feed types are switched off. On the TV the reading and listening
+// ones start off, so the feed opens on movies and shows.
+private object FeedFilterPrefs {
+    private const val PREFS = "jellio_feed"
+    private const val KEY = "hidden_types"
+    private val DEFAULT_HIDDEN = setOf("books", "manga", "audiobooks")
+
+    fun load(context: android.content.Context): Set<String> =
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).getStringSet(KEY, null)?.toSet() ?: DEFAULT_HIDDEN
+
+    fun save(context: android.content.Context, hidden: Set<String>) {
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE).edit().putStringSet(KEY, hidden).apply()
+    }
+}
+
+// A switched-off type stays on screen, dimmed and struck through.
+@Composable
+private fun FeedFilterChip(label: String, off: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (off) Color.Transparent else JellioSecondary,
+            contentColor = if (off) JellioTextSecondary else JellioBg,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            border = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = if (off) 0.25f else 0f)),
+                shape = RoundedCornerShape(999.dp),
+            ),
+            focusedBorder = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(999.dp),
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+    ) {
+        Text(
+            text = label,
+            textDecoration = if (off) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+        )
     }
 }
 
