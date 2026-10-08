@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.jellio.tv.ui.perf.MotionPolicy.init(this)
+        com.jellio.tv.ui.player.PlayerPrefs.init(this)
         enableEdgeToEdge()
         handleIntent(intent)
         setContent {

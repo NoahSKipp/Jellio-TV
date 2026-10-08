@@ -394,6 +394,7 @@ private fun PlayerSurface(
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var stopAtEnd by remember { mutableStateOf(false) }
+    var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
     var positionMs by remember { mutableLongStateOf(0L) }
@@ -956,6 +957,16 @@ private fun PlayerSurface(
         // both onscreen at once the way this app's own fixed 120 second
         // Up Next fallback now can against a real Credits segment).
         val activeSkip = activeSkipSegment(skipSegments, positionMs / 1000.0)
+        // Auto-skip intros (Settings > Playback): once per intro, the same
+        // as screens/player.js does when it's switched on.
+        LaunchedEffect(activeSkip?.targetSeconds, PlayerPrefs.autoSkipIntro) {
+            val segment = activeSkip ?: return@LaunchedEffect
+            if (PlayerPrefs.autoSkipIntro && segment.label == "Skip Intro" && autoSkippedTo != segment.targetSeconds) {
+                autoSkippedTo = segment.targetSeconds
+                player.seekTo((segment.targetSeconds * 1000).toLong())
+                onShowToast("Skipped intro")
+            }
+        }
         if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
             SkipSegmentButton(
                 label = activeSkip.label,
