@@ -70,7 +70,7 @@ fun WatchlistScreen(
                     item { PosterRow(section = HomeSection("Movies", uiState.movies), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
                 if (uiState.series.isNotEmpty()) {
-                    item { PosterRow(section = HomeSection("Series", uiState.series), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
+                    item { PosterRow(section = HomeSection("Shows", uiState.series), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
             }
         }

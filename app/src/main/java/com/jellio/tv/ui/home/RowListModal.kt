@@ -169,7 +169,7 @@ fun RowListModal(
 private fun itemSubtitle(item: BaseItemDto): String {
     val bits = mutableListOf<String>()
     item.ProductionYear?.let { bits.add(it.toString()) }
-    if (item.Type == "Series" || item.Type == "Season") bits.add("Series")
+    if (item.Type == "Series" || item.Type == "Season") bits.add("Show")
     return bits.joinToString(" · ")
 }
 
