@@ -580,5 +580,9 @@ private fun JellioTvApp(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        // Announcements from the server, over everything (Home, the
+        // player, any screen).
+        com.jellio.tv.ui.announce.AnnouncementToast(modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter))
     }
 }
