@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -106,7 +107,19 @@ fun HeroSection(
     val item = items[index]
     val heroHeight = HeroHeight.scaled()
 
-    Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
+    // Coming in from the nav rail lands on Play, not the edge arrow that
+    // happens to be nearest.
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(heroHeight)
+            .focusProperties {
+                onEnter = {
+                    if (requestedFocusDirection == androidx.compose.ui.focus.FocusDirection.Right) playFocusRequester.requestFocus()
+                }
+            }
+            .focusGroup(),
+    ) {
         Crossfade(
             targetState = item,
             animationSpec = tween(800),

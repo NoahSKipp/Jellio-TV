@@ -191,6 +191,9 @@ data class PlayerUiState(
     // a row, same real behaviour that file's own clearTimeout + fresh
     // setTimeout on every call already gets for free.
     val toastMessage: String? = null,
+    // Set while another stream is being fetched and started, so the screen
+    // can say so until it actually plays.
+    val switchingTo: String? = null,
     val toastId: Long = 0L,
 )
 
@@ -253,6 +256,10 @@ class PlayerViewModel @Inject constructor(
     // elapses; the id guard means a toast that already got replaced by
     // a newer one in the meantime does not get incorrectly cleared out
     // from under it.
+    fun clearSwitching() {
+        if (_uiState.value.switchingTo != null) _uiState.value = _uiState.value.copy(switchingTo = null)
+    }
+
     fun clearToast(id: Long) {
         if (_uiState.value.toastId == id) {
             _uiState.value = _uiState.value.copy(toastMessage = null)
@@ -674,6 +681,7 @@ class PlayerViewModel @Inject constructor(
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
         val id = itemId ?: return
         if (source.Id == _uiState.value.mediaSourceId) return
+        _uiState.value = _uiState.value.copy(switchingTo = source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifBlank { null } ?: "another stream")
         viewModelScope.launch {
             try {
                 val target = repository.resolvePlayback(
@@ -698,6 +706,7 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                 )
             } catch (err: Exception) {
+                _uiState.value = _uiState.value.copy(switchingTo = null)
                 // Real port of that file's own switchSource() catch
                 // chain: no success toast there either, only these two
                 // real failure messages, the second one a fixed generic

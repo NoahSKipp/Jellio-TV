@@ -75,10 +75,10 @@ val JellioNavItems: List<JellioRoute> = listOf(
     JellioRoute.Home,
     JellioRoute.Search,
     JellioRoute.Watchlist,
+    JellioRoute.Library,
     JellioRoute.Feed,
     JellioRoute.NowPlaying,
     JellioRoute.Calendar,
-    JellioRoute.Library,
 )
 
 fun JellioRoute.icon(): ImageVector = when (this) {
@@ -141,7 +141,7 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Search -> "Search"
     JellioRoute.Watchlist -> "Watchlist"
     JellioRoute.Calendar -> "Calendar"
-    JellioRoute.Library -> "Library"
+    JellioRoute.Library -> "Libraries"
     JellioRoute.Feed -> "Feed"
     JellioRoute.NowPlaying -> "Watching now"
     JellioRoute.Settings -> "Settings"
