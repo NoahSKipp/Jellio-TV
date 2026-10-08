@@ -64,6 +64,10 @@ import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.jellio.tv.data.prefs.QuickHubButton
+import com.jellio.tv.data.prefs.QuickHubPreferences
+import com.jellio.tv.data.prefs.QuickHubTrigger
+import android.view.KeyEvent
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -80,27 +84,42 @@ class MainActivity : ComponentActivity() {
     private var longPressKeyCode: Int? = null
     private var longPressConsumed: Boolean = false
 
-    private fun targetKeyCodeForShortcut(shortcut: com.jellio.tv.data.prefs.QuickHubShortcut): Int? = when (shortcut) {
-        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_PLAY_PAUSE -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_MENU -> android.view.KeyEvent.KEYCODE_MENU
-        com.jellio.tv.data.prefs.QuickHubShortcut.LONG_PRESS_CENTER -> android.view.KeyEvent.KEYCODE_DPAD_CENTER
-        com.jellio.tv.data.prefs.QuickHubShortcut.NONE -> null
+    private fun isTargetKey(keyCode: Int, button: QuickHubButton): Boolean = when (button) {
+        QuickHubButton.CENTER -> keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == KeyEvent.KEYCODE_ENTER ||
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+        QuickHubButton.PLAY_PAUSE -> keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+            keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+            keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
+            keyCode == KeyEvent.KEYCODE_HEADSETHOOK
+        QuickHubButton.MENU -> keyCode == KeyEvent.KEYCODE_MENU
+        QuickHubButton.BACK -> keyCode == KeyEvent.KEYCODE_BACK
+        QuickHubButton.NONE -> false
     }
 
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        val shortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
-        val targetKey = targetKeyCodeForShortcut(shortcut)
-        if (targetKey != null && keyCode == targetKey && event?.repeatCount == 0) {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isPlayerActive) return super.onKeyDown(keyCode, event)
+
+        val button = QuickHubPreferences.button
+        val trigger = QuickHubPreferences.trigger
+
+        if (isTargetKey(keyCode, button) && event?.repeatCount == 0) {
+            if (trigger == QuickHubTrigger.SHORT_PRESS) {
+                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+                return true
+            }
+
             event.startTracking()
             longPressKeyCode = keyCode
             longPressConsumed = false
             longPressJob?.cancel()
             longPressJob = lifecycleScope.launch {
-                kotlinx.coroutines.delay(500)
+                delay(500)
                 longPressConsumed = true
                 (onQuickHubShortcut ?: onMenuPressed)?.invoke()
             }
-            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
+
+            if (button == QuickHubButton.CENTER || button == QuickHubButton.BACK) {
                 return super.onKeyDown(keyCode, event)
             }
             return true
@@ -108,10 +127,12 @@ class MainActivity : ComponentActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    override fun onKeyLongPress(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        val shortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
-        val targetKey = targetKeyCodeForShortcut(shortcut)
-        if (targetKey != null && keyCode == targetKey) {
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isPlayerActive) return super.onKeyLongPress(keyCode, event)
+
+        val button = QuickHubPreferences.button
+        val trigger = QuickHubPreferences.trigger
+        if (trigger == QuickHubTrigger.LONG_PRESS && isTargetKey(keyCode, button)) {
             longPressJob?.cancel()
             if (!longPressConsumed) {
                 longPressConsumed = true
@@ -122,7 +143,16 @@ class MainActivity : ComponentActivity() {
         return super.onKeyLongPress(keyCode, event)
     }
 
-    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isPlayerActive) return super.onKeyUp(keyCode, event)
+
+        val button = QuickHubPreferences.button
+        val trigger = QuickHubPreferences.trigger
+
+        if (trigger == QuickHubTrigger.SHORT_PRESS && isTargetKey(keyCode, button)) {
+            return true
+        }
+
         if (keyCode == longPressKeyCode) {
             longPressJob?.cancel()
             longPressJob = null
@@ -571,6 +601,10 @@ private fun JellioTvApp(
                     showChangelog = true
                 },
                 onLaunchOnboarding = { showOnboarding = true },
+                onOpenQuickHub = {
+                    quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
+                    showNowPlayingDrawer = true
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Detail -> androidx.compose.runtime.key(current.itemId) {

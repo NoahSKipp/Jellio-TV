@@ -27,6 +27,9 @@ import androidx.compose.material.icons.filled.MovieFilter
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.layout.ContentScale
@@ -125,11 +128,13 @@ import com.jellio.tv.ui.i18n.string
 import com.jellio.tv.ui.i18n.formatString
 
 private enum class LanguageField { AUDIO, SUBTITLE, DISPLAY }
+private enum class ShortcutPickerField { BUTTON, TRIGGER }
 
 private enum class SettingsCategory(val labelKey: String, val icon: ImageVector) {
     ACCOUNT("settings_cat_account", Icons.Filled.Person),
     PLAYBACK("settings_cat_playback", Icons.Filled.PlayCircle),
     RECOMMENDATIONS("settings_cat_recommendations", Icons.Filled.AutoAwesome),
+    SHORTCUTS("settings_cat_shortcuts", Icons.Filled.Tune),
     DISPLAY("settings_cat_display", Icons.Filled.Palette),
     ABOUT("settings_cat_about", Icons.Filled.Info);
 
@@ -149,6 +154,7 @@ fun SettingsScreen(
     onCustomizeHome: () -> Unit = {},
     onShowChangelog: () -> Unit = {},
     onLaunchOnboarding: () -> Unit = {},
+    onOpenQuickHub: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
@@ -158,6 +164,7 @@ fun SettingsScreen(
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
+    var openShortcutPicker by remember { mutableStateOf<ShortcutPickerField?>(null) }
     val changeAvatarFocusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -803,17 +810,66 @@ fun SettingsScreen(
                         value = if (overscan == 0) string("settings_overscan_fullscreen") else formatString("settings_overscan_inset", overscan),
                         onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
                     )
-                    SettingsDivider()
-                    val currentShortcut = com.jellio.tv.data.prefs.QuickHubPreferences.shortcut
-                    SettingsPickerRow(
-                        label = string("settings_quick_hub_shortcut"),
-                        value = string(currentShortcut.labelKey),
-                        onClick = {
-                            val next = currentShortcut.next()
-                            com.jellio.tv.data.prefs.QuickHubPreferences.setShortcut(displayContext, next)
-                        },
-                    )
                 }
+                }
+                SettingsCategory.SHORTCUTS -> {
+                    val currentButton = com.jellio.tv.data.prefs.QuickHubPreferences.button
+                    val currentTrigger = com.jellio.tv.data.prefs.QuickHubPreferences.trigger
+
+                    SettingsSection(
+                        title = string("settings_quick_hub_section"),
+                        icon = Icons.Filled.Tune,
+                        description = string("settings_quick_hub_section_desc"),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            SettingsPickerRow(
+                                label = string("settings_quick_hub_button"),
+                                value = string(currentButton.labelKey),
+                                onClick = { openShortcutPicker = ShortcutPickerField.BUTTON },
+                            )
+                            SettingsDivider()
+                            SettingsPickerRow(
+                                label = string("settings_quick_hub_trigger"),
+                                value = string(currentTrigger.labelKey),
+                                onClick = { openShortcutPicker = ShortcutPickerField.TRIGGER },
+                            )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                label = string("settings_quick_hub_test"),
+                                icon = Icons.Filled.GraphicEq,
+                                description = string("settings_quick_hub_test_desc"),
+                                onClick = onOpenQuickHub,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                            .padding(16.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = null,
+                                tint = Color(0xFF00E5FF),
+                                modifier = Modifier.size(20.dp).padding(top = 2.dp),
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = string("settings_quick_hub_home_notice"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = JellioTextSecondary,
+                                lineHeight = 20.sp,
+                            )
+                        }
+                    }
                 }
                 SettingsCategory.ABOUT -> {
                 SettingsSection(title = string("settings_cat_about"), icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
@@ -866,6 +922,29 @@ fun SettingsScreen(
         )
     }
 
+    val shortcutField = openShortcutPicker
+    if (shortcutField == ShortcutPickerField.BUTTON) {
+        val currentContext = LocalContext.current
+        QuickHubButtonPickerOverlay(
+            selected = com.jellio.tv.data.prefs.QuickHubPreferences.button,
+            onSelect = { btn ->
+                com.jellio.tv.data.prefs.QuickHubPreferences.setButton(currentContext, btn)
+                openShortcutPicker = null
+            },
+            onDismiss = { openShortcutPicker = null },
+        )
+    } else if (shortcutField == ShortcutPickerField.TRIGGER) {
+        val currentContext = LocalContext.current
+        QuickHubTriggerPickerOverlay(
+            selected = com.jellio.tv.data.prefs.QuickHubPreferences.trigger,
+            onSelect = { trg ->
+                com.jellio.tv.data.prefs.QuickHubPreferences.setTrigger(currentContext, trg)
+                openShortcutPicker = null
+            },
+            onDismiss = { openShortcutPicker = null },
+        )
+    }
+
     val showAvatarPicker by viewModel.showAvatarPicker.collectAsState()
     var wasShowingAvatarPicker by remember { mutableStateOf(false) }
     LaunchedEffect(showAvatarPicker) {
@@ -894,6 +973,160 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
     SettingsRowSurface(onClick = onClick) {
         SettingsRowText(label = label, description = value)
         Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
+    }
+}
+
+@Composable
+private fun ShortcutPickerRow(
+    label: String,
+    description: String? = null,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (isSelected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(8.dp),
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).let {
+            if (focusRequester != null) it.focusRequester(focusRequester) else it
+        },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = label, style = MaterialTheme.typography.bodyLarge, color = JellioText)
+                if (!description.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(text = description, style = MaterialTheme.typography.bodySmall, color = JellioTextSecondary)
+                }
+            }
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun QuickHubButtonPickerOverlay(
+    selected: com.jellio.tv.data.prefs.QuickHubButton,
+    onSelect: (com.jellio.tv.data.prefs.QuickHubButton) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    val firstRowFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .dismissOnBack(onDismiss)
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(420.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(top = 48.dp, bottom = 48.dp),
+        ) {
+            Text(
+                text = string("settings_quick_hub_button"),
+                color = JellioText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                items(com.jellio.tv.data.prefs.QuickHubButton.entries) { btn ->
+                    ShortcutPickerRow(
+                        label = string(btn.labelKey),
+                        description = string(btn.subKey),
+                        isSelected = btn == selected,
+                        onClick = { onSelect(btn) },
+                        focusRequester = if (btn == com.jellio.tv.data.prefs.QuickHubButton.entries.first()) firstRowFocusRequester else null,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun QuickHubTriggerPickerOverlay(
+    selected: com.jellio.tv.data.prefs.QuickHubTrigger,
+    onSelect: (com.jellio.tv.data.prefs.QuickHubTrigger) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    val firstRowFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .dismissOnBack(onDismiss)
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(420.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(top = 48.dp, bottom = 48.dp),
+        ) {
+            Text(
+                text = string("settings_quick_hub_trigger"),
+                color = JellioText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                items(com.jellio.tv.data.prefs.QuickHubTrigger.entries) { trg ->
+                    ShortcutPickerRow(
+                        label = string(trg.labelKey),
+                        description = string(trg.subKey),
+                        isSelected = trg == selected,
+                        onClick = { onSelect(trg) },
+                        focusRequester = if (trg == com.jellio.tv.data.prefs.QuickHubTrigger.entries.first()) firstRowFocusRequester else null,
+                    )
+                }
+            }
+        }
     }
 }
 

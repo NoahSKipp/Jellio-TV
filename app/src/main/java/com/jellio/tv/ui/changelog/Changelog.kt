@@ -106,12 +106,12 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
-        version = "0.80.0",
+        version = "0.81.0",
         title = "What's New in Jellio TV",
-        subtitle = "Version 0.80.0",
+        subtitle = "Version 0.81.0",
         features = listOf(
             ChangelogFeature(Icons.Filled.AutoAwesome, "Unified Quick Hub Drawer", "Access Now Playing and Notifications in one unified drawer with segmented tabs, live stream counts, and unread badges."),
-            ChangelogFeature(Icons.Filled.Settings, "Configurable Remote Shortcut", "Instantly toggle the Quick Hub from anywhere using Long Press Menu, Long Press Play / Pause, or Long Press OK, customizable in Display settings."),
+            ChangelogFeature(Icons.Filled.Tune, "Remote & Shortcuts Customization", "Toggle the Quick Hub using your remote's Menu, Play / Pause, OK / Select, or Back button, with full long-press and immediate trigger customization in Settings > Remote & Shortcuts."),
             ChangelogFeature(Icons.Filled.Tune, "Multi-Edition & Version Recognition", "Automatic recognition and toggle between Color vs Noir / B&W, Theatrical, Extended, and Director's Cuts directly on the detail screen."),
             ChangelogFeature(Icons.Filled.Mic, "Firestick Voice Dictation", "Microphone search automatically opens your on-screen keyboard with Alexa dictation instructions for effortless voice input."),
         ),
