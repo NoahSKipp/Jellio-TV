@@ -275,6 +275,7 @@ data class JellioNotificationDto(
     val Name: String? = null,
     val Kind: String? = null,
     val CreatedUtc: String? = null,
+    val ImageId: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

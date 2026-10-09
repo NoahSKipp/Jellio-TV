@@ -437,6 +437,12 @@ class JellioRepository @Inject constructor(
     // by mistake.
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto> = api.getJellioNotifications()
 
+    // An announcement's picture; the image loader adds the auth header.
+    suspend fun announcementImageUrl(imageId: String): String? {
+        val server = sessionManager.serverAddress() ?: return null
+        return "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+    }
+
     suspend fun getAnimeIds(): Set<String> =
         runCatching {
             cache.get("anime-ids", CACHE_TTL_MS) { api.getAnimeIds().Ids.map { it.replace("-", "").lowercase() }.toSet() }
