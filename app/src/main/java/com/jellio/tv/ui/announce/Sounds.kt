@@ -14,7 +14,15 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.annotation.OptIn
+import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.audio.ChannelMixingAudioProcessor
+import androidx.media3.common.audio.ChannelMixingMatrix
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.jellio.tv.data.JellioRepository
@@ -67,7 +75,7 @@ class SoundViewModel @Inject constructor(
         val dataSource = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
             .setDefaultRequestProperties(repository.soundRequestHeaders())
-        val player = ExoPlayer.Builder(context)
+        val player = ExoPlayer.Builder(context, DirectionalRenderersFactory(context, sound.Direction))
             .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSource))
             .build()
         try {
@@ -111,4 +119,39 @@ fun SoundPlayerHost(viewModel: SoundViewModel = hiltViewModel()) {
             viewModel.pollWhileStarted()
         }
     }
+}
+
+// Sends the clip to one side, or to the rear pair of a 5.1 layout (front
+// L, front R, center, LFE, rear L, rear R). A stereo TV folds the rear
+// pair back into its two speakers, so there it plays from both sides.
+@OptIn(UnstableApi::class)
+private class DirectionalRenderersFactory(context: Context, private val direction: String) : DefaultRenderersFactory(context) {
+    override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
+        val mixer = ChannelMixingAudioProcessor()
+        directionMatrices(direction).forEach { mixer.putChannelMixingMatrix(it) }
+        return DefaultAudioSink.Builder(context)
+            .setAudioProcessors(arrayOf<AudioProcessor>(mixer))
+            .build()
+    }
+}
+
+@OptIn(UnstableApi::class)
+private fun directionMatrices(direction: String): List<ChannelMixingMatrix> = when (direction) {
+    // Input rows, output columns: mono then stereo into two channels.
+    "left" -> listOf(
+        ChannelMixingMatrix(1, 2, floatArrayOf(1f, 0f)),
+        ChannelMixingMatrix(2, 2, floatArrayOf(0.7f, 0f, 0.7f, 0f)),
+    )
+    "right" -> listOf(
+        ChannelMixingMatrix(1, 2, floatArrayOf(0f, 1f)),
+        ChannelMixingMatrix(2, 2, floatArrayOf(0f, 0.7f, 0f, 0.7f)),
+    )
+    "rear" -> listOf(
+        ChannelMixingMatrix(1, 6, floatArrayOf(0f, 0f, 0f, 0f, 1f, 1f)),
+        ChannelMixingMatrix(2, 6, floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, 1f)),
+    )
+    else -> listOf(
+        ChannelMixingMatrix(1, 1, floatArrayOf(1f)),
+        ChannelMixingMatrix(2, 2, floatArrayOf(1f, 0f, 0f, 1f)),
+    )
 }

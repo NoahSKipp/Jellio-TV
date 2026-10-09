@@ -285,6 +285,7 @@ data class PendingSoundDto(
     val SoundId: String = "",
     val Volume: Int = 100,
     val DuckVolume: Int = 30,
+    val Direction: String = "both",
 )
 
 @JsonClass(generateAdapter = true)
