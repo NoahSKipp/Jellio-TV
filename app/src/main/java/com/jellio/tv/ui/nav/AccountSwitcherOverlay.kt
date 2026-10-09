@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -170,7 +171,11 @@ fun AccountSwitcherOverlay(
                                 focusedContentColor = JellioText,
                             ),
                         ) {
-                            Text(text = "Notifications", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                            androidx.tv.material3.Icon(
+                                imageVector = Icons.Filled.Notifications,
+                                contentDescription = "Notifications",
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
+                            )
                         }
                         Surface(
                             onClick = onSignOut,

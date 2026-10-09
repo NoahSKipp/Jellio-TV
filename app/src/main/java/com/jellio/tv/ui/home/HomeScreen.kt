@@ -427,7 +427,7 @@ fun HomeScreen(
                     }
                     // Rows still loading below the ones already shown.
                     if (uiState.loadingMore) {
-                        items(2, key = { "skeleton-$it" }) { SkeletonRow() }
+                        item(key = "skeleton") { SkeletonRow() }
                     }
                 }
             }

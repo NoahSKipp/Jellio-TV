@@ -6,6 +6,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,9 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.jellio.tv.ui.theme.scaled
 
 // Grey placeholders for rows still on their way, like the web Home's
 // skeleton cards: a soft pulse, never focusable.
@@ -40,13 +42,17 @@ private fun skeletonColor(): Color {
 @Composable
 fun SkeletonRow(landscape: Boolean = false, modifier: Modifier = Modifier) {
     val color = skeletonColor()
-    Column(modifier = modifier.padding(start = 48.dp, top = 24.dp)) {
+    Column(modifier = modifier.fillMaxWidth().clipToBounds().padding(start = 48.dp, top = 20.dp, bottom = 4.dp)) {
         Row(
-            modifier = Modifier.width(180.dp).height(18.dp).clip(RoundedCornerShape(6.dp)).background(color),
+            modifier = Modifier.width(160.dp).height(16.dp).clip(RoundedCornerShape(6.dp)).background(color),
         ) {}
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(top = 14.dp)) {
-            repeat(if (landscape) 5 else 8) {
-                val cardWidth = if (landscape) LandscapeCardWidth.scaled() else PosterWidth.scaled()
+        // Laid out at full size and cut off at the screen edge, never squeezed.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(top = 12.dp).horizontalScroll(rememberScrollState(), enabled = false),
+        ) {
+            repeat(if (landscape) 4 else 7) {
+                val cardWidth = if (landscape) 220.dp else 110.dp
                 Row(
                     modifier = Modifier
                         .width(cardWidth)
@@ -63,12 +69,12 @@ fun SkeletonRow(landscape: Boolean = false, modifier: Modifier = Modifier) {
 @Composable
 fun HomeSkeleton(modifier: Modifier = Modifier) {
     val color = skeletonColor()
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().clipToBounds()) {
         Row(
             modifier = Modifier
-                .padding(start = 48.dp, end = 48.dp, top = 32.dp)
+                .padding(start = 48.dp, end = 48.dp, top = 28.dp)
                 .fillMaxWidth()
-                .height(320.dp)
+                .height(200.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(color),
         ) {}

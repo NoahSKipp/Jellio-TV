@@ -416,8 +416,8 @@ fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable 
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.6f)
-                .heightIn(max = 620.dp)
+                .widthIn(max = 620.dp)
+                .heightIn(max = 460.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(JellioBgElevated)
                 .padding(32.dp)
