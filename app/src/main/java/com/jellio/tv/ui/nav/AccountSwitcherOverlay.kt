@@ -69,7 +69,7 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // than a full screen of its own, same real reason that file's own
 // header gives: switching mid-browse should not need leaving the page
 // first.
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AccountSwitcherOverlay(
     session: Session,
@@ -123,7 +123,13 @@ fun AccountSwitcherOverlay(
                 )
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     Text(text = session.userName, style = MaterialTheme.typography.titleLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    // Wraps to a second line rather than squeezing the last
+                    // button down to a sliver when they don't all fit.
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) {
                         Surface(
                             onClick = { onDismiss(); onViewProfile() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
