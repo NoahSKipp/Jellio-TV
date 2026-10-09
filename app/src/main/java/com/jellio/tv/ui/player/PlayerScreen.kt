@@ -215,6 +215,10 @@ fun PlayerScreen(
     val subtitleStyle by viewModel.subtitleStyle.collectAsState()
 
     LaunchedEffect(itemId, mediaSourceId) { viewModel.load(session, itemId, mediaSourceId) }
+    DisposableEffect(Unit) {
+        PlayerPresence.active = true
+        onDispose { PlayerPresence.active = false }
+    }
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {

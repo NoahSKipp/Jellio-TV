@@ -15,6 +15,7 @@ import com.jellio.tv.BuildConfig
 import com.jellio.tv.data.network.GitHubApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,8 @@ import javax.inject.Inject
 
 private const val GITHUB_OWNER = "NoahSKipp"
 private const val GITHUB_REPO = "Jellio-TV"
+private const val UPDATE_CHECK_INTERVAL_MS = 3L * 60 * 60 * 1000
+private const val UPDATE_RECHECK_ON_RETURN_MS = 60L * 60 * 1000
 
 data class UpdateUiState(
     val availableVersion: String? = null,
@@ -74,11 +77,34 @@ class AppUpdateViewModel @Inject constructor(
         }
     }
 
+    private var lastCheckAt = 0L
+    // A version turned down stays quiet for the background checks; the
+    // next app open still asks again.
+    private var dismissedVersion: String? = null
+
     fun checkForUpdate() {
-        viewModelScope.launch {
-            val (latestVersion, apkUrl) = fetchLatestVersionAndApkUrl() ?: return@launch
-            if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME)) return@launch
-            _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
+        viewModelScope.launch { runCheck() }
+    }
+
+    private suspend fun runCheck() {
+        lastCheckAt = System.currentTimeMillis()
+        if (_uiState.value.availableVersion != null) return
+        val (latestVersion, apkUrl) = fetchLatestVersionAndApkUrl() ?: return
+        if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME) || latestVersion == dismissedVersion) return
+        if (_uiState.value.availableVersion != null) return
+        _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
+    }
+
+    // Background checks while the app is in front, like Jellio for macOS:
+    // a TV left on Jellio for days still hears about a release. Called
+    // each time the app comes to the front; checks right away if the last
+    // check is old enough, then every UPDATE_CHECK_INTERVAL_MS.
+    suspend fun checkPeriodically() {
+        while (true) {
+            if (System.currentTimeMillis() - lastCheckAt >= UPDATE_RECHECK_ON_RETURN_MS) runCheck()
+            val untilNext = UPDATE_CHECK_INTERVAL_MS - (System.currentTimeMillis() - lastCheckAt)
+            delay(untilNext.coerceAtLeast(60_000L))
+            runCheck()
         }
     }
 
@@ -113,6 +139,7 @@ class AppUpdateViewModel @Inject constructor(
     }
 
     fun dismiss() {
+        dismissedVersion = _uiState.value.availableVersion ?: dismissedVersion
         _uiState.value = UpdateUiState()
         _manualCheckResult.value = null
     }
