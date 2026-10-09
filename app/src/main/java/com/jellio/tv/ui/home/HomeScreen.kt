@@ -93,7 +93,7 @@ fun HomeScreen(
     // enabled state, same real reasoning a modal overlay would trap
     // focus if this screen mounted one instead of toggling in place.
     onEditModeChange: (Boolean) -> Unit = {},
-    onPlayDirect: (String, String?) -> Unit,
+    onPlay: (BaseItemDto) -> Unit,
     // Real port of components/cardOptionsMenu.js's own "Play manually"
     // (openStreamPicker(item, { forceChoice: true })): built at
     // MainActivity's own root the same way DetailScreen's own Change
@@ -359,7 +359,7 @@ fun HomeScreen(
                                 HeroSection(
                                     items = uiState.heroItems,
                                     imageUrl = imageUrl,
-                                    onPlay = { item -> onPlayDirect(item.Id, null) },
+                                    onPlay = onPlay,
                                     onToggleWatchlist = { item -> viewModel.toggleWatchlist(session, item) },
                                     onViewDetails = onItemClick,
                                 )
@@ -458,7 +458,7 @@ fun HomeScreen(
                 onStartOver = if (continueWatching) {
                     {
                         scope.launch {
-                            if (viewModel.restartFromBeginning(session, item)) onPlayDirect(item.Id, null)
+                            if (viewModel.restartFromBeginning(session, item)) onPlay(item)
                         }
                     }
                 } else {

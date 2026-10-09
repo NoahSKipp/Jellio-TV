@@ -287,6 +287,28 @@ private fun JellioTvApp(
     val onNavigateToDetail: (String) -> Unit = { itemId -> push(JellioRoute.Detail(itemId)) }
     val onNavigateToPerson: (String) -> Unit = { personId -> push(JellioRoute.Person(personId)) }
     val onPlayDirect: (String, String?) -> Unit = { itemId, mediaSourceId -> push(JellioRoute.Player(itemId, mediaSourceId)) }
+    // Play the way the title page does: one stream plays, several (with
+    // nothing remembered) open the picker, none opens the picker to say so.
+    val onPlay: (BaseItemDto) -> Unit = { item ->
+        if (item.Type != "Movie" && item.Type != "Episode") onPlayDirect(item.Id, null) else scope.launch {
+            when (val action = runCatching { appViewModel.resolvePlayAction(session, item) }.getOrNull()) {
+                is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
+                is PlayAction.ShowPicker -> streamPickerItem = action.item
+                null -> onPlayDirect(item.Id, null)
+            }
+        }
+    }
+    // By id, for the next episode and Watch Next links: plays straight on
+    // unless there's nothing to play, then the picker says so. leavePlayer
+    // closes the finished episode first.
+    val onPlayId: (String, Boolean) -> Unit = { itemId, leavePlayer ->
+        scope.launch {
+            val item = appViewModel.getItemOrNull(session, itemId)
+            val empty = item != null && (item.Type == "Movie" || item.Type == "Episode") && runCatching { appViewModel.getMediaSources(session, item.Id) }.getOrNull()?.isEmpty() == true
+            if (leavePlayer) routeStack = routeStack.dropLast(1)
+            if (empty) streamPickerItem = item else onPlayDirect(itemId, null)
+        }
+    }
 
     // WatchNextSyncer's own real deep link, consumed the moment this
     // real signed in tree is up and able to push a route at all: a
@@ -295,7 +317,7 @@ private fun JellioTvApp(
     // Home first the way a cold app open otherwise would.
     LaunchedEffect(deepLinkItemId) {
         val itemId = deepLinkItemId ?: return@LaunchedEffect
-        onPlayDirect(itemId, null)
+        onPlayId(itemId, false)
         onDeepLinkConsumed()
     }
 
@@ -346,7 +368,7 @@ private fun JellioTvApp(
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
                 onEditModeChange = { homeEditMode = it },
-                onPlayDirect = onPlayDirect,
+                onPlay = onPlay,
                 // Real port of components/cardOptionsMenu.js's own
                 // "Play manually" (openStreamPicker(item,
                 // {forceChoice: true})): the exact same real
@@ -444,7 +466,7 @@ private fun JellioTvApp(
                 itemId = current.itemId,
                 mediaSourceId = current.mediaSourceId,
                 onBack = { routeStack = routeStack.dropLast(1) },
-                onPlayNext = { nextItemId -> onPlayDirect(nextItemId, null) },
+                onPlayNext = { nextItemId -> onPlayId(nextItemId, true) },
                 modifier = Modifier.fillMaxSize(),
             )
         }

@@ -2,6 +2,7 @@ package com.jellio.tv.ui.detail
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -353,14 +356,37 @@ fun StreamPickerOverlay(
                     RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                 }
                 is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
-                    Column(modifier = Modifier.padding(top = 48.dp)) {
-                        Text(text = "No streams available", style = MaterialTheme.typography.titleMedium, color = JellioText)
+                    // Shown in the box the streams would fill, no buttons:
+                    // Back closes it. Focusable so the D-pad stays here
+                    // instead of wandering into the page underneath.
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .padding(top = 32.dp)
+                            .fillMaxWidth()
+                            .background(JellioBgElevated.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+                            .focusRequester(initialFocusRequester)
+                            .focusable()
+                            .padding(horizontal = 28.dp, vertical = 32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.VideocamOff,
+                            contentDescription = null,
+                            tint = JellioTextSecondary,
+                            modifier = Modifier.size(44.dp),
+                        )
+                        Text(
+                            text = "No streams available",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = JellioText,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
                         Text(
                             text = noStreamsHint(item.PremiereDate),
                             color = JellioTextSecondary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(top = 8.dp),
                         )
-                        RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                     }
                 } else {
                     // Real Jellyfin field, the same one the player's own

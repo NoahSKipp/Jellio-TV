@@ -133,6 +133,9 @@ class AppViewModel @Inject constructor(
     // already made stays honoured here even if turned off since).
     suspend fun rememberedMediaSourceId(itemId: String): String? = streamPreferences.rememberedMediaSourceId(itemId)
 
+    suspend fun getItemOrNull(session: Session, itemId: String): BaseItemDto? =
+        runCatching { repository.getItem(session.userId, itemId) }.getOrNull()
+
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
         val sources = getMediaSources(session, item.Id)
         if (sources.isEmpty()) return PlayAction.ShowPicker(item)

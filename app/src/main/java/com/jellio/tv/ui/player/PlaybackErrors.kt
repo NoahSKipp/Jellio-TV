@@ -1,11 +1,9 @@
 package com.jellio.tv.ui.player
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -18,17 +16,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.HttpDataSource
-import androidx.tv.material3.Border
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import java.io.IOException
@@ -117,17 +116,27 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
     )
 }
 
+// No buttons: they fought the player's own controls for the D-pad. The
+// panel keeps focus and swallows keys so the controls stay down, and Back
+// leaves the player.
 @Composable
 fun PlaybackErrorPanel(
     problem: PlaybackProblem,
-    onRetry: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val retryFocus = remember { FocusRequester() }
-    LaunchedEffect(problem) { retryFocus.requestFocus() }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(problem) { runCatching { focus.requestFocus() } }
     Box(
-        modifier = modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)),
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f))
+            .focusRequester(focus)
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) onBack()
+                true
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -144,39 +153,12 @@ fun PlaybackErrorPanel(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 10.dp),
             )
-            Row(modifier = Modifier.padding(top = 22.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    onClick = onRetry,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = JellioSecondary,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
-                    ),
-                    modifier = Modifier.focusRequester(retryFocus),
-                ) {
-                    Text(text = "Try again", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                }
-                Surface(
-                    onClick = onBack,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = Color.White.copy(alpha = 0.12f),
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
-                    ),
-                ) {
-                    Text(text = "Back", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                }
-            }
+            Text(
+                text = "Press Back to return.",
+                color = JellioTextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(top = 18.dp),
+            )
         }
     }
 }

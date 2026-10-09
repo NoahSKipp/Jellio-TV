@@ -227,7 +227,6 @@ fun PlayerScreen(
                 }
                 PlaybackErrorPanel(
                     problem = PlaybackProblem(uiState.error ?: "Couldn't start playback", uiState.errorDetail.orEmpty()),
-                    onRetry = { viewModel.retry(session) },
                     onBack = onBack,
                 )
             }
@@ -880,16 +879,8 @@ private fun PlayerSurface(
 
         val problem = exoError
         if (problem != null) {
-            PlaybackErrorPanel(
-                problem = problem,
-                onRetry = {
-                    exoError = null
-                    isBuffering = true
-                    player.prepare()
-                    player.play()
-                },
-                onBack = onBack,
-            )
+            LaunchedEffect(problem) { controlsVisible = false }
+            PlaybackErrorPanel(problem = problem, onBack = onBack)
         } else if (isBuffering && pauseInfo != null) {
             BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering) {
