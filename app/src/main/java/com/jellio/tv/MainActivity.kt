@@ -618,5 +618,16 @@ private fun JellioTvApp(
         // player, any screen).
         com.jellio.tv.ui.announce.AnnouncementToast(modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter))
         com.jellio.tv.ui.announce.SoundPlayerHost()
+        com.jellio.tv.ui.groupwatch.GroupWatchHost(
+            session = session,
+            isPlaying = { id ->
+                (routeStack.lastOrNull() as? JellioRoute.Player)?.let { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, id) } == true
+            },
+            // Following the group replaces whatever the player had open.
+            openItem = { id ->
+                if (routeStack.lastOrNull() is JellioRoute.Player) routeStack = routeStack.dropLast(1)
+                onPlayDirect(id, null)
+            },
+        )
     }
 }

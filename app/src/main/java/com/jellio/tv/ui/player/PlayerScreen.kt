@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -47,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +84,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.AudioAttributes
@@ -126,6 +129,8 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
 private const val SEEK_STEP_MS = 10_000L
@@ -135,6 +140,8 @@ private const val CONTROLS_HIDE_DELAY_MS = 4_000L
 // setTimeout.
 private const val TOAST_DURATION_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
+// Further apart than this from the group, a play or pause also seeks.
+private const val SYNC_DRIFT_MS = 1_500L
 // Real screens/player.js's own UPNEXT_FALLBACK_TRIGGER_SECONDS/
 // UPNEXT_COUNTDOWN_SECONDS: shouldShowUpNextNow()'s own fixed
 // seconds-left fallback, used only when skipSegments carries no real
@@ -351,8 +358,19 @@ private fun PlayerSurface(
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
+    val groupWatch: com.jellio.tv.ui.groupwatch.GroupWatchViewModel = hiltViewModel()
+    val syncPlay = groupWatch.syncPlay
+    val syncGroup by syncPlay.group.collectAsState()
+    val syncTarget by syncPlay.target.collectAsState()
+    // Set while the group is playing this very title: play, pause and
+    // seek then go through the server so everyone moves together.
+    val syncPlaylistItemId = syncTarget?.takeIf { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, currentItemId) }?.playlistItemId
+    val syncScope = rememberCoroutineScope()
+
     var resumePromptDismissed by remember { mutableStateOf(false) }
-    val showResumePrompt = resumePercent != null && !resumePromptDismissed
+    // No resume question in a group: the group decides where playback is.
+    val inGroupAtOpen = remember { syncPlay.group.value != null }
+    val showResumePrompt = resumePercent != null && !resumePromptDismissed && !inGroupAtOpen
 
     // Every real text based subtitle track declared as a real
     // MediaItem.SubtitleConfiguration from this very first prepare()
@@ -472,6 +490,85 @@ private fun PlayerSurface(
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
+
+    fun togglePlay() {
+        if (syncPlaylistItemId != null) {
+            val wasPlaying = player.isPlaying
+            syncScope.launch { if (wasPlaying) syncPlay.requestPause() else syncPlay.requestUnpause() }
+        } else if (player.isPlaying) {
+            player.pause()
+        } else {
+            player.play()
+        }
+    }
+
+    fun userSeek(targetMs: Long) {
+        if (syncPlaylistItemId != null) {
+            positionMs = targetMs.coerceAtLeast(0L)
+            syncScope.launch { syncPlay.requestSeek(targetMs.coerceAtLeast(0L) * TICKS_PER_MS) }
+        } else {
+            seekToReal(targetMs)
+        }
+    }
+
+    // Group commands, run at the moment the server set (its clock,
+    // converted to this one). A newer command replaces one still waiting.
+    LaunchedEffect(player, syncPlaylistItemId) {
+        val playlistItemId = syncPlaylistItemId ?: return@LaunchedEffect
+        syncPlay.commands.collectLatest { command ->
+            if (command.playlistItemId != null && command.playlistItemId != playlistItemId) return@collectLatest
+            val wait = syncPlay.remoteToLocalMs(command.whenRemoteMs) - System.currentTimeMillis()
+            if (wait > 0) delay(wait)
+            val reportedMs = (command.positionTicks ?: 0L) / TICKS_PER_MS
+            when (command.command) {
+                "Unpause" -> {
+                    val targetMs = syncPlay.estimateTicksNow(command.positionTicks ?: 0L, command.whenRemoteMs) / TICKS_PER_MS
+                    if (kotlin.math.abs(realPositionMs() - targetMs) > SYNC_DRIFT_MS) seekToReal(targetMs)
+                    resumePromptDismissed = true
+                    player.play()
+                }
+                "Pause" -> {
+                    player.pause()
+                    if (command.positionTicks != null && kotlin.math.abs(realPositionMs() - reportedMs) > SYNC_DRIFT_MS) seekToReal(reportedMs)
+                }
+                "Seek" -> seekToReal(reportedMs)
+                "Stop" -> player.pause()
+            }
+        }
+    }
+
+    // Tells the group when this TV is loading and when it's ready, so
+    // the server holds everyone until the slowest member has caught up.
+    var publishedQueue by remember(currentItemId) { mutableStateOf(false) }
+    var unpauseAfterPublish by remember(currentItemId) { mutableStateOf(false) }
+    LaunchedEffect(isBuffering, syncPlaylistItemId) {
+        val playlistItemId = syncPlaylistItemId ?: return@LaunchedEffect
+        val ticks = realPositionMs() * TICKS_PER_MS
+        if (isBuffering) {
+            syncPlay.notifyBuffering(ticks, player.playWhenReady, playlistItemId)
+        } else if (player.playbackState == Player.STATE_READY) {
+            syncPlay.notifyReady(ticks, player.playWhenReady, playlistItemId)
+            if (unpauseAfterPublish) {
+                unpauseAfterPublish = false
+                syncPlay.requestUnpause()
+            }
+        }
+    }
+
+    // Starting a title while in a group starts it for the whole group,
+    // as on the web; a title opened by following the group is already
+    // the group's, so it isn't published again.
+    LaunchedEffect(syncGroup?.groupId, currentItemId) {
+        if (syncGroup == null) return@LaunchedEffect
+        if (publishedQueue || syncPlaylistItemId != null) return@LaunchedEffect
+        val target = syncPlay.target.value
+        if (target != null && com.jellio.tv.data.syncplay.SyncPlayManager.sameId(target.itemId, currentItemId)) return@LaunchedEffect
+        publishedQueue = true
+        if (syncPlay.publishQueue(currentItemId, startPositionTicks).isSuccess) {
+            unpauseAfterPublish = true
+            groupWatch.announceStarted(currentItemId, title.ifBlank { "something" })
+        }
+    }
     // Bumped on every key press, so the controls stay up while the remote
     // is in use.
     var interaction by remember { mutableStateOf(0) }
@@ -488,6 +585,7 @@ private fun PlayerSurface(
     var showAudioMenu by remember { mutableStateOf(false) }
     var showSourcePanel by remember { mutableStateOf(false) }
     var showEpisodesPanel by remember { mutableStateOf(false) }
+    var showReactMenu by remember { mutableStateOf(false) }
     var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
     var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
@@ -705,8 +803,8 @@ private fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(controlsVisible, isPlaying, interaction, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel, showEpisodesPanel) {
-        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel && !showEpisodesPanel) {
+    LaunchedEffect(controlsVisible, isPlaying, interaction, showSubtitleMenu, showSpeedMenu, showSleepMenu, showAudioMenu, showSourcePanel, showEpisodesPanel, showReactMenu) {
+        if (controlsVisible && isPlaying && !showSubtitleMenu && !showSpeedMenu && !showSleepMenu && !showAudioMenu && !showSourcePanel && !showEpisodesPanel && !showReactMenu) {
             delay(CONTROLS_HIDE_DELAY_MS)
             controlsVisible = false
         }
@@ -748,6 +846,13 @@ private fun PlayerSurface(
             }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                if (showReactMenu) {
+                    if (event.key == Key.Back) {
+                        showReactMenu = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
                 if (showSubtitleMenu) {
                     if (event.key == Key.Back) {
                         showSubtitleMenu = false
@@ -819,19 +924,19 @@ private fun PlayerSurface(
                         val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
                         val base = seekFlash?.target ?: positionMs
                         val newPos = seekTarget(base, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, durationMs)
-                        seekToReal(newPos)
+                        userSeek(newPos)
                         val total = (seekFlash?.totalMs ?: 0L) + if (forward) SEEK_STEP_MS else -SEEK_STEP_MS
                         seekFlash = SeekFlash(newPos, total, System.nanoTime())
                         true
                     }
                     Key.MediaPlayPause -> {
-                        if (player.isPlaying) player.pause() else player.play()
+                        togglePlay()
                         controlsVisible = true
                         true
                     }
                     Key.DirectionCenter, Key.Enter -> {
                         if (controlsVisible) return@onKeyEvent false
-                        if (player.isPlaying) player.pause() else player.play()
+                        togglePlay()
                         controlsVisible = true
                         scrubFrame = null
                         scrubPositionMs = null
@@ -943,7 +1048,7 @@ private fun PlayerSurface(
             }
         }
 
-        val anyMenuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel
+        val anyMenuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel || showReactMenu
         if (controlsVisible) {
             PlayerControls(
                 title = title,
@@ -960,22 +1065,24 @@ private fun PlayerSurface(
                 scrubPositionMs = scrubPositionMs,
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
-                onPlayPause = { if (player.isPlaying) player.pause() else player.play() },
+                onPlayPause = { togglePlay() },
                 onSkip = { deltaMs ->
-                    seekToReal(seekTarget(positionMs, deltaMs, durationMs))
+                    userSeek(seekTarget(positionMs, deltaMs, durationMs))
                 },
                 onScrub = { target ->
                     scrubPositionMs = target
                     scrubFrame = if (hasTrickplay) onComputeTrickplayFrame(target) else null
                 },
                 onScrubEnd = { target ->
-                    if (target != null) seekToReal(target)
+                    if (target != null) userSeek(target)
                     scrubFrame = null
                     scrubPositionMs = null
                 },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
                 onOpenSpeedMenu = { showSpeedMenu = true },
                 onOpenSleepMenu = { showSleepMenu = true },
+                inGroup = syncGroup != null,
+                onOpenReactMenu = { showReactMenu = true },
                 onOpenAudioMenu = { showAudioMenu = true },
                 onOpenSourceMenu = {
                     showEpisodesPanel = false
@@ -1091,14 +1198,14 @@ private fun PlayerSurface(
             val segment = activeSkip ?: return@LaunchedEffect
             if (PlayerPrefs.autoSkipIntro && segment.label == "Skip Intro" && autoSkippedTo != segment.targetSeconds) {
                 autoSkippedTo = segment.targetSeconds
-                seekToReal((segment.targetSeconds * 1000).toLong())
+                userSeek((segment.targetSeconds * 1000).toLong())
                 onShowToast("Skipped intro")
             }
         }
         if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
             SkipSegmentButton(
                 label = activeSkip.label,
-                onClick = { seekToReal((activeSkip.targetSeconds * 1000).toLong()) },
+                onClick = { userSeek((activeSkip.targetSeconds * 1000).toLong()) },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
             )
         }
@@ -1110,6 +1217,16 @@ private fun PlayerSurface(
                 onPlayNow = { onPlayNext(upNextInfo.itemId) },
                 onDismiss = { upNextDismissed = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
+            )
+        }
+
+        if (showReactMenu) {
+            ReactMenu(
+                onReact = { emoji ->
+                    showReactMenu = false
+                    groupWatch.react(emoji)
+                },
+                onDismiss = { showReactMenu = false },
             )
         }
 
@@ -1179,6 +1296,8 @@ private fun PlayerControls(
     onOpenAudioMenu: () -> Unit,
     onOpenSourceMenu: () -> Unit,
     onOpenEpisodesMenu: () -> Unit,
+    inGroup: Boolean = false,
+    onOpenReactMenu: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize().focusProperties { canFocus = enabled }) {
         Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
@@ -1309,6 +1428,9 @@ private fun PlayerControls(
                             active = sleepTimerActive,
                             onClick = onOpenSleepMenu,
                         )
+                        if (inGroup) {
+                            PlayerPillButton(icon = Icons.Filled.EmojiEmotions, label = "React", onClick = onOpenReactMenu)
+                        }
                     }
                 }
             }
@@ -1856,6 +1978,46 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
                         },
                         modifier = Modifier.focusRequester(req),
                     )
+                }
+            }
+        }
+    }
+}
+
+// Group Watch reactions: a row of preset emoji sent to the group's chat,
+// in place of typing on a remote.
+@Composable
+private fun ReactMenu(onReact: (String) -> Unit, onDismiss: () -> Unit) {
+    BackHandler(onBack = onDismiss)
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { first.requestFocus() }
+    }
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .padding(bottom = 140.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(JellioBgElevated.copy(alpha = 0.95f))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            com.jellio.tv.ui.groupwatch.GROUP_REACTIONS.forEachIndexed { index, emoji ->
+                androidx.tv.material3.Surface(
+                    onClick = { onReact(emoji) },
+                    shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(shape = androidx.compose.foundation.shape.CircleShape),
+                    colors = androidx.tv.material3.ClickableSurfaceDefaults.colors(
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                    ),
+                    scale = androidx.tv.material3.ClickableSurfaceDefaults.scale(focusedScale = 1.2f),
+                    modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
+                ) {
+                    Text(text = emoji, fontSize = 30.sp, modifier = Modifier.padding(10.dp))
                 }
             }
         }

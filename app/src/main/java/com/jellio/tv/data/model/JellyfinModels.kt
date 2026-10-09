@@ -280,6 +280,52 @@ data class JellioNotificationDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class UtcTimeDto(val RequestReceptionTime: String? = null, val ResponseTransmissionTime: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlayGroupDto(
+    val GroupId: String = "",
+    val GroupName: String? = null,
+    val State: String? = null,
+    val Participants: List<String> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlayNewBody(val GroupName: String)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlayJoinBody(val GroupId: String)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlaySeekBody(val PositionTicks: Long)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlayStateBody(val When: String, val PositionTicks: Long, val IsPlaying: Boolean, val PlaylistItemId: String)
+
+@JsonClass(generateAdapter = true)
+data class SyncPlayQueueBody(val PlayingQueue: List<String>, val PlayingItemPosition: Int, val StartPositionTicks: Long)
+
+@JsonClass(generateAdapter = true)
+data class GroupWatchInviteDto(
+    val Id: Long = 0,
+    val GroupId: String = "",
+    val GroupName: String? = null,
+    val FromUserName: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GroupWatchMessageDto(
+    val Id: Long = 0,
+    val UserId: String? = null,
+    val UserName: String? = null,
+    val Text: String = "",
+    val ItemId: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class GroupWatchSendBody(val Text: String, val ItemId: String? = null)
+
+@JsonClass(generateAdapter = true)
 data class PendingSoundDto(
     val Seq: Long = 0,
     val SoundId: String = "",
