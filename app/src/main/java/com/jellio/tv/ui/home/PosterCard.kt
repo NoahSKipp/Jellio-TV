@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
@@ -98,12 +97,12 @@ fun PosterCard(
     // on: PosterWidth.scaled()'s own header (ui/theme/TvScale.kt)
     // explains why a fixed dp size alone was not real enough coverage.
     val posterWidth = PosterWidth.scaled()
-    val prefetchViewModel: GelatoPrefetchViewModel = hiltViewModel()
+    val prefetch = LocalGelatoPrefetch.current
     var isFocused by remember { mutableStateOf(false) }
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
             delay(PREFETCH_DEBOUNCE_MS)
-            prefetchViewModel.prefetch(item)
+            prefetch(item)
         }
     }
     Box(modifier = modifier.width(posterWidth)) {

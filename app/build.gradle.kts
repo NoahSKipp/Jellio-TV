@@ -86,6 +86,7 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

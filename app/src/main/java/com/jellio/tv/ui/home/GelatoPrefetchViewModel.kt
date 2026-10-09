@@ -26,6 +26,11 @@ import javax.inject.Inject
 // gets a harmless no-op response back (it has no streams of its own,
 // only its episodes do), same silent best-effort failure everything
 // else through this call already tolerates.
+// One shared prefetch for every card, provided at the app root: each
+// card asking Hilt for its own view model cost a lookup per card on
+// every scroll.
+val LocalGelatoPrefetch = androidx.compose.runtime.staticCompositionLocalOf<(BaseItemDto) -> Unit> { {} }
+
 @HiltViewModel
 class GelatoPrefetchViewModel @Inject constructor(
     private val repository: JellioRepository,

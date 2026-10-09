@@ -83,11 +83,16 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         setContent {
             JellioTvTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    JellioTvRoot(
-                        deepLinkItemId = deepLinkItemId.value,
-                        onDeepLinkConsumed = { deepLinkItemId.value = null },
-                    )
+                val prefetchViewModel: com.jellio.tv.ui.home.GelatoPrefetchViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchViewModel::prefetch,
+                ) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        JellioTvRoot(
+                            deepLinkItemId = deepLinkItemId.value,
+                            onDeepLinkConsumed = { deepLinkItemId.value = null },
+                        )
+                    }
                 }
             }
         }
