@@ -3,6 +3,12 @@ package com.jellio.tv.ui.groupwatch
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -85,6 +91,11 @@ class GroupWatchViewModel @Inject constructor(
     private val _prompt = MutableStateFlow<GroupPrompt?>(null)
     val prompt: StateFlow<GroupPrompt?> = _prompt.asStateFlow()
 
+    // Invites not yet answered, newest first, for the Group Watch and
+    // Notifications panels.
+    private val _invites = MutableStateFlow<List<com.jellio.tv.data.model.GroupWatchInviteDto>>(emptyList())
+    val invites: StateFlow<List<com.jellio.tv.data.model.GroupWatchInviteDto>> = _invites.asStateFlow()
+
     private var noticeId = 0L
     private var lastInviteId = 0L
 
@@ -121,11 +132,12 @@ class GroupWatchViewModel @Inject constructor(
         val invites = runCatching { api.getGroupWatchInvites(lastInviteId) }.getOrNull() ?: return
         invites.forEach { invite ->
             lastInviteId = maxOf(lastInviteId, invite.Id)
+            _invites.update { list -> (listOf(invite) + list.filterNot { it.GroupId == invite.GroupId }).take(10) }
             _prompt.value = GroupPrompt(
                 title = "Group Watch invite",
                 text = (invite.FromUserName ?: "Someone") + " invited you to join " + (invite.GroupName ?: "Group Watch"),
                 actionLabel = "Join",
-                onAction = { runCatching { syncPlay.join(invite.GroupId) } },
+                onAction = { acceptInvite(invite) },
             )
         }
     }
@@ -191,6 +203,19 @@ class GroupWatchViewModel @Inject constructor(
         val prompt = _prompt.value ?: return
         _prompt.value = null
         if (accept) viewModelScope.launch { prompt.onAction() }
+    }
+
+    suspend fun acceptInvite(invite: com.jellio.tv.data.model.GroupWatchInviteDto) {
+        _invites.update { list -> list.filterNot { it.Id == invite.Id } }
+        runCatching { syncPlay.join(invite.GroupId) }
+    }
+
+    fun joinInvite(invite: com.jellio.tv.data.model.GroupWatchInviteDto) {
+        viewModelScope.launch { acceptInvite(invite) }
+    }
+
+    fun dismissInvite(invite: com.jellio.tv.data.model.GroupWatchInviteDto) {
+        _invites.update { list -> list.filterNot { it.Id == invite.Id } }
     }
 
     fun join(groupId: String) {
@@ -303,8 +328,9 @@ fun GroupButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
 // or the server's groups to join, plus starting a new one. Inviting
 // people and the full chat stay on desktop and the web.
 @Composable
-fun GroupWatchSettings(userName: String, viewModel: GroupWatchViewModel = hiltViewModel()) {
+fun GroupWatchPanelContent(userName: String, viewModel: GroupWatchViewModel = hiltViewModel()) {
     val group by viewModel.syncPlay.group.collectAsState()
+    val invites by viewModel.invites.collectAsState()
     var groups by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<com.jellio.tv.data.model.SyncPlayGroupDto>>(emptyList()) }
     var refreshKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     LaunchedEffect(group?.groupId, refreshKey) {
@@ -312,6 +338,11 @@ fun GroupWatchSettings(userName: String, viewModel: GroupWatchViewModel = hiltVi
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val current = group
+        if (current == null) {
+            invites.forEach { invite ->
+                InviteRow(invite = invite, onJoin = { viewModel.joinInvite(invite) }, onDismiss = { viewModel.dismissInvite(invite) })
+            }
+        }
         if (current != null) {
             Text(text = "You're in " + current.groupName, color = JellioText, style = MaterialTheme.typography.titleSmall)
             Text(
@@ -348,5 +379,61 @@ fun GroupWatchSettings(userName: String, viewModel: GroupWatchViewModel = hiltVi
                 GroupButton(label = "Refresh", onClick = { refreshKey++ })
             }
         }
+    }
+}
+
+@Composable
+fun InviteRow(invite: com.jellio.tv.data.model.GroupWatchInviteDto, onJoin: () -> Unit, onDismiss: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(modifier = Modifier.weight(1f, fill = false)) {
+            Text(text = (invite.FromUserName ?: "Someone") + " invited you", color = JellioText)
+            Text(text = invite.GroupName ?: "Group Watch", color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        GroupButton(label = "Join", primary = true, onClick = onJoin)
+        GroupButton(label = "Dismiss", onClick = onDismiss)
+    }
+}
+
+// The panels opened from the profile menu: a centered card over the
+// current screen that keeps focus until Back closes it.
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    BackHandler(onBack = onDismiss)
+    val panelFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        repeat(10) {
+            delay(50)
+            if (runCatching { panelFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .heightIn(max = 620.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(JellioBgElevated)
+                .padding(32.dp)
+                .focusRequester(panelFocus)
+                .focusGroup()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text(text = title, color = JellioText, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 20.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+fun GroupWatchOverlay(userName: String, onDismiss: () -> Unit) {
+    SidePanelOverlay(title = "Group Watch", onDismiss = onDismiss) {
+        GroupWatchPanelContent(userName = userName)
     }
 }
