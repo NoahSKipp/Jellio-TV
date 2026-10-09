@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
@@ -55,9 +56,9 @@ class AnnouncementViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("jellio_announcements", Context.MODE_PRIVATE)
-    private val _current = MutableStateFlow<String?>(null)
-    val current: StateFlow<String?> = _current.asStateFlow()
-    private val queue = ArrayDeque<String>()
+    private val _current = MutableStateFlow<Announcement?>(null)
+    val current: StateFlow<Announcement?> = _current.asStateFlow()
+    private val queue = ArrayDeque<Announcement>()
     private var polling = false
 
     fun start() {
@@ -74,7 +75,10 @@ class AnnouncementViewModel @Inject constructor(
                             seen.add(entry.Id)
                             val created = runCatching { Instant.parse(entry.CreatedUtc.orEmpty().let { if (it.endsWith("Z")) it else it + "Z" }).toEpochMilli() }.getOrNull()
                             val text = entry.Name?.trim().orEmpty()
-                            if (text.isNotEmpty() && (created == null || now - created < MAX_AGE_MS)) queue.addLast(text)
+                            val image = entry.ImageId?.let { repository.announcementImageUrl(it) }
+                            if ((text.isNotEmpty() || image != null) && (created == null || now - created < MAX_AGE_MS)) {
+                                queue.addLast(Announcement(text, image))
+                            }
                         }
                     prefs.edit().putStringSet("seen", seen.toList().takeLast(200).toSet()).apply()
                     if (_current.value == null) showNext()
@@ -88,7 +92,7 @@ class AnnouncementViewModel @Inject constructor(
         val next = queue.removeFirstOrNull() ?: return
         _current.value = next
         viewModelScope.launch {
-            delay(SHOW_MS)
+            delay(if (next.imageUrl != null) SHOW_MS + 4_000 else SHOW_MS)
             _current.value = null
             delay(400)
             showNext()
@@ -96,13 +100,15 @@ class AnnouncementViewModel @Inject constructor(
     }
 }
 
+data class Announcement(val text: String, val imageUrl: String?)
+
 // The toast itself: top of the screen, above Home, the player and every
 // other screen, gone after a few seconds without needing the remote.
 @Composable
 fun AnnouncementToast(modifier: Modifier = Modifier, viewModel: AnnouncementViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { viewModel.start() }
     val message by viewModel.current.collectAsState()
-    val text = message ?: return
+    val announcement = message ?: return
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -116,7 +122,27 @@ fun AnnouncementToast(modifier: Modifier = Modifier, viewModel: AnnouncementView
         Icon(imageVector = Icons.Filled.Campaign, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(28.dp))
         Column(modifier = Modifier.padding(start = 14.dp)) {
             Text(text = "From the server", color = JellioTextSecondary, style = MaterialTheme.typography.labelMedium)
-            Text(text = text, color = JellioText, style = MaterialTheme.typography.bodyLarge)
+            if (announcement.imageUrl != null) {
+                // Shown shrunk to fit, never full size.
+                coil3.compose.AsyncImage(
+                    model = announcement.imageUrl,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .heightIn(max = 220.dp)
+                        .widthIn(max = 420.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                )
+            }
+            if (announcement.text.isNotEmpty()) {
+                Text(
+                    text = announcement.text,
+                    color = JellioText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = if (announcement.imageUrl != null) 8.dp else 0.dp),
+                )
+            }
         }
     }
 }
