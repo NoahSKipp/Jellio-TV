@@ -420,10 +420,12 @@ fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable 
                 .heightIn(max = 460.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(JellioBgElevated)
-                .padding(32.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp)
                 .focusRequester(panelFocus)
                 .focusGroup()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                // Room for a focused button to grow without being cut off.
+                .padding(horizontal = 8.dp, vertical = 16.dp),
         ) {
             Text(text = title, color = JellioText, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 20.dp))
             content()
