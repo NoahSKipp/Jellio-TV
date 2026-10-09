@@ -641,6 +641,7 @@ private fun JellioTvApp(
         // player, any screen).
         com.jellio.tv.ui.announce.AnnouncementToast(modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter))
         com.jellio.tv.ui.announce.SoundPlayerHost()
+        com.jellio.tv.ui.announce.ScreenOverlayHost()
         com.jellio.tv.ui.groupwatch.GroupWatchHost(
             session = session,
             isPlaying = { id ->

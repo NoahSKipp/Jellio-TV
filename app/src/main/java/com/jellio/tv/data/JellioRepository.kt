@@ -443,6 +443,13 @@ class JellioRepository @Inject constructor(
         return "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
     }
 
+    suspend fun getPendingOverlays(after: Long): com.jellio.tv.data.model.PendingOverlaysDto = api.getPendingOverlays(after)
+
+    suspend fun overlayImageUrl(imageId: String): String? {
+        val server = sessionManager.serverAddress() ?: return null
+        return "$server/Jellio/overlays/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+    }
+
     suspend fun getPendingSounds(after: Long): com.jellio.tv.data.model.PendingSoundsDto = api.getPendingSounds(after)
 
     suspend fun soundUrl(soundId: String): String? {

@@ -329,6 +329,18 @@ data class GroupWatchMessageDto(
 data class GroupWatchSendBody(val Text: String, val ItemId: String? = null)
 
 @JsonClass(generateAdapter = true)
+data class PendingOverlayDto(
+    val Seq: Long = 0,
+    val Text: String? = null,
+    val ImageId: String? = null,
+    val Opacity: Int = 80,
+    val Seconds: Int = 5,
+)
+
+@JsonClass(generateAdapter = true)
+data class PendingOverlaysDto(val Latest: Long = 0, val Overlays: List<PendingOverlayDto> = emptyList())
+
+@JsonClass(generateAdapter = true)
 data class PendingSoundDto(
     val Seq: Long = 0,
     val SoundId: String = "",
