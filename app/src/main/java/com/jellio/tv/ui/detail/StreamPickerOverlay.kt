@@ -354,7 +354,12 @@ fun StreamPickerOverlay(
                 }
                 is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
                     Column(modifier = Modifier.padding(top = 48.dp)) {
-                        Text(text = "No streams found for this title.", color = JellioTextSecondary)
+                        Text(text = "No streams available", style = MaterialTheme.typography.titleMedium, color = JellioText)
+                        Text(
+                            text = noStreamsHint(item.PremiereDate),
+                            color = JellioTextSecondary,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                        )
                         RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                     }
                 } else {
@@ -665,5 +670,17 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
                 Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
         }
+    }
+}
+
+// Like Nuvio: with nothing found, a recent or undated title most likely
+// isn't out digitally yet.
+private fun noStreamsHint(premiereDate: String?): String {
+    val released = premiereDate?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+    val recent = released != null && java.time.Duration.between(released, java.time.Instant.now()).toDays() < 120
+    return if (released == null || recent) {
+        "There may not be a digital release yet. Check back once it's out on digital."
+    } else {
+        "Nothing was found for this title right now. Try again later."
     }
 }
