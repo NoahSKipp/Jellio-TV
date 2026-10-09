@@ -14,7 +14,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.PendingSoundDto
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,7 +48,9 @@ class SoundViewModel @Inject constructor(
 
     suspend fun pollWhileStarted() {
         while (coroutineContext.isActive) {
-            val pending = runCatching { repository.getPendingSounds(after) }.getOrNull()
+            val pending = runCatching { repository.getPendingSounds(after) }
+                .onFailure { android.util.Log.w("JellioSounds", "pending sounds poll failed", it) }
+                .getOrNull()
             if (pending != null) {
                 val first = after < 0
                 after = pending.Latest
@@ -58,7 +62,12 @@ class SoundViewModel @Inject constructor(
 
     private suspend fun play(sound: PendingSoundDto) {
         val url = repository.soundUrl(sound.SoundId) ?: return
-        val player = ExoPlayer.Builder(context).build()
+        val dataSource = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setDefaultRequestProperties(repository.soundRequestHeaders())
+        val player = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSource))
+            .build()
         try {
             player.volume = (sound.Volume / 100f).coerceIn(0f, 1f)
             player.setMediaItem(MediaItem.fromUri(url))
@@ -72,6 +81,7 @@ class SoundViewModel @Inject constructor(
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
+                        android.util.Log.w("JellioSounds", "sound failed to play", error)
                         if (continuation.isActive) continuation.resume(Unit)
                     }
                 })

@@ -447,9 +447,17 @@ class JellioRepository @Inject constructor(
 
     suspend fun soundUrl(soundId: String): String? {
         val server = sessionManager.serverAddress() ?: return null
-        val token = sessionManager.accessToken() ?: return null
-        return "$server/Jellio/sounds/file/" + java.net.URLEncoder.encode(soundId, "UTF-8") +
-            "?ApiKey=" + java.net.URLEncoder.encode(token, "UTF-8")
+        return "$server/Jellio/sounds/file/" + java.net.URLEncoder.encode(soundId, "UTF-8")
+    }
+
+    // Same headers the video player sends, a token in the URL can be
+    // dropped by a proxy in front of Jellyfin.
+    suspend fun soundRequestHeaders(): Map<String, String> {
+        val token = sessionManager.accessToken() ?: return emptyMap()
+        return mapOf(
+            "X-Emby-Token" to token,
+            "Authorization" to com.jellio.tv.data.network.buildEmbyAuthorizationHeader("AndroidTV", com.jellio.tv.data.network.APP_VERSION, token),
+        )
     }
 
     suspend fun getAnimeIds(): Set<String> =
