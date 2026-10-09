@@ -282,6 +282,9 @@ interface JellyfinApi {
     @POST("Jellio/groupwatch/{groupId}/messages")
     suspend fun sendGroupWatchMessage(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.GroupWatchSendBody)
 
+    @GET("Jellio/overlays/pending")
+    suspend fun getPendingOverlays(@Query("after") after: Long): com.jellio.tv.data.model.PendingOverlaysDto
+
     @GET("Jellio/sounds/pending")
     suspend fun getPendingSounds(@Query("after") after: Long): com.jellio.tv.data.model.PendingSoundsDto
 
