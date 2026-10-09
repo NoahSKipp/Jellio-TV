@@ -6,7 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -211,7 +211,7 @@ class GroupWatchViewModel @Inject constructor(
 // Mounted once at the app root: runs Group Watch while the app is in
 // front and draws its pop-ups over every screen, the player included.
 @Composable
-fun BoxScope.GroupWatchHost(
+fun GroupWatchHost(
     session: Session,
     isPlaying: (String) -> Boolean,
     openItem: (String) -> Unit,
@@ -226,6 +226,7 @@ fun BoxScope.GroupWatchHost(
     val notices by viewModel.notices.collectAsState()
     val prompt by viewModel.prompt.collectAsState()
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.align(Alignment.BottomStart).padding(start = 48.dp, bottom = 40.dp),
@@ -251,6 +252,7 @@ fun BoxScope.GroupWatchHost(
             onAnswer = { viewModel.answerPrompt(it) },
             modifier = Modifier.align(Alignment.BottomEnd),
         )
+    }
     }
 }
 
