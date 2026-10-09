@@ -192,6 +192,10 @@ fun SettingsScreen(
             PasswordSection(session = session, viewModel = viewModel)
         }
 
+        SettingsSection(title = "Group Watch") {
+            com.jellio.tv.ui.groupwatch.GroupWatchSettings(userName = session.userName)
+        }
+
         SettingsSection(title = "Sleep Timer") {
             SleepTimerSection(viewModel = viewModel)
         }

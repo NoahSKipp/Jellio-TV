@@ -238,6 +238,50 @@ interface JellyfinApi {
     @GET("Jellio/notifications")
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto>
 
+    // Jellyfin SyncPlay (SyncPlayController) and server time for its clock sync.
+    @GET("GetUtcTime")
+    suspend fun getUtcTime(): com.jellio.tv.data.model.UtcTimeDto
+
+    @GET("SyncPlay/List")
+    suspend fun getSyncPlayGroups(): List<com.jellio.tv.data.model.SyncPlayGroupDto>
+
+    @POST("SyncPlay/New")
+    suspend fun syncPlayNew(@Body body: com.jellio.tv.data.model.SyncPlayNewBody)
+
+    @POST("SyncPlay/Join")
+    suspend fun syncPlayJoin(@Body body: com.jellio.tv.data.model.SyncPlayJoinBody)
+
+    @POST("SyncPlay/Leave")
+    suspend fun syncPlayLeave()
+
+    @POST("SyncPlay/Pause")
+    suspend fun syncPlayPause()
+
+    @POST("SyncPlay/Unpause")
+    suspend fun syncPlayUnpause()
+
+    @POST("SyncPlay/Seek")
+    suspend fun syncPlaySeek(@Body body: com.jellio.tv.data.model.SyncPlaySeekBody)
+
+    @POST("SyncPlay/Buffering")
+    suspend fun syncPlayBuffering(@Body body: com.jellio.tv.data.model.SyncPlayStateBody)
+
+    @POST("SyncPlay/Ready")
+    suspend fun syncPlayReady(@Body body: com.jellio.tv.data.model.SyncPlayStateBody)
+
+    @POST("SyncPlay/SetNewQueue")
+    suspend fun syncPlaySetNewQueue(@Body body: com.jellio.tv.data.model.SyncPlayQueueBody)
+
+    // Jellio's own group watch extras (Controllers/GroupWatch*Controller.cs).
+    @GET("Jellio/groupwatch/invites")
+    suspend fun getGroupWatchInvites(@Query("after") after: Long): List<com.jellio.tv.data.model.GroupWatchInviteDto>
+
+    @GET("Jellio/groupwatch/{groupId}/messages")
+    suspend fun getGroupWatchMessages(@Path("groupId") groupId: String, @Query("after") after: Long): List<com.jellio.tv.data.model.GroupWatchMessageDto>
+
+    @POST("Jellio/groupwatch/{groupId}/messages")
+    suspend fun sendGroupWatchMessage(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.GroupWatchSendBody)
+
     @GET("Jellio/sounds/pending")
     suspend fun getPendingSounds(@Query("after") after: Long): com.jellio.tv.data.model.PendingSoundsDto
 
