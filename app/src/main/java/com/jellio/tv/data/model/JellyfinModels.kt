@@ -130,6 +130,7 @@ data class MediaStreamDto(
 data class MediaSourceDto(
     val Id: String? = null,
     val Name: String? = null,
+    val Path: String? = null,
     val Container: String? = null,
     val Size: Long? = null,
     val Bitrate: Long? = null,

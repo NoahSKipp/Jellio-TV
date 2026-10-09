@@ -935,8 +935,12 @@ class JellioRepository @Inject constructor(
         return Regex("special", RegexOption.IGNORE_CASE).containsMatchIn(season.Name ?: "")
     }
 
+    // With no releases found, Gelato lists the title's own placeholder so
+    // the list is never empty: stubbed like every stream but without the
+    // stream name a real release always has. It can't play, so it's dropped.
     suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> =
-        api.getItem(userId, itemId, fields = "MediaSources").MediaSources ?: emptyList()
+        (api.getItem(userId, itemId, fields = "MediaSources").MediaSources ?: emptyList())
+            .filterNot { it.Path == "/stub" && it.Name.isNullOrBlank() }
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false

@@ -207,7 +207,8 @@ class DetailViewModel @Inject constructor(
     // one real source still has nothing to change to either way.
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
         val sources = getMediaSources(session, item.Id)
-        if (sources.size <= 1) return PlayAction.Direct(item.Id, sources.firstOrNull()?.Id)
+        if (sources.isEmpty()) return PlayAction.ShowPicker(item)
+        if (sources.size == 1) return PlayAction.Direct(item.Id, sources.first().Id)
 
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
