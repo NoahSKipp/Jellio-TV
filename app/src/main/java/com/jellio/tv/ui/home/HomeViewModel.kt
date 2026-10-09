@@ -241,6 +241,42 @@ class HomeViewModel @Inject constructor(
 
                     val studioHubs = groupByService(collections).keys.sorted()
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
+                    val watchlist = watchlistDeferred.await()
+                    val policy = user?.Policy
+                    val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
+                    val topRows = buildList<HomeRow> {
+                        if (continueWatching.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
+                        }
+                        if (upNext.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
+                        }
+                        // The Watchlist, split by kind, in place of its own nav button.
+                        val watchlistMovies = watchlist.filter { it.Type == "Movie" }
+                        val watchlistSeries = watchlist.filter { it.Type == "Series" }
+                        if (watchlistMovies.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Watchlist Movies", watchlistMovies, key = "watchlist-movies")))
+                        }
+                        if (watchlistSeries.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection("Watchlist Shows", watchlistSeries, key = "watchlist-shows")))
+                        }
+                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
+                        if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
+                    }
+                    // First open: show the top of Home now, the recommendation,
+                    // catalog and genre rows below take the longest and are
+                    // added when they arrive. A returning visit keeps its
+                    // full rows until the refresh is done.
+                    if (!isReturningVisit) {
+                        _uiState.value = HomeUiState(
+                            isLoading = false,
+                            heroItems = heroCandidates,
+                            greeting = greeting,
+                            rows = topRows,
+                            customization = customization,
+                            canDeleteItems = canDeleteItems,
+                        )
+                    }
 
                     val recommendationSource = RecommendationDataSource(
                         getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
@@ -290,25 +326,8 @@ class HomeViewModel @Inject constructor(
                     // Services, then every recommendation/catalog/genre
                     // row, same real sequence that file's own header
                     // comments document at each real call site.
-                    val watchlist = watchlistDeferred.await()
                     val rows = buildList<HomeRow> {
-                        if (continueWatching.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
-                        }
-                        if (upNext.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
-                        }
-                        // The Watchlist, split by kind, in place of its own nav button.
-                        val watchlistMovies = watchlist.filter { it.Type == "Movie" }
-                        val watchlistSeries = watchlist.filter { it.Type == "Series" }
-                        if (watchlistMovies.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Watchlist Movies", watchlistMovies, key = "watchlist-movies")))
-                        }
-                        if (watchlistSeries.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Watchlist Shows", watchlistSeries, key = "watchlist-shows")))
-                        }
-                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
-                        if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
+                        addAll(topRows)
 
                         // Ported from runtime/recommend.js:
                         // Seasonal recommendation row (e.g. "Spooky Season", "Holiday Favorites")
@@ -329,9 +348,6 @@ class HomeViewModel @Inject constructor(
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
 
-                    val policy = user?.Policy
-                    val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
-
                     _uiState.value = HomeUiState(
                         isLoading = false,
                         heroItems = heroCandidates,
@@ -346,7 +362,7 @@ class HomeViewModel @Inject constructor(
                 // network blip, say) leaves whatever real rows already
                 // rendered alone rather than replacing a working screen
                 // with an error state over one failed background retry.
-                if (!isReturningVisit) {
+                if (!isReturningVisit && _uiState.value.rows.isEmpty()) {
                     _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
                 }
             }
