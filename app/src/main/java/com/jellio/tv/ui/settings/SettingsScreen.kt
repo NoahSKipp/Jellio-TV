@@ -406,6 +406,12 @@ private fun LanguagePickerRow(
 // after every submit attempt.
 @Composable
 private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
+    // Folded behind a button: open, the three fields each grabbed the
+    // D-pad and brought up the keyboard on the way down the page.
+    var open by remember { mutableStateOf(false) }
+    var everOpened by remember { mutableStateOf(false) }
+    val firstField = remember { androidx.compose.ui.focus.FocusRequester() }
+    val openButton = remember { androidx.compose.ui.focus.FocusRequester() }
     var current by remember { mutableStateOf("") }
     var next by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -418,36 +424,71 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
             current = ""
             next = ""
             confirm = ""
+            open = false
+        }
+    }
+    LaunchedEffect(open) {
+        if (open) {
+            everOpened = true
+            runCatching { firstField.requestFocus() }
+        } else if (everOpened) {
+            runCatching { openButton.requestFocus() }
         }
     }
 
     Column {
-        JellioTextField(value = current, onValueChange = { current = it }, label = "Current password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        if (!open) {
+            status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(bottom = 12.dp)) }
+            PasswordButton(label = "Change password", onClick = { open = true }, modifier = Modifier.focusRequester(openButton))
+            return@Column
+        }
+        JellioTextField(value = current, onValueChange = { current = it }, label = "Current password", isPassword = true, modifier = Modifier.fillMaxWidth().focusRequester(firstField))
         Spacer(modifier = Modifier.height(12.dp))
         JellioTextField(value = next, onValueChange = { next = it }, label = "New password", isPassword = true, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
         JellioTextField(value = confirm, onValueChange = { confirm = it }, label = "Confirm new password", isPassword = true, modifier = Modifier.fillMaxWidth())
         status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp)) }
-        Surface(
-            onClick = { viewModel.updatePassword(session, current, next, confirm) },
-            enabled = !isUpdating,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = JellioBgElevated,
-                contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                focusedContentColor = JellioText,
-            ),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(2.dp, Color.White),
-                    shape = RoundedCornerShape(999.dp),
-                )
-            ),
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text(text = if (isUpdating) "Updating..." else "Update password", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 16.dp)) {
+            PasswordButton(
+                label = if (isUpdating) "Updating..." else "Update password",
+                enabled = !isUpdating,
+                onClick = { viewModel.updatePassword(session, current, next, confirm) },
+            )
+            PasswordButton(
+                label = "Cancel",
+                enabled = !isUpdating,
+                onClick = {
+                    current = ""
+                    next = ""
+                    confirm = ""
+                    open = false
+                },
+            )
         }
+    }
+}
+
+@Composable
+private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(999.dp),
+            )
+        ),
+        modifier = modifier,
+    ) {
+        Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
     }
 }
 
