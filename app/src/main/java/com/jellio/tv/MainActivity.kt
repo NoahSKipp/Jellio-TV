@@ -61,6 +61,7 @@ import com.jellio.tv.ui.theme.scaled
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
+import androidx.lifecycle.repeatOnLifecycle
 import com.jellio.tv.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -120,9 +121,13 @@ private fun JellioTvRoot(
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     // Check for updates at the root level so logged-out users, users on the
-    // login screen, and logged-in users alike receive update prompts immediately.
-    LaunchedEffect(Unit) {
-        appUpdateViewModel.checkForUpdate()
+    // login screen, and logged-in users alike receive update prompts: on
+    // open, and in the background for as long as the app stays in front.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            appUpdateViewModel.checkPeriodically()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -142,7 +147,9 @@ private fun JellioTvRoot(
         }
 
         val updateState by appUpdateViewModel.uiState.collectAsState()
-        updateState.availableVersion?.let { version ->
+        // Held back during playback, the prompt takes focus; it shows
+        // once the player closes.
+        updateState.availableVersion?.takeUnless { com.jellio.tv.ui.player.PlayerPresence.active }?.let { version ->
             UpdateToast(
                 version = version,
                 downloading = updateState.downloading,
