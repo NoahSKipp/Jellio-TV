@@ -285,6 +285,9 @@ interface JellyfinApi {
     @GET("Jellio/sounds/pending")
     suspend fun getPendingSounds(@Query("after") after: Long): com.jellio.tv.data.model.PendingSoundsDto
 
+    @POST("Jellio/notifications/read")
+    suspend fun markJellioNotificationsRead()
+
     @GET("Jellio/anime/ids")
     suspend fun getAnimeIds(): com.jellio.tv.data.model.AnimeIdsDto
 

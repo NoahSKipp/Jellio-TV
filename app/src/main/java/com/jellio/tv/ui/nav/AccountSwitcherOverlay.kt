@@ -76,6 +76,8 @@ fun AccountSwitcherOverlay(
     onViewProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     onSignOut: () -> Unit,
+    onOpenGroupWatch: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AccountSwitcherViewModel = hiltViewModel(),
 ) {
@@ -145,6 +147,30 @@ fun AccountSwitcherOverlay(
                             ),
                         ) {
                             Text(text = "Settings", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                        }
+                        Surface(
+                            onClick = { onDismiss(); onOpenGroupWatch() },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = JellioBg,
+                                contentColor = JellioText,
+                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                                focusedContentColor = JellioText,
+                            ),
+                        ) {
+                            Text(text = "Group Watch", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                        }
+                        Surface(
+                            onClick = { onDismiss(); onOpenNotifications() },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = JellioBg,
+                                contentColor = JellioText,
+                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                                focusedContentColor = JellioText,
+                            ),
+                        ) {
+                            Text(text = "Notifications", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
                             onClick = onSignOut,

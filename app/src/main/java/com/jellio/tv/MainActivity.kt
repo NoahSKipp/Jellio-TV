@@ -236,6 +236,8 @@ private fun JellioTvApp(
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }
+    var showGroupWatch by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
     // Real feedback live: SidebarNav's own items stayed reachable while
@@ -567,7 +569,27 @@ private fun JellioTvApp(
                     onViewProfile = { push(JellioRoute.Profile()) },
                     onOpenSettings = { switchTab(JellioRoute.Settings) },
                     onSignOut = { appViewModel.logout() },
+                    onOpenGroupWatch = { showGroupWatch = true },
+                    onOpenNotifications = { showNotifications = true },
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (showGroupWatch) {
+                com.jellio.tv.ui.groupwatch.GroupWatchOverlay(
+                    userName = session.userName,
+                    onDismiss = {
+                        showGroupWatch = false
+                        runCatching { sidebarFocusRequester.requestFocus() }
+                    },
+                )
+            }
+            if (showNotifications) {
+                com.jellio.tv.ui.notify.NotificationsOverlay(
+                    onDismiss = {
+                        showNotifications = false
+                        runCatching { sidebarFocusRequester.requestFocus() }
+                    },
+                    onOpenItem = { itemId -> onNavigateToDetail(itemId.replace("-", "")) },
                 )
             }
             if (showLibraryPicker) {
