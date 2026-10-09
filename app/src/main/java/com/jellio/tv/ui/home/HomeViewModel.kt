@@ -70,6 +70,8 @@ data class HomeUiState(
     // rest of this screen's own load() rather than per card.
     val canDeleteItems: Boolean = false,
     val error: String? = null,
+    // More rows are still loading below the ones shown (skeletons there).
+    val loadingMore: Boolean = false,
 )
 
 private const val COMING_SOON_LIMIT = 12
@@ -220,11 +222,32 @@ class HomeViewModel @Inject constructor(
                     // Soon and (through exclude below) every discovery row.
                     animeIds = animeIdsDeferred.await()
                     val heroCandidates = heroCandidatesDeferred.await().filterNot { isAnime(it) }
+                    val user = userDeferred.await()
+                    val customization = customizationDeferred.await()
+                    // First open: the banner, Continue Watching and Up Next
+                    // show as soon as they're in, with skeletons below for
+                    // everything still loading (Coming Soon in particular
+                    // asks TMDb and can take a while).
+                    if (!isReturningVisit) {
+                        _uiState.value = HomeUiState(
+                            isLoading = false,
+                            heroItems = heroCandidates,
+                            greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name),
+                            rows = buildList {
+                                if (continueWatching.isNotEmpty()) {
+                                    add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
+                                }
+                                if (upNext.isNotEmpty()) {
+                                    add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
+                                }
+                            },
+                            customization = customization,
+                            loadingMore = true,
+                        )
+                    }
                     val comingSoon = comingSoonDeferred.await().filterNot { normalizeId(it.ItemId) in animeIds }
                     val collections = collectionsDeferred.await()
-                    val user = userDeferred.await()
                     val config = configDeferred.await()
-                    val customization = customizationDeferred.await()
 
                     val activeTheme = activeSeasonalTheme(Calendar.getInstance(), config)
                     val seasonalDeferred = if (activeTheme != null && SEASONS_SPEC.containsKey(activeTheme)) {
@@ -275,6 +298,7 @@ class HomeViewModel @Inject constructor(
                             rows = topRows,
                             customization = customization,
                             canDeleteItems = canDeleteItems,
+                            loadingMore = true,
                         )
                     }
 
@@ -362,6 +386,7 @@ class HomeViewModel @Inject constructor(
                 // network blip, say) leaves whatever real rows already
                 // rendered alone rather than replacing a working screen
                 // with an error state over one failed background retry.
+                if (_uiState.value.loadingMore) _uiState.value = _uiState.value.copy(loadingMore = false)
                 if (!isReturningVisit && _uiState.value.rows.isEmpty()) {
                     _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
                 }

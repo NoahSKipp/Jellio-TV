@@ -58,7 +58,6 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
-import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -156,22 +155,11 @@ fun HomeScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize()) {
-                // Real port of css/app.css's own .jellio-screen-spinner:
-                // this app's own generic "Loading..." state used to
-                // borrow ProgressSweep.kt's own real sweep bar instead,
-                // a real but different CSS class (that file's own
-                // header covers what it actually is), never what a
-                // reader on web actually sees here.
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
-                    ScreenSpinner()
-                    Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
-                }
-            }
+            uiState.isLoading -> HomeSkeleton()
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
             }
-            uiState.rows.isEmpty() -> {
+            uiState.rows.isEmpty() && !uiState.loadingMore -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = "Nothing here yet.", color = JellioTextSecondary)
                 }
@@ -436,6 +424,10 @@ fun HomeScreen(
                                 is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                             }
                         }
+                    }
+                    // Rows still loading below the ones already shown.
+                    if (uiState.loadingMore) {
+                        items(2, key = { "skeleton-$it" }) { SkeletonRow() }
                     }
                 }
             }

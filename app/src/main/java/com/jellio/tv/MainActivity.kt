@@ -181,7 +181,6 @@ private fun AppBootGate(
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
 ) {
-    val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
     // Long enough for the mark's pop-in not to flash past, no longer:
     // this used to hold every launch for 10s, sized for a video splash
@@ -203,7 +202,9 @@ private fun AppBootGate(
     LaunchedEffect(libraries) {
         libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
     }
-    if (homeState.isLoading || !minSplashTimeElapsed) {
+    // Home draws its own skeletons while rows load, so the splash only
+    // waits for the logo, not for Home's data.
+    if (!minSplashTimeElapsed) {
         Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
             BootSplashMark(modifier = Modifier.fillMaxSize())
         }
