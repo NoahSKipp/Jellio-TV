@@ -183,13 +183,12 @@ private fun AppBootGate(
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val libraries by appViewModel.libraries.collectAsState()
-    // 10s: the ~8s this prefetch usually takes plus the 2s of real
-    // room asked for, so the splash stays up for at least that long
-    // even on a fast/cached load rather than flashing past the mark's
-    // own pop-in reveal the moment homeState.isLoading flips.
+    // Long enough for the mark's pop-in not to flash past, no longer:
+    // this used to hold every launch for 10s, sized for a video splash
+    // that is gone.
     var minSplashTimeElapsed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(10_000)
+        delay(1_200)
         minSplashTimeElapsed = true
     }
     LaunchedEffect(session.userId) { homeViewModel.load(session) }
