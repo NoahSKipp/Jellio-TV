@@ -55,6 +55,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
@@ -234,8 +237,27 @@ fun DetailScreen(
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+            // Holds focus while a title loads (a newly added one can take
+            // a while), so the D-pad can't wander off into the sidebar.
+            // Back still leaves.
+            uiState.isLoading -> {
+                val loadingFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+                LaunchedEffect(Unit) { runCatching { loadingFocus.requestFocus() } }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusRequester(loadingFocus)
+                        .focusable()
+                        .onPreviewKeyEvent { event ->
+                            event.key == androidx.compose.ui.input.key.Key.DirectionLeft ||
+                                event.key == androidx.compose.ui.input.key.Key.DirectionRight ||
+                                event.key == androidx.compose.ui.input.key.Key.DirectionUp ||
+                                event.key == androidx.compose.ui.input.key.Key.DirectionDown
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "Loading...", color = JellioTextSecondary)
+                }
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
