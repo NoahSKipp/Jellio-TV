@@ -411,6 +411,12 @@ private fun PlayerSurface(
         onDispose { mediaSession.release() }
     }
 
+    // Turned down while a sound sent from the dashboard plays.
+    LaunchedEffect(player) {
+        androidx.compose.runtime.snapshotFlow { com.jellio.tv.ui.announce.PlaybackDuck.level }
+            .collect { player.volume = it }
+    }
+
     var isPlaying by remember { mutableStateOf(true) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }

@@ -279,6 +279,17 @@ data class JellioNotificationDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class PendingSoundDto(
+    val Seq: Long = 0,
+    val SoundId: String = "",
+    val Volume: Int = 100,
+    val DuckVolume: Int = 30,
+)
+
+@JsonClass(generateAdapter = true)
+data class PendingSoundsDto(val Latest: Long = 0, val Sounds: List<PendingSoundDto> = emptyList())
+
+@JsonClass(generateAdapter = true)
 data class AnimeIdsDto(val Ids: List<String> = emptyList())
 
 @JsonClass(generateAdapter = true)

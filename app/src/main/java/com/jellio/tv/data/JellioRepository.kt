@@ -443,6 +443,15 @@ class JellioRepository @Inject constructor(
         return "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
     }
 
+    suspend fun getPendingSounds(after: Long): com.jellio.tv.data.model.PendingSoundsDto = api.getPendingSounds(after)
+
+    suspend fun soundUrl(soundId: String): String? {
+        val server = sessionManager.serverAddress() ?: return null
+        val token = sessionManager.accessToken() ?: return null
+        return "$server/Jellio/sounds/file/" + java.net.URLEncoder.encode(soundId, "UTF-8") +
+            "?ApiKey=" + java.net.URLEncoder.encode(token, "UTF-8")
+    }
+
     suspend fun getAnimeIds(): Set<String> =
         runCatching {
             cache.get("anime-ids", CACHE_TTL_MS) { api.getAnimeIds().Ids.map { it.replace("-", "").lowercase() }.toSet() }
