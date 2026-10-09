@@ -951,11 +951,19 @@ class JellioRepository @Inject constructor(
     }
 
     // With no releases found, Gelato lists the title's own placeholder so
-    // the list is never empty: stubbed like every stream but without the
-    // stream name a real release always has. It can't play, so it's dropped.
-    suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> =
-        (api.getItem(userId, itemId, fields = "MediaSources").MediaSources ?: emptyList())
-            .filterNot { it.Path == "/stub" && it.Name.isNullOrBlank() }
+    // the list is never empty: no file behind it, no size, and named after
+    // the title itself (or not at all) rather than by the addon the way a
+    // real release is. It can't play, so it's dropped.
+    suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
+        val item = api.getItem(userId, itemId, fields = "MediaSources")
+        val titles = listOfNotNull(item.Name, item.SeriesName).map { it.trim().lowercase() }
+        return (item.MediaSources ?: emptyList()).filterNot { source ->
+            val path = source.Path.orEmpty()
+            val noFile = path.isEmpty() || path == "/stub" || path.startsWith("gelato", ignoreCase = true) || path.startsWith("stremio", ignoreCase = true)
+            val name = source.Name.orEmpty().trim().lowercase()
+            noFile && (source.Size ?: 0L) == 0L && (name.isEmpty() || name in titles)
+        }
+    }
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
