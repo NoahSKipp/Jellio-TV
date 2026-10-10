@@ -163,6 +163,24 @@ fun SettingsScreen(
                 checked = PlayerPrefs.autoSkipIntro,
                 onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            // Each press steps to the next level.
+            SettingsPickerRow(
+                label = "Pre-buffer",
+                value = when (PlayerPrefs.prebuffer) {
+                    "more" -> "More: 3 s to start, loads 90 s ahead, 5 min when paused"
+                    "max" -> "Maximum: 6 s to start, loads 3 min ahead, 10 min when paused"
+                    else -> "Standard"
+                },
+                onClick = {
+                    val next = when (PlayerPrefs.prebuffer) {
+                        "standard" -> "more"
+                        "more" -> "max"
+                        else -> "standard"
+                    }
+                    PlayerPrefs.setPrebuffer(playerContext, next)
+                },
+            )
         }
 
         SettingsSection(title = "Language") {

@@ -10,12 +10,24 @@ import androidx.compose.runtime.setValue
 object PlayerPrefs {
     private const val PREFS = "jellio_player"
     private const val AUTO_SKIP = "autoskip"
+    private const val PREBUFFER = "prebuffer"
 
     var autoSkipIntro by mutableStateOf(false)
         private set
 
+    // "standard", "more" or "max": see JellioLoadControl.
+    var prebuffer by mutableStateOf("standard")
+        private set
+
     fun init(context: Context) {
-        autoSkipIntro = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(AUTO_SKIP, false)
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        autoSkipIntro = prefs.getBoolean(AUTO_SKIP, false)
+        prebuffer = prefs.getString(PREBUFFER, "standard") ?: "standard"
+    }
+
+    fun setPrebuffer(context: Context, level: String) {
+        prebuffer = level
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(PREBUFFER, level).apply()
     }
 
     fun setAutoSkipIntro(context: Context, enabled: Boolean) {

@@ -412,6 +412,7 @@ private fun PlayerSurface(
 
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
             setMediaItem(mediaItem)
