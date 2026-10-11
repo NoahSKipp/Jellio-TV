@@ -183,6 +183,17 @@ fun SettingsScreen(
             )
         }
 
+        SettingsSection(title = "Screen overlays") {
+            val overlayViewModel: com.jellio.tv.ui.announce.ScreenOverlayViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            val diagnostic by overlayViewModel.diagnostic.collectAsState()
+            val testScope = androidx.compose.runtime.rememberCoroutineScope()
+            SettingsPickerRow(
+                label = "Test screen overlay",
+                value = diagnostic ?: "Shows a sample overlay and checks the server",
+                onClick = { overlayViewModel.runTest(testScope) },
+            )
+        }
+
         SettingsSection(title = "Language") {
             SettingsPickerRow(
                 label = "Default audio language",

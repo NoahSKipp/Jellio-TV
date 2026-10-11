@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
 
@@ -62,6 +63,23 @@ class ScreenOverlayViewModel @Inject constructor(private val repository: JellioR
     val current: StateFlow<ScreenOverlay?> = _current.asStateFlow()
     private var after = -1L
     private val queue = ArrayDeque<ScreenOverlay>()
+
+    // Settings' test button: what the server answers right now, and a
+    // sample overlay drawn locally, to tell a delivery problem from a
+    // drawing one.
+    private val _diagnostic = MutableStateFlow<String?>(null)
+    val diagnostic: StateFlow<String?> = _diagnostic.asStateFlow()
+
+    fun runTest(scope: kotlinx.coroutines.CoroutineScope) {
+        scope.launch {
+            _diagnostic.value = "Checking..."
+            _diagnostic.value = runCatching { repository.getPendingOverlays(0) }.fold(
+                onSuccess = { "Server answered: latest #${it.Latest}, ${it.Overlays.size} pending for you. This TV last saw #$after." },
+                onFailure = { "Server check failed: ${it.javaClass.simpleName}: ${it.message}" },
+            )
+            queue.addLast(ScreenOverlay("Test overlay", null, 0.9f, 4, -System.currentTimeMillis()))
+        }
+    }
 
     suspend fun runWhileStarted() {
         while (coroutineContext.isActive) {
@@ -89,7 +107,11 @@ class ScreenOverlayViewModel @Inject constructor(private val repository: JellioR
                 delay(next.seconds * 1000L + OVERLAY_FADE_MS)
                 _current.value = null
             }
-            delay(OVERLAY_POLL_MS)
+            // Polls every 5 s, but picks up a queued test overlay within a second.
+            repeat((OVERLAY_POLL_MS / 1000).toInt()) {
+                if (queue.isNotEmpty() && _current.value == null) return@repeat
+                delay(1000)
+            }
         }
     }
 }
