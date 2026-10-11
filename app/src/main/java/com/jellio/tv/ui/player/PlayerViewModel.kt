@@ -60,6 +60,8 @@ data class UpNextInfo(
     val itemId: String,
     val thumbnailUrl: String?,
     val title: String,
+    val overview: String? = null,
+    val seriesName: String? = null,
 )
 
 // Real port of screens/player.js's own buildEpisodeRow(): thumbnailUrl
@@ -454,7 +456,13 @@ class PlayerViewModel @Inject constructor(
         } else {
             episode.Name.orEmpty()
         }
-        return UpNextInfo(itemId = episode.Id, thumbnailUrl = thumbnailUrl, title = title)
+        return UpNextInfo(
+            itemId = episode.Id,
+            thumbnailUrl = thumbnailUrl,
+            title = title,
+            overview = episode.Overview?.takeIf { it.isNotBlank() },
+            seriesName = episode.SeriesName,
+        )
     }
 
     // Real port of screens/player.js's own seriesAwareArtworkUrl(): an

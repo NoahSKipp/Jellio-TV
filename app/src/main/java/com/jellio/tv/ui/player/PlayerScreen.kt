@@ -83,6 +83,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -142,11 +143,7 @@ private const val TOAST_DURATION_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.
 private const val SYNC_DRIFT_MS = 1_500L
-// Real screens/player.js's own UPNEXT_FALLBACK_TRIGGER_SECONDS/
-// UPNEXT_COUNTDOWN_SECONDS: shouldShowUpNextNow()'s own fixed
-// seconds-left fallback, used only when skipSegments carries no real
-// Credits segment for this title (see shouldShowUpNextNow() below).
-private const val UPNEXT_FALLBACK_TRIGGER_SECONDS = 120
+// How long Play Next counts down on the Up Next card and end screen.
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
 // Real screens/player.js's own PLAYBACK_SPEEDS: the exact same six
@@ -199,7 +196,9 @@ private fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSecon
     if (credits != null && credits.End > 0 && credits.Start >= 0) {
         return currentSeconds >= credits.Start
     }
-    return durationSeconds - currentSeconds <= UPNEXT_FALLBACK_TRIGGER_SECONDS
+    // Like the web player: no credits data, no card. The end screen
+    // takes over when the episode finishes instead.
+    return false
 }
 
 // No native jellyfin-web playbackManager to lean on here (screens/
@@ -792,7 +791,45 @@ private fun PlayerSurface(
             EpisodeSleepTimer.remaining = null
             stopAtEnd = true
         }
+        // No credits data, so the card never counted this episode toward
+        // an episode sleep timer: count it here.
+        if (!stopAtEnd && upNextInfo != null && !upNextShown) {
+            EpisodeSleepTimer.remaining?.let { left ->
+                if (left <= 1) {
+                    EpisodeSleepTimer.remaining = null
+                    stopAtEnd = true
+                } else {
+                    EpisodeSleepTimer.remaining = left - 1
+                }
+            }
+        }
         if (stopAtEnd) onBack()
+    }
+
+    // The end screen: the next episode with Play Next, Replay and Back,
+    // or Replay and Back for a movie or a series finale.
+    val showEndScreen = isEnded && !stopAtEnd
+    var endCountdown by remember(streamUrl) { mutableStateOf<Int?>(null) }
+    LaunchedEffect(showEndScreen) {
+        if (!showEndScreen) {
+            endCountdown = null
+            return@LaunchedEffect
+        }
+        val next = upNextInfo ?: return@LaunchedEffect
+        // The card's countdown already runs on into the end screen.
+        if (upNextShown || upNextDismissed) return@LaunchedEffect
+        endCountdown = UPNEXT_COUNTDOWN_SECONDS
+        while ((endCountdown ?: 0) > 0) {
+            delay(1000)
+            endCountdown = (endCountdown ?: 1) - 1
+        }
+        onPlayNext(next.itemId)
+    }
+    val upNextCardVisible = upNextInfo != null && upNextShown && !upNextDismissed && !showEndScreen
+    // Both sit over the player's own controls and take the remote, so the
+    // controls go away while they're up.
+    LaunchedEffect(upNextCardVisible, showEndScreen) {
+        if (upNextCardVisible || showEndScreen) controlsVisible = false
     }
 
     LaunchedEffect(player) {
@@ -847,6 +884,15 @@ private fun PlayerSurface(
             }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                // The Up Next card and the end screen own the remote while
+                // shown: arrows move between their buttons instead of seeking.
+                if (showEndScreen || upNextCardVisible) {
+                    if (event.key == Key.Back) {
+                        if (showEndScreen) onBack() else upNextDismissed = true
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
                 if (showReactMenu) {
                     if (event.key == Key.Back) {
                         showReactMenu = false
@@ -1211,13 +1257,26 @@ private fun PlayerSurface(
             )
         }
 
-        if (upNextInfo != null && upNextShown && !upNextDismissed) {
+        if (upNextCardVisible && upNextInfo != null) {
             UpNextOverlay(
                 info = upNextInfo,
                 secondsRemaining = upNextCountdown,
                 onPlayNow = { onPlayNext(upNextInfo.itemId) },
                 onDismiss = { upNextDismissed = true },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 40.dp),
+            )
+        }
+
+        if (showEndScreen) {
+            EndScreen(
+                finishedTitle = title,
+                finishedSubtitle = subtitle,
+                next = upNextInfo,
+                countdown = if (upNextShown && !upNextDismissed) upNextCountdown else endCountdown,
+                onPlayNext = { upNextInfo?.let { onPlayNext(it.itemId) } },
+                onReplay = onRestart,
+                onBack = onBack,
+                backdropUrl = pauseInfo?.backdropUrl,
             )
         }
 
@@ -1760,9 +1819,14 @@ private fun UpNextOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val playFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(150)
+        runCatching { playFocus.requestFocus() }
+    }
     Row(
         modifier = modifier
-            .widthIn(max = 420.dp)
+            .widthIn(min = 440.dp, max = 540.dp)
             .background(JellioBgElevated, RoundedCornerShape(16.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1800,8 +1864,9 @@ private fun UpNextOverlay(
                             shape = RoundedCornerShape(999.dp),
                         )
                     ),
+                    modifier = Modifier.focusRequester(playFocus),
                 ) {
-                    Text(text = "Play now ($secondsRemaining)", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = "Play now ($secondsRemaining)", maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onDismiss,
@@ -1819,10 +1884,107 @@ private fun UpNextOverlay(
                         )
                     ),
                 ) {
-                    Text(text = "Dismiss", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = "Dismiss", maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
             }
         }
+    }
+}
+
+// The web player's end screen (buildEndScreenModal) for the TV: shown when
+// an episode or movie finishes, over the player and its controls.
+@Composable
+private fun EndScreen(
+    finishedTitle: String,
+    finishedSubtitle: String,
+    next: UpNextInfo?,
+    countdown: Int?,
+    onPlayNext: () -> Unit,
+    onReplay: () -> Unit,
+    onBack: () -> Unit,
+    backdropUrl: String?,
+) {
+    val firstFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(150)
+        runCatching { firstFocus.requestFocus() }
+    }
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        if (backdropUrl != null) {
+            AsyncImage(
+                model = backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().alpha(0.35f),
+            )
+        }
+        Column(
+            modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 900.dp),
+        ) {
+            if (next != null) {
+                Text(text = "Up next", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                next.seriesName?.let {
+                    Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
+                }
+                Row(modifier = Modifier.padding(top = 20.dp), verticalAlignment = Alignment.Top) {
+                    if (next.thumbnailUrl != null) {
+                        AsyncImage(
+                            model = next.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.width(320.dp).height(180.dp).clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
+                    Column(modifier = Modifier.padding(start = if (next.thumbnailUrl != null) 24.dp else 0.dp)) {
+                        Text(text = next.title, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        next.overview?.let {
+                            Text(text = it, color = JellioTextSecondary, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+                        }
+                    }
+                }
+            } else {
+                Text(text = "Finished", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                Text(text = finishedTitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
+                if (finishedSubtitle.isNotEmpty()) {
+                    Text(text = finishedSubtitle, color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 28.dp)) {
+                if (next != null) {
+                    EndScreenButton(
+                        label = if (countdown != null && countdown > 0) "Play next episode ($countdown)" else "Play next episode",
+                        primary = true,
+                        onClick = onPlayNext,
+                        modifier = Modifier.focusRequester(firstFocus),
+                    )
+                    EndScreenButton(label = "Replay", onClick = onReplay)
+                    EndScreenButton(label = "Back to show", onClick = onBack)
+                } else {
+                    EndScreenButton(label = "Replay", primary = true, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = "Back", onClick = onBack)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndScreenButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (primary) JellioSecondary else Color.White.copy(alpha = 0.12f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.32f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+        ),
+        modifier = modifier,
+    ) {
+        Text(text = label, maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
     }
 }
 
