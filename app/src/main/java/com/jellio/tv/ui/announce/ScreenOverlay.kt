@@ -19,7 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -109,12 +110,21 @@ fun ScreenOverlayHost(viewModel: ScreenOverlayViewModel = hiltViewModel()) {
         delay(shown.seconds * 1000L)
         visible = false
     }
-    val alpha by animateFloatAsState(
+    val overlayAlpha by animateFloatAsState(
         targetValue = if (visible) shown.opacity else 0f,
         animationSpec = tween(OVERLAY_FADE_MS),
         label = "overlayAlpha",
     )
-    Box(modifier = Modifier.fillMaxSize().alpha(alpha), contentAlignment = Alignment.Center) {
+    // Opacity goes on the picture and the text themselves, not a layer
+    // around them: an offscreen alpha layer can drop out over the video
+    // surface during playback.
+    Box(
+        modifier = Modifier.fillMaxSize().graphicsLayer {
+            alpha = overlayAlpha
+            compositingStrategy = CompositingStrategy.ModulateAlpha
+        },
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp),
