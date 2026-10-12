@@ -1924,9 +1924,9 @@ private fun UpNextOverlay(
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = JellioSecondary,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                        focusedContentColor = JellioText,
+                        contentColor = JellioBg,
+                        focusedContainerColor = Color.White,
+                        focusedContentColor = JellioBg,
                     ),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(
@@ -2045,9 +2045,9 @@ private fun EndScreenButton(label: String, onClick: () -> Unit, modifier: Modifi
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (primary) JellioSecondary else Color.White.copy(alpha = 0.12f),
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.32f),
-            focusedContentColor = JellioText,
+            contentColor = if (primary) JellioBg else JellioText,
+            focusedContainerColor = if (primary) Color.White else Color.White.copy(alpha = 0.32f),
+            focusedContentColor = if (primary) JellioBg else JellioText,
         ),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
@@ -2113,9 +2113,9 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = JellioSecondary,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.35f),
-                        focusedContentColor = JellioText,
+                        contentColor = JellioBg,
+                        focusedContainerColor = Color.White,
+                        focusedContentColor = JellioBg,
                     ),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(

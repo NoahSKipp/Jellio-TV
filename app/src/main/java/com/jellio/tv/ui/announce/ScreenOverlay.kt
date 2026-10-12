@@ -58,7 +58,10 @@ data class ScreenOverlay(val text: String?, val imageUrl: String?, val opacity: 
 // middle of the screen for a few seconds, over every screen, never
 // taking focus.
 @HiltViewModel
-class ScreenOverlayViewModel @Inject constructor(private val repository: JellioRepository) : ViewModel() {
+class ScreenOverlayViewModel @Inject constructor(
+    private val repository: JellioRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+) : ViewModel() {
     private val _current = MutableStateFlow<ScreenOverlay?>(null)
     val current: StateFlow<ScreenOverlay?> = _current.asStateFlow()
     private var after = -1L
@@ -103,6 +106,16 @@ class ScreenOverlayViewModel @Inject constructor(private val repository: JellioR
             }
             while (_current.value == null && queue.isNotEmpty()) {
                 val next = queue.removeFirst()
+                if (!next.imageUrl.isNullOrBlank()) {
+                    runCatching {
+                        kotlinx.coroutines.withTimeoutOrNull(6000L) {
+                            val request = coil3.request.ImageRequest.Builder(context)
+                                .data(next.imageUrl)
+                                .build()
+                            coil3.SingletonImageLoader.get(context).execute(request)
+                        }
+                    }
+                }
                 _current.value = next
                 delay(next.seconds * 1000L + OVERLAY_FADE_MS)
                 _current.value = null
@@ -143,7 +156,6 @@ fun ScreenOverlayHost(viewModel: ScreenOverlayViewModel = hiltViewModel()) {
     Box(
         modifier = Modifier.fillMaxSize().graphicsLayer {
             alpha = overlayAlpha
-            compositingStrategy = CompositingStrategy.ModulateAlpha
         },
         contentAlignment = Alignment.Center,
     ) {
@@ -154,7 +166,9 @@ fun ScreenOverlayHost(viewModel: ScreenOverlayViewModel = hiltViewModel()) {
         ) {
             if (shown.imageUrl != null) {
                 AsyncImage(
-                    model = shown.imageUrl,
+                    model = coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(shown.imageUrl)
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(12.dp)),

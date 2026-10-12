@@ -56,7 +56,13 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val entryPoint = EntryPointAccessors.fromApplication(this, ImageLoaderEntryPoint::class.java)
         val sessionManager = entryPoint.sessionManager()
 
+        val imageDispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 64
+            maxRequestsPerHost = 16
+        }
+
         val imageOkHttpClient = OkHttpClient.Builder()
+            .dispatcher(imageDispatcher)
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -91,10 +97,9 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         return ImageLoader.Builder(context)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { imageOkHttpClient }))
+                add(GifDecoder.Factory())
                 if (Build.VERSION.SDK_INT >= 28) {
                     add(AnimatedImageDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
                 }
                 add(SvgDecoder.Factory())
             }

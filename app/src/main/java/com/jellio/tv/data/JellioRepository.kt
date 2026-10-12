@@ -441,17 +441,33 @@ class JellioRepository @Inject constructor(
     // by mistake.
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto> = api.getJellioNotifications()
 
-    // An announcement's picture; the image loader adds the auth header.
+    // An announcement's picture; adds ApiKey query param so Jellyfin authorizes it.
     suspend fun announcementImageUrl(imageId: String): String? {
         val server = sessionManager.serverAddress() ?: return null
-        return "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+        if (imageId.startsWith("http://", ignoreCase = true) || imageId.startsWith("https://", ignoreCase = true)) {
+            return imageId
+        }
+        if (imageId.startsWith("/")) {
+            return "$server$imageId"
+        }
+        val token = sessionManager.accessToken()
+        val base = "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
     }
 
     suspend fun getPendingOverlays(after: Long): com.jellio.tv.data.model.PendingOverlaysDto = api.getPendingOverlays(after)
 
     suspend fun overlayImageUrl(imageId: String): String? {
         val server = sessionManager.serverAddress() ?: return null
-        return "$server/Jellio/overlays/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+        if (imageId.startsWith("http://", ignoreCase = true) || imageId.startsWith("https://", ignoreCase = true)) {
+            return imageId
+        }
+        if (imageId.startsWith("/")) {
+            return "$server$imageId"
+        }
+        val token = sessionManager.accessToken()
+        val base = "$server/Jellio/overlays/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
     }
 
     suspend fun getPendingSounds(after: Long): com.jellio.tv.data.model.PendingSoundsDto = api.getPendingSounds(after)
