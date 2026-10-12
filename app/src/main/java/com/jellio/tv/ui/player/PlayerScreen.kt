@@ -1266,6 +1266,7 @@ private fun PlayerSurface(
                     showSourcePanel = false
                     onSelectSource(source, realPositionMs() * TICKS_PER_MS)
                 },
+                onBlocked = { onShowToast("This stream needs the server to re-encode the video, which is turned off on this server.") },
                 onDismiss = { showSourcePanel = false },
             )
         }
@@ -2525,6 +2526,7 @@ private fun SourcePanel(
     sources: List<MediaSourceDto>,
     currentMediaSourceId: String?,
     onSelect: (MediaSourceDto) -> Unit,
+    onBlocked: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -2532,6 +2534,12 @@ private fun SourcePanel(
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(60)
         runCatching { firstFocusRequester.requestFocus() }
+    }
+    // Streams the server would have to re-encode stay listed, last, marked
+    // (Video transcode policy Avoid or Block).
+    val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+    val needsReencode = remember(sources) {
+        sources.filter { policy.avoiding && policy.needsReencode(it) }.mapNotNull { it.Id }.toSet()
     }
     // Same language and quality chips as the stream picker before playback,
     // combinable the same way.
@@ -2553,7 +2561,7 @@ private fun SourcePanel(
     val filtered = sources.filter { source ->
         (selectedLanguage == null || sourceAudioLanguages(source).contains(selectedLanguage)) &&
             (selectedQuality == null || sourceQuality(source) == selectedQuality)
-    }
+    }.sortedBy { if (it.Id in needsReencode) 1 else 0 }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -2606,13 +2614,19 @@ private fun SourcePanel(
                     )
                 }
                 itemsIndexed(filtered, key = { _, it -> it.Id ?: it.hashCode() }) { index, source ->
+                    val blocked = policy.blocking && source.Id in needsReencode && source.Id != currentMediaSourceId
                     SourceCard(
                         source = source,
                         onClick = {
-                            if (source.Id != currentMediaSourceId) onSelect(source)
-                            onDismiss()
+                            if (blocked) {
+                                onBlocked()
+                            } else {
+                                if (source.Id != currentMediaSourceId) onSelect(source)
+                                onDismiss()
+                            }
                         },
                         isActive = source.Id == currentMediaSourceId,
+                        transcodeMark = true,
                         modifier = if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier,
                     )
                 }

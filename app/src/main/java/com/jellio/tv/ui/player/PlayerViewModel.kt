@@ -566,7 +566,6 @@ class PlayerViewModel @Inject constructor(
                 // applies before ever enabling sourceButton.
                 viewModelScope.launch {
                     val sources = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrNull()
-                        ?.filter { !VideoTranscodePolicy.blocking || it.Id == target.mediaSource.Id || !VideoTranscodePolicy.needsReencode(it) }
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
                     }

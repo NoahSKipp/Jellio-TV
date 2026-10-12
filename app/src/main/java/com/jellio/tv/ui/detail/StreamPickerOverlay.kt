@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VideocamOff
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -643,7 +645,25 @@ private fun RetryButton(onClick: () -> Unit, focusRequester: FocusRequester? = n
 }
 
 @Composable
-internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false, modifier: Modifier = Modifier, recentlyFailed: Boolean = false) {
+internal fun SourceCard(
+    source: MediaSourceDto,
+    onClick: () -> Unit,
+    isActive: Boolean = false,
+    modifier: Modifier = Modifier,
+    recentlyFailed: Boolean = false,
+    // In the player: mark a stream that needs a video re-encode, yellow
+    // under Avoid, red under Block.
+    transcodeMark: Boolean = false,
+) {
+    val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+    val reencode = remember(source, transcodeMark) {
+        if (transcodeMark && policy.avoiding && com.jellio.tv.data.playback.videoInfoOf(source) != null) {
+            policy.classify(source).takeIf { it.needsVideoTranscode }
+        } else {
+            null
+        }
+    }
+    val blocked = reencode != null && policy.blocking
     // Real .jellio-stream-picker-card-active treatment: a
     // JellioSecondary border plus a slightly brighter fill, ported as a
     // plain color swap here rather than a real border stroke, the same
@@ -661,8 +681,13 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
         // real dark-fill/bright-text pair every other real selectable
         // text row in this app already uses instead.
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (isActive) JellioSecondary.copy(alpha = 0.22f) else JellioBgElevated,
-            contentColor = JellioText,
+            containerColor = when {
+                isActive -> JellioSecondary.copy(alpha = 0.22f)
+                blocked -> Color(0xFFEF5350).copy(alpha = 0.12f)
+                reencode != null -> Color(0xFFFFD54F).copy(alpha = 0.08f)
+                else -> JellioBgElevated
+            },
+            contentColor = if (blocked) JellioText.copy(alpha = 0.6f) else JellioText,
             focusedContainerColor = Color.White.copy(alpha = 0.28f),
             focusedContentColor = JellioText,
         ),
@@ -681,7 +706,30 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
             if (recentlyFailed) {
                 Text(text = "⚠ Didn't play recently", color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
             }
-            PlayMethodBadge(source)
+            if (reencode != null) {
+                val markColor = if (blocked) Color(0xFFEF5350) else Color(0xFFFFD54F)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
+                    Icon(
+                        imageVector = if (blocked) Icons.Filled.Block else Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = markColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    val reasons = reencode.reasons.joinToString(", ") { com.jellio.tv.data.playback.TranscodeReason.describe(it) }
+                    Text(
+                        text = (if (blocked) "Blocked: needs a video re-encode" else "Slow: needs a video re-encode") +
+                            (if (reasons.isNotEmpty()) " ($reasons)" else "") +
+                            (if (reencode.guessed) ", going by its name" else ""),
+                        color = markColor,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            } else {
+                PlayMethodBadge(source)
+            }
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),
                 color = JellioText,
