@@ -1821,46 +1821,7 @@ private fun TrickplayPreview(frame: TrickplayFrame, timeLabel: String, modifier:
 
 @Composable
 private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize()) {
-        if (info.backdropUrl != null) {
-            AsyncImage(
-                model = info.backdropUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            // A very light gradient just to make controls readable if they are open
-            Box(modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                    startY = 0f,
-                    endY = 1080f // Approximate 1080p height
-                )
-            ))
-        }
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (info.logoUrl != null) {
-                val infiniteTransition = rememberInfiniteTransition(label = "bouncing_logo")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.95f,
-                    targetValue = 1.05f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "logo_scale"
-                )
-                AsyncImage(
-                    model = info.logoUrl,
-                    contentDescription = info.title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth(0.4f).fillMaxHeight(0.4f).scale(scale)
-                )
-            } else {
-                PulsingTitle(text = info.title.ifBlank { "Loading" })
-            }
-        }
-    }
+    com.jellio.tv.ui.common.TitleLoadingArt(info.backdropUrl, info.logoUrl, info.title, modifier)
 }
 
 @Composable

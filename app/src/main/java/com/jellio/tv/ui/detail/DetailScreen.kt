@@ -256,7 +256,12 @@ fun DetailScreen(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(text = "Loading...", color = JellioTextSecondary)
+                    val art = uiState.loadingArt
+                    if (art != null) {
+                        com.jellio.tv.ui.common.TitleLoadingArt(art.backdropUrl, art.logoUrl, art.title)
+                    } else {
+                        Text(text = "Loading...", color = JellioTextSecondary)
+                    }
                 }
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

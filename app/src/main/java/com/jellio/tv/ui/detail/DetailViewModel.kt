@@ -43,7 +43,11 @@ data class DetailUiState(
     val isWatched: Boolean = false,
     val likes: Boolean? = null,
     val resolvingPlay: Boolean = false,
+    // While loading: art from the row the title was picked in.
+    val loadingArt: TitleLoadingArtInfo? = null,
 )
+
+data class TitleLoadingArtInfo(val backdropUrl: String?, val logoUrl: String?, val title: String)
 
 // Real behavior ported from screens/detail.js: a series has no video
 // of its own, its own hero Play button lazily resolves which episode
@@ -92,19 +96,9 @@ class DetailViewModel @Inject constructor(
     private fun loadInternal(session: Session, itemId: String) {
         seriesPlayDeferred = null
         viewModelScope.launch {
-            // Drawn at once from the row it was picked in; the full details
-            // fill in when they arrive.
-            val preview = repository.previewItem(itemId)
-            _uiState.value = if (preview != null) {
-                DetailUiState(
-                    isLoading = false,
-                    item = preview,
-                    isWatchlisted = preview.UserData?.IsFavorite ?: false,
-                    isWatched = preview.UserData?.Played ?: false,
-                )
-            } else {
-                DetailUiState(isLoading = true)
-            }
+            // The player's loader, with art from the row the title was
+            // picked in, until the full details arrive.
+            _uiState.value = DetailUiState(isLoading = true, loadingArt = repository.previewItem(itemId)?.let { loadingArt(session, it) })
             try {
                 val item = repository.getItemDetails(session.userId, itemId)
                 ratingTargetId = item.Id
@@ -136,10 +130,30 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
-                if (preview != null) return@launch
                 _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
             }
         }
+    }
+
+    // A real backdrop only: an episode's own still, stretched to fill the
+    // screen, looked wrong.
+    private fun loadingArt(session: Session, item: BaseItemDto): TitleLoadingArtInfo {
+        val isEpisode = item.Type == "Episode"
+        val backdropUrl = if (isEpisode) {
+            val tag = item.ParentBackdropImageTags?.firstOrNull()
+            val id = item.ParentBackdropItemId ?: item.SeriesId
+            if (tag != null && id != null) repository.imageUrl(session.serverAddress, id, tag, "Backdrop", 1600, session.accessToken) else null
+        } else {
+            item.BackdropImageTags?.firstOrNull()?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Backdrop", 1600, session.accessToken) }
+        }
+        val logoUrl = if (isEpisode) {
+            val tag = item.ParentLogoImageTag
+            val id = item.ParentLogoItemId ?: item.SeriesId
+            if (tag != null && id != null) repository.imageUrl(session.serverAddress, id, tag, "Logo", 800, session.accessToken) else null
+        } else {
+            item.ImageTags?.get("Logo")?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Logo", 800, session.accessToken) }
+        }
+        return TitleLoadingArtInfo(backdropUrl, logoUrl, if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty())
     }
 
     private suspend fun resolveSeriesPlay(session: Session, seriesId: String): BaseItemDto? {
