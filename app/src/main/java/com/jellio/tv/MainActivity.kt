@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
         com.jellio.tv.ui.perf.MotionPolicy.init(this)
         com.jellio.tv.ui.player.PlayerPrefs.init(this)
         com.jellio.tv.ui.player.BadStreams.init(this)
+        com.jellio.tv.data.playback.DeviceDecoderCaps.attach(this)
         enableEdgeToEdge()
         handleIntent(intent)
         setContent {

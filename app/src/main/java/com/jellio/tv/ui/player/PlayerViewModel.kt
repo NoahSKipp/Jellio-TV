@@ -7,6 +7,9 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
+import com.jellio.tv.data.playback.TranscodeReason
+import com.jellio.tv.data.playback.VideoTranscodePolicy
+import com.jellio.tv.data.playback.videoInfoOf
 import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.prefs.SubtitleStylePreferences
@@ -133,7 +136,7 @@ fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double
 
 // Shown while an automatic retry loads: which attempt this is and the
 // stream being tried.
-data class FailoverNotice(val attempt: Int, val sourceLabel: String)
+data class FailoverNotice(val attempt: Int, val sourceLabel: String, val slowTranscode: Boolean = false)
 
 data class PlayerUiState(
     // The title's runtime, to spot a placeholder clip far shorter than it.
@@ -164,6 +167,9 @@ data class PlayerUiState(
     // selectedAudioStreamIndex/directPlay) or needs a real fresh
     // PlaybackInfo negotiation the way a transcoded source always did.
     val directPlay: Boolean = false,
+    // The server is re-encoding this stream's video (Video transcode
+    // policy Avoid or Block): give up on it sooner when no picture comes.
+    val reencodingVideo: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
     val skipSegments: IntroSkipperSegmentsDto? = null,
@@ -230,6 +236,10 @@ class PlayerViewModel @Inject constructor(
     private var failoverLanguage: String? = null
     private var failingOver = false
     private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
+    // Streams passed over for needing a video re-encode, so a wrong guess
+    // from a stream's name can't bounce between two of them.
+    private val transcodeSkipped = mutableSetOf<String>()
+    private var transcodeSkippedFor: String? = null
 
     fun failoverPlaying() {
         _failover.value = null
@@ -263,10 +273,19 @@ class PlayerViewModel @Inject constructor(
             failoverLanguage = language
             val sources = runCatching { repository.getMediaSources(session.userId, id) }.getOrDefault(emptyList())
             val candidates = sources.filter { it.Id != null && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
-            val next = if (language != null) {
-                candidates.firstOrNull { hasAudioLanguage(it, language) } ?: candidates.firstOrNull()
+            fun pick(list: List<com.jellio.tv.data.model.MediaSourceDto>) = if (language != null) {
+                list.firstOrNull { hasAudioLanguage(it, language) } ?: list.firstOrNull()
             } else {
-                candidates.firstOrNull()
+                list.firstOrNull()
+            }
+            // Avoid and Block try streams whose video can be copied first;
+            // Block never falls back to one the server would re-encode.
+            val policy = VideoTranscodePolicy
+            val next = if (policy.avoiding) {
+                val (reencode, copyable) = candidates.partition { policy.needsReencode(it) }
+                pick(copyable) ?: if (policy.blocking) null else pick(reencode)
+            } else {
+                pick(candidates)
             }
             if (next == null) {
                 _failover.value = null
@@ -284,7 +303,11 @@ class PlayerViewModel @Inject constructor(
                 failingOver = false
                 return@launch
             }
-            _failover.value = FailoverNotice(attempt = triedSourceIds.size + 1, sourceLabel = sourceLabel(next))
+            _failover.value = FailoverNotice(
+                attempt = triedSourceIds.size + 1,
+                sourceLabel = sourceLabel(next),
+                slowTranscode = state.reencodingVideo && reason.startsWith("no picture"),
+            )
             failingOver = false
             currentSource = next
             load(session, id, next.Id, fromFailover = true)
@@ -395,6 +418,42 @@ class PlayerViewModel @Inject constructor(
                     ""
                 }
 
+                repository.loadVideoTranscodePolicy()
+                val classification = VideoTranscodePolicy.classify(target.mediaSource)
+                val loggedSource = target.mediaSource
+                val loggedDirect = target.directPlay
+                viewModelScope.launch { repository.logPlaybackDecision(itemId, loggedSource, loggedDirect) }
+                // Avoid and Block move to a stream whose video can be
+                // copied; Block won't start a video re-encode at all.
+                if (VideoTranscodePolicy.avoiding && classification.needsVideoTranscode && !fromFailover && syncPlay.group.value == null) {
+                    if (transcodeSkippedFor != itemId) {
+                        transcodeSkipped.clear()
+                        transcodeSkippedFor = itemId
+                    }
+                    target.mediaSource.Id?.let { transcodeSkipped.add(it) }
+                    val others = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
+                        .filter { it.Id != null && it.Id !in transcodeSkipped && !BadStreams.isBad(itemId, it) && !VideoTranscodePolicy.needsReencode(it) }
+                    // One known to copy (probed, or by its name) before one nothing is known about.
+                    val copyable = others.firstOrNull { videoInfoOf(it) != null } ?: others.firstOrNull()
+                    if (copyable != null && (mediaSourceId == null || VideoTranscodePolicy.blocking)) {
+                        loadedItemId = null
+                        load(session, itemId, copyable.Id)
+                        return@launch
+                    }
+                    if (VideoTranscodePolicy.blocking) {
+                        _uiState.value = PlayerUiState(
+                            isLoading = false,
+                            error = "This stream can't be played here",
+                            errorDetail = "It needs the server to re-encode the video (" +
+                                classification.reasons.joinToString(", ") { TranscodeReason.describe(it) } +
+                                "), which is turned off on this server, and no other stream for it can be played as is.",
+                            title = _uiState.value.title,
+                            pauseInfo = _uiState.value.pauseInfo,
+                        )
+                        return@launch
+                    }
+                }
+
                 currentSource = target.mediaSource
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
                 // The server's own probe already says how long the stream
@@ -435,6 +494,7 @@ class PlayerViewModel @Inject constructor(
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                     selectedAudioStreamIndex = preferredAudio,
                     directPlay = target.directPlay,
+                    reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
                 )
 
                 // Real port of screens/player.js's own real fire-and-
@@ -506,6 +566,7 @@ class PlayerViewModel @Inject constructor(
                 // applies before ever enabling sourceButton.
                 viewModelScope.launch {
                     val sources = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrNull()
+                        ?.filter { !VideoTranscodePolicy.blocking || it.Id == target.mediaSource.Id || !VideoTranscodePolicy.needsReencode(it) }
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
                     }
@@ -672,6 +733,8 @@ class PlayerViewModel @Inject constructor(
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
         return mediaSource.MediaStreams
             ?.filter { it.Type == "Subtitle" }
+            // Block: an image subtitle would make the server re-encode the video.
+            ?.filter { it.IsTextSubtitleStream == true || !VideoTranscodePolicy.blocking }
             ?.mapNotNull { stream ->
                 val index = stream.Index ?: return@mapNotNull null
                 val isText = stream.IsTextSubtitleStream == true
@@ -681,10 +744,13 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     null
                 }
-                SubtitleTrackUiState(index, if (isText) label else "$label (image)", isText, url, stream.Language)
+                SubtitleTrackUiState(index, if (isText) label else label + imageSubtitleSuffix(), isText, url, stream.Language)
             }
             ?: emptyList()
     }
+
+    private fun imageSubtitleSuffix(): String =
+        if (VideoTranscodePolicy.avoiding) " (slow: burns into video)" else " (image)"
 
     private var audioLanguagePreference: String? = null
 
@@ -770,7 +836,7 @@ class PlayerViewModel @Inject constructor(
     fun selectBurnedInSubtitle(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val requestedLabel = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == streamIndex }
-            ?.label?.removeSuffix(" (image)") ?: "subtitle"
+            ?.label?.removeSuffix(imageSubtitleSuffix()) ?: "subtitle"
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSwitchingSubtitle = true)
             try {
@@ -925,6 +991,7 @@ class PlayerViewModel @Inject constructor(
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                     directPlay = target.directPlay,
+                    reencodingVideo = VideoTranscodePolicy.avoiding && VideoTranscodePolicy.needsReencode(target.mediaSource),
                 )
             } catch (err: Exception) {
                 _uiState.value = _uiState.value.copy(switchingTo = null)

@@ -306,8 +306,22 @@ fun StreamPickerOverlay(
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
         state = try {
-            // Streams that recently failed to play go last, flagged.
-            SourcesState.Loaded(loadSources().sortedBy { if (com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it)) 1 else 0 })
+            // Streams that recently failed to play go last, flagged. With
+            // the Video transcode policy on, ones the server would have to
+            // re-encode go after the rest, and Block leaves them out.
+            val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+            val loaded = loadSources()
+            val kept = if (policy.blocking) loaded.filterNot { policy.needsReencode(it) } else loaded
+            if (policy.blocking && loaded.isNotEmpty() && kept.isEmpty()) {
+                SourcesState.Error("Every stream for this title would need the server to re-encode the video, which is turned off on this server.")
+            } else {
+                SourcesState.Loaded(
+                    kept.sortedBy {
+                        (if (com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it)) 2 else 0) +
+                            (if (policy.avoiding && policy.needsReencode(it)) 1 else 0)
+                    },
+                )
+            }
         } catch (err: Exception) {
             SourcesState.Error(err.message ?: "Could not load streams")
         }
@@ -667,6 +681,7 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
             if (recentlyFailed) {
                 Text(text = "⚠ Didn't play recently", color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
             }
+            PlayMethodBadge(source)
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),
                 color = JellioText,
@@ -714,4 +729,30 @@ private fun noStreamsHint(premiereDate: String?): String {
     } else {
         "Nothing was found for this title right now. Try again later."
     }
+}
+
+// Direct play / Remux / Transcode, shown while the Video transcode policy
+// is Avoid or Block. "Likely" when it's read from the stream's name.
+@Composable
+private fun PlayMethodBadge(source: MediaSourceDto) {
+    val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+    if (!policy.avoiding) return
+    if (com.jellio.tv.data.playback.videoInfoOf(source) == null) return
+    val classification = remember(source) { policy.classify(source) }
+    val method = com.jellio.tv.data.playback.playMethodFor(classification, source.SupportsDirectPlay == true)
+    val color = when (method) {
+        com.jellio.tv.data.playback.PlayMethod.DirectPlay -> Color(0xFF81C784)
+        com.jellio.tv.data.playback.PlayMethod.Remux -> Color(0xFF64B5F6)
+        com.jellio.tv.data.playback.PlayMethod.Transcode -> Color(0xFFFFB74D)
+    }
+    val label = if (classification.guessed) "Likely " + method.label.lowercase() else method.label
+    Text(
+        text = label,
+        color = color,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier
+            .padding(bottom = 2.dp)
+            .background(color.copy(alpha = 0.16f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
 }

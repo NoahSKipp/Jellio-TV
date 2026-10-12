@@ -144,6 +144,7 @@ private const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.
 private const val SYNC_DRIFT_MS = 1_500L
 private const val START_TIMEOUT_MS = 25_000L
+private const val REENCODE_START_TIMEOUT_MS = 12_000L
 // How long Play Next counts down on the Up Next card and end screen.
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
@@ -301,6 +302,7 @@ fun PlayerScreen(
                 onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
                 onSwitchSettled = { viewModel.clearSwitching() },
                 expectedRuntimeMs = uiState.expectedRuntimeMs,
+                reencodingVideo = uiState.reencodingVideo,
                 onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
                 onPlaybackStarted = { viewModel.failoverPlaying() },
             )
@@ -343,7 +345,7 @@ private fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
         ) {
             com.jellio.tv.ui.common.ScreenSpinner()
             Text(
-                text = "That stream didn't work",
+                text = if (notice.slowTranscode) "The server couldn't re-encode that stream fast enough" else "That stream didn't work",
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(top = 18.dp),
@@ -412,6 +414,7 @@ private fun PlayerSurface(
     onSwitchSettled: () -> Unit,
     onSeekReload: (Long) -> Unit,
     expectedRuntimeMs: Long = 0,
+    reencodingVideo: Boolean = false,
     onStreamFailed: (String) -> Unit = {},
     onPlaybackStarted: () -> Unit = {},
 ) {
@@ -861,12 +864,14 @@ private fun PlayerSurface(
 
     // The episode sleep timer ran out: leave the player once this one ends
     // (a film, with no Up Next, counts as its one episode).
-    // No picture 25 s after playback was asked for: try the next stream.
+    // No picture 25 s after playback was asked for (12 s for a video
+    // re-encode the server was told to avoid): try the next stream.
     LaunchedEffect(player, playWhenReadyState) {
         if (!playWhenReadyState || hasReportedStart) return@LaunchedEffect
-        delay(START_TIMEOUT_MS)
+        val timeoutMs = if (reencodingVideo) REENCODE_START_TIMEOUT_MS else START_TIMEOUT_MS
+        delay(timeoutMs)
         if (!hasReportedStart && player.playbackState != Player.STATE_READY && syncGroup == null) {
-            onStreamFailed("no picture after ${START_TIMEOUT_MS / 1000}s")
+            onStreamFailed("no picture after ${timeoutMs / 1000}s")
         }
     }
 

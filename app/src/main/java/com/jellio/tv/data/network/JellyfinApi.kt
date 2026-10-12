@@ -304,6 +304,9 @@ interface JellyfinApi {
     @GET("Jellio/config")
     suspend fun getJellioConfig(): ClientConfigDto
 
+    @POST("Jellio/playback/decision")
+    suspend fun logPlaybackDecision(@Body body: com.jellio.tv.data.model.PlaybackDecisionBody)
+
     // Real Controllers/SleepTimerController.cs endpoints: server side
     // duration timer, one per user/device. See SleepTimerStatusDto's
     // own header comment for why this app's own player also has to

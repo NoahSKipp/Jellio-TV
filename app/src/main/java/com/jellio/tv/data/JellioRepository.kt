@@ -113,6 +113,7 @@ private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "fl
 // coming back noticeably, incorrectly low quality regardless of the
 // source's own real resolution.
 private const val FALLBACK_VIDEO_BITRATE = 20000000L
+private const val COPY_RANGE_TYPES = "SDR,HDR10,HDR10Plus,HLG,DOVIWithHDR10,DOVIWithHLG,DOVIWithSDR,DOVIWithHDR10Plus"
 
 // Real port of runtime/api.js's own cached()/invalidateCache(): a
 // small in-memory cache keyed by request identity, TTL'd rather than
@@ -963,6 +964,8 @@ class JellioRepository @Inject constructor(
     // the title itself (or not at all) rather than by the addon the way a
     // real release is. It can't play, so it's dropped.
     suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
+        // Stream lists are ranked and badged by it.
+        loadVideoTranscodePolicy()
         val item = api.getItem(userId, itemId, fields = "MediaSources")
         val titles = listOfNotNull(item.Name, item.SeriesName).map { it.trim().lowercase() }
         return (item.MediaSources ?: emptyList()).filterNot { source ->
@@ -1090,6 +1093,35 @@ class JellioRepository @Inject constructor(
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
+        ?.also { com.jellio.tv.data.playback.VideoTranscodePolicy.set(it.VideoTranscodePolicy) }
+
+    // The admin's Video transcode policy, re-read every few minutes.
+    suspend fun loadVideoTranscodePolicy(): String {
+        if (!com.jellio.tv.data.playback.VideoTranscodePolicy.isFresh()) getJellioConfig()
+        return com.jellio.tv.data.playback.VideoTranscodePolicy.policy
+    }
+
+    // One line in the Jellyfin log per playback: play method and why.
+    suspend fun logPlaybackDecision(itemId: String, mediaSource: MediaSourceDto, directPlay: Boolean) {
+        val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+        val classification = policy.classify(mediaSource)
+        val serverReasons = mediaSource.TranscodingUrl
+            ?.let { Regex("[?&]TranscodeReasons=([^&]*)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
+            ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
+        runCatching {
+            api.logPlaybackDecision(
+                com.jellio.tv.data.model.PlaybackDecisionBody(
+                    ItemId = itemId,
+                    MediaSourceId = mediaSource.Id,
+                    PlayMethod = com.jellio.tv.data.playback.playMethodFor(classification, directPlay).name,
+                    Reasons = classification.reasons,
+                    ServerTranscodeReasons = serverReasons,
+                    Policy = policy.policy,
+                    Guessed = classification.guessed,
+                ),
+            )
+        }
+    }
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
@@ -1271,9 +1303,23 @@ class JellioRepository @Inject constructor(
             if (directPlay) {
                 append("&Static=true")
             } else {
-                append("&VideoCodec=h264&AudioCodec=aac")
-                append("&VideoBitRate=").append(estimateVideoBitrate(mediaSource))
-                append("&AudioBitRate=192000")
+                if (com.jellio.tv.data.playback.VideoTranscodePolicy.avoiding) {
+                    // Every codec this TV decodes, no bitrate cap: the
+                    // server copies the video and converts only the
+                    // container or audio.
+                    val codecs = com.jellio.tv.data.playback.copyableVideoCodecs(com.jellio.tv.data.playback.DeviceDecoderCaps)
+                    append("&VideoCodec=").append(codecs.joinToString(","))
+                    append("&AudioCodec=aac&AudioBitRate=192000")
+                    append("&AllowVideoStreamCopy=true&AllowAudioStreamCopy=true")
+                    val ranges = if (com.jellio.tv.data.playback.DeviceDecoderCaps.dolbyVision) "$COPY_RANGE_TYPES,DOVI" else COPY_RANGE_TYPES
+                    codecs.filter { it != "h264" }.forEach { codec ->
+                        append("&").append(codec).append("-videorangetype=").append(ranges)
+                    }
+                } else {
+                    append("&VideoCodec=h264&AudioCodec=aac")
+                    append("&VideoBitRate=").append(estimateVideoBitrate(mediaSource))
+                    append("&AudioBitRate=192000")
+                }
             }
             if (audioStreamIndex != null) {
                 append("&AudioStreamIndex=").append(audioStreamIndex)

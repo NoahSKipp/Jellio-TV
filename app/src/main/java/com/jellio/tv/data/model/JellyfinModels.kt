@@ -124,6 +124,9 @@ data class MediaStreamDto(
     val DeliveryMethod: String? = null,
     val DeliveryUrl: String? = null,
     val IsExternalUrl: Boolean? = null,
+    val BitDepth: Int? = null,
+    val IsInterlaced: Boolean? = null,
+    val DvProfile: Int? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -428,10 +431,24 @@ data class SeasonalEffectConfigDto(
     val Range: SeasonalRangeDto? = null,
 )
 
+// Controllers/PlaybackLogController.cs's DecisionBody.
+@JsonClass(generateAdapter = true)
+data class PlaybackDecisionBody(
+    val ItemId: String,
+    val MediaSourceId: String?,
+    val PlayMethod: String,
+    val Reasons: List<String>,
+    val ServerTranscodeReasons: String?,
+    val Policy: String,
+    val Guessed: Boolean,
+    val Client: String = "tv",
+)
+
 @JsonClass(generateAdapter = true)
 data class ClientConfigDto(
     val SeasonalEffectsEnabled: Boolean = false,
     val SeasonalEffects: Map<String, SeasonalEffectConfigDto> = emptyMap(),
+    val VideoTranscodePolicy: String = "Allow",
 )
 
 // Real Controllers/FeedController.cs shape, its own FeedEntry record:
