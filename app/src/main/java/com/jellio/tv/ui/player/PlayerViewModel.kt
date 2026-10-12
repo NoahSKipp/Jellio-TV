@@ -393,7 +393,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
             try {
-                val item = repository.getItemDetails(session.userId, itemId)
+                val item = repository.getItemDetails(session.userId, itemId, forPlayer = true)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
                 // is still being prepared, not a blank screen.

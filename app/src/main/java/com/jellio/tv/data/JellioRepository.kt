@@ -58,9 +58,12 @@ import javax.inject.Singleton
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
-// real metadata a plain row/grid fetch never asks for.
+// real metadata a plain row/grid fetch never asks for. Trickplay only for
+// the player: the server looks it up per stream version, which for a
+// Gelato title made opening its page far slower than on web.
 private const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
-    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags,Trickplay"
+    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
+private const val PLAYER_DETAIL_FIELDS = "$DETAIL_FIELDS,Trickplay"
 
 // Two distinct real patterns, same distinction navShared.js's own
 // getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
@@ -574,6 +577,7 @@ class JellioRepository @Inject constructor(
     // function gets the same real exclusion for free.
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> {
         val items = api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
+        seedPreviews(items)
         val hidden = runCatching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
         if (hidden.isEmpty()) return items
         return items.filterNot { hidden.contains(it.SeriesId) }
@@ -784,8 +788,21 @@ class JellioRepository @Inject constructor(
             ).Items
         }
 
-    suspend fun getItemDetails(userId: String, itemId: String): BaseItemDto =
-        api.getItem(userId, itemId, fields = DETAIL_FIELDS)
+    suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
+        cache.get("details:$itemId:$forPlayer", SHORT_CACHE_TTL_MS) {
+            api.getItem(userId, itemId, fields = if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
+        }.also { previews[it.Id] = it }
+
+    // Items already seen in a row or list, so a title page can draw them
+    // at once while the full details load.
+    private val previews = ConcurrentHashMap<String, BaseItemDto>()
+
+    fun seedPreviews(items: List<BaseItemDto>) {
+        if (previews.size > 600) previews.clear()
+        items.forEach { previews[it.Id] = it }
+    }
+
+    fun previewItem(itemId: String): BaseItemDto? = previews[itemId]
 
     suspend fun getItem(userId: String, itemId: String): BaseItemDto =
         cache.get("item:$itemId", CACHE_TTL_MS) { api.getItem(userId, itemId) }
@@ -898,7 +915,7 @@ class JellioRepository @Inject constructor(
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
             api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
-        }
+        }.also { seedPreviews(it) }
 
     // Real port of runtime/api.js's own getNextEpisode(): the next real
     // episode in this same season if this one is not the season's own

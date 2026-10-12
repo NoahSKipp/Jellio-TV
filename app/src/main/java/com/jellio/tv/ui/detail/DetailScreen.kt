@@ -204,7 +204,7 @@ fun DetailScreen(
     // screen only ever requests real focus once, nothing else competes
     // for it first the way Resume/chips did there, but the retry is
     // cheap insurance against that same class of timing gap regardless.
-    LaunchedEffect(uiState.item) {
+    LaunchedEffect(uiState.item?.Id) {
         if (uiState.item != null) {
             listState.scrollToItem(0)
             for (attempt in 0 until 30) {

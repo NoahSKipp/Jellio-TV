@@ -92,7 +92,19 @@ class DetailViewModel @Inject constructor(
     private fun loadInternal(session: Session, itemId: String) {
         seriesPlayDeferred = null
         viewModelScope.launch {
-            _uiState.value = DetailUiState(isLoading = true)
+            // Drawn at once from the row it was picked in; the full details
+            // fill in when they arrive.
+            val preview = repository.previewItem(itemId)
+            _uiState.value = if (preview != null) {
+                DetailUiState(
+                    isLoading = false,
+                    item = preview,
+                    isWatchlisted = preview.UserData?.IsFavorite ?: false,
+                    isWatched = preview.UserData?.Played ?: false,
+                )
+            } else {
+                DetailUiState(isLoading = true)
+            }
             try {
                 val item = repository.getItemDetails(session.userId, itemId)
                 ratingTargetId = item.Id
@@ -124,6 +136,7 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
+                if (preview != null) return@launch
                 _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
             }
         }
