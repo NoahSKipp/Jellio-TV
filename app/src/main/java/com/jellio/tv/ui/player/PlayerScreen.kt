@@ -144,6 +144,7 @@ private const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.
 private const val SYNC_DRIFT_MS = 1_500L
 private const val START_TIMEOUT_MS = 25_000L
+private const val SIDELOADED_SUBTITLE_PREFIX = "jellio-sub-"
 private const val REENCODE_START_TIMEOUT_MS = 12_000L
 // How long Play Next counts down on the Up Next card and end screen.
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
@@ -445,7 +446,7 @@ private fun PlayerSurface(
         val subtitleConfigs = subtitleTracks.filter { it.isTextBased && it.url != null }.map { track ->
             MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))
                 .setMimeType(MimeTypes.TEXT_VTT)
-                .setId(track.streamIndex.toString())
+                .setId(SIDELOADED_SUBTITLE_PREFIX + track.streamIndex)
                 .setLabel(track.label)
                 .setLanguage(track.language)
                 .build()
@@ -2424,9 +2425,11 @@ private fun selectAudioTrack(
         .build()
 }
 
-// Off, or one text track. Side-loaded subtitle tracks can carry their id
-// with a prefix ("1:3"), so the stream index is matched at the end too;
-// failing that, a text track in the same language. Returns whether the
+// Off, or one text track. Our side-loaded tracks carry a prefixed id
+// (Media3 may add its own "1:" in front): a bare stream index also
+// matched the file's embedded tracks, numbered from 1 where Jellyfin
+// counts from 0, so English SDH could pick the German track before it.
+// Failing that, a text track in the same language. Returns whether the
 // chosen track was found (true when subtitles are off).
 private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?, language: String?): Boolean {
     val params = player.trackSelectionParameters.buildUpon()
@@ -2436,7 +2439,7 @@ private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?, 
         params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
     } else {
         params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-        val targetId = selectedSubtitleIndex.toString()
+        val targetId = SIDELOADED_SUBTITLE_PREFIX + selectedSubtitleIndex
         fun matches(id: String?) = id != null && (id == targetId || id.endsWith(":$targetId"))
         val textGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
         var choice: Pair<androidx.media3.common.Tracks.Group, Int>? = null
