@@ -25,10 +25,13 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MovieFilter
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.Icons
@@ -80,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -165,6 +169,12 @@ fun SettingsScreen(
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
     var openShortcutPicker by remember { mutableStateOf<ShortcutPickerField?>(null) }
+    var showRecordKeyDialog by remember { mutableStateOf(false) }
+    val currentActivity = androidx.compose.ui.platform.LocalContext.current as? com.jellio.tv.MainActivity
+    androidx.compose.runtime.DisposableEffect(showRecordKeyDialog) {
+        if (showRecordKeyDialog) currentActivity?.isRecordingShortcut = true
+        onDispose { currentActivity?.isRecordingShortcut = false }
+    }
     val changeAvatarFocusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -824,7 +834,14 @@ fun SettingsScreen(
                         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                             SettingsPickerRow(
                                 label = string("settings_quick_hub_button"),
-                                value = string(currentButton.labelKey),
+                                value = if (currentButton == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM) {
+                                    val customLabel = com.jellio.tv.data.prefs.QuickHubPreferences.customKeyLabel.ifBlank {
+                                        com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode)
+                                    }
+                                    "${string("settings_quick_hub_btn_custom")}: $customLabel"
+                                } else {
+                                    string(currentButton.labelKey)
+                                },
                                 onClick = { openShortcutPicker = ShortcutPickerField.BUTTON },
                             )
                             SettingsDivider()
@@ -832,6 +849,13 @@ fun SettingsScreen(
                                 label = string("settings_quick_hub_trigger"),
                                 value = string(currentTrigger.labelKey),
                                 onClick = { openShortcutPicker = ShortcutPickerField.TRIGGER },
+                            )
+                            SettingsDivider()
+                            SettingsActionRow(
+                                label = string("settings_quick_hub_record_btn"),
+                                icon = Icons.Filled.SettingsRemote,
+                                description = string("settings_quick_hub_record_btn_desc"),
+                                onClick = { showRecordKeyDialog = true },
                             )
                             SettingsDivider()
                             SettingsActionRow(
@@ -845,31 +869,9 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                            .padding(16.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = null,
-                                tint = Color(0xFF00E5FF),
-                                modifier = Modifier.size(20.dp).padding(top = 2.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = string("settings_quick_hub_home_notice"),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = JellioTextSecondary,
-                                lineHeight = 20.sp,
-                            )
-                        }
-                    }
+                    QuickHubNoticeCard(text = string("settings_quick_hub_home_notice"))
+
+                    Spacer(modifier = Modifier.height(100.dp))
                 }
                 SettingsCategory.ABOUT -> {
                 SettingsSection(title = string("settings_cat_about"), icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
@@ -931,6 +933,10 @@ fun SettingsScreen(
                 com.jellio.tv.data.prefs.QuickHubPreferences.setButton(currentContext, btn)
                 openShortcutPicker = null
             },
+            onRecordNew = {
+                openShortcutPicker = null
+                showRecordKeyDialog = true
+            },
             onDismiss = { openShortcutPicker = null },
         )
     } else if (shortcutField == ShortcutPickerField.TRIGGER) {
@@ -942,6 +948,22 @@ fun SettingsScreen(
                 openShortcutPicker = null
             },
             onDismiss = { openShortcutPicker = null },
+        )
+    }
+
+    if (showRecordKeyDialog) {
+        val currentContext = LocalContext.current
+        RecordRemoteButtonDialog(
+            onDismiss = { showRecordKeyDialog = false },
+            onSave = { keyCode, label, trigger ->
+                com.jellio.tv.data.prefs.QuickHubPreferences.setCustomButton(
+                    currentContext,
+                    keyCode,
+                    label,
+                    trigger,
+                )
+                showRecordKeyDialog = false
+            },
         )
     }
 
@@ -973,6 +995,42 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
     SettingsRowSurface(onClick = onClick) {
         SettingsRowText(label = label, description = value)
         Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
+    }
+}
+
+@Composable
+private fun QuickHubNoticeCard(text: String) {
+    var isFocused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = if (isFocused) 0.09f else 0.05f))
+            .border(
+                1.dp,
+                if (isFocused) Color.White.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.10f),
+                RoundedCornerShape(12.dp),
+            )
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .padding(18.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = if (isFocused) Color.White else JellioTextSecondary,
+                modifier = Modifier.size(20.dp).padding(top = 2.dp),
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isFocused) JellioText else JellioTextSecondary,
+                lineHeight = 22.sp,
+            )
+        }
     }
 }
 
@@ -1033,6 +1091,7 @@ private fun ShortcutPickerRow(
 private fun QuickHubButtonPickerOverlay(
     selected: com.jellio.tv.data.prefs.QuickHubButton,
     onSelect: (com.jellio.tv.data.prefs.QuickHubButton) -> Unit,
+    onRecordNew: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -1053,7 +1112,7 @@ private fun QuickHubButtonPickerOverlay(
     ) {
         Column(
             modifier = Modifier
-                .width(420.dp)
+                .width(440.dp)
                 .fillMaxSize()
                 .background(JellioBgElevated)
                 .padding(top = 48.dp, bottom = 48.dp),
@@ -1066,12 +1125,45 @@ private fun QuickHubButtonPickerOverlay(
             )
             LazyColumn {
                 items(com.jellio.tv.data.prefs.QuickHubButton.entries) { btn ->
+                    val customLabel = if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode != 0) {
+                        com.jellio.tv.data.prefs.QuickHubPreferences.customKeyLabel.ifBlank {
+                            com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode)
+                        }
+                    } else null
+
+                    val label = if (customLabel != null) {
+                        "${string(btn.labelKey)} ($customLabel)"
+                    } else {
+                        string(btn.labelKey)
+                    }
+
+                    val desc = if (customLabel != null) {
+                        formatString(btn.subKey, customLabel)
+                    } else {
+                        string(btn.subKey)
+                    }
+
                     ShortcutPickerRow(
-                        label = string(btn.labelKey),
-                        description = string(btn.subKey),
+                        label = label,
+                        description = desc,
                         isSelected = btn == selected,
-                        onClick = { onSelect(btn) },
+                        onClick = {
+                            if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode == 0) {
+                                onRecordNew()
+                            } else {
+                                onSelect(btn)
+                            }
+                        },
                         focusRequester = if (btn == com.jellio.tv.data.prefs.QuickHubButton.entries.first()) firstRowFocusRequester else null,
+                    )
+                }
+                item {
+                    SettingsDivider()
+                    ShortcutPickerRow(
+                        label = string("settings_quick_hub_record_btn"),
+                        description = string("settings_quick_hub_record_btn_desc"),
+                        isSelected = false,
+                        onClick = onRecordNew,
                     )
                 }
             }
@@ -1124,6 +1216,384 @@ private fun QuickHubTriggerPickerOverlay(
                         onClick = { onSelect(trg) },
                         focusRequester = if (trg == com.jellio.tv.data.prefs.QuickHubTrigger.entries.first()) firstRowFocusRequester else null,
                     )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun RecordRemoteButtonDialog(
+    onDismiss: () -> Unit,
+    onSave: (keyCode: Int, label: String, trigger: com.jellio.tv.data.prefs.QuickHubTrigger) -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+
+    var recordedCode by remember { mutableStateOf<Int?>(null) }
+    var recordedLabel by remember { mutableStateOf("") }
+    var isRestricted by remember { mutableStateOf(false) }
+    var selectedTrigger by remember { mutableStateOf(com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS) }
+
+    val listeningFocusRequester = remember { FocusRequester() }
+    val actionFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(recordedCode) {
+        if (recordedCode == null) {
+            repeat(10) {
+                if (runCatching { listeningFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+                delay(40)
+            }
+        } else {
+            repeat(10) {
+                if (runCatching { actionFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+                delay(40)
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.75f))
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .then(
+                if (recordedCode == null) {
+                    Modifier
+                        .focusRequester(listeningFocusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
+                                val code = keyEvent.nativeKeyEvent.keyCode
+                                if (code == android.view.KeyEvent.KEYCODE_BACK) {
+                                    onDismiss()
+                                    return@onPreviewKeyEvent true
+                                }
+                                val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
+                                val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
+                                recordedCode = code
+                                recordedLabel = name
+                                isRestricted = restricted
+                                if (code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_BACK) {
+                                    selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
+                                }
+                                return@onPreviewKeyEvent true
+                            }
+                            false
+                        }
+                } else {
+                    Modifier
+                }
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(JellioBgElevated)
+                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)), RoundedCornerShape(16.dp))
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val code = recordedCode
+            if (code == null) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SettingsRemote,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = string("settings_quick_hub_dialog_title"),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = JellioText,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = string("settings_quick_hub_dialog_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = JellioTextSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+                        .padding(vertical = 16.dp, horizontal = 20.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = string("settings_quick_hub_dialog_listening"),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = string("settings_quick_hub_dialog_hint"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = JellioTextSecondary,
+                )
+            } else if (isRestricted) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = string("settings_quick_hub_dialog_reserved_title"),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = JellioText,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = formatString("settings_quick_hub_dialog_reserved_warning", recordedLabel),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = JellioTextSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(
+                        onClick = { recordedCode = null },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            focusedContainerColor = Color.White.copy(alpha = 0.9f),
+                            focusedContentColor = Color.Black,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                        modifier = Modifier.focusRequester(actionFocusRequester),
+                    ) {
+                        Text(
+                            text = string("settings_quick_hub_dialog_try_again"),
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        )
+                    }
+                    Surface(
+                        onClick = onDismiss,
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.08f),
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                            focusedContentColor = Color.White,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                    ) {
+                        Text(
+                            text = string("action_cancel"),
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = string("settings_quick_hub_dialog_detected_title"),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = JellioText,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.07f))
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = formatString("settings_quick_hub_dialog_detected_btn", recordedLabel),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                val isNavKey = code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_BACK
+                if (isNavKey) {
+                    Text(
+                        text = string("settings_quick_hub_dialog_nav_note"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = JellioTextSecondary,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp,
+                    )
+                } else {
+                    Text(
+                        text = string("settings_quick_hub_dialog_trigger_title"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = JellioTextSecondary,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        val isLong = selectedTrigger == com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
+                        Surface(
+                            onClick = { selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = if (isLong) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f),
+                                contentColor = if (isLong) Color.White else JellioTextSecondary,
+                                focusedContainerColor = Color.White.copy(alpha = 0.32f),
+                                focusedContentColor = Color.White,
+                            ),
+                            border = ClickableSurfaceDefaults.border(
+                                border = if (isLong) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))) else Border.None,
+                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                            ),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = string("settings_quick_hub_trigger_long"),
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                            )
+                        }
+                        Surface(
+                            onClick = { selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.SHORT_PRESS },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = if (!isLong) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f),
+                                contentColor = if (!isLong) Color.White else JellioTextSecondary,
+                                focusedContainerColor = Color.White.copy(alpha = 0.32f),
+                                focusedContentColor = Color.White,
+                            ),
+                            border = ClickableSurfaceDefaults.border(
+                                border = if (!isLong) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))) else Border.None,
+                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                            ),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = string("settings_quick_hub_trigger_short"),
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Surface(
+                        onClick = { onSave(code, recordedLabel, selectedTrigger) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                            focusedContainerColor = Color.White.copy(alpha = 0.9f),
+                            focusedContentColor = Color.Black,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                        modifier = Modifier.focusRequester(actionFocusRequester),
+                    ) {
+                        Text(
+                            text = string("settings_quick_hub_dialog_save"),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                        )
+                    }
+                    Surface(
+                        onClick = { recordedCode = null },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.08f),
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                            focusedContentColor = Color.White,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                    ) {
+                        Text(
+                            text = string("settings_quick_hub_dialog_try_again"),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
+                    Surface(
+                        onClick = onDismiss,
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.08f),
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                            focusedContentColor = Color.White,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                        ),
+                    ) {
+                        Text(
+                            text = string("action_cancel"),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
                 }
             }
         }

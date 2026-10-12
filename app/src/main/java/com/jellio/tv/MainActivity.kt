@@ -77,6 +77,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val deepLinkItemId = mutableStateOf<String?>(null)
     private var isPlayerActive: Boolean = false
+    var isQuickHubOpen: Boolean = false
+    var isRecordingShortcut: Boolean = false
     var onMenuPressed: (() -> Unit)? = null
     var onQuickHubShortcut: (() -> Unit)? = null
 
@@ -94,75 +96,75 @@ class MainActivity : ComponentActivity() {
             keyCode == KeyEvent.KEYCODE_HEADSETHOOK
         QuickHubButton.MENU -> keyCode == KeyEvent.KEYCODE_MENU
         QuickHubButton.BACK -> keyCode == KeyEvent.KEYCODE_BACK
+        QuickHubButton.CUSTOM -> keyCode == QuickHubPreferences.customKeyCode && keyCode != 0
         QuickHubButton.NONE -> false
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (isPlayerActive) return super.onKeyDown(keyCode, event)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isPlayerActive || isRecordingShortcut) return super.dispatchKeyEvent(event)
 
         val button = QuickHubPreferences.button
-        val trigger = QuickHubPreferences.trigger
+        if (button == QuickHubButton.NONE) return super.dispatchKeyEvent(event)
 
-        if (isTargetKey(keyCode, button) && event?.repeatCount == 0) {
+        val keyCode = event.keyCode
+
+        // If the Quick Hub is already open on screen and the user presses Back,
+        // let standard dispatch handle it so BackHandler dismisses the drawer immediately.
+        if (isQuickHubOpen && keyCode == KeyEvent.KEYCODE_BACK) {
+            return super.dispatchKeyEvent(event)
+        }
+
+        if (isTargetKey(keyCode, button)) {
+            val trigger = QuickHubPreferences.trigger
+
             if (trigger == QuickHubTrigger.SHORT_PRESS) {
-                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+                }
                 return true
             }
 
-            event.startTracking()
-            longPressKeyCode = keyCode
-            longPressConsumed = false
-            longPressJob?.cancel()
-            longPressJob = lifecycleScope.launch {
-                delay(500)
-                longPressConsumed = true
-                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
-            }
-
-            if (button == QuickHubButton.CENTER || button == QuickHubButton.BACK) {
-                return super.onKeyDown(keyCode, event)
-            }
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
-        if (isPlayerActive) return super.onKeyLongPress(keyCode, event)
-
-        val button = QuickHubPreferences.button
-        val trigger = QuickHubPreferences.trigger
-        if (trigger == QuickHubTrigger.LONG_PRESS && isTargetKey(keyCode, button)) {
-            longPressJob?.cancel()
-            if (!longPressConsumed) {
-                longPressConsumed = true
-                (onQuickHubShortcut ?: onMenuPressed)?.invoke()
-            }
-            return true
-        }
-        return super.onKeyLongPress(keyCode, event)
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (isPlayerActive) return super.onKeyUp(keyCode, event)
-
-        val button = QuickHubPreferences.button
-        val trigger = QuickHubPreferences.trigger
-
-        if (trigger == QuickHubTrigger.SHORT_PRESS && isTargetKey(keyCode, button)) {
-            return true
-        }
-
-        if (keyCode == longPressKeyCode) {
-            longPressJob?.cancel()
-            longPressJob = null
-            longPressKeyCode = null
-            if (longPressConsumed) {
-                longPressConsumed = false
+            // Long Press mode
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) {
+                    longPressKeyCode = keyCode
+                    longPressConsumed = false
+                    longPressJob?.cancel()
+                    longPressJob = lifecycleScope.launch {
+                        delay(450)
+                        longPressConsumed = true
+                        (onQuickHubShortcut ?: onMenuPressed)?.invoke()
+                    }
+                }
                 return true
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                if (keyCode == longPressKeyCode) {
+                    longPressJob?.cancel()
+                    longPressJob = null
+                    val wasConsumed = longPressConsumed
+                    longPressConsumed = false
+                    longPressKeyCode = null
+
+                    if (wasConsumed) {
+                        // Consumed by Quick Hub long-press hold: swallow ACTION_UP completely
+                        // so neither Compose, views, nor BackHandler receive it.
+                        return true
+                    } else {
+                        // User released before 450ms elapsed (short press).
+                        if (keyCode == KeyEvent.KEYCODE_BACK) {
+                            onBackPressedDispatcher.onBackPressed()
+                            return true
+                        }
+                        // Synthesize DOWN + UP for other buttons (e.g. Center / Custom) so short clicks work:
+                        val down = KeyEvent(event.downTime, event.eventTime, KeyEvent.ACTION_DOWN, keyCode, 0, event.metaState, event.deviceId, event.scanCode)
+                        super.dispatchKeyEvent(down)
+                        return super.dispatchKeyEvent(event)
+                    }
+                }
             }
         }
-        return super.onKeyUp(keyCode, event)
+
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onUserLeaveHint() {
@@ -399,6 +401,7 @@ private fun JellioTvApp(
 
     androidx.compose.runtime.DisposableEffect(route, showNowPlayingDrawer) {
         val act = (context as? MainActivity)
+        act?.isQuickHubOpen = showNowPlayingDrawer
         val toggleHandler = {
             if (!route.isImmersive()) {
                 quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
@@ -408,6 +411,7 @@ private fun JellioTvApp(
         act?.onQuickHubShortcut = toggleHandler
         act?.onMenuPressed = toggleHandler
         onDispose {
+            act?.isQuickHubOpen = false
             act?.onQuickHubShortcut = null
             act?.onMenuPressed = null
         }

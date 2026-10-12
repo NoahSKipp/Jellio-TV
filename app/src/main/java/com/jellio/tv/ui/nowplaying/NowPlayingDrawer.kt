@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,8 +88,6 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-private val DrawerCyan = Color(0xFF17A7DD)
-private val DrawerMagenta = Color(0xFFC657E3)
 private val DrawerWidth = 430.dp
 
 enum class QuickHubTab {
@@ -128,26 +127,50 @@ fun NowPlayingDrawer(
     val nowPlayingCount = sessions.size + (if (localPaused != null) 1 else 0)
     val notificationsCount = invites.size + (notifications?.count { !it.Read } ?: 0)
 
+    val tabNowPlayingFocus = remember { FocusRequester() }
+    val tabNotificationsFocus = remember { FocusRequester() }
     val firstItemFocus = remember { FocusRequester() }
+    val emptyActionFocus = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        repeat(25) {
+            val focused = runCatching {
+                if (initialTab == QuickHubTab.NOW_PLAYING) {
+                    tabNowPlayingFocus.requestFocus()
+                } else {
+                    tabNotificationsFocus.requestFocus()
+                }
+            }.isSuccess
+            if (focused) return@LaunchedEffect
+            kotlinx.coroutines.delay(40)
+        }
+    }
+
     LaunchedEffect(selectedTab) {
-        kotlinx.coroutines.delay(100)
-        runCatching { firstItemFocus.requestFocus() }
+        kotlinx.coroutines.delay(50)
+        runCatching {
+            if (selectedTab == QuickHubTab.NOW_PLAYING) {
+                if (nowPlayingCount > 0) firstItemFocus.requestFocus()
+                else emptyActionFocus.requestFocus()
+            } else {
+                if (notificationsCount > 0) firstItemFocus.requestFocus()
+                else emptyActionFocus.requestFocus()
+            }
+        }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .dismissOnBack(onDismiss)
-            .background(Color.Black.copy(alpha = 0.65f))
+            .background(Color.Black.copy(alpha = 0.70f))
             .pointerInput(Unit) { detectTapGestures { onDismiss() } }
             .focusProperties {
                 onExit = {
                     if (requestedFocusDirection == FocusDirection.Left) {
                         onDismiss()
-                        FocusRequester.Cancel
-                    } else {
-                        FocusRequester.Default
                     }
+                    FocusRequester.Cancel
                 }
             }
             .focusGroup(),
@@ -162,8 +185,10 @@ fun NowPlayingDrawer(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(DrawerWidth.scaled())
-                    .background(Color(0xF50D101C))
+                    .background(Color(0xF2141414))
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)))
                     .padding(vertical = 24.dp, horizontal = 24.dp)
+                    .focusGroup()
                     .pointerInput(Unit) { detectTapGestures { } },
             ) {
                 // Header Row
@@ -177,14 +202,15 @@ fun NowPlayingDrawer(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(38.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Brush.linearGradient(listOf(DrawerCyan, DrawerMagenta))),
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
                         ) {
                             Icon(
-                                imageVector = if (selectedTab == QuickHubTab.NOW_PLAYING) Icons.Filled.GraphicEq else Icons.Filled.Notifications,
+                                imageVector = Icons.Filled.Tune,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(22.dp),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
@@ -197,6 +223,7 @@ fun NowPlayingDrawer(
                             Text(
                                 text = when (selectedTab) {
                                     QuickHubTab.NOW_PLAYING -> when (nowPlayingCount) {
+                                        0 -> Strings.get("now_playing_empty")
                                         1 -> Strings.get("now_playing_active_stream")
                                         else -> Strings.format("now_playing_active_streams", nowPlayingCount)
                                     }
@@ -207,7 +234,7 @@ fun NowPlayingDrawer(
                                     }
                                 },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DrawerCyan,
+                                color = JellioTextSecondary,
                             )
                         }
                     }
@@ -218,9 +245,12 @@ fun NowPlayingDrawer(
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.08f),
-                            focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
                             contentColor = JellioTextSecondary,
                             focusedContentColor = JellioText,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                         ),
                         modifier = Modifier.size(36.dp),
                     ) {
@@ -246,16 +276,18 @@ fun NowPlayingDrawer(
                         onClick = { selectedTab = QuickHubTab.NOW_PLAYING },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
-                            containerColor = if (isNowPlayingSelected) DrawerCyan.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                            containerColor = if (isNowPlayingSelected) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.05f),
                             contentColor = if (isNowPlayingSelected) Color.White else JellioTextSecondary,
-                            focusedContainerColor = DrawerCyan.copy(alpha = 0.35f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.28f),
                             focusedContentColor = Color.White,
                         ),
                         border = ClickableSurfaceDefaults.border(
-                            border = if (isNowPlayingSelected) Border(BorderStroke(1.5.dp, DrawerCyan.copy(alpha = 0.6f))) else Border.None,
+                            border = if (isNowPlayingSelected) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))) else Border.None,
                             focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                         ),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(tabNowPlayingFocus),
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.Center,
@@ -282,12 +314,12 @@ fun NowPlayingDrawer(
                                     modifier = Modifier
                                         .size(18.dp)
                                         .clip(CircleShape)
-                                        .background(if (isNowPlayingSelected) DrawerCyan else Color.White.copy(alpha = 0.2f)),
+                                        .background(Color.White.copy(alpha = 0.22f)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = nowPlayingCount.toString(),
-                                        color = if (isNowPlayingSelected) Color.Black else Color.White,
+                                        color = Color.White,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                     )
@@ -301,16 +333,18 @@ fun NowPlayingDrawer(
                         onClick = { selectedTab = QuickHubTab.NOTIFICATIONS },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
-                            containerColor = if (isNotificationsSelected) DrawerCyan.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                            containerColor = if (isNotificationsSelected) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.05f),
                             contentColor = if (isNotificationsSelected) Color.White else JellioTextSecondary,
-                            focusedContainerColor = DrawerCyan.copy(alpha = 0.35f),
+                            focusedContainerColor = Color.White.copy(alpha = 0.28f),
                             focusedContentColor = Color.White,
                         ),
                         border = ClickableSurfaceDefaults.border(
-                            border = if (isNotificationsSelected) Border(BorderStroke(1.5.dp, DrawerCyan.copy(alpha = 0.6f))) else Border.None,
+                            border = if (isNotificationsSelected) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))) else Border.None,
                             focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                         ),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(tabNotificationsFocus),
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.Center,
@@ -337,7 +371,7 @@ fun NowPlayingDrawer(
                                     modifier = Modifier
                                         .size(18.dp)
                                         .clip(CircleShape)
-                                        .background(if (isNotificationsSelected) DrawerCyan else Color(0xFFE50914)),
+                                        .background(Color(0xFFFF3B30)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
@@ -364,8 +398,8 @@ fun NowPlayingDrawer(
                                 Icon(
                                     imageVector = Icons.Filled.Tv,
                                     contentDescription = null,
-                                    tint = JellioTextSecondary.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(48.dp),
+                                    tint = JellioTextSecondary.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(44.dp),
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
@@ -373,6 +407,27 @@ fun NowPlayingDrawer(
                                     color = JellioTextSecondary,
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Surface(
+                                    onClick = onDismiss,
+                                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                                    colors = ClickableSurfaceDefaults.colors(
+                                        containerColor = Color.White.copy(alpha = 0.08f),
+                                        focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                        contentColor = JellioText,
+                                        focusedContentColor = Color.White,
+                                    ),
+                                    border = ClickableSurfaceDefaults.border(
+                                        focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                    ),
+                                    modifier = Modifier.focusRequester(emptyActionFocus),
+                                ) {
+                                    Text(
+                                        text = Strings.get("action_cancel"),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -420,8 +475,8 @@ fun NowPlayingDrawer(
                                 Icon(
                                     imageVector = Icons.Filled.Notifications,
                                     contentDescription = null,
-                                    tint = JellioTextSecondary.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(48.dp),
+                                    tint = JellioTextSecondary.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(44.dp),
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
@@ -429,6 +484,27 @@ fun NowPlayingDrawer(
                                     color = JellioTextSecondary,
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Surface(
+                                    onClick = onDismiss,
+                                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                                    colors = ClickableSurfaceDefaults.colors(
+                                        containerColor = Color.White.copy(alpha = 0.08f),
+                                        focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                        contentColor = JellioText,
+                                        focusedContentColor = Color.White,
+                                    ),
+                                    border = ClickableSurfaceDefaults.border(
+                                        focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                    ),
+                                    modifier = Modifier.focusRequester(emptyActionFocus),
+                                ) {
+                                    Text(
+                                        text = Strings.get("action_cancel"),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -454,7 +530,7 @@ fun NowPlayingDrawer(
 
                             // Notification cards
                             if (notifList != null) {
-                                items(notifList, key = { it.Id ?: it.hashCode().toString() }) { n ->
+                                items(notifList, key = { it.Id }) { n ->
                                     val isFirst = invites.isEmpty() && notifList.firstOrNull() == n
                                     val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
                                     Surface(
@@ -520,8 +596,8 @@ private fun LocalPausedCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF161A2B))
-            .border(1.dp, Color(0xFF282F4E), RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
             .padding(16.dp),
     ) {
         Column {
@@ -536,12 +612,12 @@ private fun LocalPausedCard(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(DrawerMagenta.copy(alpha = 0.2f)),
+                            .background(Color.White.copy(alpha = 0.12f)),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Pause,
                             contentDescription = null,
-                            tint = DrawerMagenta,
+                            tint = Color.White,
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -549,7 +625,7 @@ private fun LocalPausedCard(
                     Text(
                         text = Strings.get("now_playing_this_tv"),
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = DrawerMagenta,
+                        color = Color.White,
                     )
                 }
             }
@@ -609,8 +685,8 @@ private fun SessionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF141828))
-            .border(1.dp, Color(0xFF242C47), RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
             .padding(14.dp),
     ) {
         Column {
@@ -626,12 +702,12 @@ private fun SessionCard(
                         modifier = Modifier
                             .size(24.dp)
                             .clip(CircleShape)
-                            .background(DrawerCyan.copy(alpha = 0.2f)),
+                            .background(Color.White.copy(alpha = 0.12f)),
                     ) {
                         Text(
                             text = session.UserName?.take(1)?.uppercase() ?: "U",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = DrawerCyan,
+                            color = Color.White,
                             fontSize = 11.sp,
                         )
                     }
@@ -660,13 +736,13 @@ private fun SessionCard(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (session.IsPaused) Color.White.copy(alpha = 0.08f) else DrawerCyan.copy(alpha = 0.15f))
+                        .background(Color.White.copy(alpha = 0.08f))
                         .padding(horizontal = 7.dp, vertical = 3.dp),
                 ) {
                     Text(
                         text = if (session.IsPaused) Strings.get("action_pause") else if (isLive) "LIVE" else Strings.get("action_play"),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (session.IsPaused) JellioTextSecondary else DrawerCyan,
+                        color = JellioTextSecondary,
                         fontSize = 10.sp,
                     )
                 }
@@ -734,7 +810,7 @@ private fun SessionCard(
                             .fillMaxWidth(fraction)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(2.dp))
-                            .background(Brush.horizontalGradient(listOf(DrawerCyan, DrawerMagenta))),
+                            .background(Color.White),
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -751,7 +827,7 @@ private fun SessionCard(
                     Text(
                         text = "${(fraction * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
-                        color = DrawerCyan,
+                        color = JellioTextSecondary,
                         fontSize = 10.sp,
                     )
                     Text(
@@ -814,14 +890,14 @@ private fun DrawerActionButton(
             pressedScale = 0.96f,
         ),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (primary) DrawerCyan else Color.White.copy(alpha = 0.08f),
-            focusedContainerColor = if (primary) DrawerCyan.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.22f),
+            containerColor = if (primary) Color.White else Color.White.copy(alpha = 0.08f),
+            focusedContainerColor = if (primary) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.22f),
             contentColor = if (primary) Color.Black else JellioText,
             focusedContentColor = if (primary) Color.Black else JellioText,
         ),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(2.dp, if (primary) Color.White else DrawerCyan),
+                border = BorderStroke(2.dp, Color.White),
                 shape = shape,
             ),
         ),

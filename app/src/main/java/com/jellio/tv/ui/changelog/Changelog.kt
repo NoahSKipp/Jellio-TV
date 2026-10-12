@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
@@ -106,13 +107,13 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
-        version = "0.81.0",
+        version = "0.82.0",
         title = "What's New in Jellio TV",
-        subtitle = "Version 0.81.0",
+        subtitle = "Version 0.82.0",
         features = listOf(
-            ChangelogFeature(Icons.Filled.AutoAwesome, "Unified Quick Hub Drawer", "Access Now Playing and Notifications in one unified drawer with segmented tabs, live stream counts, and unread badges."),
-            ChangelogFeature(Icons.Filled.Tune, "Remote & Shortcuts Customization", "Toggle the Quick Hub using your remote's Menu, Play / Pause, OK / Select, or Back button, with full long-press and immediate trigger customization in Settings > Remote & Shortcuts."),
-            ChangelogFeature(Icons.Filled.Tune, "Multi-Edition & Version Recognition", "Automatic recognition and toggle between Color vs Noir / B&W, Theatrical, Extended, and Director's Cuts directly on the detail screen."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Unified Quick Hub Drawer", "Access Now Playing and Notifications in a newly redesigned, glassy dark drawer with segmented tabs, live stream counts, and unread badges."),
+            ChangelogFeature(Icons.Filled.SettingsRemote, "Remote Button Recorder & Custom Mapping", "Map any remote button to the Quick Hub using the interactive button recorder, with Long Press or Short Press modes and clear guidance for system-reserved keys."),
+            ChangelogFeature(Icons.Filled.Tune, "Multi-Edition & Version Recognition", "Automatic recognition and interactive toggle between Color vs Noir / B&W, Theatrical, Extended, and Director's Cuts directly on the detail screen."),
             ChangelogFeature(Icons.Filled.Mic, "Firestick Voice Dictation", "Microphone search automatically opens your on-screen keyboard with Alexa dictation instructions for effortless voice input."),
         ),
     ),
