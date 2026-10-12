@@ -961,12 +961,18 @@ class PlayerViewModel @Inject constructor(
     // default season load()'s own real fire-and-forget above already
     // triggers and for every later real season tab tap PlayerScreen
     // sends here.
+    // Only the latest season asked for fills the panel; an earlier answer
+    // arriving late is dropped.
+    private var episodeRequest = 0
+
     fun loadSeasonEpisodes(session: Session, seriesId: String, seasonId: String) {
+        val request = ++episodeRequest
         _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId, isLoadingEpisodes = true)
         viewModelScope.launch {
             val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }
                 .getOrDefault(emptyList())
                 .map { buildEpisodePanelEntry(session, it) }
+            if (request != episodeRequest) return@launch
             _uiState.value = _uiState.value.copy(episodes = episodes, isLoadingEpisodes = false)
         }
     }

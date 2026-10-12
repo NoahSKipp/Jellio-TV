@@ -2630,7 +2630,15 @@ private fun EpisodesPanel(
 ) {
     BackHandler(onBack = onDismiss)
     val firstFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val seasonRowState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val currentIndex = episodes.indexOfFirst { it.itemId == currentItemId }
+    // Opens on the playing episode: scrolled to and focused, its season
+    // tab in view; another season opens at its first episode.
+    LaunchedEffect(episodes) {
+        if (episodes.isEmpty()) return@LaunchedEffect
+        seasons.indexOfFirst { it.Id == selectedSeasonId }.takeIf { it >= 0 }?.let { seasonRowState.scrollToItem(it) }
+        listState.scrollToItem(if (currentIndex > 0) currentIndex - 1 else 0)
         kotlinx.coroutines.delay(60)
         runCatching { firstFocusRequester.requestFocus() }
     }
@@ -2652,6 +2660,7 @@ private fun EpisodesPanel(
         ) {
             Text(text = "Episodes", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyRow(
+                state = seasonRowState,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 16.dp),
             ) {
@@ -2678,6 +2687,7 @@ private fun EpisodesPanel(
                 }
             }
             LazyColumn(
+                state = listState,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 16.dp),
             ) {
@@ -2686,7 +2696,7 @@ private fun EpisodesPanel(
                         episode = episode,
                         isActive = episode.itemId == currentItemId,
                         onClick = { onSelectEpisode(episode.itemId) },
-                        modifier = if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier,
+                        modifier = if (index == (if (currentIndex >= 0) currentIndex else 0)) Modifier.focusRequester(firstFocusRequester) else Modifier,
                     )
                 }
             }
