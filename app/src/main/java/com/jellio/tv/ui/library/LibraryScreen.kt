@@ -274,22 +274,24 @@ fun LibraryScreen(
                 }
                 uiState.mainRow?.let { row ->
                     item {
+                        val onMainRowTitleClick = remember(row) { { rowListTarget = row } }
                         PosterRow(
                             section = row,
                             imageUrl = imageUrl,
                             onItemClick = onItemClick,
                             onItemOptions = openItemOptions,
-                            onTitleClick = { rowListTarget = row },
+                            onTitleClick = onMainRowTitleClick,
                         )
                     }
                 }
                 items(uiState.sections, key = { it.title }) { section ->
+                    val onSectionTitleClick = remember(section) { { rowListTarget = section } }
                     PosterRow(
                         section = section,
                         imageUrl = imageUrl,
                         onItemClick = onItemClick,
                         onItemOptions = openItemOptions,
-                        onTitleClick = { rowListTarget = section },
+                        onTitleClick = onSectionTitleClick,
                     )
                 }
             }

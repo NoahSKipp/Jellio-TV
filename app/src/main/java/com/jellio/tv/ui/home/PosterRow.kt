@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -50,6 +52,7 @@ fun PosterRow(
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.focusRestorer(),
         ) {
             // Real feedback live: a focusable heading blocked ordinary
             // Left/Right between cards in the same row, the nearest
@@ -60,11 +63,13 @@ fun PosterRow(
             // height a real card here has, replaces it instead of
             // dropping "view all" entirely.
             items(section.items.take(10), key = { it.Id }) { item ->
+                val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
+                val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
                 PosterCard(
                     item = item,
                     imageUrl = imageUrl,
-                    onClick = { onItemClick(item) },
-                    onOptionsClick = onItemOptions?.let { { it(item) } },
+                    onClick = onCardClick,
+                    onOptionsClick = onCardOptions,
                 )
             }
             if (onTitleClick != null && section.items.size > 10) {

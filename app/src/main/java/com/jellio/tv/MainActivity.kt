@@ -87,8 +87,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             JellioTvTheme {
                 val prefetchViewModel: com.jellio.tv.ui.home.GelatoPrefetchViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                val prefetchLambda = androidx.compose.runtime.remember(prefetchViewModel) {
+                    { item: com.jellio.tv.data.model.BaseItemDto -> prefetchViewModel.prefetch(item) }
+                }
                 androidx.compose.runtime.CompositionLocalProvider(
-                    com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchViewModel::prefetch,
+                    com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchLambda,
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         JellioTvRoot(

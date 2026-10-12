@@ -11,6 +11,7 @@ import java.util.Calendar
 // per bucket, picking one by day of year rather than holding one line
 // fixed all bucket long.
 
+@androidx.compose.runtime.Immutable
 data class ShowsEditorial(val icon: String, val label: String, val tagline: String, val description: String)
 
 private data class BucketCopy(val kicker: String, val title: String, val subtitle: String)

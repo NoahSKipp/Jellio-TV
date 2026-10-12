@@ -382,43 +382,53 @@ fun HomeScreen(
                     items(visibleRows, key = { it.key }) { row ->
                         val hidden = uiState.customization.hidden.contains(row.key)
                         val index = order.indexOf(row.key)
+                        val onMoveUp = remember(row.key) { { viewModel.moveRow(row.key, -1) } }
+                        val onMoveDown = remember(row.key) { { viewModel.moveRow(row.key, 1) } }
+                        val onToggleHidden = remember(row.key) { { viewModel.toggleRowHidden(row.key) } }
                         HomeRowEditor(
                             editMode = editMode,
                             displayName = row.displayName,
                             hidden = hidden,
                             canMoveUp = index > 0,
                             canMoveDown = index < order.size - 1,
-                            onMoveUp = { viewModel.moveRow(row.key, -1) },
-                            onMoveDown = { viewModel.moveRow(row.key, 1) },
-                            onToggleHidden = { viewModel.toggleRowHidden(row.key) },
+                            onMoveUp = onMoveUp,
+                            onMoveDown = onMoveDown,
+                            onToggleHidden = onToggleHidden,
                         ) {
                             when (row) {
-                                is PosterHomeRow -> if (row.landscape) {
-                                    LandscapeRow(
-                                        section = row.section,
-                                        rawImageUrl = rawImageUrl,
-                                        onItemClick = onItemClick,
-                                        onTitleClick = { rowListTarget = row.section },
-                                        onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
-                                        removingItemId = removingTarget?.first,
-                                        onShatterFinished = { item ->
-                                            val isShowRemoval = removingTarget?.second == true
-                                            removingTarget = null
-                                            if (isShowRemoval) {
-                                                viewModel.hideShowFromRow(item)
-                                            } else {
-                                                viewModel.removeFromRow(session, item)
+                                is PosterHomeRow -> {
+                                    val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
+                                    val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
+                                    if (row.landscape) {
+                                        val onShatterFinished = remember(row, session) {
+                                            { item: BaseItemDto ->
+                                                val isShowRemoval = removingTarget?.second == true
+                                                removingTarget = null
+                                                if (isShowRemoval) {
+                                                    viewModel.hideShowFromRow(item)
+                                                } else {
+                                                    viewModel.removeFromRow(session, item)
+                                                }
                                             }
-                                        },
-                                    )
-                                } else {
-                                    PosterRow(
-                                        section = row.section,
-                                        imageUrl = imageUrl,
-                                        onItemClick = onItemClick,
-                                        onItemOptions = { item -> cardMenuTarget = CardMenuTarget(item, row) },
-                                        onTitleClick = { rowListTarget = row.section },
-                                    )
+                                        }
+                                        LandscapeRow(
+                                            section = row.section,
+                                            rawImageUrl = rawImageUrl,
+                                            onItemClick = onItemClick,
+                                            onTitleClick = onRowTitle,
+                                            onItemOptions = onRowOptions,
+                                            removingItemId = removingTarget?.first,
+                                            onShatterFinished = onShatterFinished,
+                                        )
+                                    } else {
+                                        PosterRow(
+                                            section = row.section,
+                                            imageUrl = imageUrl,
+                                            onItemClick = onItemClick,
+                                            onItemOptions = onRowOptions,
+                                            onTitleClick = onRowTitle,
+                                        )
+                                    }
                                 }
                                 is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
                                 is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)

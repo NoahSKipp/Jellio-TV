@@ -39,6 +39,7 @@ import javax.inject.Inject
 // reload the same way that file's own real keys are, title alone
 // defaulting for a caller (Library, Service) that never sets one and
 // has no customization concept to key against.
+@androidx.compose.runtime.Immutable
 data class HomeSection(
     val title: String,
     val items: List<BaseItemDto>,

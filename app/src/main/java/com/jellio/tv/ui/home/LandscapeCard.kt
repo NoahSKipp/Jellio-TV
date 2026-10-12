@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,6 +74,7 @@ fun LandscapeRow(
         LazyRow(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.focusRestorer(),
         ) {
             // Same real reasoning PosterRow's own header carries: a
             // focusable heading blocked ordinary Left/Right onto this
@@ -79,11 +82,13 @@ fun LandscapeRow(
             // to plain text. RowExpandButton at the row's own start
             // instead, sized to this row's own real 16:9 card height.
             items(section.items.take(10), key = { it.Id }) { item ->
+                val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
+                val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
                 LandscapeCard(
                     item = item,
                     imageUrl = rawImageUrl,
-                    onClick = { onItemClick(item) },
-                    onOptionsClick = onItemOptions?.let { { it(item) } },
+                    onClick = onCardClick,
+                    onOptionsClick = onCardOptions,
                     isRemoving = removingItemId == item.Id,
                     onShatterFinished = { onShatterFinished(item) },
                 )

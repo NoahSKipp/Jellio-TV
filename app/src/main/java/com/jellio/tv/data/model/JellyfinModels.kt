@@ -1,5 +1,6 @@
 package com.jellio.tv.data.model
 
+import androidx.compose.runtime.Immutable
 import com.squareup.moshi.JsonClass
 
 // Field names match the real Jellyfin server JSON verbatim (PascalCase),
@@ -69,6 +70,7 @@ data class AuthenticationResultDto(
     val ServerId: String? = null,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class UserItemDataDto(
     val IsFavorite: Boolean = false,
@@ -81,6 +83,7 @@ data class UserItemDataDto(
     val Likes: Boolean? = null,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class PersonDto(
     val Id: String,
@@ -90,12 +93,14 @@ data class PersonDto(
     val PrimaryImageTag: String? = null,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class TrailerDto(
     val Name: String? = null,
     val Url: String? = null,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class MediaStreamDto(
     val Type: String? = null,
@@ -129,6 +134,7 @@ data class MediaStreamDto(
     val DvProfile: Int? = null,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class MediaSourceDto(
     val Id: String? = null,
@@ -150,6 +156,7 @@ data class MediaSourceDto(
 // can carry more than one real generated resolution), each entry one
 // real sheet's own layout, several packed thumbnails per sheet rather
 // than one image per thumbnail.
+@Immutable
 @JsonClass(generateAdapter = true)
 data class TrickplayInfoDto(
     val Width: Int = 0,
@@ -159,6 +166,7 @@ data class TrickplayInfoDto(
     val Interval: Int = 0,
 )
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class BaseItemDto(
     val Id: String,
@@ -359,6 +367,7 @@ data class PendingSoundsDto(val Latest: Long = 0, val Sounds: List<PendingSoundD
 @JsonClass(generateAdapter = true)
 data class AnimeIdsDto(val Ids: List<String> = emptyList())
 
+@Immutable
 @JsonClass(generateAdapter = true)
 data class CalendarEntryDto(
     val ItemId: String,
