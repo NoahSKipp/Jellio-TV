@@ -143,6 +143,7 @@ private const val TOAST_DURATION_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.
 private const val SYNC_DRIFT_MS = 1_500L
+private const val START_TIMEOUT_MS = 25_000L
 // How long Play Next counts down on the Up Next card and end screen.
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
@@ -221,6 +222,7 @@ fun PlayerScreen(
     val subtitleStyle by viewModel.subtitleStyle.collectAsState()
 
     LaunchedEffect(itemId, mediaSourceId) { viewModel.load(session, itemId, mediaSourceId) }
+    val failover by viewModel.failover.collectAsState()
     DisposableEffect(Unit) {
         PlayerPresence.active = true
         onDispose { PlayerPresence.active = false }
@@ -298,7 +300,63 @@ fun PlayerScreen(
                 switchingTo = uiState.switchingTo,
                 onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
                 onSwitchSettled = { viewModel.clearSwitching() },
+                expectedRuntimeMs = uiState.expectedRuntimeMs,
+                onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
+                onPlaybackStarted = { viewModel.failoverPlaying() },
             )
+        }
+        failover?.let { notice ->
+            FailoverOverlay(
+                notice = notice,
+                onStop = {
+                    viewModel.stopFailover()
+                    onBack()
+                },
+            )
+        }
+    }
+}
+
+// Shown while an automatic retry loads, over the player and its controls:
+// what happened, which attempt this is, and Stop to give up.
+@Composable
+private fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
+    val stopFocus = remember { FocusRequester() }
+    LaunchedEffect(notice) {
+        delay(150)
+        runCatching { stopFocus.requestFocus() }
+    }
+    BackHandler(onBack = onStop)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.75f))
+            .onKeyEvent { event -> event.key != Key.Back && event.key != Key.DirectionCenter && event.key != Key.Enter },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .background(JellioBgElevated, RoundedCornerShape(16.dp))
+                .padding(horizontal = 32.dp, vertical = 28.dp),
+        ) {
+            com.jellio.tv.ui.common.ScreenSpinner()
+            Text(
+                text = "That stream didn't work",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(top = 18.dp),
+            )
+            Text(
+                text = "Trying the next one (attempt ${notice.attempt}): ${notice.sourceLabel}",
+                color = JellioTextSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            EndScreenButton(label = "Stop", onClick = onStop, modifier = Modifier.padding(top = 20.dp).focusRequester(stopFocus))
         }
     }
 }
@@ -353,6 +411,9 @@ private fun PlayerSurface(
     switchingTo: String?,
     onSwitchSettled: () -> Unit,
     onSeekReload: (Long) -> Unit,
+    expectedRuntimeMs: Long = 0,
+    onStreamFailed: (String) -> Unit = {},
+    onPlaybackStarted: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -441,6 +502,8 @@ private fun PlayerSurface(
     var isPlaying by remember { mutableStateOf(true) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
+    var endedAsPlaceholder by remember(streamUrl) { mutableStateOf(false) }
+    var placeholderReported by remember(streamUrl) { mutableStateOf(false) }
     var stopAtEnd by remember { mutableStateOf(false) }
     var subtitleMissingReported by remember { mutableStateOf(false) }
     val selectedSubtitleLanguage = subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.language
@@ -626,8 +689,13 @@ private fun PlayerSurface(
                 playWhenReadyState = playWhenReady
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                exoError = friendlyPlaybackError(error)
                 isBuffering = false
+                // Never got going: set it aside and try the next stream.
+                if (!hasReportedStart && syncGroup == null) {
+                    onStreamFailed("error before the first frame")
+                    return
+                }
+                exoError = friendlyPlaybackError(error)
             }
             override fun onPlaybackStateChanged(state: Int) {
                 isEnded = state == Player.STATE_ENDED
@@ -637,7 +705,9 @@ private fun PlayerSurface(
                 // three real signals since ExoPlayer only ever reaches
                 // STATE_ENDED once this real stream has genuinely run
                 // out of data to play.
-                if (isEnded) {
+                // A placeholder clip ending isn't the title ending: it
+                // reports no duration and marks nothing watched.
+                if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs)) {
                     onReportRealDuration(realPositionMs() / 1000.0)
                     onMarkRealWatchComplete()
                 }
@@ -706,7 +776,12 @@ private fun PlayerSurface(
                 // reportRealDurationIfUseful() takes since it is the
                 // real total, not a lower bound off wherever playback
                 // happens to be right now.
-                if (directPlay) onReportRealDuration(durationMs / 1000.0)
+                val placeholder = looksLikePlaceholder(durationMs, expectedRuntimeMs)
+                if (directPlay && placeholder && !placeholderReported && syncGroup == null) {
+                    placeholderReported = true
+                    onStreamFailed("placeholder clip of ${durationMs / 1000}s")
+                }
+                if (directPlay && !placeholder) onReportRealDuration(durationMs / 1000.0)
                 if (!seekedToResume && startPositionTicks > 0 && directPlay) {
                     seekedToResume = true
                     player.seekTo(startPositionTicks / TICKS_PER_MS)
@@ -720,6 +795,7 @@ private fun PlayerSurface(
                 if (!hasReportedStart && isPlaying) {
                     hasReportedStart = true
                     onReportStart(realPositionMs() * TICKS_PER_MS)
+                    onPlaybackStarted()
                 }
             }
             if (pendingReloadMs == null) positionMs = realPositionMs()
@@ -730,7 +806,7 @@ private fun PlayerSurface(
             // AchievementService's own item.RunTimeTicks based gate
             // alone never reliably catches a genuine full watch of a
             // title whose library metadata runtime is inflated.
-            if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9) {
+            if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9 && !looksLikePlaceholder(durationMs, expectedRuntimeMs)) {
                 onMarkRealWatchComplete()
             }
             // Real port of screens/player.js's own timeupdate-driven
@@ -785,8 +861,22 @@ private fun PlayerSurface(
 
     // The episode sleep timer ran out: leave the player once this one ends
     // (a film, with no Up Next, counts as its one episode).
+    // No picture 25 s after playback was asked for: try the next stream.
+    LaunchedEffect(player, playWhenReadyState) {
+        if (!playWhenReadyState || hasReportedStart) return@LaunchedEffect
+        delay(START_TIMEOUT_MS)
+        if (!hasReportedStart && player.playbackState != Player.STATE_READY && syncGroup == null) {
+            onStreamFailed("no picture after ${START_TIMEOUT_MS / 1000}s")
+        }
+    }
+
     LaunchedEffect(isEnded) {
         if (!isEnded) return@LaunchedEffect
+        if (looksLikePlaceholder(realPositionMs(), expectedRuntimeMs) && syncGroup == null) {
+            endedAsPlaceholder = true
+            onStreamFailed("ended after ${realPositionMs() / 1000}s")
+            return@LaunchedEffect
+        }
         if (!stopAtEnd && upNextInfo == null && EpisodeSleepTimer.remaining != null) {
             EpisodeSleepTimer.remaining = null
             stopAtEnd = true
@@ -808,7 +898,7 @@ private fun PlayerSurface(
 
     // The end screen: the next episode with Play Next, Replay and Back,
     // or Replay and Back for a movie or a series finale.
-    val showEndScreen = isEnded && !stopAtEnd
+    val showEndScreen = isEnded && !stopAtEnd && !endedAsPlaceholder
     var endCountdown by remember(streamUrl) { mutableStateOf<Int?>(null) }
     LaunchedEffect(showEndScreen) {
         if (!showEndScreen) {

@@ -131,6 +131,7 @@ data class MediaSourceDto(
     val Id: String? = null,
     val Name: String? = null,
     val Path: String? = null,
+    val RunTimeTicks: Long? = null,
     val Container: String? = null,
     val Size: Long? = null,
     val Bitrate: Long? = null,

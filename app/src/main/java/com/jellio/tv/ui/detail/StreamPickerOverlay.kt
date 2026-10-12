@@ -306,7 +306,8 @@ fun StreamPickerOverlay(
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
         state = try {
-            SourcesState.Loaded(loadSources())
+            // Streams that recently failed to play go last, flagged.
+            SourcesState.Loaded(loadSources().sortedBy { if (com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it)) 1 else 0 })
         } catch (err: Exception) {
             SourcesState.Error(err.message ?: "Could not load streams")
         }
@@ -536,6 +537,7 @@ fun StreamPickerOverlay(
                         itemsIndexed(filteredSources, key = { index, source -> source.Id ?: index }) { index, source ->
                             SourceCard(
                                 source = source,
+                                recentlyFailed = com.jellio.tv.ui.player.BadStreams.isBad(item.Id, source),
                                 onClick = { onSelect(source) },
                                 modifier = if (index == 0) {
                                     Modifier
@@ -627,7 +629,7 @@ private fun RetryButton(onClick: () -> Unit, focusRequester: FocusRequester? = n
 }
 
 @Composable
-internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false, modifier: Modifier = Modifier) {
+internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: Boolean = false, modifier: Modifier = Modifier, recentlyFailed: Boolean = false) {
     // Real .jellio-stream-picker-card-active treatment: a
     // JellioSecondary border plus a slightly brighter fill, ported as a
     // plain color swap here rather than a real border stroke, the same
@@ -662,6 +664,9 @@ internal fun SourceCard(source: MediaSourceDto, onClick: () -> Unit, isActive: B
         // Real feedback live: shrunk from 16dp/2dp/6dp/4dp so more of
         // this real list fits on screen at once without scrolling.
         Column(modifier = Modifier.padding(12.dp)) {
+            if (recentlyFailed) {
+                Text(text = "⚠ Didn't play recently", color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
+            }
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),
                 color = JellioText,

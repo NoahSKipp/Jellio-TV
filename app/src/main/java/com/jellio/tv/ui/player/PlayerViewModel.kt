@@ -131,7 +131,13 @@ fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double
     return null
 }
 
+// Shown while an automatic retry loads: which attempt this is and the
+// stream being tried.
+data class FailoverNotice(val attempt: Int, val sourceLabel: String)
+
 data class PlayerUiState(
+    // The title's runtime, to spot a placeholder clip far shorter than it.
+    val expectedRuntimeMs: Long = 0,
     val isLoading: Boolean = true,
     val error: String? = null,
     val errorDetail: String? = null,
@@ -210,7 +216,81 @@ data class PlayerUiState(
 class PlayerViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val subtitleStylePreferences: SubtitleStylePreferences,
+    private val syncPlay: com.jellio.tv.data.syncplay.SyncPlayManager,
 ) : ViewModel() {
+
+    // ---- Stream failover -------------------------------------------------
+    // A stream that errors before its first frame, shows no picture, or
+    // turns out to be a placeholder clip is remembered as bad and the next
+    // one is loaded by itself: same language as this attempt first, else
+    // the reader's audio language. Not in a Group Watch.
+    private val _failover = MutableStateFlow<FailoverNotice?>(null)
+    val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()
+    private val triedSourceIds = mutableListOf<String>()
+    private var failoverLanguage: String? = null
+    private var failingOver = false
+    private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
+
+    fun failoverPlaying() {
+        _failover.value = null
+    }
+
+    fun stopFailover() {
+        _failover.value = null
+        failingOver = true
+    }
+
+    private fun sourceLabel(source: com.jellio.tv.data.model.MediaSourceDto): String =
+        source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: "another stream"
+
+    private fun hasAudioLanguage(source: com.jellio.tv.data.model.MediaSourceDto, language: String): Boolean =
+        source.MediaStreams.orEmpty().any { it.Type == "Audio" && sameLanguage(it.Language, language) }
+
+    fun streamFailed(session: Session, reason: String) {
+        if (failingOver || syncPlay.group.value != null) return
+        val id = itemId ?: return
+        val source = currentSource ?: return
+        failingOver = true
+        android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
+        viewModelScope.launch {
+            BadStreams.mark(id, source)
+            source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
+            val state = _uiState.value
+            val language = failoverLanguage
+                ?: state.audioTracks.firstOrNull { it.streamIndex == (state.selectedAudioStreamIndex ?: state.defaultAudioStreamIndex) }?.language
+                ?: source.MediaStreams.orEmpty().firstOrNull { it.Type == "Audio" }?.Language
+                ?: audioLanguagePreference
+            failoverLanguage = language
+            val sources = runCatching { repository.getMediaSources(session.userId, id) }.getOrDefault(emptyList())
+            val candidates = sources.filter { it.Id != null && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
+            val next = if (language != null) {
+                candidates.firstOrNull { hasAudioLanguage(it, language) } ?: candidates.firstOrNull()
+            } else {
+                candidates.firstOrNull()
+            }
+            if (next == null) {
+                _failover.value = null
+                _uiState.value = PlayerUiState(
+                    isLoading = false,
+                    error = "None of the streams worked",
+                    errorDetail = if (triedSourceIds.size > 1) {
+                        "${triedSourceIds.size} streams were tried for this title and none of them played. Try again later, or pick one from Change stream on the title's page."
+                    } else {
+                        "This stream couldn't be played and there's no other one to try. Try again later."
+                    },
+                    title = state.title,
+                    pauseInfo = state.pauseInfo,
+                )
+                failingOver = false
+                return@launch
+            }
+            _failover.value = FailoverNotice(attempt = triedSourceIds.size + 1, sourceLabel = sourceLabel(next))
+            failingOver = false
+            currentSource = next
+            load(session, id, next.Id, fromFailover = true)
+        }
+    }
+    // -------------------------------------------------------------------------
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -275,10 +355,16 @@ class PlayerViewModel @Inject constructor(
         load(session, id, mediaSourceIdParam)
     }
 
-    fun load(session: Session, itemId: String, mediaSourceId: String?) {
+    fun load(session: Session, itemId: String, mediaSourceId: String?, fromFailover: Boolean = false) {
         val key = itemId + "|" + mediaSourceId
         if (loadedItemId == key) return
         loadedItemId = key
+        if (!fromFailover) {
+            triedSourceIds.clear()
+            failoverLanguage = null
+            failingOver = false
+            _failover.value = null
+        }
         this.itemId = itemId
         this.mediaSourceIdParam = mediaSourceId
         viewModelScope.launch {
@@ -309,6 +395,15 @@ class PlayerViewModel @Inject constructor(
                     ""
                 }
 
+                currentSource = target.mediaSource
+                val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
+                // The server's own probe already says how long the stream
+                // is: a placeholder clip goes straight to the next one.
+                val probedMs = (target.mediaSource.RunTimeTicks ?: 0L) / 10_000
+                if (looksLikePlaceholder(probedMs, expectedRuntimeMs) && syncPlay.group.value == null) {
+                    streamFailed(session, "server reports a ${probedMs / 1000}s stream")
+                    return@launch
+                }
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 subtitleSeriesId = if (isEpisode) item.SeriesId else null
                 val initialSubtitle = initialSubtitleIndex(
@@ -324,6 +419,7 @@ class PlayerViewModel @Inject constructor(
                 trickplayMediaSourceId = target.mediaSource.Id
 
                 _uiState.value = PlayerUiState(
+                    expectedRuntimeMs = expectedRuntimeMs,
                     isLoading = false,
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
@@ -443,6 +539,11 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             } catch (err: Exception) {
+                // A retry that the server can't even start moves on too.
+                if (fromFailover && syncPlay.group.value == null) {
+                    streamFailed(session, "could not start: ${err.message}")
+                    return@launch
+                }
                 val problem = friendlyPlaybackError(err)
                 _uiState.value = PlayerUiState(
                     isLoading = false,
