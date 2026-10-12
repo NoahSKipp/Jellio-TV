@@ -661,6 +661,14 @@ class JellioRepository @Inject constructor(
 
     // The whole genre list for a library, A to Z, for the genre picker.
     // The reader's chosen audio language (Settings > Language), e.g. "ger".
+    // The reader's default subtitle language, unless their subtitle mode
+    // is set to never show any.
+    suspend fun getSubtitleLanguagePreference(userId: String): String? =
+        runCatching {
+            val config = getUser(userId)?.Configuration
+            if (config?.SubtitleMode.equals("None", ignoreCase = true)) null else config?.SubtitleLanguagePreference
+        }.getOrNull()?.trim()?.ifBlank { null }
+
     suspend fun getAudioLanguagePreference(userId: String): String? =
         runCatching { getUser(userId)?.Configuration?.AudioLanguagePreference }.getOrNull()?.trim()?.ifBlank { null }
 

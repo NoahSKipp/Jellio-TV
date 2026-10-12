@@ -310,6 +310,12 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                subtitleSeriesId = if (isEpisode) item.SeriesId else null
+                val initialSubtitle = initialSubtitleIndex(
+                    subtitleTracks,
+                    subtitleSeriesId,
+                    repository.getSubtitleLanguagePreference(session.userId),
+                )
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 }?.roundToInt()
 
@@ -327,6 +333,7 @@ class PlayerViewModel @Inject constructor(
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
                     subtitleTracks = subtitleTracks,
+                    selectedSubtitleIndex = initialSubtitle,
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                     audioTracks = audioTracks,
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
@@ -530,7 +537,10 @@ class PlayerViewModel @Inject constructor(
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
                     resumePercent = null,
-                    selectedSubtitleIndex = null,
+                    // Start over keeps the subtitles that were on.
+                    selectedSubtitleIndex = _uiState.value.selectedSubtitleIndex?.takeIf { index ->
+                        subtitleTracks.any { it.streamIndex == index && it.isTextBased }
+                    },
                     subtitleTracks = subtitleTracks,
                     directPlay = target.directPlay,
                 )
@@ -604,6 +614,50 @@ class PlayerViewModel @Inject constructor(
     // this only changes which one the player currently selects.
     fun selectSubtitle(index: Int?) {
         _uiState.value = _uiState.value.copy(selectedSubtitleIndex = index)
+        rememberSubtitleChoice(index)
+    }
+
+    // The show this episode belongs to, for remembering its subtitle pick.
+    private var subtitleSeriesId: String? = null
+
+    private fun rememberSubtitleChoice(index: Int?) {
+        val seriesId = subtitleSeriesId ?: return
+        val choice = if (index == null) {
+            "off"
+        } else {
+            val track = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == index } ?: return
+            track.language?.takeIf { it.isNotBlank() } ?: ("label:" + track.label)
+        }
+        subtitleStylePreferences.setSubtitleChoice(seriesId, choice)
+    }
+
+    // Which text track to start with: what was picked for this show last
+    // time, else the reader's default subtitle language, else none. Image
+    // tracks need a burned-in transcode, so they're never picked here.
+    private fun initialSubtitleIndex(tracks: List<SubtitleTrackUiState>, seriesId: String?, defaultLanguage: String?): Int? {
+        val remembered = seriesId?.let { subtitleStylePreferences.subtitleChoice(it) }
+        if (remembered == "off") return null
+        val text = tracks.filter { it.isTextBased }
+        if (remembered != null) {
+            val match = if (remembered.startsWith("label:")) {
+                text.firstOrNull { it.label == remembered.removePrefix("label:") }
+            } else {
+                text.firstOrNull { sameLanguage(it.language, remembered) }
+            }
+            if (match != null) return match.streamIndex
+        }
+        val language = defaultLanguage ?: return null
+        return text.firstOrNull { sameLanguage(it.language, language) }?.streamIndex
+    }
+
+    private fun sameLanguage(a: String?, b: String?): Boolean {
+        if (a.isNullOrBlank() || b.isNullOrBlank()) return false
+        if (a.equals(b, ignoreCase = true)) return true
+        fun short(code: String): String = runCatching { java.util.Locale.forLanguageTag(code).language }.getOrDefault(code).lowercase()
+        val left = short(a)
+        val right = short(b)
+        return left.isNotEmpty() && left == right ||
+            runCatching { java.util.Locale(a).isO3Language.equals(java.util.Locale(b).isO3Language, ignoreCase = true) }.getOrDefault(false)
     }
 
     // An image based subtitle (screens/player.js's own real
@@ -638,6 +692,7 @@ class PlayerViewModel @Inject constructor(
                     subtitleTracks = subtitleTracks,
                     directPlay = target.directPlay,
                 )
+                rememberSubtitleChoice(streamIndex)
                 showToast("Requested $requestedLabel (burned in), reloading…")
             } catch (err: Exception) {
                 _uiState.value = _uiState.value.copy(isSwitchingSubtitle = false)

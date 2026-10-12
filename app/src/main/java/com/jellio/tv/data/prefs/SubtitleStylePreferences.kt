@@ -32,6 +32,17 @@ class SubtitleStylePreferences @Inject constructor(
         val BACKGROUND = stringPreferencesKey("background")
     }
 
+    // The subtitle picked for a show, kept per series so the next episode
+    // starts the same way: "off", a language code, or "label:<name>" for a
+    // track without one.
+    private val choices = context.getSharedPreferences("jellio_subtitle_choice", Context.MODE_PRIVATE)
+
+    fun subtitleChoice(seriesId: String): String? = choices.getString(seriesId, null)
+
+    fun setSubtitleChoice(seriesId: String, choice: String) {
+        choices.edit().putString(seriesId, choice).apply()
+    }
+
     val style: Flow<SubtitleStyle> = context.subtitleStyleDataStore.data.map { prefs ->
         SubtitleStyle(
             size = prefs[Keys.SIZE]?.takeIf { v -> SUBTITLE_SIZES.any { it.value == v } } ?: "medium",
