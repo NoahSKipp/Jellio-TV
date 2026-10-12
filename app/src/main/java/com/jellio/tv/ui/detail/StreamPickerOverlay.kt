@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,16 +71,27 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 // same real core job, picking one of Gelato's own resolved sources.
 internal val QUALITY_ORDER = listOf("4K", "QHD", "FHD", "HD", "SD")
 private val QUALITY_NAME_PATTERNS = listOf(
-    "4K" to Regex("(^|[^a-z0-9])(2160p|4k|uhd)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
-    "QHD" to Regex("(^|[^a-z0-9])1440p([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
-    "FHD" to Regex("(^|[^a-z0-9])(1080[pi]|fhd)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
-    "HD" to Regex("(^|[^a-z0-9])720p([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
-    "SD" to Regex("(^|[^a-z0-9])(576p|480p|360p|sd|dvdrip)([^a-z0-9]|$)", RegexOption.IGNORE_CASE),
+    // Names say "720p" or just "HD", "Full HD", "Ultra HD"; HDR and HDTV
+    // aren't resolutions.
+    "4K" to Regex("(^|[^a-z0-9])(2160p|4k|uhd|ultra[ .-]?hd)([^a-z0-9+]|$)", RegexOption.IGNORE_CASE),
+    "QHD" to Regex("(^|[^a-z0-9])(1440p|qhd|2k)([^a-z0-9+]|$)", RegexOption.IGNORE_CASE),
+    "FHD" to Regex("(^|[^a-z0-9])(1080[pi]|fhd|full[ .-]?hd)([^a-z0-9+]|$)", RegexOption.IGNORE_CASE),
+    "HD" to Regex("(^|[^a-z0-9])(720p|hd)([^a-z0-9+]|$)", RegexOption.IGNORE_CASE),
+    "SD" to Regex("(^|[^a-z0-9])(576p|540p|480p|360p|240p|sd|dvdrip)([^a-z0-9+]|$)", RegexOption.IGNORE_CASE),
 )
 
-// Same buckets as streamPicker.js's sourceQuality(): probed video size
-// first, then the release name, since most unplayed sources are unprobed.
+private fun matchQuality(text: String): String? =
+    QUALITY_NAME_PATTERNS.firstOrNull { it.second.containsMatchIn(text) }?.first
+
+// The tier the addon's own label (the name's first line) states, or null.
+internal fun labelQuality(source: MediaSourceDto): String? =
+    source.Name?.substringBefore('\n')?.let { matchQuality(it) }
+
+// Same as streamPicker.js's sourceQuality(): the addon's label first (it's
+// parsed from the actual file, while probe details Gelato attaches can
+// belong to another version), then probed size, then the release name.
 internal fun sourceQuality(source: MediaSourceDto): String? {
+    labelQuality(source)?.let { return it }
     val video = source.MediaStreams?.firstOrNull { it.Type == "Video" }
     val height = video?.Height ?: 0
     val width = video?.Width ?: 0
@@ -92,8 +104,7 @@ internal fun sourceQuality(source: MediaSourceDto): String? {
             else -> "SD"
         }
     }
-    val name = source.Name ?: return null
-    return QUALITY_NAME_PATTERNS.firstOrNull { it.second.containsMatchIn(name) }?.first
+    return source.Name?.let { matchQuality(it) }
 }
 
 internal fun sourceResolutionLabel(source: MediaSourceDto): String {
@@ -656,13 +667,10 @@ internal fun SourceCard(
     transcodeMark: Boolean = false,
 ) {
     val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
-    val reencode = remember(source, transcodeMark) {
-        if (transcodeMark && policy.avoiding && com.jellio.tv.data.playback.videoInfoOf(source) != null) {
-            policy.classify(source).takeIf { it.needsVideoTranscode }
-        } else {
-            null
-        }
+    val classification = remember(source) {
+        if (policy.avoiding && com.jellio.tv.data.playback.videoInfoOf(source) != null) policy.classify(source) else null
     }
+    val reencode = classification?.takeIf { transcodeMark && it.needsVideoTranscode }
     val blocked = reencode != null && policy.blocking
     // Real .jellio-stream-picker-card-active treatment: a
     // JellioSecondary border plus a slightly brighter fill, ported as a
@@ -706,29 +714,8 @@ internal fun SourceCard(
             if (recentlyFailed) {
                 Text(text = "⚠ Didn't play recently", color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
             }
-            if (reencode != null) {
-                val markColor = if (blocked) Color(0xFFEF5350) else Color(0xFFFFD54F)
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
-                    Icon(
-                        imageVector = if (blocked) Icons.Filled.Block else Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = markColor,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    val reasons = reencode.reasons.joinToString(", ") { com.jellio.tv.data.playback.TranscodeReason.describe(it) }
-                    Text(
-                        text = (if (blocked) "Blocked: needs a video re-encode" else "Slow: needs a video re-encode") +
-                            (if (reasons.isNotEmpty()) " ($reasons)" else "") +
-                            (if (reencode.guessed) ", going by its name" else ""),
-                        color = markColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-            } else {
-                PlayMethodBadge(source)
+            if (classification != null) {
+                OutlookBadge(com.jellio.tv.data.playback.playbackOutlook(classification, policy.policy))
             }
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),
@@ -742,7 +729,7 @@ internal fun SourceCard(
                 Text(text = description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 1.dp))
             }
             val tags = listOfNotNull(
-                sourceResolutionLabel(source).ifEmpty { sourceQuality(source) },
+                labelQuality(source) ?: sourceResolutionLabel(source).ifEmpty { sourceQuality(source) },
                 sourceBitrateLabel(source).ifEmpty { null },
                 formatFileSize(source.Size).ifEmpty { null },
                 source.Container?.uppercase(),
@@ -779,28 +766,30 @@ private fun noStreamsHint(premiereDate: String?): String {
     }
 }
 
-// Direct play / Remux / Transcode, shown while the Video transcode policy
-// is Avoid or Block. "Likely" when it's read from the stream's name.
+// "Plays smoothly" / "Likely to stutter: ..." / "Won't play: ...", shown
+// while the Video transcode policy is Avoid or Block.
 @Composable
-private fun PlayMethodBadge(source: MediaSourceDto) {
-    val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
-    if (!policy.avoiding) return
-    if (com.jellio.tv.data.playback.videoInfoOf(source) == null) return
-    val classification = remember(source) { policy.classify(source) }
-    val method = com.jellio.tv.data.playback.playMethodFor(classification, source.SupportsDirectPlay == true)
-    val color = when (method) {
-        com.jellio.tv.data.playback.PlayMethod.DirectPlay -> Color(0xFF81C784)
-        com.jellio.tv.data.playback.PlayMethod.Remux -> Color(0xFF64B5F6)
-        com.jellio.tv.data.playback.PlayMethod.Transcode -> Color(0xFFFFB74D)
+private fun OutlookBadge(outlook: com.jellio.tv.data.playback.PlaybackOutlook) {
+    val (color, icon) = when (outlook.tone) {
+        com.jellio.tv.data.playback.OutlookTone.Good -> Color(0xFF81C784) to Icons.Filled.CheckCircle
+        com.jellio.tv.data.playback.OutlookTone.Warn -> Color(0xFFFFD54F) to Icons.Filled.Warning
+        com.jellio.tv.data.playback.OutlookTone.Block -> Color(0xFFEF5350) to Icons.Filled.Block
     }
-    val label = if (classification.guessed) "Likely " + method.label.lowercase() else method.label
-    Text(
-        text = label,
-        color = color,
-        style = MaterialTheme.typography.labelSmall,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .padding(bottom = 2.dp)
             .background(color.copy(alpha = 0.16f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+            .padding(start = 6.dp, end = 10.dp, top = 2.dp, bottom = 2.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+        Text(
+            text = outlook.text,
+            color = color,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 5.dp),
+        )
+    }
 }

@@ -99,4 +99,18 @@ class TranscodeClassifierTest {
         assertEquals(listOf("h264", "hevc", "av1", "vp9"), copyableVideoCodecs(box))
         assertEquals(listOf("h264"), copyableVideoCodecs(oldBox))
     }
+
+    @Test
+    fun outlookWording() {
+        val ok = Classification(false, emptyList(), false)
+        val okGuess = Classification(false, emptyList(), true)
+        val hdr = Classification(true, listOf("hdr-on-sdr"), false)
+        val hdrGuess = Classification(true, listOf("hdr-on-sdr"), true)
+        assertEquals(PlaybackOutlook(OutlookTone.Good, "Plays smoothly"), playbackOutlook(ok, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Good, "Likely plays smoothly"), playbackOutlook(okGuess, "Block"))
+        assertEquals(PlaybackOutlook(OutlookTone.Warn, "Likely to stutter: HDR on a non-HDR screen"), playbackOutlook(hdr, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Warn, "May stutter: HDR on a non-HDR screen"), playbackOutlook(hdrGuess, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Block, "Won't play: HDR on a non-HDR screen"), playbackOutlook(hdr, "Block"))
+        assertEquals(PlaybackOutlook(OutlookTone.Block, "Probably won't play: HDR on a non-HDR screen"), playbackOutlook(hdrGuess, "Block"))
+    }
 }

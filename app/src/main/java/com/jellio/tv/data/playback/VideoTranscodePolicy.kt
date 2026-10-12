@@ -33,6 +33,34 @@ object VideoTranscodePolicy {
     fun needsReencode(source: MediaSourceDto): Boolean = classify(source).needsVideoTranscode
 }
 
+enum class OutlookTone { Good, Warn, Block }
+
+data class PlaybackOutlook(val tone: OutlookTone, val text: String)
+
+private fun shortReason(reason: String?): String = when (reason) {
+    TranscodeReason.CODEC -> "a video format this TV can't play"
+    TranscodeReason.HDR_ON_SDR -> "HDR on a non-HDR screen"
+    TranscodeReason.DOLBY_VISION_5 -> "Dolby Vision only"
+    TranscodeReason.INTERLACED -> "interlaced video"
+    TranscodeReason.BURN_IN -> "image subtitles"
+    else -> "needs converting"
+}
+
+// What a viewer cares about: will this play smoothly here? Guesses from a
+// stream's name are worded less certainly than probed details.
+fun playbackOutlook(classification: Classification, policy: String): PlaybackOutlook {
+    val guessed = classification.guessed
+    if (!classification.needsVideoTranscode) {
+        return PlaybackOutlook(OutlookTone.Good, if (guessed) "Likely plays smoothly" else "Plays smoothly")
+    }
+    val reason = shortReason(classification.reasons.firstOrNull())
+    return if (policy == "Block") {
+        PlaybackOutlook(OutlookTone.Block, (if (guessed) "Probably won't play: " else "Won't play: ") + reason)
+    } else {
+        PlaybackOutlook(OutlookTone.Warn, (if (guessed) "May stutter: " else "Likely to stutter: ") + reason)
+    }
+}
+
 // What this TV's decoders and screen handle, asked once.
 object DeviceDecoderCaps : DecoderCaps {
     private const val AV1_PROFILE_MAIN_10 = 2

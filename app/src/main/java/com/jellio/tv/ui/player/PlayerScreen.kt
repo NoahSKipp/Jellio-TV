@@ -864,6 +864,18 @@ private fun PlayerSurface(
 
     // The episode sleep timer ran out: leave the player once this one ends
     // (a film, with no Up Next, counts as its one episode).
+    // The failover notice goes once the picture moves, even when the
+    // stream's length isn't known yet (a transcode still starting).
+    LaunchedEffect(player) {
+        while (true) {
+            delay(500)
+            if (player.isPlaying && player.currentPosition > 0) {
+                onPlaybackStarted()
+                break
+            }
+        }
+    }
+
     // No picture 25 s after playback was asked for (12 s for a video
     // re-encode the server was told to avoid): try the next stream.
     LaunchedEffect(player, playWhenReadyState) {
