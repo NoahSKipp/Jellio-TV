@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +49,7 @@ fun StudioHubRow(
     Column {
         RowTitle(text = "Studio Hubs")
         LazyRow(
+            state = rememberTvRowState(),
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {

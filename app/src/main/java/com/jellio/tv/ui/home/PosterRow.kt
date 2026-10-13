@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,7 @@ fun PosterRow(
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
         LazyRow(
+            state = rememberTvRowState(),
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.focusRestorer(),

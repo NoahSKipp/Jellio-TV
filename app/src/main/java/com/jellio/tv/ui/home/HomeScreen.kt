@@ -105,7 +105,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val listState = rememberLazyListState()
+    val listState = com.jellio.tv.ui.common.rememberTvColumnState()
     val scope = rememberCoroutineScope()
     // Real ui/library/LibraryScreen.kt's own header on this exact fix:
     // switching focus between an arrow and View Details still nudged

@@ -39,6 +39,13 @@ private fun skeletonColor(): Color {
     return Color.White.copy(alpha = pulse)
 }
 
+// One poster-shaped placeholder, for grids still filling in (search).
+@Composable
+fun SkeletonPoster(modifier: Modifier = Modifier) {
+    val color = skeletonColor()
+    Row(modifier = modifier.aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(color)) {}
+}
+
 @Composable
 fun SkeletonRow(landscape: Boolean = false, modifier: Modifier = Modifier) {
     val color = skeletonColor()
