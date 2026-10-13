@@ -788,6 +788,21 @@ class JellioRepository @Inject constructor(
     // try/catch already needs the real thrown exception to tell an HTTP
     // 404 (no Gelato on this server, fall back to searchItems) apart
     // from any other real failure.
+    // Only what the library already holds: Gelato passes a "local:" search
+    // straight to Jellyfin's own search (tens of milliseconds) instead of
+    // asking the addons. Without Gelato nothing matches it.
+    suspend fun searchLibrary(userId: String, term: String): List<BaseItemDto> {
+        if (term.isBlank()) return emptyList()
+        return api.getItems(
+            userId = userId,
+            includeItemTypes = "Movie,Series",
+            recursive = true,
+            limit = 50,
+            searchTerm = "local:$term",
+            fields = "PrimaryImageAspectRatio,ProviderIds,ProductionYear",
+        ).Items
+    }
+
     suspend fun searchMovies(term: String): List<BaseItemDto> = api.searchGelatoMovies(term)
 
     suspend fun searchSeries(term: String): List<BaseItemDto> = api.searchGelatoSeries(term)

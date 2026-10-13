@@ -9,6 +9,7 @@ import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,16 +58,15 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    // Real bottleneck JellyfinApi.kt's own searchGelatoMovies/
-    // searchGelatoSeries header documents: the old single
-    // repository.searchItems() call waited on Gelato's own combined
-    // movie+series search server side before answering at all. Firing
-    // the two halves independently and merging each into results the
-    // moment it resolves - regardless of which one lands first - means
-    // SearchScreen can paint partial results as soon as the faster half
-    // is done rather than both waiting on the slower one; isSearching
-    // only clears once both have settled, so SearchScreen still has a
-    // "still loading the rest" signal to show alongside partial results.
+    // Results fill in as each answer lands: titles already in the library
+    // (near instant) first, then each addon search's results appended
+    // after them, nothing shown twice and nothing reordered under the
+    // focus. isSearching stays on, with placeholder cards after the
+    // results, until every search has answered.
+    //
+    // Servers without Gelato (or an older build without the per-type
+    // routes) 404 on the addon searches and match nothing on "local:":
+    // the plain combined search answers instead, same as it always did.
     fun onQueryChange(session: Session, query: String) {
         _uiState.value = _uiState.value.copy(query = query)
         searchJob?.cancel()
@@ -80,70 +80,94 @@ class SearchViewModel @Inject constructor(
             if (_uiState.value.query != query) return@launch
 
             val stateLock = Mutex()
-            var settledCount = 0
+            val seen = HashSet<String>()
+            var pending = 3
+            var failures = 0
             var fellBack = false
 
-            suspend fun markSettled() {
+            suspend fun add(items: List<BaseItemDto>) {
                 stateLock.withLock {
-                    settledCount += 1
-                    if (settledCount >= 2 && _uiState.value.query == query) {
-                        _uiState.value = _uiState.value.copy(isSearching = false)
+                    if (_uiState.value.query != query) return
+                    val fresh = items.filter { item ->
+                        val keys = identityKeys(item)
+                        if (keys.any { it in seen }) false else { seen.addAll(keys); true }
+                    }
+                    if (fresh.isNotEmpty()) {
+                        _uiState.value = _uiState.value.copy(results = _uiState.value.results + fresh, error = null)
                     }
                 }
             }
 
-            // screens/search.js's own header comment documents the real
-            // bug this fixes: a failed request must not "look identical
-            // to search doing nothing", real feedback reported live
-            // against exactly that. A caught failure now surfaces its
-            // own distinct real message rather than folding into the
-            // same "No results" state a genuine empty search leaves.
-            //
-            // Real servers without Gelato installed (or on an older
-            // build without these two routes yet) 404 here: fall back to
-            // the original combined call so search still works there,
-            // same real result that call always gave.
+            suspend fun settle(count: Int, failed: Boolean) {
+                stateLock.withLock {
+                    pending -= count
+                    if (failed) failures += count
+                    if (_uiState.value.query != query || pending > 0) return
+                    val nothing = _uiState.value.results.isEmpty()
+                    _uiState.value = _uiState.value.copy(
+                        isSearching = false,
+                        error = if (nothing && failures >= 3) "Could not load search results. Check your connection and try again." else null,
+                    )
+                }
+            }
+
             suspend fun fallBackToCombined() {
-                stateLock.withLock {
-                    if (fellBack) return
-                    fellBack = true
-                }
-                try {
-                    val results = repository.searchItems(session.userId, query)
-                    if (_uiState.value.query == query) {
-                        _uiState.value = _uiState.value.copy(results = results, isSearching = false, error = null)
-                    }
+                val first = stateLock.withLock { if (fellBack) false else { fellBack = true; true } }
+                // The other addon search's 404 is settled with this one.
+                if (!first) return
+                val ok = try {
+                    add(repository.searchItems(session.userId, query))
+                    true
+                } catch (err: CancellationException) {
+                    throw err
                 } catch (err: Exception) {
-                    if (_uiState.value.query == query) {
-                        _uiState.value = _uiState.value.copy(
-                            results = emptyList(),
-                            isSearching = false,
-                            error = "Could not load search results. Check your connection and try again.",
-                        )
-                    }
+                    false
                 }
+                settle(2, !ok)
             }
 
-            suspend fun runOne(fetch: suspend () -> List<BaseItemDto>) {
+            suspend fun runAddon(fetch: suspend () -> List<BaseItemDto>) {
                 try {
                     val items = fetch()
-                    if (_uiState.value.query == query && !fellBack) {
-                        val merged = (_uiState.value.results + items).distinctBy { it.Id }
-                        _uiState.value = _uiState.value.copy(results = merged, error = null)
-                    }
-                    markSettled()
+                    if (!fellBack) add(items)
+                    settle(1, false)
+                } catch (err: CancellationException) {
+                    throw err
                 } catch (err: HttpException) {
-                    if (err.code() == 404) fallBackToCombined() else markSettled()
+                    if (err.code() == 404) fallBackToCombined() else settle(1, true)
                 } catch (err: Exception) {
-                    markSettled()
+                    settle(1, true)
                 }
             }
 
             coroutineScope {
-                launch { runOne { repository.searchMovies(query) } }
-                launch { runOne { repository.searchSeries(query) } }
+                launch {
+                    val ok = try {
+                        add(repository.searchLibrary(session.userId, query))
+                        true
+                    } catch (err: CancellationException) {
+                        throw err
+                    } catch (err: Exception) {
+                        false
+                    }
+                    settle(1, !ok)
+                }
+                launch { runAddon { repository.searchMovies(query) } }
+                launch { runAddon { repository.searchSeries(query) } }
             }
         }
+    }
+
+    // The same title from the library and from an addon search: Gelato
+    // answers owned titles with the library's own item, so the id
+    // usually matches; provider ids and name plus year catch the rest.
+    private fun identityKeys(item: BaseItemDto): List<String> = buildList {
+        add("id:" + item.Id.replace("-", "").lowercase())
+        item.ProviderIds?.forEach { (provider, value) ->
+            if (value.isNotBlank() && provider.lowercase() in setOf("tmdb", "imdb", "tvdb")) add("${item.Type}:${provider.lowercase()}:$value")
+        }
+        val name = item.Name?.trim()?.lowercase()
+        if (!name.isNullOrEmpty() && item.ProductionYear != null) add("${item.Type}:name:$name:${item.ProductionYear}")
     }
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
