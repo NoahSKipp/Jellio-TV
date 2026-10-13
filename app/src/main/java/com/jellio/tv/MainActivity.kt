@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Surface
 import com.jellio.tv.data.model.BaseItemDto
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.jellio.tv.ui.perf.MotionPolicy.init(this)
+        com.jellio.tv.data.prefs.DisplayPreferences.init(this)
         com.jellio.tv.ui.player.PlayerPrefs.init(this)
         com.jellio.tv.ui.player.BadStreams.init(this)
         com.jellio.tv.data.playback.DeviceDecoderCaps.attach(this)
@@ -93,7 +95,16 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchLambda,
                 ) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
+                    val overscanPercent = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
+                    val config = androidx.compose.ui.platform.LocalConfiguration.current
+                    val insetX = (config.screenWidthDp * (overscanPercent / 100f) / 2f).dp
+                    val insetY = (config.screenHeightDp * (overscanPercent / 100f) / 2f).dp
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(androidx.compose.ui.graphics.Color.Black)
+                            .padding(horizontal = insetX, vertical = insetY),
+                    ) {
                         JellioTvRoot(
                             deepLinkItemId = deepLinkItemId.value,
                             onDeepLinkConsumed = { deepLinkItemId.value = null },
@@ -335,6 +346,20 @@ private fun JellioTvApp(
         onDeepLinkConsumed()
     }
 
+    val memoizedImageUrl = remember(session) {
+        { item: com.jellio.tv.data.model.BaseItemDto, imageType: String, maxWidth: Int ->
+            appViewModel.imageUrl(session, item, imageType, maxWidth)
+        }
+    }
+    val memoizedRawImageUrl = remember(session) {
+        { itemId: String, tag: String?, imageType: String, maxWidth: Int ->
+            appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth)
+        }
+    }
+    val memoizedServiceLogoUrl = remember(session) {
+        { name: String -> appViewModel.serviceLogoUrl(session, name) }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Real components/seasonalEffects.js's own real z-index: 5,
         // pointer-events: none layer, mounted first (bottommost) so
@@ -362,22 +387,22 @@ private fun JellioTvApp(
                 userId = current.userId,
                 userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
                 bannerUrl = { userId -> appViewModel.bannerUrl(session, userId) },
-                itemImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                itemImageUrl = memoizedRawImageUrl,
                 onNavigateToDetail = onNavigateToDetail,
                 onLogout = { appViewModel.logout() },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Feed -> FeedScreen(
-                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                imageUrl = memoizedRawImageUrl,
                 userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
                 onUserClick = { userId -> push(JellioRoute.Profile(userId)) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Home -> HomeScreen(
                 session = session,
-                imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
-                rawImageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                serviceLogoUrl = { name -> appViewModel.serviceLogoUrl(session, name) },
+                imageUrl = memoizedImageUrl,
+                rawImageUrl = memoizedRawImageUrl,
+                serviceLogoUrl = memoizedServiceLogoUrl,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
@@ -402,18 +427,18 @@ private fun JellioTvApp(
             )
             JellioRoute.Search -> SearchScreen(
                 session = session,
-                imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                imageUrl = memoizedImageUrl,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Watchlist -> WatchlistScreen(
                 session = session,
-                imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                imageUrl = memoizedImageUrl,
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Calendar -> CalendarScreen(
-                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                imageUrl = memoizedRawImageUrl,
                 onItemClick = onNavigateToDetail,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -424,7 +449,7 @@ private fun JellioTvApp(
                         LibraryScreen(
                             session = session,
                             library = library,
-                            imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                            imageUrl = memoizedImageUrl,
                             onItemClick = { item -> onNavigateToDetail(item.Id) },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -437,7 +462,7 @@ private fun JellioTvApp(
                     LibraryScreen(
                         session = session,
                         library = library,
-                        imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                        imageUrl = memoizedImageUrl,
                         onItemClick = { item -> onNavigateToDetail(item.Id) },
                         modifier = Modifier.fillMaxSize(),
                     )

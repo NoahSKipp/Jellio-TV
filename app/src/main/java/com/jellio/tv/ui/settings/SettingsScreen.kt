@@ -96,6 +96,7 @@ fun SettingsScreen(
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
+    var showOverscanCalibration by remember { mutableStateOf(false) }
     // Real bug found live: AvatarPickerOverlay's own dismiss removed its
     // whole real focused subtree with nothing requesting focus back
     // onto this row first, the same real class of dead-remote bug -
@@ -227,6 +228,12 @@ fun SettingsScreen(
 
         SettingsSection(title = "Display") {
             MotionRow()
+            val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
+            SettingsPickerRow(
+                label = "Display safe area (overscan)",
+                value = if (overscan == 0) "Full screen (0%)" else "Inset by $overscan%",
+                onClick = { showOverscanCalibration = true },
+            )
         }
 
         SettingsSection(title = "About") {
@@ -292,6 +299,12 @@ fun SettingsScreen(
             onSelectPreset = { id -> viewModel.selectAvatarPreset(session, id) },
             onUpload = { bytes, contentType -> viewModel.uploadAvatar(session, bytes, contentType) },
             onDismiss = { viewModel.closeAvatarPicker() },
+        )
+    }
+
+    if (showOverscanCalibration) {
+        OverscanCalibrationModal(
+            onDismiss = { showOverscanCalibration = false },
         )
     }
     }

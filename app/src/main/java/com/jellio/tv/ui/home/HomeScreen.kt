@@ -58,6 +58,7 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
+import com.jellio.tv.ui.common.TvBringIntoViewSpec
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -181,23 +182,27 @@ fun HomeScreen(
                 // bug-fix header documents, for free here since this is
                 // a plain derived value off uiState rather than
                 // anything mutated in place.
-                val liveKeys = uiState.rows.map { it.key }
-                val order = HomeCustomization.effectiveOrder(liveKeys, uiState.customization)
-                val byKey = uiState.rows.associateBy { it.key }
-                val orderedRows = order.mapNotNull { byKey[it] }
-                val visibleRows = if (editMode) {
-                    orderedRows
-                } else {
-                    orderedRows.filter { !uiState.customization.hidden.contains(it.key) }
+                val (order, visibleRows) = remember(uiState.rows, uiState.customization, editMode) {
+                    val liveKeys = uiState.rows.map { it.key }
+                    val ord = HomeCustomization.effectiveOrder(liveKeys, uiState.customization)
+                    val byKey = uiState.rows.associateBy { it.key }
+                    val orderedRows = ord.mapNotNull { byKey[it] }
+                    val visible = if (editMode) {
+                        orderedRows
+                    } else {
+                        orderedRows.filter { !uiState.customization.hidden.contains(it.key) }
+                    }
+                    ord to visible
                 }
 
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(blockScrollWhileHeroFocused)
-                        .focusRestorer(),
-                ) {
+                CompositionLocalProvider(LocalBringIntoViewSpec provides TvBringIntoViewSpec) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(blockScrollWhileHeroFocused)
+                            .focusRestorer(),
+                    ) {
                     item {
                         // Real bug found live: pressing Up back to this
                         // real hero only ever scrolled this list the
@@ -379,7 +384,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(start = 48.dp, top = if (uiState.greeting.isEmpty()) 16.dp else 0.dp, bottom = 8.dp),
                         )
                     }
-                    items(visibleRows, key = { it.key }) { row ->
+                    items(visibleRows, key = { it.key }, contentType = { it::class.java.name }) { row ->
                         val hidden = uiState.customization.hidden.contains(row.key)
                         val index = order.indexOf(row.key)
                         val onMoveUp = remember(row.key) { { viewModel.moveRow(row.key, -1) } }
@@ -439,6 +444,7 @@ fun HomeScreen(
                     if (uiState.loadingMore) {
                         item(key = "skeleton") { SkeletonRow() }
                     }
+                }
                 }
             }
         }
@@ -567,33 +573,7 @@ private fun HomeRowEditor(
                 onToggleHidden = onToggleHidden,
             )
         }
-        if (!hidden) RowEntrance(content = content)
-    }
-}
-
-// Real port of css/library-browse.css's own real jellio-row-enter
-// keyframe (opacity 0 to 1, translateY 12px to 0, 420ms ease-out),
-// css/streaming-hub.css's own jellio-hub-enter reusing the identical
-// animation for hub rows: this LazyColumn item's own real first
-// composition (remember here is scoped to it, the same as every other
-// row's own real key) is close enough to that file's own real
-// scroll-into-view trigger for the same real fade-and-rise read.
-@Composable
-private fun RowEntrance(content: @Composable () -> Unit) {
-    val startOffsetPx = with(LocalDensity.current) { 12.dp.toPx() }
-    val alpha = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(startOffsetPx) }
-    LaunchedEffect(Unit) {
-        launch { alpha.animateTo(1f, animationSpec = tween(420, easing = LinearOutSlowInEasing)) }
-        launch { offsetY.animateTo(0f, animationSpec = tween(420, easing = LinearOutSlowInEasing)) }
-    }
-    Box(
-        modifier = Modifier.graphicsLayer {
-            this.alpha = alpha.value
-            translationY = offsetY.value
-        },
-    ) {
-        content()
+        if (!hidden) content()
     }
 }
 

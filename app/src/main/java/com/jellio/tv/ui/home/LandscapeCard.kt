@@ -68,7 +68,8 @@ fun LandscapeRow(
     removingItemId: String? = null,
     onShatterFinished: (BaseItemDto) -> Unit = {},
 ) {
-    if (section.items.isEmpty()) return
+    val rowItems = remember(section.items) { section.items.take(10) }
+    if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
         LazyRow(
@@ -81,7 +82,7 @@ fun LandscapeRow(
             // row's own first card, and real feedback asked for it back
             // to plain text. RowExpandButton at the row's own start
             // instead, sized to this row's own real 16:9 card height.
-            items(section.items.take(10), key = { it.Id }) { item ->
+            items(rowItems, key = { it.Id }, contentType = { "landscape_card" }) { item ->
                 val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                 val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
                 LandscapeCard(

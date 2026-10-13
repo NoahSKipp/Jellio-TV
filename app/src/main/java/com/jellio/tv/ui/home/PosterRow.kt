@@ -46,7 +46,8 @@ fun PosterRow(
     onItemOptions: ((BaseItemDto) -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
 ) {
-    if (section.items.isEmpty()) return
+    val rowItems = remember(section.items) { section.items.take(10) }
+    if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
         LazyRow(
@@ -62,7 +63,7 @@ fun PosterRow(
             // real button at the row's own start, same shape and
             // height a real card here has, replaces it instead of
             // dropping "view all" entirely.
-            items(section.items.take(10), key = { it.Id }) { item ->
+            items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
                 val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                 val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
                 PosterCard(

@@ -38,6 +38,7 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
+import com.jellio.tv.ui.common.TvBringIntoViewSpec
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
@@ -135,11 +136,12 @@ fun LibraryScreen(
             uiState.sections.all { it.items.isEmpty() } && (uiState.mainRow?.items?.isEmpty() != false) && uiState.coverflowItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = "Nothing here yet.", color = JellioTextSecondary)
             }
-            else -> LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .nestedScroll(blockScrollWhileCoverflowFocused)
+            else -> CompositionLocalProvider(LocalBringIntoViewSpec provides TvBringIntoViewSpec) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(blockScrollWhileCoverflowFocused)
                     // Real feedback live: this rail's own reference
                     // viewport (TvScale.kt's own header) is only ~540dp
                     // tall, so on initial open (or back at this list's
@@ -284,7 +286,7 @@ fun LibraryScreen(
                         )
                     }
                 }
-                items(uiState.sections, key = { it.title }) { section ->
+                items(uiState.sections, key = { it.title }, contentType = { "library_section" }) { section ->
                     val onSectionTitleClick = remember(section) { { rowListTarget = section } }
                     PosterRow(
                         section = section,
@@ -294,6 +296,7 @@ fun LibraryScreen(
                         onTitleClick = onSectionTitleClick,
                     )
                 }
+            }
             }
         }
 
