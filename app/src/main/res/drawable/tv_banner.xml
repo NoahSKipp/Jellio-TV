@@ -5,9 +5,19 @@
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
-    <path
-        android:fillColor="#0D0D0D"
-        android:pathData="M0,0h320v180h-320z" />
+    <!-- The launcher icon's indigo, with rounded corners. -->
+    <path android:pathData="M22,0h276a22,22 0 0,1 22,22v136a22,22 0 0,1 -22,22h-276a22,22 0 0,1 -22,-22v-136a22,22 0 0,1 22,-22z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="160"
+                android:centerY="84"
+                android:gradientRadius="190">
+                <item android:offset="0" android:color="#FF464C6E" />
+                <item android:offset="1" android:color="#FF2C3047" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <group android:translateX="90" android:translateY="20" android:scaleX="0.35" android:scaleY="0.35">
 
         <!-- Real port of jellio-mark-animated.svg's own static frame: the

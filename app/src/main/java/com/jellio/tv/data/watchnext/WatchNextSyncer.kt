@@ -18,6 +18,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -185,7 +186,7 @@ class WatchNextSyncer @Inject constructor(
             _status.value = WatchNextStatus(System.currentTimeMillis(), 0, continueWatching.size, 0, 0, "This device has no Continue Watching row")
             return
         }
-        withContext(Dispatchers.IO) {
+        locked {
             try {
                 val existing = queryExisting()
                 // One entry per series, the most recently played episode.
@@ -255,7 +256,7 @@ class WatchNextSyncer @Inject constructor(
     // Sign out: nothing of this account stays on the launcher.
     suspend fun clear() {
         if (!supported()) return
-        withContext(Dispatchers.IO) {
+        locked {
             runCatching {
                 queryExisting().values.forEach { row ->
                     context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
@@ -268,6 +269,15 @@ class WatchNextSyncer @Inject constructor(
     private class Row(val id: Long, val browsable: Boolean, val engagedAt: Long)
 
     // A plain query against this shared table only returns this app's rows.
+    // Home loads and playback stops can sync at the same moment; both used
+    // to see no row yet and insert the same title twice.
+    private val syncLock = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun locked(block: suspend () -> Unit) {
+        syncLock.withLock { withContext(Dispatchers.IO) { block() } }
+    }
+
+    // One row per title: extra copies (left by that race) are deleted.
     private fun queryExisting(): Map<String, Row> {
         val result = mutableMapOf<String, Row>()
         val cursor = context.contentResolver.query(
@@ -281,6 +291,10 @@ class WatchNextSyncer @Inject constructor(
             while (it.moveToNext()) {
                 val program = WatchNextProgram.fromCursor(it)
                 val internalId = program.internalProviderId ?: continue
+                if (result.containsKey(internalId)) {
+                    context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(program.id), null, null)
+                    continue
+                }
                 result[internalId] = Row(program.id, program.isBrowsable, program.lastEngagementTimeUtcMillis)
             }
         }

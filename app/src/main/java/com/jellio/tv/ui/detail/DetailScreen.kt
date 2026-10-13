@@ -616,6 +616,14 @@ private fun DetailHero(
                     onClick = { actionsExpanded = !actionsExpanded },
                 )
             }
+            state.streamStatus?.let { status ->
+                Text(
+                    text = status,
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+            }
         }
     }
 }

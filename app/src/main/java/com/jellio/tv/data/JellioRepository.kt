@@ -63,9 +63,9 @@ private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 // real metadata a plain row/grid fetch never asks for. Trickplay only for
 // the player: the server looks it up per stream version, which for a
 // Gelato title made opening its page far slower than on web.
-private const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
+internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
-private const val PLAYER_DETAIL_FIELDS = "$DETAIL_FIELDS,Trickplay"
+internal const val PLAYER_DETAIL_FIELDS = "$DETAIL_FIELDS,Trickplay"
 
 // Two distinct real patterns, same distinction navShared.js's own
 // getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
@@ -834,7 +834,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
         cache.get("details:$itemId:$forPlayer", SHORT_CACHE_TTL_MS) {
-            api.getItem(userId, itemId, fields = if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
+            fetchItemInfo(userId, itemId, if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
         }.also { previews[it.Id] = it }
 
     // Full details fetched while the viewer rests on a card, so the title
@@ -849,7 +849,7 @@ class JellioRepository @Inject constructor(
         prefetchScope.launch {
             try {
                 val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
-                val item = api.getItem(userId, itemId, fields = DETAIL_FIELDS)
+                val item = fetchItemInfo(userId, itemId, DETAIL_FIELDS)
                 if (preloaded.size > 200) preloaded.clear()
                 preloaded[itemId] = System.currentTimeMillis() to item
             } catch (_: Exception) {
@@ -876,12 +876,19 @@ class JellioRepository @Inject constructor(
     fun previewItem(itemId: String): BaseItemDto? = previews[itemId]
 
     suspend fun getItem(userId: String, itemId: String): BaseItemDto =
-        cache.get("item:$itemId", CACHE_TTL_MS) { api.getItem(userId, itemId) }
+        cache.get("item:$itemId", CACHE_TTL_MS) { fetchItemInfo(userId, itemId, null) }
+
+    // Title info through /Items?ids=, never with MediaSources or
+    // MediaStreams. A title Gelato has not imported yet only exists once
+    // it is asked for by id, so that request stays as the fallback.
+    private suspend fun fetchItemInfo(userId: String, itemId: String, fields: String?): BaseItemDto =
+        runCatching { api.getItemsByIds(userId, itemId, fields).Items.firstOrNull() }.getOrNull()
+            ?: api.getItem(userId, itemId, fields)
 
     // screens/person.js's own real getPerson(): a plain item lookup,
     // real Jellyfin Person items share the same BaseItemDto shape as
     // everything else this app already reads.
-    suspend fun getPerson(userId: String, personId: String): BaseItemDto = api.getItem(userId, personId)
+    suspend fun getPerson(userId: String, personId: String): BaseItemDto = fetchItemInfo(userId, personId, null)
 
     // Real endpoint, GET /Items?personIds=X (Jellyfin.Api's own
     // ItemsController, confirmed against screens/person.js's own

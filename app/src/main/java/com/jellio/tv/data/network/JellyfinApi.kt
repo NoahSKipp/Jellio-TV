@@ -138,6 +138,15 @@ interface JellyfinApi {
     @GET("gelato/search/series")
     suspend fun searchGelatoSeries(@Query("q") query: String): List<BaseItemDto>
 
+    // Title info by id without Gelato resolving its streams first, which
+    // the single-item request below does (2.5-4 s cold on a Gelato server).
+    @GET("Items")
+    suspend fun getItemsByIds(
+        @Query("userId") userId: String,
+        @Query("ids") ids: String,
+        @Query("Fields") fields: String? = null,
+    ): ItemsResultDto
+
     @GET("Users/{userId}/Items/{itemId}")
     suspend fun getItem(
         @Path("userId") userId: String,

@@ -45,6 +45,8 @@ data class DetailUiState(
     val resolvingPlay: Boolean = false,
     // While loading: art from the row the title was picked in.
     val loadingArt: TitleLoadingArtInfo? = null,
+    // Shown under the actions while the stream lookup runs or found nothing.
+    val streamStatus: String? = null,
 )
 
 data class TitleLoadingArtInfo(val backdropUrl: String?, val logoUrl: String?, val title: String)
@@ -122,6 +124,8 @@ class DetailViewModel @Inject constructor(
                     isWatchlisted = item.UserData?.IsFavorite ?: false,
                     isWatched = item.UserData?.Played ?: false,
                 )
+
+                if (item.Type == "Movie" || item.Type == "Episode") lookForStreams(session, item.Id)
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     runCatching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
@@ -235,6 +239,23 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = runCatching { repository.setRating(session.userId, targetId, next) }.getOrNull()
             _uiState.value = _uiState.value.copy(likes = updated?.Likes ?: next)
+        }
+    }
+
+    // Streams are looked up only once the page is drawn; Play reuses this
+    // same lookup (the repository shares it and caches the answer).
+    private fun lookForStreams(session: Session, itemId: String) {
+        _uiState.value = _uiState.value.copy(streamStatus = "Finding streams…")
+        viewModelScope.launch {
+            val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
+            if (_uiState.value.item?.Id != itemId) return@launch
+            _uiState.value = _uiState.value.copy(
+                streamStatus = when {
+                    sources.isFailure -> "Could not check for streams."
+                    sources.getOrNull().isNullOrEmpty() -> "No streams found yet."
+                    else -> null
+                },
+            )
         }
     }
 
