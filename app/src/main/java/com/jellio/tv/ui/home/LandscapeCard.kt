@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.rowEntry
+import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -73,11 +75,12 @@ fun LandscapeRow(
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
+        val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
         LazyRow(
             state = rememberTvRowState(),
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.focusRestorer(),
+            modifier = Modifier.rowEntry(firstCard),
         ) {
             // Same real reasoning PosterRow's own header carries: a
             // focusable heading blocked ordinary Left/Right onto this
@@ -87,14 +90,16 @@ fun LandscapeRow(
             items(rowItems, key = { it.Id }, contentType = { "landscape_card" }) { item ->
                 val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                 val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
-                LandscapeCard(
-                    item = item,
-                    imageUrl = rawImageUrl,
-                    onClick = onCardClick,
-                    onOptionsClick = onCardOptions,
-                    isRemoving = removingItemId == item.Id,
-                    onShatterFinished = { onShatterFinished(item) },
-                )
+                RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
+                    LandscapeCard(
+                        item = item,
+                        imageUrl = rawImageUrl,
+                        onClick = onCardClick,
+                        onOptionsClick = onCardOptions,
+                        isRemoving = removingItemId == item.Id,
+                        onShatterFinished = { onShatterFinished(item) },
+                    )
+                }
             }
             if (onTitleClick != null && section.items.size > 10) {
                 item {

@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.rowEntry
+import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
@@ -51,11 +53,12 @@ fun PosterRow(
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
+        val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
         LazyRow(
             state = rememberTvRowState(),
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.focusRestorer(),
+            modifier = Modifier.rowEntry(firstCard),
         ) {
             // Real feedback live: a focusable heading blocked ordinary
             // Left/Right between cards in the same row, the nearest
@@ -68,12 +71,14 @@ fun PosterRow(
             items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
                 val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                 val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
-                PosterCard(
-                    item = item,
-                    imageUrl = imageUrl,
-                    onClick = onCardClick,
-                    onOptionsClick = onCardOptions,
-                )
+                RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
+                    PosterCard(
+                        item = item,
+                        imageUrl = imageUrl,
+                        onClick = onCardClick,
+                        onOptionsClick = onCardOptions,
+                    )
+                }
             }
             if (onTitleClick != null && section.items.size > 10) {
                 item {

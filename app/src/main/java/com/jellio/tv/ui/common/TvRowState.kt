@@ -5,6 +5,12 @@ import androidx.compose.foundation.lazy.LazyListPrefetchStrategy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
@@ -27,3 +33,19 @@ fun rememberTvRowState(): LazyListState =
 @Composable
 fun rememberTvColumnState(): LazyListState =
     rememberLazyListState(cacheWindow = remember { LazyLayoutCacheWindow(ahead = 420.dp, behind = 320.dp) })
+
+// Moving into a row from above or below lands on the card last used in
+// that row, or its first card, instead of whichever card happened to sit
+// closest on screen. Put rowEntry on the LazyRow and RowEntryTarget
+// around the first item.
+@OptIn(ExperimentalComposeUiApi::class)
+fun Modifier.rowEntry(first: FocusRequester): Modifier = focusRestorer(first)
+
+@androidx.compose.runtime.Composable
+fun RowEntryTarget(first: FocusRequester?, content: @androidx.compose.runtime.Composable () -> Unit) {
+    if (first == null) {
+        content()
+    } else {
+        Box(Modifier.focusRequester(first)) { content() }
+    }
+}

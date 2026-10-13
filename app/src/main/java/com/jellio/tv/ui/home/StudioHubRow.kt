@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.rowEntry
+import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,13 +50,17 @@ fun StudioHubRow(
     if (services.isEmpty()) return
     Column {
         RowTitle(text = "Studio Hubs")
+        val firstTile = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         LazyRow(
             state = rememberTvRowState(),
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.rowEntry(firstTile),
         ) {
             items(services, key = { it }) { service ->
-                StudioHubTile(name = service, logoUrl = logoUrl(service), onClick = { onServiceClick(service) })
+                RowEntryTarget(if (service == services.first()) firstTile else null) {
+                    StudioHubTile(name = service, logoUrl = logoUrl(service), onClick = { onServiceClick(service) })
+                }
             }
         }
     }
