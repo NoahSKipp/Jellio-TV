@@ -2,6 +2,30 @@ package com.jellio.tv.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.tv.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -74,11 +98,11 @@ import com.jellio.tv.ui.update.ManualCheckResult
 
 private enum class LanguageField { AUDIO, SUBTITLE }
 
-private enum class SettingsCategory(val label: String) {
-    ACCOUNT("Account"),
-    PLAYBACK("Playback"),
-    DISPLAY("Display"),
-    ABOUT("About"),
+private enum class SettingsCategory(val label: String, val icon: ImageVector) {
+    ACCOUNT("Account", Icons.Filled.Person),
+    PLAYBACK("Playback", Icons.Filled.PlayCircle),
+    DISPLAY("Display", Icons.Filled.Palette),
+    ABOUT("About", Icons.Filled.Info),
 }
 
 // A real port of screens/settings.js: this app's own real
@@ -133,6 +157,7 @@ fun SettingsScreen(
                 SettingsCategory.entries.forEachIndexed { index, entry ->
                     SettingsCategoryItem(
                         label = entry.label,
+                        icon = entry.icon,
                         selected = entry == category,
                         onFocus = { category = entry },
                         modifier = if (index == 0) Modifier.focusRequester(firstCategory) else Modifier,
@@ -147,34 +172,29 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState),
         ) {
+          Column(modifier = Modifier.widthIn(max = 820.dp)) {
             Text(text = category.label, style = MaterialTheme.typography.headlineSmall, color = JellioText, modifier = Modifier.padding(top = 4.dp))
             when (category) {
                 SettingsCategory.ACCOUNT -> {
-                SettingsSection(title = "Profile") {
-                    SettingsRow(label = "Address", value = session.serverAddress)
-                    SettingsRow(label = "Signed in as", value = session.userName)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
-                        Surface(
-                            onClick = { viewModel.openAvatarPicker() },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                            modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
-                        ) {
-                            Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                        }
-                        Surface(
-                            onClick = onViewProfile,
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                            modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
-                        ) {
-                            Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                        }
-                    }
+                SettingsSection(title = "Profile", icon = Icons.Filled.AccountCircle, description = "Signed in as ${session.userName} on ${session.serverAddress}.") {
+                    SettingsActionRow(
+                        label = "Change avatar",
+                        icon = Icons.Filled.AddAPhoto,
+                        onClick = { viewModel.openAvatarPicker() },
+                        modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
+                    )
+                    SettingsDivider()
+                    SettingsActionRow(
+                        label = "View profile",
+                        description = "Banner, badges and activity.",
+                        icon = Icons.Filled.Badge,
+                        onClick = onViewProfile,
+                        modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
+                    )
                 }
 
                 val isPrivate by viewModel.isPrivate.collectAsState()
-                SettingsSection(title = "Privacy") {
+                SettingsSection(title = "Privacy", icon = Icons.Filled.Lock) {
                     SettingsToggleRow(
                         label = "Private profile",
                         description = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users.",
@@ -183,27 +203,21 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Change Password") {
+                SettingsSection(title = "Security", icon = Icons.Filled.Key, form = true) {
                     PasswordSection(session = session, viewModel = viewModel)
                 }
 
-                Surface(
-                    onClick = onLogout,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = com.jellio.tv.ui.common.dangerButtonColors(),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.5.dp, Color.White),
-                            shape = RoundedCornerShape(999.dp),
-                        )
-                    ),
-                    modifier = Modifier.padding(top = 32.dp),
-                ) {
-                    Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+                SettingsSection(title = null) {
+                    SettingsActionRow(
+                        label = "Log Out",
+                        icon = Icons.AutoMirrored.Filled.Logout,
+                        onClick = onLogout,
+                        danger = true,
+                    )
                 }
                 }
                 SettingsCategory.PLAYBACK -> {
-                SettingsSection(title = "Playback") {
+                SettingsSection(title = "Playback", icon = Icons.Filled.PlayCircle) {
                     SettingsToggleRow(
                         label = "Remember stream choice",
                         description = "Skip the stream picker on a title you already picked one for, for 4 days.",
@@ -211,14 +225,14 @@ fun SettingsScreen(
                         onToggle = { viewModel.setRememberStream(!rememberStream) },
                     )
                     val playerContext = LocalContext.current
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingsDivider()
                     SettingsToggleRow(
                         label = "Auto-skip intros",
                         description = "Jump past an episode's intro by itself when the server knows where it is.",
                         checked = PlayerPrefs.autoSkipIntro,
                         onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingsDivider()
                     // Each press steps to the next level.
                     SettingsPickerRow(
                         label = "Pre-buffer",
@@ -238,12 +252,13 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Language") {
+                SettingsSection(title = "Language", icon = Icons.Filled.Translate) {
                     SettingsPickerRow(
                         label = "Default audio language",
                         value = audioLanguage?.let { languageName(it) } ?: "No preference",
                         onClick = { openField = LanguageField.AUDIO },
                     )
+                    SettingsDivider()
                     SettingsPickerRow(
                         label = "Default subtitle language",
                         value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
@@ -251,14 +266,14 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Sleep Timer") {
+                SettingsSection(title = "Sleep Timer", icon = Icons.Filled.Bedtime, form = true) {
                     SleepTimerSection(viewModel = viewModel)
                 }
                 }
                 SettingsCategory.DISPLAY -> {
-                SettingsSection(title = "Display") {
+                SettingsSection(title = "Display", icon = Icons.Filled.Tv) {
                     MotionRow()
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingsDivider()
                     val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
                     SettingsPickerRow(
                         label = "Display safe area (overscan)",
@@ -267,7 +282,7 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Screen overlays") {
+                SettingsSection(title = "Screen overlays", icon = Icons.Filled.Campaign) {
                     val overlayViewModel: com.jellio.tv.ui.announce.ScreenOverlayViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                     val diagnostic by overlayViewModel.diagnostic.collectAsState()
                     val testScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -279,14 +294,16 @@ fun SettingsScreen(
                 }
                 }
                 SettingsCategory.ABOUT -> {
-                SettingsSection(title = "About") {
-                    SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
-                    UpdateCheckRow(viewModel = appUpdateViewModel)
-                    ImageCheckRow(session = session)
+                SettingsSection(title = "About", icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                        UpdateCheckRow(viewModel = appUpdateViewModel)
+                        ImageCheckRow(session = session)
+                    }
                 }
                 }
             }
             Spacer(modifier = Modifier.height(64.dp))
+          }
         }
     }
 
@@ -337,32 +354,9 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = JellioBgElevated,
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.28f),
-            focusedContentColor = JellioText,
-        ),
-        border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(2.dp, Color.White),
-                shape = RoundedCornerShape(12.dp),
-            )
-        ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(text = label, color = JellioText)
-            Text(text = value, color = JellioTextSecondary)
-        }
+    SettingsRowSurface(onClick = onClick) {
+        SettingsRowText(label = label, description = value)
+        Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -588,40 +582,178 @@ private fun SleepTimerSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun SettingsCategoryItem(label: String, selected: Boolean, onFocus: () -> Unit, modifier: Modifier = Modifier) {
+private fun SettingsCategoryItem(label: String, icon: ImageVector, selected: Boolean, onFocus: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onFocus,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) Color.White.copy(alpha = 0.08f) else Color.Transparent,
+            containerColor = if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent,
             contentColor = if (selected) JellioText else JellioTextSecondary,
-            focusedContainerColor = JellioSecondary,
-            focusedContentColor = JellioBg,
+            focusedContainerColor = Color.White.copy(alpha = 0.16f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(border = BorderStroke(2.dp, JellioSecondary), shape = RoundedCornerShape(12.dp)),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { if (it.isFocused) onFocus() },
     ) {
-        Text(text = label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Text(text = label, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+private val CardBorder = Color.White.copy(alpha = 0.08f)
+private val CardBg = Color.White.copy(alpha = 0.035f)
+private val DangerColor = Color(0xFFFF6B81)
+
+// A grouped card like the web settings: an icon badge and title over
+// divided rows. form = true pads the body for fields and buttons.
+@Composable
+private fun SettingsSection(
+    title: String?,
+    icon: ImageVector? = null,
+    description: String? = null,
+    form: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .padding(top = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardBg)
+            .border(1.dp, CardBorder, RoundedCornerShape(16.dp)),
+    ) {
+        if (title != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                if (icon != null) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.06f)),
+                    ) {
+                        Icon(imageVector = icon, contentDescription = null, tint = JellioText, modifier = Modifier.size(22.dp))
+                    }
+                }
+                Column {
+                    Text(text = title, style = MaterialTheme.typography.titleMedium, color = JellioText)
+                    if (description != null) {
+                        Text(text = description, style = MaterialTheme.typography.bodySmall, color = JellioTextSecondary)
+                    }
+                }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(CardBorder))
+        }
+        Column(modifier = if (form) Modifier.padding(20.dp) else Modifier.padding(vertical = 6.dp)) { content() }
     }
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier = Modifier.padding(top = 32.dp)) {
-        Text(text = title, style = MaterialTheme.typography.titleMedium, color = JellioTextSecondary)
-        Column(modifier = Modifier.padding(top = 12.dp)) { content() }
+private fun SettingsDivider() {
+    Box(Modifier.padding(horizontal = 20.dp).fillMaxWidth().height(1.dp).background(CardBorder))
+}
+
+// One focusable row inside a card: a soft highlight with a thin accent
+// border when focused, nothing at rest.
+@Composable
+private fun SettingsRowSurface(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val accent = if (danger) DangerColor else JellioSecondary
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = JellioText,
+            focusedContainerColor = if (danger) DangerColor.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(border = BorderStroke(2.dp, accent), shape = RoundedCornerShape(12.dp)),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.SettingsRowText(label: String, description: String?, color: Color = JellioText) {
+    Column(modifier = Modifier.weight(1f)) {
+        Text(text = label, color = color, style = MaterialTheme.typography.titleSmall)
+        if (!description.isNullOrBlank()) {
+            Text(text = description, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun SettingsActionRow(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    danger: Boolean = false,
+) {
+    val color = if (danger) DangerColor else JellioText
+    SettingsRowSurface(onClick = onClick, modifier = modifier, danger = danger) {
+        Icon(imageVector = icon, contentDescription = null, tint = if (danger) DangerColor else JellioTextSecondary, modifier = Modifier.size(22.dp))
+        SettingsRowText(label = label, description = description, color = color)
+        if (!danger) {
+            Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
+        }
     }
 }
 
 @Composable
 private fun SettingsRow(label: String, value: String) {
-    Box(modifier = Modifier.padding(vertical = 8.dp)) {
-        Column {
-            Text(text = label, color = JellioTextSecondary)
-            Text(text = value, color = JellioText, style = MaterialTheme.typography.bodyLarge)
-        }
+    Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp)) {
+        Text(text = label, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
+        Text(text = value, color = JellioText, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+// The web settings' toggle: a pill track with a sliding thumb.
+@Composable
+private fun SettingsSwitch(checked: Boolean) {
+    Box(
+        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
+        modifier = Modifier
+            .width(48.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (checked) JellioSecondary else Color.White.copy(alpha = 0.14f))
+            .padding(3.dp),
+    ) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(if (checked) JellioBg else JellioText),
+        )
     }
 }
 
@@ -776,42 +908,18 @@ private fun MotionRow() {
             else -> "Full"
         } + ")"
     }
-    Surface(
+    SettingsRowSurface(
         onClick = {
             val next = options[(options.indexOf(preference).coerceAtLeast(0) + 1) % options.size]
             MotionPolicy.setPreference(context, next)
         },
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = JellioBgElevated,
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.28f),
-            focusedContentColor = JellioText,
-        ),
-        border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(2.dp, Color.White),
-                shape = RoundedCornerShape(12.dp),
-            )
-        ),
-        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                Text(text = "Seasonal animations", color = JellioText)
-                Text(
-                    text = "Reduced redraws less often and keeps menus smoother on slower devices. " +
-                        (profile?.let { "This device: " + it.describe() + "." } ?: ""),
-                    color = JellioTextSecondary,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-            Text(text = labelOf(preference), color = JellioText, style = MaterialTheme.typography.titleSmall)
-        }
+        SettingsRowText(
+            label = "Seasonal animations: " + labelOf(preference),
+            description = "Reduced redraws less often and keeps menus smoother on slower devices. " +
+                (profile?.let { "This device: " + it.describe() + "." } ?: ""),
+        )
+        Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -822,46 +930,8 @@ private fun MotionRow() {
 // such trust.
 @Composable
 private fun SettingsToggleRow(label: String, description: String, checked: Boolean, onToggle: () -> Unit) {
-    Surface(
-        onClick = onToggle,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = JellioBgElevated,
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.28f),
-            focusedContentColor = JellioText,
-        ),
-        border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(2.dp, Color.White),
-                shape = RoundedCornerShape(12.dp),
-            )
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Real bug found live, on a real screenshot: this column
-            // had no real weight of its own inside this real Row, so a
-            // long real description (this toggle's own real Privacy
-            // one, well past "Remember stream choice"'s own real
-            // shorter one) could grow wide enough to squeeze the real
-            // On/Off indicator right out of this row's own visible
-            // bounds - "doesn't show the on/off", real feedback's own
-            // words. weight(1f) bounds it to the real space actually
-            // left over instead.
-            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                Text(text = label, color = JellioText)
-                Text(text = description, color = JellioTextSecondary, style = MaterialTheme.typography.bodyLarge)
-            }
-            Text(
-                text = if (checked) "On" else "Off",
-                color = if (checked) JellioText else JellioTextSecondary,
-                style = MaterialTheme.typography.titleSmall,
-            )
-        }
+    SettingsRowSurface(onClick = onToggle) {
+        SettingsRowText(label = label, description = description)
+        SettingsSwitch(checked = checked)
     }
 }
