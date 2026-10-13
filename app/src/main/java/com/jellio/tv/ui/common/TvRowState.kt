@@ -13,7 +13,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.unit.dp
 
 // A row inside a vertically scrolling screen. When the screen builds the
 // row ahead of time, it builds every card that will be on screen, not
@@ -26,13 +25,13 @@ import androidx.compose.ui.unit.dp
 fun rememberTvRowState(): LazyListState =
     rememberLazyListState(prefetchStrategy = remember { LazyListPrefetchStrategy(nestedPrefetchItemCount = 9) })
 
-// The vertical list of rows: keeps about one row below and one above
-// composed, so a D-pad move that scrolls brings in a row that is
-// already built.
+// The vertical list of rows: keeps a full screen of rows below and half a
+// screen above built while idle, so scrolling to a row further down never
+// has to compose it (and start its images) inside the scroll animation.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun rememberTvColumnState(): LazyListState =
-    rememberLazyListState(cacheWindow = remember { LazyLayoutCacheWindow(ahead = 420.dp, behind = 320.dp) })
+    rememberLazyListState(cacheWindow = remember { LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f) })
 
 // Moving into a row from above or below lands on the card last used in
 // that row, or its first card, instead of whichever card happened to sit

@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
@@ -142,10 +143,11 @@ fun SeasonalEffectsOverlay(themeKey: String?, modifier: Modifier = Modifier) {
     val level = MotionPolicy.level
     if (level == MotionLevel.OFF) return
     Box(modifier = modifier.fillMaxSize()) {
-        Canvas(Modifier.fillMaxSize()) { drawWash(spec) }
+        // Static parts go in their own offscreen layer, kept as a texture
+        // instead of redrawing full-screen gradients on every scroll frame.
+        Canvas(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) { drawWash(spec) }
         if (level == MotionLevel.STILL) {
-            // The scenery, drawn once: no clock, no redraws.
-            Canvas(Modifier.fillMaxSize()) {
+            Canvas(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
                 when (themeKey) {
                     "halloween" -> drawHalloweenStill()
                     "christmas" -> drawChristmasStill()
