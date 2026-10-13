@@ -1122,6 +1122,13 @@ class PlayerViewModel @Inject constructor(
     // once markRealWatchComplete() already ran keeps native Jellyfin's
     // own math in its own "ignore progress during the beginning" branch
     // instead, which only ever touches positionTicks, never Played.
+    // The next episode's stream list, fetched once when its Up Next card
+    // appears so autoplay finds it cached instead of resolving then.
+    fun preloadUpNextSources(session: Session) {
+        val nextId = _uiState.value.upNextInfo?.itemId ?: return
+        viewModelScope.launch { runCatching { repository.getMediaSources(session.userId, nextId, reason = "up next") } }
+    }
+
     fun reportStopped(positionTicks: Long) {
         val id = itemId ?: return
         val reportedPositionTicks = if (hasCreditedRealWatch) 0 else positionTicks

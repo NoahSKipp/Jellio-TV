@@ -274,6 +274,7 @@ fun PlayerScreen(
                 sleepTimerEndTimeMs = uiState.sleepTimerEndTimeMs,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
+                onUpNextShown = { viewModel.preloadUpNextSources(session) },
                 onReportProgress = { positionTicks, paused -> viewModel.reportProgress(positionTicks, paused) },
                 onReportStopped = { viewModel.reportStopped(it) },
                 onMarkRealWatchComplete = { viewModel.markRealWatchComplete() },
@@ -395,6 +396,7 @@ private fun PlayerSurface(
     sleepTimerEndTimeMs: Long?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
+    onUpNextShown: () -> Unit = {},
     onReportProgress: (Long, Boolean) -> Unit,
     onReportStopped: (Long) -> Unit,
     onMarkRealWatchComplete: () -> Unit,
@@ -820,6 +822,7 @@ private fun PlayerSurface(
             if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
                 if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
+                    onUpNextShown()
                     // The episode sleep timer counts this boundary; on the
                     // last one there's no Up Next, playback stops at the end.
                     EpisodeSleepTimer.remaining?.let { left ->

@@ -98,7 +98,19 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             // The player's loader, with art from the row the title was
             // picked in, until the full details arrive.
-            _uiState.value = DetailUiState(isLoading = true, loadingArt = repository.previewItem(itemId)?.let { loadingArt(session, it) })
+            val preloaded = repository.preloadedDetails(itemId)
+            _uiState.value = if (preloaded != null) {
+                DetailUiState(
+                    isLoading = false,
+                    item = preloaded,
+                    cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
+                    trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
+                    isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
+                    isWatched = preloaded.UserData?.Played ?: false,
+                )
+            } else {
+                DetailUiState(isLoading = true, loadingArt = repository.previewItem(itemId)?.let { loadingArt(session, it) })
+            }
             try {
                 val item = repository.getItemDetails(session.userId, itemId)
                 ratingTargetId = item.Id

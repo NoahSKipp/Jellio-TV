@@ -38,6 +38,7 @@ class GelatoPrefetchViewModel @Inject constructor(
     fun prefetch(item: BaseItemDto) {
         repository.seedPreviews(listOf(item))
         if (item.Type != "Movie" && item.Type != "Episode" && item.Type != "Series") return
+        repository.preloadDetails(item.Id)
         repository.prefetchStreams(item.Id)
     }
 }

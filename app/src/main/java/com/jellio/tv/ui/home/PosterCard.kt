@@ -99,11 +99,24 @@ fun PosterCard(
     // explains why a fixed dp size alone was not real enough coverage.
     val posterWidth = PosterWidth.scaled()
     val prefetch = LocalGelatoPrefetch.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
             delay(PREFETCH_DEBOUNCE_MS)
-            if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) prefetch(item)
+            if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) {
+                prefetch(item)
+                // The title page's backdrop, into the disk cache only.
+                if (!item.BackdropImageTags.isNullOrEmpty()) {
+                    coil3.SingletonImageLoader.get(context).enqueue(
+                        coil3.request.ImageRequest.Builder(context)
+                            .data(imageUrl(item, "Backdrop", 1920))
+                            .memoryCachePolicy(coil3.request.CachePolicy.DISABLED)
+                            .size(640, 360)
+                            .build(),
+                    )
+                }
+            }
         }
     }
     Box(modifier = modifier.width(posterWidth)) {

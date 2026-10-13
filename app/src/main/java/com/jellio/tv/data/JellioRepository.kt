@@ -56,6 +56,7 @@ import javax.inject.Singleton
 // asked the server whether one even existed), same real field
 // screens/home.js's own hero already knows to ask for.
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
+private const val PRELOAD_TTL_MS = 60_000L
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
@@ -835,6 +836,33 @@ class JellioRepository @Inject constructor(
         cache.get("details:$itemId:$forPlayer", SHORT_CACHE_TTL_MS) {
             api.getItem(userId, itemId, fields = if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
         }.also { previews[it.Id] = it }
+
+    // Full details fetched while the viewer rests on a card, so the title
+    // page can open complete; fresh for a minute, the page still refreshes.
+    private val preloaded = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
+    private val preloadSlots = java.util.concurrent.Semaphore(2)
+
+    fun preloadDetails(itemId: String) {
+        val now = System.currentTimeMillis()
+        if (preloaded[itemId]?.let { now - it.first < PRELOAD_TTL_MS } == true) return
+        if (!preloadSlots.tryAcquire()) return
+        prefetchScope.launch {
+            try {
+                val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
+                val item = api.getItem(userId, itemId, fields = DETAIL_FIELDS)
+                if (preloaded.size > 200) preloaded.clear()
+                preloaded[itemId] = System.currentTimeMillis() to item
+            } catch (_: Exception) {
+            } finally {
+                preloadSlots.release()
+            }
+        }
+    }
+
+    fun preloadedDetails(itemId: String): BaseItemDto? {
+        val entry = preloaded[itemId] ?: return null
+        return entry.second.takeIf { System.currentTimeMillis() - entry.first < PRELOAD_TTL_MS }
+    }
 
     // Items already seen in a row or list, so a title page can draw them
     // at once while the full details load.
