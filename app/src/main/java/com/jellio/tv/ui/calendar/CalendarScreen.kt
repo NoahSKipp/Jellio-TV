@@ -101,7 +101,7 @@ fun CalendarScreen(
             }
             uiState.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "Nothing upcoming yet. Anything on your Watchlist with a known air or digital release date shows up here.",
+                    text = "Nothing upcoming yet. Your Watchlist and the shows you have been watching appear here once a new episode or release date is announced.",
                     color = JellioTextSecondary,
                 )
             }
