@@ -141,7 +141,7 @@ class WatchNextSyncer @Inject constructor(
         return runCatching { parseInstant(raw) }.getOrDefault(System.currentTimeMillis())
     }
 
-    private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean): WatchNextProgram? {
+    private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean, engaged: Long): WatchNextProgram? {
         val runtimeMs = ((item.RunTimeTicks ?: 0L) / 10_000).toInt()
         val positionMs = ((item.UserData?.PlaybackPositionTicks ?: 0L) / 10_000).toInt()
         if (runtimeMs <= 0) return null
@@ -166,7 +166,7 @@ class WatchNextSyncer @Inject constructor(
             .setInternalProviderId(item.Id)
             .setDurationMillis(runtimeMs)
             .setLastPlaybackPositionMillis(positionMs)
-            .setLastEngagementTimeUtcMillis(engagedAt(item))
+            .setLastEngagementTimeUtcMillis(engaged)
         item.Overview?.takeIf { it.isNotBlank() }?.let { builder.setDescription(it) }
         if (item.Type == "Episode") {
             item.ParentIndexNumber?.let { builder.setSeasonNumber(it) }
@@ -191,10 +191,17 @@ class WatchNextSyncer @Inject constructor(
                 // One entry per series, the most recently played episode.
                 // Unfinished titles as CONTINUE, then the next episode of other
                 // shows being watched as NEXT; one entry per series.
-                val nextIds = upNext.map { it.Id }.toSet()
-                val candidates = (continueWatching + upNext).distinctBy { it.SeriesId ?: it.Id }.take(MAX_ROWS)
-                val wanted = candidates.mapNotNull { item ->
-                    toWatchNextProgram(session, item, next = item.Id in nextIds && item !in continueWatching)?.let { item.Id to it }
+                // Google TV shows five cards per app: unfinished titles take
+                // them first, next episodes fill the rest and sort just after.
+                val continuing = continueWatching.distinctBy { it.SeriesId ?: it.Id }
+                val seen = continuing.map { it.SeriesId ?: it.Id }.toSet()
+                val nexts = upNext.filter { (it.SeriesId ?: it.Id) !in seen }.distinctBy { it.SeriesId ?: it.Id }
+                val candidates = (continuing + nexts).take(MAX_ROWS)
+                val oldest = continuing.minOfOrNull { engagedAt(it) } ?: System.currentTimeMillis()
+                val wanted = candidates.mapIndexedNotNull { index, item ->
+                    val next = index >= continuing.size
+                    val engaged = if (next) oldest - (index + 1) * 60_000L else engagedAt(item)
+                    toWatchNextProgram(session, item, next, engaged)?.let { item.Id to it }
                 }.toMap()
 
                 wanted.forEach { (itemId, program) ->
@@ -282,6 +289,6 @@ class WatchNextSyncer @Inject constructor(
 
     private companion object {
         const val TAG = "JellioWatchNext"
-        const val MAX_ROWS = 20
+        const val MAX_ROWS = 5
     }
 }
