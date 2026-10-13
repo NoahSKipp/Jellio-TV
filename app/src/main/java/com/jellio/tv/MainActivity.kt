@@ -96,19 +96,28 @@ class MainActivity : ComponentActivity() {
                     com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchLambda,
                 ) {
                     val overscanPercent = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
+                    val isCalibrating = com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating
                     val config = androidx.compose.ui.platform.LocalConfiguration.current
-                    val insetX = (config.screenWidthDp * (overscanPercent / 100f) / 2f).dp
-                    val insetY = (config.screenHeightDp * (overscanPercent / 100f) / 2f).dp
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(androidx.compose.ui.graphics.Color.Black)
-                            .padding(horizontal = insetX, vertical = insetY),
-                    ) {
-                        JellioTvRoot(
-                            deepLinkItemId = deepLinkItemId.value,
-                            onDeepLinkConsumed = { deepLinkItemId.value = null },
-                        )
+                    val insetX = if (isCalibrating) 0.dp else (config.screenWidthDp * (overscanPercent / 100f) / 2f).dp
+                    val insetY = if (isCalibrating) 0.dp else (config.screenHeightDp * (overscanPercent / 100f) / 2f).dp
+                    Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(androidx.compose.ui.graphics.Color.Black)
+                                .padding(horizontal = insetX, vertical = insetY),
+                        ) {
+                            JellioTvRoot(
+                                deepLinkItemId = deepLinkItemId.value,
+                                onDeepLinkConsumed = { deepLinkItemId.value = null },
+                            )
+                        }
+
+                        if (isCalibrating) {
+                            com.jellio.tv.ui.settings.OverscanCalibrationModal(
+                                onDismiss = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = false },
+                            )
+                        }
                     }
                 }
             }

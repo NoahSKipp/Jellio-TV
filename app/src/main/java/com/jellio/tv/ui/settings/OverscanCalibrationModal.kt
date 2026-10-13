@@ -14,12 +14,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -27,7 +31,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -56,11 +60,16 @@ fun OverscanCalibrationModal(
 ) {
     val context = LocalContext.current
     var currentPercent by remember { mutableIntStateOf(DisplayPreferences.overscanPercent) }
+    val initialFocus = remember { FocusRequester() }
 
     fun applyChange(newPercent: Int) {
         val clamped = newPercent.coerceIn(DisplayPreferences.MIN_PERCENT, DisplayPreferences.MAX_PERCENT)
         currentPercent = clamped
         DisplayPreferences.setOverscan(context, clamped)
+    }
+
+    LaunchedEffect(Unit) {
+        initialFocus.requestFocus()
     }
 
     BackHandler {
@@ -76,21 +85,7 @@ fun OverscanCalibrationModal(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        Key.DirectionLeft -> {
-                            applyChange(currentPercent - 1)
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            applyChange(currentPercent + 1)
-                            true
-                        }
-                        else -> false
-                    }
-                } else false
-            },
+            .focusProperties { onExit = { FocusRequester.Cancel } },
     ) {
         // Outer reference bounds with 4-corner brackets
         Box(
@@ -231,12 +226,19 @@ fun OverscanCalibrationModal(
                         focusedContentColor = JellioText,
                     ),
                     border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+                        focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
                     ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    modifier = Modifier.onKeyEvent {
+                        if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionLeft && currentPercent > DisplayPreferences.MIN_PERCENT) {
+                            applyChange(currentPercent - 1)
+                            true
+                        } else false
+                    },
                 ) {
                     Text(
                         text = "◀ Expand (-)",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }
 
@@ -251,12 +253,21 @@ fun OverscanCalibrationModal(
                         focusedContentColor = JellioText,
                     ),
                     border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+                        focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
                     ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    modifier = Modifier
+                        .focusRequester(initialFocus)
+                        .onKeyEvent {
+                            if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionRight && currentPercent < DisplayPreferences.MAX_PERCENT) {
+                                applyChange(currentPercent + 1)
+                                true
+                            } else false
+                        },
                 ) {
                     Text(
                         text = "Inset (+) ▶",
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }
             }
@@ -278,8 +289,9 @@ fun OverscanCalibrationModal(
                             focusedContentColor = JellioText,
                         ),
                         border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+                            focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
                         ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
                         Text(
                             text = "Reset (0%)",
@@ -301,8 +313,9 @@ fun OverscanCalibrationModal(
                         focusedContentColor = JellioBg,
                     ),
                     border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+                        focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
                     ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                 ) {
                     Text(
                         text = "Save & Apply",

@@ -3,6 +3,7 @@ package com.jellio.tv.data.prefs
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 // Controls the display safe area (overscan inset margin) for TVs where
@@ -17,6 +18,8 @@ object DisplayPreferences {
 
     var overscanPercent by mutableIntStateOf(0)
         private set
+
+    var isCalibrating by mutableStateOf(false)
 
     fun init(context: Context) {
         val app = context.applicationContext
