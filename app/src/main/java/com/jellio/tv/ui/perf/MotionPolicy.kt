@@ -8,9 +8,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-// How much ambient motion (the seasonal scenes) this device gets. FULL
-// redraws every frame, REDUCED at a lower rate, STILL not at all.
-enum class MotionLevel { FULL, REDUCED, STILL }
+// How much of the seasonal scenes this device gets. FULL redraws every
+// frame; REDUCED fewer creatures and particles at a lower rate; STILL the
+// scenery (moon, cobwebs, garlands, glow) drawn once with nothing moving;
+// OFF nothing at all.
+enum class MotionLevel { FULL, REDUCED, STILL, OFF }
+
+// Set while a screen's list is scrolling: the scenes hold their frame
+// meanwhile, so the scroll gets the whole frame budget.
+object ScrollActivity {
+    var scrolling by mutableStateOf(false)
+}
 
 // What the device looks like, worked out once at start: low-RAM devices,
 // two cores or a small heap struggle with full-screen redraws, and a UI
@@ -31,7 +39,7 @@ object MotionPolicy {
     private const val PREFS = "jellio_display"
     private const val KEY = "motion"
 
-    // "auto", "full", "reduced" or "off".
+    // "auto", "full", "reduced", "still" or "off".
     var preference by mutableStateOf("auto")
         private set
 
@@ -60,7 +68,8 @@ object MotionPolicy {
             systemStill -> MotionLevel.STILL
             preference == "full" -> MotionLevel.FULL
             preference == "reduced" -> MotionLevel.REDUCED
-            preference == "off" -> MotionLevel.STILL
+            preference == "still" -> MotionLevel.STILL
+            preference == "off" -> MotionLevel.OFF
             else -> profile?.suggested ?: MotionLevel.FULL
         }
 

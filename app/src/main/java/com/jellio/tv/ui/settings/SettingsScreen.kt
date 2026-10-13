@@ -706,20 +706,22 @@ private fun ImageCheckRow(session: Session) {
 }
 
 // Seasonal animations: Auto picks from the device check, the rest force
-// it. Pressing cycles through the four.
+// it. Pressing cycles through them.
 @Composable
 private fun MotionRow() {
     val context = LocalContext.current
     val preference = MotionPolicy.preference
     val profile = MotionPolicy.profile
-    val options = listOf("auto", "full", "reduced", "off")
+    val options = listOf("auto", "full", "reduced", "still", "off")
     fun labelOf(value: String) = when (value) {
         "full" -> "Full"
         "reduced" -> "Reduced"
+        "still" -> "Still (no animation)"
         "off" -> "Off"
         else -> "Auto (" + when (profile?.suggested) {
             MotionLevel.REDUCED -> "Reduced"
-            MotionLevel.STILL -> "Off"
+            MotionLevel.STILL -> "Still"
+            MotionLevel.OFF -> "Off"
             else -> "Full"
         } + ")"
     }

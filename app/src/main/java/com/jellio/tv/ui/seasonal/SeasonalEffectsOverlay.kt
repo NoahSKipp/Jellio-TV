@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import com.jellio.tv.ui.perf.MotionLevel
 import com.jellio.tv.ui.perf.MotionPolicy
+import com.jellio.tv.ui.perf.ScrollActivity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -60,8 +62,8 @@ import kotlin.random.Random
 // Compose: a static layer (washes and decorations, drawn once), an
 // animated layer (creatures and particles, positions worked out from
 // the clock each frame) and, above the page, the sky (Halloween
-// lightning, the New Year title). With the system's animations turned
-// off only the washes stay.
+// lightning, the New Year title). STILL keeps the washes and scenery
+// without motion; OFF draws nothing.
 
 private fun svg(d: String): Path = PathParser().parsePathString(d).toPath()
 
@@ -90,25 +92,35 @@ private fun cycle(t: Float, duration: Float, offset: Float): Float {
     return v - floor(v)
 }
 
-// Off when the system or the reader turned motion off (Settings, or the
-// device check in MotionPolicy picked it).
+// Nothing moves on STILL (and nothing at all is drawn on OFF): from the
+// Settings choice, the device check in MotionPolicy, or the system's
+// animations being off.
 @Composable
-private fun animationsOff(): Boolean = MotionPolicy.level == MotionLevel.STILL
+private fun animationsOff(): Boolean = MotionPolicy.level == MotionLevel.STILL || MotionPolicy.level == MotionLevel.OFF
+
+@Composable
+private fun reducedMotion(): Boolean = MotionPolicy.level == MotionLevel.REDUCED
 
 // The scenes' time. Every frame on capable devices; on REDUCED it only
-// moves on about 24 times a second, so the full-screen redraw behind the
-// page costs well under half as much.
+// moves on about 15 times a second, so the full-screen redraw behind the
+// page costs a fraction as much. While a list scrolls it holds still
+// (ScrollActivity), leaving the frames to the scroll; the scene then
+// carries on from where it was.
 @Composable
 private fun rememberClock(): MutableLongState {
     val clock = remember { mutableLongStateOf(0L) }
     val level = MotionPolicy.level
     LaunchedEffect(level) {
-        val start = withFrameNanos { it }
-        val stepNanos = if (level == MotionLevel.REDUCED) 1_000_000_000L / 24 else 0L
-        var last = 0L
+        val stepNanos = if (level == MotionLevel.REDUCED) 1_000_000_000L / 15 else 0L
+        var previous = withFrameNanos { it }
+        var t = clock.longValue
+        var last = t
         while (true) {
             withFrameNanos { now ->
-                val t = now - start
+                val delta = now - previous
+                previous = now
+                if (ScrollActivity.scrolling) return@withFrameNanos
+                t += delta
                 if (t - last >= stepNanos) {
                     last = t
                     clock.longValue = t
@@ -127,10 +139,22 @@ private object SeasonSignals {
 @Composable
 fun SeasonalEffectsOverlay(themeKey: String?, modifier: Modifier = Modifier) {
     val spec = themeKey?.let { SEASONAL_THEMES[it] } ?: return
-    val still = animationsOff()
+    val level = MotionPolicy.level
+    if (level == MotionLevel.OFF) return
     Box(modifier = modifier.fillMaxSize()) {
         Canvas(Modifier.fillMaxSize()) { drawWash(spec) }
-        if (still) return@Box
+        if (level == MotionLevel.STILL) {
+            // The scenery, drawn once: no clock, no redraws.
+            Canvas(Modifier.fillMaxSize()) {
+                when (themeKey) {
+                    "halloween" -> drawHalloweenStill()
+                    "christmas" -> drawChristmasStill()
+                    "newyear" -> drawNewYearStill()
+                    "valentine" -> drawValentineStill()
+                }
+            }
+            return@Box
+        }
         when (themeKey) {
             "halloween" -> HalloweenScene()
             "christmas" -> ChristmasScene()
@@ -205,35 +229,21 @@ private fun HalloweenScene() {
         drawCobweb(Offset.Zero, 1f)
         drawCobweb(Offset(size.width, 0f), -1f)
     }
-    Canvas(Modifier.fillMaxSize().graphicsLayer { translationX = size.width * fogShift }) {
-        drawRect(
-            Brush.radialGradient(
-                0f to Color(0x427C3AED), 1f to Color.Transparent,
-                center = Offset(size.width * 0.2f, size.height * 1.05f), radius = size.width * 0.45f,
-            ),
-        )
-        drawRect(
-            Brush.radialGradient(
-                0f to Color(0x2EFF7518), 1f to Color.Transparent,
-                center = Offset(size.width * 0.75f, size.height * 1.05f), radius = size.width * 0.38f,
-            ),
-        )
-    }
-    Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = dread }) {
-        drawRect(
-            Brush.radialGradient(
-                0.45f to Color.Transparent, 1f to Color(0x80000000),
-                center = Offset(size.width / 2, size.height * 0.4f), radius = maxOf(size.width, size.height) * 0.75f,
-            ),
-        )
-    }
+    Canvas(Modifier.fillMaxSize().graphicsLayer { translationX = size.width * fogShift }) { drawHalloweenFog() }
+    Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = dread }) { drawDread() }
 
+    // REDUCED keeps a third of the creatures: the four near bats, one
+    // ghost, one spider, a few embers.
     val rng = remember { Random(31) }
-    val bats = remember { List(12) { i -> val near = i < 4; Bat(rng.nextFloat() * 0.9f, -rng.range(0.3f, 0.6f), if (near) rng.range(9f, 13f) else rng.range(15f, 24f), rng.range(0f, 20f), if (near) rng.range(40f, 56f) else rng.range(20f, 30f), if (near) 0.6f else 0.34f, rng.range(0.26f, 0.4f)) } }
-    val ghosts = remember { List(3) { Ghost(rng.range(0.08f, 0.88f), rng.range(34f, 62f), rng.range(0.18f, 0.34f), rng.range(20f, 32f), rng.range(0f, 28f)) } }
-    val spiders = remember { List(2) { Spider(rng.range(0.14f, 0.88f), rng.range(0.22f, 0.55f), rng.range(22f, 32f), rng.range(15f, 24f), rng.range(0f, 20f)) } }
-    val embers = remember { List(20) { Ember(rng.nextFloat(), rng.range(2f, 4.5f), rng.range(-60f, 60f), rng.range(8f, 15f), rng.range(0f, 15f)) } }
+    val allBats = remember { List(12) { i -> val near = i < 4; Bat(rng.nextFloat() * 0.9f, -rng.range(0.3f, 0.6f), if (near) rng.range(9f, 13f) else rng.range(15f, 24f), rng.range(0f, 20f), if (near) rng.range(40f, 56f) else rng.range(20f, 30f), if (near) 0.6f else 0.34f, rng.range(0.26f, 0.4f)) } }
+    val allGhosts = remember { List(3) { Ghost(rng.range(0.08f, 0.88f), rng.range(34f, 62f), rng.range(0.18f, 0.34f), rng.range(20f, 32f), rng.range(0f, 28f)) } }
+    val allSpiders = remember { List(2) { Spider(rng.range(0.14f, 0.88f), rng.range(0.22f, 0.55f), rng.range(22f, 32f), rng.range(15f, 24f), rng.range(0f, 20f)) } }
+    val allEmbers = remember { List(20) { Ember(rng.nextFloat(), rng.range(2f, 4.5f), rng.range(-60f, 60f), rng.range(8f, 15f), rng.range(0f, 15f)) } }
     val eyes = remember { listOf(Color(0xFFFF7518), Color(0xFF7CFF6B), Color(0xFFFF3B3B)).map { Eyes(rng.range(0.15f, 0.8f), rng.range(0.34f, 0.74f), it, rng.range(12f, 19f), rng.range(0f, 14f)) } }
+    val bats = if (reduced) allBats.take(4) else allBats
+    val ghosts = if (reduced) allGhosts.take(1) else allGhosts
+    val spiders = if (reduced) allSpiders.take(1) else allSpiders
+    val embers = if (reduced) allEmbers.take(6) else allEmbers
     val clock = rememberClock()
 
     Canvas(Modifier.fillMaxSize()) {
@@ -337,35 +347,90 @@ private fun HalloweenScene() {
             }
         }
 
-        listOf(Triple(0.10f, 70f, 0f), Triple(0.92f, 56f, 1.4f)).forEach { (fx, sizeDp, off) ->
-            val sizePx = sizeDp * dp
-            val left = if (fx < 0.5f) fx * w else fx * w - sizePx
-            val top = h * 0.98f - sizePx * 0.9f
-            val flicker = 0.75f + 0.25f * sin((t + off) * 2f * PI.toFloat() / 3.4f) * sin((t + off) * 7.3f)
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(Color(0x8CFF8C1E), Color(0x2EFF7518), Color.Transparent),
-                    center = Offset(left + sizePx / 2, top + sizePx * 0.5f), radius = sizePx * 1.1f,
-                ),
-                sizePx * 1.1f, Offset(left + sizePx / 2, top + sizePx * 0.5f), alpha = flicker,
-            )
-            translate(left, top) {
-                scale(sizePx / 80f, Offset.Zero) { drawPumpkin(flicker) }
-            }
-        }
+        drawPumpkins(if (reduced) null else t)
+        // A slow cloud across the moon (parked on REDUCED).
+        drawMoonCloud(if (reduced) 0f else sin(t * 2f * PI.toFloat() / 52f))
+    }
+}
 
-        // A slow cloud across the moon.
-        val moonR = 75f * dp
-        val mc = Offset(w - w * 0.07f - moonR, h * 0.04f + moonR)
-        val cloudX = mc.x + sin(t * 2f * PI.toFloat() / 52f) * moonR * 0.6f
-        translate(cloudX, mc.y + moonR * 0.15f) {
-            scale(3f, 0.45f, Offset.Zero) {
-                drawCircle(
-                    Brush.radialGradient(listOf(Color(0xD90C0812), Color.Transparent), center = Offset.Zero, radius = moonR * 0.5f),
-                    moonR * 0.5f, Offset.Zero,
-                )
-            }
+private fun DrawScope.drawHalloweenFog() {
+    drawRect(
+        Brush.radialGradient(
+            0f to Color(0x427C3AED), 1f to Color.Transparent,
+            center = Offset(size.width * 0.2f, size.height * 1.05f), radius = size.width * 0.45f,
+        ),
+    )
+    drawRect(
+        Brush.radialGradient(
+            0f to Color(0x2EFF7518), 1f to Color.Transparent,
+            center = Offset(size.width * 0.75f, size.height * 1.05f), radius = size.width * 0.38f,
+        ),
+    )
+}
+
+private fun DrawScope.drawDread() {
+    drawRect(
+        Brush.radialGradient(
+            0.45f to Color.Transparent, 1f to Color(0x80000000),
+            center = Offset(size.width / 2, size.height * 0.4f), radius = maxOf(size.width, size.height) * 0.75f,
+        ),
+    )
+}
+
+// t: the scene's time for the candle flicker, null for a steady light.
+private fun DrawScope.drawPumpkins(t: Float?) {
+    val dp = density
+    val w = size.width
+    val h = size.height
+    listOf(Triple(0.10f, 70f, 0f), Triple(0.92f, 56f, 1.4f)).forEach { (fx, sizeDp, off) ->
+        val sizePx = sizeDp * dp
+        val left = if (fx < 0.5f) fx * w else fx * w - sizePx
+        val top = h * 0.98f - sizePx * 0.9f
+        val flicker = if (t == null) 0.9f else 0.75f + 0.25f * sin((t + off) * 2f * PI.toFloat() / 3.4f) * sin((t + off) * 7.3f)
+        drawCircle(
+            Brush.radialGradient(
+                listOf(Color(0x8CFF8C1E), Color(0x2EFF7518), Color.Transparent),
+                center = Offset(left + sizePx / 2, top + sizePx * 0.5f), radius = sizePx * 1.1f,
+            ),
+            sizePx * 1.1f, Offset(left + sizePx / 2, top + sizePx * 0.5f), alpha = flicker,
+        )
+        translate(left, top) {
+            scale(sizePx / 80f, Offset.Zero) { drawPumpkin(flicker) }
         }
+    }
+}
+
+// drift: -1..1 across the moon.
+private fun DrawScope.drawMoonCloud(drift: Float) {
+    val moonR = 75f * density
+    val mc = Offset(size.width - size.width * 0.07f - moonR, size.height * 0.04f + moonR)
+    translate(mc.x + drift * moonR * 0.6f, mc.y + moonR * 0.15f) {
+        scale(3f, 0.45f, Offset.Zero) {
+            drawCircle(
+                Brush.radialGradient(listOf(Color(0xD90C0812), Color.Transparent), center = Offset.Zero, radius = moonR * 0.5f),
+                moonR * 0.5f, Offset.Zero,
+            )
+        }
+    }
+}
+
+// STILL: the moon behind its cloud, the cobwebs, the fog and the lit
+// pumpkins, nothing flying.
+private fun DrawScope.drawHalloweenStill() {
+    drawMoonFaded(0.85f)
+    drawMoonCloud(0.3f)
+    drawCobweb(Offset.Zero, 1f)
+    drawCobweb(Offset(size.width, 0f), -1f)
+    drawHalloweenFog()
+    drawDread()
+    drawPumpkins(null)
+}
+
+private fun DrawScope.drawMoonFaded(alpha: Float) {
+    drawIntoCanvas { canvas ->
+        canvas.saveLayer(androidx.compose.ui.geometry.Rect(Offset.Zero, size), androidx.compose.ui.graphics.Paint().apply { this.alpha = alpha })
+        drawMoon()
+        canvas.restore()
     }
 }
 
@@ -534,43 +599,32 @@ private fun wirePath(w: Float, dp: Float): Path {
 
 @Composable
 private fun ChristmasScene() {
-    val glow = rememberInfiniteTransition(label = "hearth")
-    val hearth by glow.animateFloat(0.65f, 1f, infiniteRepeatable(tween(2300, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "hearthAlpha")
-
-    Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = hearth }) {
-        val c = Offset(size.width / 2f, size.height + 120f * density)
-        drawRect(
-            Brush.radialGradient(listOf(Color(0x52FF9632), Color(0x1AFF6E1E), Color.Transparent), center = c, radius = size.width * 0.38f),
-        )
+    val reduced = reducedMotion()
+    val hearthState: androidx.compose.runtime.State<Float> = if (reduced) {
+        remember { mutableStateOf(0.85f) }
+    } else {
+        rememberInfiniteTransition(label = "hearth").animateFloat(0.65f, 1f, infiniteRepeatable(tween(2300, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "hearthAlpha")
     }
+    val hearth by hearthState
+
+    Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = hearth }) { drawHearth() }
     // Garland, the drift, the frost and the wire never move: drawn once.
-    Canvas(Modifier.fillMaxSize()) {
-        val dp = density
-        drawFrost(Offset(0f, size.height), 1f)
-        drawFrost(Offset(size.width, size.height), -1f)
-        val driftH = 120f * dp
-        translate(-size.width * 0.03f, size.height - driftH) {
-            scale(size.width * 1.06f / 1200f, driftH / 120f, Offset.Zero) {
-                drawPath(Art.drift1, Brush.verticalGradient(listOf(Color(0xFFF4F9FF), Color(0xFF9FB8D6)), 40f, 120f), alpha = 0.92f)
-                drawPath(Art.drift2, Color.White, alpha = 0.55f)
-            }
-        }
-        drawGarland(Offset.Zero, 1f)
-        drawGarland(Offset(size.width, 0f), -1f)
-        drawPath(wirePath(size.width, dp), Color(0xFF0B1F14), style = Stroke(width = 2.2f * dp))
-    }
+    Canvas(Modifier.fillMaxSize()) { drawChristmasDecor() }
 
+    // REDUCED: under half the snow, fewer twinkles.
     val rng = remember { Random(25) }
-    val flakes = remember {
+    val allFlakes = remember {
         List(46) { Flake(0, rng.nextFloat(), rng.nextFloat(), rng.range(0.8f, 1.6f), rng.range(0.25f, 0.5f), rng.range(0f, 7f), rng.range(0.4f, 0.8f), 0f) } +
             List(24) { Flake(1, rng.nextFloat(), rng.nextFloat(), rng.range(1.8f, 3f), rng.range(0.6f, 1.1f), rng.range(0f, 7f), rng.range(0.4f, 0.8f), 0f) } +
             List(7) { Flake(2, rng.nextFloat(), rng.nextFloat(), rng.range(5f, 9f), rng.range(1.3f, 2f), rng.range(0f, 7f), 0.85f, rng.range(0.2f, 0.6f)) }
     }
-    val twinkles = remember {
+    val allTwinkles = remember {
         listOf(Color.White, Color(0xFFFFE08A), Color(0xFFBFE3FF)).let { colors ->
             List(9) { Twinkle(rng.range(0.03f, 0.96f), rng.range(0.06f, 0.92f), rng.range(8f, 16f), rng.range(3f, 7f), rng.range(0f, 7f), colors[it % 3]) }
         }
     }
+    val flakes = if (reduced) allFlakes.filterIndexed { i, f -> (f.depth == 0 && i < 18) || (f.depth == 1 && i < 46 + 10) || (f.depth == 2 && i < 70 + 3) } else allFlakes
+    val twinkles = if (reduced) allTwinkles.take(4) else allTwinkles
     val shootStart = remember { Offset(rng.range(0.1f, 0.4f), rng.range(0.08f, 0.25f)) }
     val clock = rememberClock()
     var bulbs by remember { mutableStateOf<Pair<Float, List<Offset>>?>(null) }
@@ -620,46 +674,95 @@ private fun ChristmasScene() {
         }
 
         // Baubles swinging from the top.
-        listOf(Triple(0.14f, Color(0xFFC0392B), 120f), Triple(0.86f, Color(0xFFD4AF37), 150f), Triple(0.5f, Color(0xFF3B82F6), 96f)).forEachIndexed { i, (fx, color, len) ->
-            val anchor = Offset(fx * w, 0f)
-            val angle = 4f * sin(t * 2f * PI.toFloat() / (4.5f + i) + i * 1.7f)
-            rotate(angle, anchor) {
-                val end = Offset(anchor.x, len * dp)
-                drawLine(Color.White.copy(alpha = 0.35f), anchor, end, 1f * dp)
-                val r = (if (i == 2) 15f else 17f) * dp
-                val center = Offset(end.x, end.y + r * 1.2f)
-                drawCircle(color.copy(alpha = 0.25f), r * 1.6f, center)
-                drawRect(Color(0xFFD4AF37), Offset(end.x - 4f * dp, end.y - 1f * dp), Size(8f * dp, 6f * dp))
-                drawCircle(
-                    Brush.radialGradient(
-                        0f to Color(0xE6FFFFFF), 0.25f to color, 1f to Color(0x8C000000),
-                        center = Offset(center.x - r * 0.35f, center.y - r * 0.4f), radius = r * 1.6f,
-                    ),
-                    r, center,
-                )
-            }
-        }
+        drawBaubles(t)
 
         // Bulbs along the wire, chasing.
         val cached = bulbs
         val points = if (cached != null && cached.first == w) cached.second else {
-            val measure = PathMeasure()
-            measure.setPath(wirePath(w, dp), false)
-            val length = measure.length
-            val count = (length / (38f * dp)).toInt().coerceAtLeast(1)
-            val list = List(count) { b -> measure.getPosition((b + 0.5f) * length / count) }
+            val list = bulbPoints(w, dp)
             bulbs = w to list
             list
         }
-        points.forEachIndexed { b, p ->
-            val color = BULBS[b % BULBS.size]
-            val a = 0.35f + 0.65f * (0.5f + 0.5f * cos(2f * PI.toFloat() * (t / 3.2f + (b % 5) * 0.2f)))
-            drawCircle(color.copy(alpha = 0.28f * a), 13f * dp, Offset(p.x, p.y + 9f * dp))
-            drawRect(Color(0xFF10261A), Offset(p.x - 2.5f * dp, p.y - 1f * dp), Size(5f * dp, 5f * dp))
-            drawOval(color.copy(alpha = 0.55f + 0.45f * a), Offset(p.x - 5f * dp, p.y + 3f * dp), Size(10f * dp, 14f * dp))
-            drawOval(Color.White.copy(alpha = 0.55f * a), Offset(p.x - 3f * dp, p.y + 6f * dp), Size(2.6f * dp, 5f * dp))
+        drawBulbs(points, t)
+    }
+}
+
+private fun DrawScope.drawHearth() {
+    val c = Offset(size.width / 2f, size.height + 120f * density)
+    drawRect(
+        Brush.radialGradient(listOf(Color(0x52FF9632), Color(0x1AFF6E1E), Color.Transparent), center = c, radius = size.width * 0.38f),
+    )
+}
+
+private fun DrawScope.drawChristmasDecor() {
+    val dp = density
+    drawFrost(Offset(0f, size.height), 1f)
+    drawFrost(Offset(size.width, size.height), -1f)
+    val driftH = 120f * dp
+    translate(-size.width * 0.03f, size.height - driftH) {
+        scale(size.width * 1.06f / 1200f, driftH / 120f, Offset.Zero) {
+            drawPath(Art.drift1, Brush.verticalGradient(listOf(Color(0xFFF4F9FF), Color(0xFF9FB8D6)), 40f, 120f), alpha = 0.92f)
+            drawPath(Art.drift2, Color.White, alpha = 0.55f)
         }
     }
+    drawGarland(Offset.Zero, 1f)
+    drawGarland(Offset(size.width, 0f), -1f)
+    drawPath(wirePath(size.width, dp), Color(0xFF0B1F14), style = Stroke(width = 2.2f * dp))
+}
+
+// t: the scene's time for the swing, null to hang straight.
+private fun DrawScope.drawBaubles(t: Float?) {
+    val dp = density
+    val w = size.width
+    listOf(Triple(0.14f, Color(0xFFC0392B), 120f), Triple(0.86f, Color(0xFFD4AF37), 150f), Triple(0.5f, Color(0xFF3B82F6), 96f)).forEachIndexed { i, (fx, color, len) ->
+        val anchor = Offset(fx * w, 0f)
+        val angle = if (t == null) 0f else 4f * sin(t * 2f * PI.toFloat() / (4.5f + i) + i * 1.7f)
+        rotate(angle, anchor) {
+            val end = Offset(anchor.x, len * dp)
+            drawLine(Color.White.copy(alpha = 0.35f), anchor, end, 1f * dp)
+            val r = (if (i == 2) 15f else 17f) * dp
+            val center = Offset(end.x, end.y + r * 1.2f)
+            drawCircle(color.copy(alpha = 0.25f), r * 1.6f, center)
+            drawRect(Color(0xFFD4AF37), Offset(end.x - 4f * dp, end.y - 1f * dp), Size(8f * dp, 6f * dp))
+            drawCircle(
+                Brush.radialGradient(
+                    0f to Color(0xE6FFFFFF), 0.25f to color, 1f to Color(0x8C000000),
+                    center = Offset(center.x - r * 0.35f, center.y - r * 0.4f), radius = r * 1.6f,
+                ),
+                r, center,
+            )
+        }
+    }
+}
+
+private fun bulbPoints(w: Float, dp: Float): List<Offset> {
+    val measure = PathMeasure()
+    measure.setPath(wirePath(w, dp), false)
+    val length = measure.length
+    val count = (length / (38f * dp)).toInt().coerceAtLeast(1)
+    return List(count) { b -> measure.getPosition((b + 0.5f) * length / count) }
+}
+
+// t: the scene's time for the chase, null for every bulb lit.
+private fun DrawScope.drawBulbs(points: List<Offset>, t: Float?) {
+    val dp = density
+    points.forEachIndexed { b, p ->
+        val color = BULBS[b % BULBS.size]
+        val a = if (t == null) 0.85f else 0.35f + 0.65f * (0.5f + 0.5f * cos(2f * PI.toFloat() * (t / 3.2f + (b % 5) * 0.2f)))
+        drawCircle(color.copy(alpha = 0.28f * a), 13f * dp, Offset(p.x, p.y + 9f * dp))
+        drawRect(Color(0xFF10261A), Offset(p.x - 2.5f * dp, p.y - 1f * dp), Size(5f * dp, 5f * dp))
+        drawOval(color.copy(alpha = 0.55f + 0.45f * a), Offset(p.x - 5f * dp, p.y + 3f * dp), Size(10f * dp, 14f * dp))
+        drawOval(Color.White.copy(alpha = 0.55f * a), Offset(p.x - 3f * dp, p.y + 6f * dp), Size(2.6f * dp, 5f * dp))
+    }
+}
+
+// STILL: the hearth glow, frost, drift and garlands, the baubles hanging
+// straight and every bulb lit.
+private fun DrawScope.drawChristmasStill() {
+    drawHearth()
+    drawChristmasDecor()
+    drawBaubles(null)
+    drawBulbs(bulbPoints(size.width, density), null)
 }
 
 private fun DrawScope.drawCrystal(c: Offset, r: Float, rot: Float) {
@@ -730,7 +833,8 @@ private class Glow(val x: Float, val y: Float, val color: Color, val born: Float
 private class Confetto(val x: Float, val y: Float, val w: Float, val h: Float, val v: Float, val sway: Float, val phase: Float, val spin: Float, val color: Color, val alpha: Float)
 private class Bubble(val x: Float, val size: Float, val sway: Float, val duration: Float, val offset: Float)
 
-private class Fireworks(seed: Int) {
+// spacing: how far apart launches are (REDUCED launches fewer).
+private class Fireworks(seed: Int, val spacing: Float = 1f) {
     val rng = Random(seed)
     val rockets = mutableListOf<Rocket>()
     val sparks = mutableListOf<Spark>()
@@ -784,7 +888,7 @@ private class Fireworks(seed: Int) {
         if (now > nextLaunch) {
             launch(w, h)
             if (rng.nextFloat() < 0.4f) pending.add(now + rng.range(0.15f, 0.4f) to { launch(w, h) })
-            nextLaunch = now + rng.range(1.1f, 2.3f) / 1.3f
+            nextLaunch = now + rng.range(1.1f, 2.3f) / 1.3f * spacing
         }
         val due = pending.filter { it.first <= now }
         pending.removeAll(due)
@@ -815,11 +919,16 @@ private class Fireworks(seed: Int) {
 
 @Composable
 private fun NewYearScene() {
+    // REDUCED: about a third of the confetti, half the bubbles, fireworks
+    // half as often.
+    val reduced = reducedMotion()
     val rng = remember { Random(11) }
-    val stars = remember { List(44) { Triple(Offset(rng.nextFloat(), rng.nextFloat() * 0.62f), rng.range(1f, 2.4f), rng.range(2.5f, 6f) to rng.range(0f, 6f)) } }
-    val bubbles = remember { List(22) { Bubble(rng.range(0.02f, 0.98f), rng.range(4f, 11f), rng.range(-14f, 14f), rng.range(8f, 14f), rng.range(0f, 14f)) } }
-    val confetti = remember { List(80) { Confetto(rng.nextFloat(), rng.nextFloat(), rng.range(4f, 8f), rng.range(6f, 12f), rng.range(0.7f, 1.7f), rng.range(0.5f, 1.6f), rng.range(0f, 7f), rng.range(-0.05f, 0.05f), NY_CONFETTI[rng.nextInt(NY_CONFETTI.size)], rng.range(0.55f, 0.85f)) } }
-    val fireworks = remember { Fireworks(5) }
+    val stars = remember { newYearStars() }
+    val allBubbles = remember { List(22) { Bubble(rng.range(0.02f, 0.98f), rng.range(4f, 11f), rng.range(-14f, 14f), rng.range(8f, 14f), rng.range(0f, 14f)) } }
+    val allConfetti = remember { List(80) { Confetto(rng.nextFloat(), rng.nextFloat(), rng.range(4f, 8f), rng.range(6f, 12f), rng.range(0.7f, 1.7f), rng.range(0.5f, 1.6f), rng.range(0f, 7f), rng.range(-0.05f, 0.05f), NY_CONFETTI[rng.nextInt(NY_CONFETTI.size)], rng.range(0.55f, 0.85f)) } }
+    val bubbles = if (reduced) allBubbles.take(11) else allBubbles
+    val confetti = if (reduced) allConfetti.take(28) else allConfetti
+    val fireworks = remember(reduced) { Fireworks(5, if (reduced) 2f else 1f) }
     val clock = rememberClock()
     var stepped by remember { mutableStateOf(0L) }
     val context = LocalContext.current
@@ -854,10 +963,7 @@ private fun NewYearScene() {
             stepped = nanos
         }
 
-        stars.forEach { (pos, size, timing) ->
-            val a = 0.15f + 0.75f * (0.5f + 0.5f * sin(2f * PI.toFloat() * (t + timing.second) / timing.first))
-            drawCircle(Color.White, size * dp / 2f, Offset(pos.x * w, pos.y * h), alpha = a)
-        }
+        drawStars(stars, t)
         bubbles.forEach { b ->
             val p = cycle(t, b.duration, b.offset)
             val alpha = if (p < 0.12f) p / 0.12f * 0.85f else (1f - p) / 0.88f * 0.85f
@@ -868,22 +974,7 @@ private fun NewYearScene() {
             drawCircle(Color.White.copy(alpha = 0.45f), r * 0.35f, Offset(x - r * 0.35f, y - r * 0.35f), alpha = alpha)
         }
         // Streamers from the top corners.
-        listOf(0.02f to 1f, 0.98f to -1f).forEachIndexed { i, (fx, dir) ->
-            val anchor = Offset(fx * w, 0f)
-            rotate(3f * sin(t * 2f * PI.toFloat() / 12f + i * 2.2f), anchor) {
-                listOf(Triple(Color(0xFFD4AF37), 18f, 0), Triple(Color(0xFFEEF0F5), 52f, 1), Triple(Color(0xFFC9A227), 86f, 2)).forEach { (color, ox, j) ->
-                    val swing = (if (j % 2 == 1) 26f else -26f) * dp
-                    val x0 = anchor.x + dir * (ox - 60f) * dp
-                    val path = Path().apply {
-                        moveTo(x0, 0f)
-                        cubicTo(x0 + swing, 30f * dp, x0 - swing, 60f * dp, x0, 90f * dp)
-                        cubicTo(x0 + swing, 120f * dp, x0 - swing, 150f * dp, x0, 180f * dp)
-                        cubicTo(x0 - swing, 210f * dp, x0 + swing, 240f * dp, x0, (240f + j * 20f) * dp)
-                    }
-                    drawPath(path, color, alpha = 0.85f, style = Stroke(width = 4f * dp, cap = StrokeCap.Round))
-                }
-            }
-        }
+        drawStreamers(t)
         confetti.forEach { c ->
             val travel = h + 28f * dp
             val y = ((c.y * travel + c.v * 60f * dp * t) % travel) - 14f * dp
@@ -921,6 +1012,46 @@ private fun NewYearScene() {
     }
 }
 
+private fun newYearStars(): List<Triple<Offset, Float, Pair<Float, Float>>> {
+    val rng = Random(11)
+    return List(44) { Triple(Offset(rng.nextFloat(), rng.nextFloat() * 0.62f), rng.range(1f, 2.4f), rng.range(2.5f, 6f) to rng.range(0f, 6f)) }
+}
+
+// t: the scene's time for the twinkle, null for steady stars.
+private fun DrawScope.drawStars(stars: List<Triple<Offset, Float, Pair<Float, Float>>>, t: Float?) {
+    stars.forEach { (pos, starSize, timing) ->
+        val a = if (t == null) 0.55f else 0.15f + 0.75f * (0.5f + 0.5f * sin(2f * PI.toFloat() * (t + timing.second) / timing.first))
+        drawCircle(Color.White, starSize * density / 2f, Offset(pos.x * size.width, pos.y * size.height), alpha = a)
+    }
+}
+
+// t: the scene's time for the sway, null to hang straight.
+private fun DrawScope.drawStreamers(t: Float?) {
+    val dp = density
+    listOf(0.02f to 1f, 0.98f to -1f).forEachIndexed { i, (fx, dir) ->
+        val anchor = Offset(fx * size.width, 0f)
+        rotate(if (t == null) 0f else 3f * sin(t * 2f * PI.toFloat() / 12f + i * 2.2f), anchor) {
+            listOf(Triple(Color(0xFFD4AF37), 18f, 0), Triple(Color(0xFFEEF0F5), 52f, 1), Triple(Color(0xFFC9A227), 86f, 2)).forEach { (color, ox, j) ->
+                val swing = (if (j % 2 == 1) 26f else -26f) * dp
+                val x0 = anchor.x + dir * (ox - 60f) * dp
+                val path = Path().apply {
+                    moveTo(x0, 0f)
+                    cubicTo(x0 + swing, 30f * dp, x0 - swing, 60f * dp, x0, 90f * dp)
+                    cubicTo(x0 + swing, 120f * dp, x0 - swing, 150f * dp, x0, 180f * dp)
+                    cubicTo(x0 - swing, 210f * dp, x0 + swing, 240f * dp, x0, (240f + j * 20f) * dp)
+                }
+                drawPath(path, color, alpha = 0.85f, style = Stroke(width = 4f * dp, cap = StrokeCap.Round))
+            }
+        }
+    }
+}
+
+// STILL: the starry sky and the streamers.
+private fun DrawScope.drawNewYearStill() {
+    drawStars(newYearStars(), null)
+    drawStreamers(null)
+}
+
 @Composable
 private fun NewYearTitle(modifier: Modifier) {
     val shownAt = SeasonSignals.newYearTitleAt
@@ -954,8 +1085,11 @@ private fun NewYearTitle(modifier: Modifier) {
 
 @Composable
 private fun ValentineScene() {
+    // REDUCED: the five soft hearts and five small ones.
+    val reduced = reducedMotion()
     val rng = remember { Random(14) }
-    val hearts = remember { List(22) { i -> Bubble(rng.nextFloat(), if (i < 5) rng.range(34f, 54f) else rng.range(12f, 22f), rng.range(-28f, 28f), rng.range(12f, 22f), rng.range(0f, 22f)) } }
+    val allHearts = remember { List(22) { i -> Bubble(rng.nextFloat(), if (i < 5) rng.range(34f, 54f) else rng.range(12f, 22f), rng.range(-28f, 28f), rng.range(12f, 22f), rng.range(0f, 22f)) } }
+    val hearts = if (reduced) allHearts.take(10) else allHearts
     val clock = rememberClock()
     Canvas(Modifier.fillMaxSize()) {
         val t = clock.longValue / 1_000_000_000f
@@ -972,6 +1106,18 @@ private fun ValentineScene() {
                 scale(s, Offset.Zero) {
                     drawPath(Art.heart, if (soft) Color(0xFFFFB3C6) else Color(0xFFFF4D6D), alpha = alpha)
                 }
+            }
+        }
+    }
+}
+
+// STILL: a few soft hearts resting low on the screen.
+private fun DrawScope.drawValentineStill() {
+    val dp = density
+    listOf(Triple(0.08f, 0.84f, 50f), Triple(0.22f, 0.92f, 34f), Triple(0.78f, 0.9f, 42f), Triple(0.93f, 0.8f, 54f), Triple(0.5f, 0.95f, 28f)).forEach { (fx, fy, sizeDp) ->
+        translate(fx * size.width, fy * size.height) {
+            scale(sizeDp * dp / 24f, Offset.Zero) {
+                drawPath(Art.heart, Color(0xFFFFB3C6), alpha = 0.16f)
             }
         }
     }

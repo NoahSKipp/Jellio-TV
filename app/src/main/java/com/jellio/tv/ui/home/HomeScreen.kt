@@ -106,6 +106,14 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = com.jellio.tv.ui.common.rememberTvColumnState()
+    // The seasonal scenes hold their frame while the rows scroll.
+    LaunchedEffect(listState) {
+        androidx.compose.runtime.snapshotFlow { listState.isScrollInProgress }
+            .collect { com.jellio.tv.ui.perf.ScrollActivity.scrolling = it }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { com.jellio.tv.ui.perf.ScrollActivity.scrolling = false }
+    }
     val scope = rememberCoroutineScope()
     // Real ui/library/LibraryScreen.kt's own header on this exact fix:
     // switching focus between an arrow and View Details still nudged
