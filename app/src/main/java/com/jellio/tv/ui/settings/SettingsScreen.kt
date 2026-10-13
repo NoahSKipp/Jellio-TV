@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,6 +74,13 @@ import com.jellio.tv.ui.update.ManualCheckResult
 
 private enum class LanguageField { AUDIO, SUBTITLE }
 
+private enum class SettingsCategory(val label: String) {
+    ACCOUNT("Account"),
+    PLAYBACK("Playback"),
+    DISPLAY("Display"),
+    ABOUT("About"),
+}
+
 // A real port of screens/settings.js: this app's own real
 // server/account facts, the same real remember-stream-choice
 // preference components/streamPicker.js's own picker reads, the real
@@ -80,6 +88,7 @@ private enum class LanguageField { AUDIO, SUBTITLE }
 // change (POST Users/{id}/Password) and, only when the server admin
 // has not turned the whole real feature off, real Quick Connect
 // approval.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
     session: Session,
@@ -109,154 +118,176 @@ fun SettingsScreen(
     LaunchedEffect(session.userId) { viewModel.load(session) }
 
     Box(modifier = modifier.fillMaxSize()) {
-    // Real bug found live testing on device: this Column carried no
-    // scroll of its own at all, so once Change Password/Sleep
-    // Timer/Quick Connect/About (the Check for Updates button among
-    // them) pushed the real content taller than one screen, everything
-    // past that point was simply unreachable, nothing to bring it into
-    // view. verticalScroll() is Compose's own real fix, the same real
-    // bring-into-view behaviour a LazyColumn gets for free already
-    // covering a plain Column here too.
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(top = 32.dp, start = 48.dp, end = 48.dp),
-    ) {
-        Text(text = "Settings", style = MaterialTheme.typography.titleLarge)
-
-        SettingsSection(title = "Server") {
-            SettingsRow(label = "Address", value = session.serverAddress)
-            SettingsRow(label = "Signed in as", value = session.userName)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
-                Surface(
-                    onClick = { viewModel.openAvatarPicker() },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                    modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
-                ) {
-                    Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-                }
-                Surface(
-                    onClick = onViewProfile,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                    modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
-                ) {
-                    Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+    // Categories down the left like the web settings' own menu, the
+    // focused one's settings on the right.
+    var category by remember { mutableStateOf(SettingsCategory.ACCOUNT) }
+    LaunchedEffect(category) { scrollState.scrollTo(0) }
+    val firstCategory = remember { FocusRequester() }
+    Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
+        Column(modifier = Modifier.width(260.dp)) {
+            Text(text = "Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.focusRestorer(firstCategory),
+            ) {
+                SettingsCategory.entries.forEachIndexed { index, entry ->
+                    SettingsCategoryItem(
+                        label = entry.label,
+                        selected = entry == category,
+                        onFocus = { category = entry },
+                        modifier = if (index == 0) Modifier.focusRequester(firstCategory) else Modifier,
+                    )
                 }
             }
         }
-
-        SettingsSection(title = "Playback") {
-            SettingsToggleRow(
-                label = "Remember stream choice",
-                description = "Skip the stream picker on a title you already picked one for, for 4 days.",
-                checked = rememberStream,
-                onToggle = { viewModel.setRememberStream(!rememberStream) },
-            )
-            val playerContext = LocalContext.current
-            Spacer(modifier = Modifier.height(12.dp))
-            SettingsToggleRow(
-                label = "Auto-skip intros",
-                description = "Jump past an episode's intro by itself when the server knows where it is.",
-                checked = PlayerPrefs.autoSkipIntro,
-                onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            // Each press steps to the next level.
-            SettingsPickerRow(
-                label = "Pre-buffer",
-                value = when (PlayerPrefs.prebuffer) {
-                    "more" -> "More: 3 s to start, loads 90 s ahead, 5 min when paused"
-                    "max" -> "Maximum: 6 s to start, loads 3 min ahead, 10 min when paused"
-                    else -> "Standard"
-                },
-                onClick = {
-                    val next = when (PlayerPrefs.prebuffer) {
-                        "standard" -> "more"
-                        "more" -> "max"
-                        else -> "standard"
-                    }
-                    PlayerPrefs.setPrebuffer(playerContext, next)
-                },
-            )
-        }
-
-        SettingsSection(title = "Screen overlays") {
-            val overlayViewModel: com.jellio.tv.ui.announce.ScreenOverlayViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-            val diagnostic by overlayViewModel.diagnostic.collectAsState()
-            val testScope = androidx.compose.runtime.rememberCoroutineScope()
-            SettingsPickerRow(
-                label = "Test screen overlay",
-                value = diagnostic ?: "Shows a sample overlay and checks the server",
-                onClick = { overlayViewModel.runTest(testScope) },
-            )
-        }
-
-        SettingsSection(title = "Language") {
-            SettingsPickerRow(
-                label = "Default audio language",
-                value = audioLanguage?.let { languageName(it) } ?: "No preference",
-                onClick = { openField = LanguageField.AUDIO },
-            )
-            SettingsPickerRow(
-                label = "Default subtitle language",
-                value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
-                onClick = { openField = LanguageField.SUBTITLE },
-            )
-        }
-
-        val isPrivate by viewModel.isPrivate.collectAsState()
-        SettingsSection(title = "Privacy") {
-            SettingsToggleRow(
-                label = "Private profile",
-                description = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users.",
-                checked = isPrivate,
-                onToggle = { viewModel.setPrivate(!isPrivate) },
-            )
-        }
-
-        SettingsSection(title = "Change Password") {
-            PasswordSection(session = session, viewModel = viewModel)
-        }
-
-        SettingsSection(title = "Sleep Timer") {
-            SleepTimerSection(viewModel = viewModel)
-        }
-
-        SettingsSection(title = "Display") {
-            MotionRow()
-            Spacer(modifier = Modifier.height(12.dp))
-            val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
-            SettingsPickerRow(
-                label = "Display safe area (overscan)",
-                value = if (overscan == 0) "Full screen (0%)" else "Inset by $overscan%",
-                onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
-            )
-        }
-
-        SettingsSection(title = "About") {
-            SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
-            UpdateCheckRow(viewModel = appUpdateViewModel)
-            ImageCheckRow(session = session)
-        }
-
-        Surface(
-            onClick = onLogout,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = com.jellio.tv.ui.common.dangerButtonColors(),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(2.5.dp, Color.White),
-                    shape = RoundedCornerShape(999.dp),
-                )
-            ),
-            modifier = Modifier.padding(top = 32.dp),
+        Spacer(modifier = Modifier.width(48.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxSize()
+                .verticalScroll(scrollState),
         ) {
-            Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+            Text(text = category.label, style = MaterialTheme.typography.headlineSmall, color = JellioText, modifier = Modifier.padding(top = 4.dp))
+            when (category) {
+                SettingsCategory.ACCOUNT -> {
+                SettingsSection(title = "Profile") {
+                    SettingsRow(label = "Address", value = session.serverAddress)
+                    SettingsRow(label = "Signed in as", value = session.userName)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
+                        Surface(
+                            onClick = { viewModel.openAvatarPicker() },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                            modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
+                        ) {
+                            Text(text = "Change avatar", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                        }
+                        Surface(
+                            onClick = onViewProfile,
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                            modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
+                        ) {
+                            Text(text = "View profile", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                        }
+                    }
+                }
+
+                val isPrivate by viewModel.isPrivate.collectAsState()
+                SettingsSection(title = "Privacy") {
+                    SettingsToggleRow(
+                        label = "Private profile",
+                        description = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users.",
+                        checked = isPrivate,
+                        onToggle = { viewModel.setPrivate(!isPrivate) },
+                    )
+                }
+
+                SettingsSection(title = "Change Password") {
+                    PasswordSection(session = session, viewModel = viewModel)
+                }
+
+                Surface(
+                    onClick = onLogout,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = com.jellio.tv.ui.common.dangerButtonColors(),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.5.dp, Color.White),
+                            shape = RoundedCornerShape(999.dp),
+                        )
+                    ),
+                    modifier = Modifier.padding(top = 32.dp),
+                ) {
+                    Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+                }
+                }
+                SettingsCategory.PLAYBACK -> {
+                SettingsSection(title = "Playback") {
+                    SettingsToggleRow(
+                        label = "Remember stream choice",
+                        description = "Skip the stream picker on a title you already picked one for, for 4 days.",
+                        checked = rememberStream,
+                        onToggle = { viewModel.setRememberStream(!rememberStream) },
+                    )
+                    val playerContext = LocalContext.current
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingsToggleRow(
+                        label = "Auto-skip intros",
+                        description = "Jump past an episode's intro by itself when the server knows where it is.",
+                        checked = PlayerPrefs.autoSkipIntro,
+                        onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Each press steps to the next level.
+                    SettingsPickerRow(
+                        label = "Pre-buffer",
+                        value = when (PlayerPrefs.prebuffer) {
+                            "more" -> "More: 3 s to start, loads 90 s ahead, 5 min when paused"
+                            "max" -> "Maximum: 6 s to start, loads 3 min ahead, 10 min when paused"
+                            else -> "Standard"
+                        },
+                        onClick = {
+                            val next = when (PlayerPrefs.prebuffer) {
+                                "standard" -> "more"
+                                "more" -> "max"
+                                else -> "standard"
+                            }
+                            PlayerPrefs.setPrebuffer(playerContext, next)
+                        },
+                    )
+                }
+
+                SettingsSection(title = "Language") {
+                    SettingsPickerRow(
+                        label = "Default audio language",
+                        value = audioLanguage?.let { languageName(it) } ?: "No preference",
+                        onClick = { openField = LanguageField.AUDIO },
+                    )
+                    SettingsPickerRow(
+                        label = "Default subtitle language",
+                        value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
+                        onClick = { openField = LanguageField.SUBTITLE },
+                    )
+                }
+
+                SettingsSection(title = "Sleep Timer") {
+                    SleepTimerSection(viewModel = viewModel)
+                }
+                }
+                SettingsCategory.DISPLAY -> {
+                SettingsSection(title = "Display") {
+                    MotionRow()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
+                    SettingsPickerRow(
+                        label = "Display safe area (overscan)",
+                        value = if (overscan == 0) "Full screen (0%)" else "Inset by $overscan%",
+                        onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
+                    )
+                }
+
+                SettingsSection(title = "Screen overlays") {
+                    val overlayViewModel: com.jellio.tv.ui.announce.ScreenOverlayViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                    val diagnostic by overlayViewModel.diagnostic.collectAsState()
+                    val testScope = androidx.compose.runtime.rememberCoroutineScope()
+                    SettingsPickerRow(
+                        label = "Test screen overlay",
+                        value = diagnostic ?: "Shows a sample overlay and checks the server",
+                        onClick = { overlayViewModel.runTest(testScope) },
+                    )
+                }
+                }
+                SettingsCategory.ABOUT -> {
+                SettingsSection(title = "About") {
+                    SettingsRow(label = "Version", value = BuildConfig.VERSION_NAME)
+                    UpdateCheckRow(viewModel = appUpdateViewModel)
+                    ImageCheckRow(session = session)
+                }
+                }
+            }
+            Spacer(modifier = Modifier.height(64.dp))
         }
-        Spacer(modifier = Modifier.height(64.dp))
     }
 
     val field = openField
@@ -553,6 +584,26 @@ private fun SleepTimerSection(viewModel: SettingsViewModel) {
                 Text(text = if (isCancelling) "Cancelling..." else "Cancel timer", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsCategoryItem(label: String, selected: Boolean, onFocus: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onFocus,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Color.White.copy(alpha = 0.08f) else Color.Transparent,
+            contentColor = if (selected) JellioText else JellioTextSecondary,
+            focusedContainerColor = JellioSecondary,
+            focusedContentColor = JellioBg,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { if (it.isFocused) onFocus() },
+    ) {
+        Text(text = label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
     }
 }
 
