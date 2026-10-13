@@ -42,6 +42,16 @@ import javax.inject.Singleton
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
 private fun parseInstant(raw: String): Long = java.time.Instant.parse(raw).toEpochMilli()
 
+// What the last sync did, for Settings > About.
+data class WatchNextStatus(
+    val at: Long,
+    val published: Int,
+    val candidates: Int,
+    val onLauncher: Int,
+    val hiddenByViewer: Int,
+    val error: String?,
+)
+
 @Singleton
 class WatchNextSyncer @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -54,6 +64,15 @@ class WatchNextSyncer @Inject constructor(
         .build()
 
     private fun supported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+
+    private val _status = kotlinx.coroutines.flow.MutableStateFlow<WatchNextStatus?>(null)
+    val status: kotlinx.coroutines.flow.StateFlow<WatchNextStatus?> = _status
+
+    // Google requires the Content ID on every item (API 28+ column).
+    private fun valuesOf(program: WatchNextProgram, itemId: String): android.content.ContentValues =
+        program.toContentValues().apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) put(android.media.tv.TvContract.WatchNextPrograms.COLUMN_CONTENT_ID, itemId)
+        }
 
     private fun deepLinkUri(itemId: String): Uri {
         val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://jellio.tv/play?id=$itemId"))
@@ -160,22 +179,27 @@ class WatchNextSyncer @Inject constructor(
     // lists. A row the viewer removed from the launcher stays removed until
     // they watch that title again.
     suspend fun sync(session: Session, continueWatching: List<BaseItemDto>) {
-        if (!supported()) return
+        if (!supported()) {
+            _status.value = WatchNextStatus(System.currentTimeMillis(), 0, continueWatching.size, 0, 0, "This device has no Continue Watching row")
+            return
+        }
         withContext(Dispatchers.IO) {
             try {
                 val existing = queryExisting()
-                val wanted = continueWatching.take(MAX_ROWS).mapNotNull { item -> toWatchNextProgram(session, item)?.let { item.Id to it } }.toMap()
+                // One entry per series, the most recently played episode.
+                val candidates = continueWatching.distinctBy { it.SeriesId ?: it.Id }.take(MAX_ROWS)
+                val wanted = candidates.mapNotNull { item -> toWatchNextProgram(session, item)?.let { item.Id to it } }.toMap()
 
                 wanted.forEach { (itemId, program) ->
                     val row = existing[itemId]
                     when {
-                        row == null -> context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, program.toContentValues())
+                        row == null -> context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, valuesOf(program, itemId))
                         !row.browsable && row.engagedAt >= program.lastEngagementTimeUtcMillis -> Unit
                         !row.browsable -> {
                             context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
-                            context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, program.toContentValues())
+                            context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, valuesOf(program, itemId))
                         }
-                        else -> context.contentResolver.update(TvContractCompat.buildWatchNextProgramUri(row.id), program.toContentValues(), null, null)
+                        else -> context.contentResolver.update(TvContractCompat.buildWatchNextProgramUri(row.id), valuesOf(program, itemId), null, null)
                     }
                 }
 
@@ -186,8 +210,18 @@ class WatchNextSyncer @Inject constructor(
                 }
                 val keep = wanted.keys.map { safe(it) + "-" }
                 artDir().listFiles()?.forEach { file -> if (keep.none { file.name.startsWith(it) }) file.delete() }
-                Log.i(TAG, "synced ${wanted.size} of ${continueWatching.size} titles")
+                val after = queryExisting()
+                _status.value = WatchNextStatus(
+                    at = System.currentTimeMillis(),
+                    published = wanted.size,
+                    candidates = candidates.size,
+                    onLauncher = after.values.count { it.browsable },
+                    hiddenByViewer = after.values.count { !it.browsable },
+                    error = null,
+                )
+                Log.i(TAG, "synced ${wanted.size} of ${candidates.size} titles, ${after.size} rows in the provider")
             } catch (err: Exception) {
+                _status.value = WatchNextStatus(System.currentTimeMillis(), 0, continueWatching.size, 0, 0, err.javaClass.simpleName + ": " + err.message)
                 Log.w(TAG, "sync failed", err)
             }
         }

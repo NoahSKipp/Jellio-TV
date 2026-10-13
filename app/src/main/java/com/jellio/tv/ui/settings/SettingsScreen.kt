@@ -6,6 +6,7 @@ import androidx.tv.material3.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Person
@@ -299,6 +300,16 @@ fun SettingsScreen(
                         UpdateCheckRow(viewModel = appUpdateViewModel)
                         ImageCheckRow(session = session)
                     }
+                }
+
+                val watchNext by viewModel.watchNextStatus.collectAsState()
+                SettingsSection(title = "Google TV home", icon = Icons.Filled.Tv, description = "Titles you are watching, in the Continue Watching row of the Google TV home.") {
+                    SettingsActionRow(
+                        label = "Sync Continue Watching now",
+                        icon = Icons.Filled.Sync,
+                        description = watchNextSummary(watchNext),
+                        onClick = { viewModel.syncWatchNext() },
+                    )
                 }
                 }
             }
@@ -658,6 +669,14 @@ private fun SettingsSection(
         }
         Column(modifier = if (form) Modifier.padding(20.dp) else Modifier.padding(vertical = 6.dp)) { content() }
     }
+}
+
+private fun watchNextSummary(status: com.jellio.tv.data.watchnext.WatchNextStatus?): String {
+    if (status == null) return "Not synced yet in this session."
+    val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(status.at))
+    status.error?.let { return "Last sync at $time failed: $it" }
+    val hidden = if (status.hiddenByViewer > 0) ", ${status.hiddenByViewer} removed on the home screen" else ""
+    return "Last sync at $time: ${status.published} of ${status.candidates} titles published, ${status.onLauncher} in the row$hidden."
 }
 
 @Composable

@@ -18,7 +18,14 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
+    private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
+
+    val watchNextStatus = watchNextSyncer.status
+
+    fun syncWatchNext() {
+        viewModelScope.launch { watchNextSyncer.refresh() }
+    }
 
     private val _rememberStream = MutableStateFlow(true)
     val rememberStream: StateFlow<Boolean> = _rememberStream.asStateFlow()
