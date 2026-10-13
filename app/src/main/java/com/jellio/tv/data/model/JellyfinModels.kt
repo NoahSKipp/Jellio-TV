@@ -77,6 +77,7 @@ data class UserItemDataDto(
     val Played: Boolean = false,
     val PlaybackPositionTicks: Long = 0,
     val PlayedPercentage: Double? = null,
+    val LastPlayedDate: String? = null,
     // Real Jellyfin like/dislike, absent (null) rather than false when
     // never set, screens/detail.js's own three-way paintThumbs() reads
     // the same real distinction.

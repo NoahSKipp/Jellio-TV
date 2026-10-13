@@ -66,6 +66,11 @@
              files dir, a real content:// Uri is the only way to hand
              a file there to the system installer without a legacy
              file:// Uri's own StrictMode/FileUriExposedException. -->
+        <!-- Continue Watching artwork for the Google TV home. -->
+        <provider
+            android:name=".data.watchnext.WatchNextArtProvider"
+            android:authorities="${applicationId}.watchnextart"
+            android:exported="true" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

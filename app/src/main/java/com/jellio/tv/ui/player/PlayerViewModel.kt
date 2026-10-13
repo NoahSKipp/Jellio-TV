@@ -223,6 +223,7 @@ class PlayerViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val subtitleStylePreferences: SubtitleStylePreferences,
     private val syncPlay: com.jellio.tv.data.syncplay.SyncPlayManager,
+    private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
 
     // ---- Stream failover -------------------------------------------------
@@ -1124,7 +1125,13 @@ class PlayerViewModel @Inject constructor(
     fun reportStopped(positionTicks: Long) {
         val id = itemId ?: return
         val reportedPositionTicks = if (hasCreditedRealWatch) 0 else positionTicks
-        viewModelScope.launch { repository.reportPlaybackStopped(id, uiState.value.mediaSourceId, reportedPositionTicks) }
+        // Not viewModelScope: the player is usually closing, and the Google TV
+        // row should catch up even when the viewer leaves for the launcher.
+        val mediaSourceId = uiState.value.mediaSourceId
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            repository.reportPlaybackStopped(id, mediaSourceId, reportedPositionTicks)
+            watchNextSyncer.refresh()
+        }
     }
 
     // Real port of screens/player.js's own markRealWatchComplete():

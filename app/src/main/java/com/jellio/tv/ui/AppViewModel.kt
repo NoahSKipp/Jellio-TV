@@ -47,6 +47,7 @@ sealed interface PlayAction {
 class AppViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
+    private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
 
     val authState: StateFlow<AuthState> = repository.sessionFlow
@@ -73,7 +74,10 @@ class AppViewModel @Inject constructor(
     }
 
     fun logout() {
-        viewModelScope.launch { repository.logout() }
+        viewModelScope.launch {
+            watchNextSyncer.clear()
+            repository.logout()
+        }
     }
 
     // A Gelato-imported item commonly has a real Primary poster but no
