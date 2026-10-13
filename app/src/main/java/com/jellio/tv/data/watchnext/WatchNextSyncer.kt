@@ -141,7 +141,7 @@ class WatchNextSyncer @Inject constructor(
         return runCatching { parseInstant(raw) }.getOrDefault(System.currentTimeMillis())
     }
 
-    private fun toWatchNextProgram(session: Session, item: BaseItemDto): WatchNextProgram? {
+    private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean): WatchNextProgram? {
         val runtimeMs = ((item.RunTimeTicks ?: 0L) / 10_000).toInt()
         val positionMs = ((item.UserData?.PlaybackPositionTicks ?: 0L) / 10_000).toInt()
         if (runtimeMs <= 0) return null
@@ -154,7 +154,9 @@ class WatchNextSyncer @Inject constructor(
         }
         val builder = WatchNextProgram.Builder()
             .setType(type)
-            .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+            .setWatchNextType(
+                if (next) TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT else TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE,
+            )
             .setTitle(displayTitle(item))
             .setPosterArtUri(WatchNextArtProvider.uriFor(context, file))
             .setPosterArtAspectRatio(
@@ -178,7 +180,7 @@ class WatchNextSyncer @Inject constructor(
     // INTERNAL_PROVIDER_ID and removes rows Continue Watching no longer
     // lists. A row the viewer removed from the launcher stays removed until
     // they watch that title again.
-    suspend fun sync(session: Session, continueWatching: List<BaseItemDto>) {
+    suspend fun sync(session: Session, continueWatching: List<BaseItemDto>, upNext: List<BaseItemDto> = emptyList()) {
         if (!supported()) {
             _status.value = WatchNextStatus(System.currentTimeMillis(), 0, continueWatching.size, 0, 0, "This device has no Continue Watching row")
             return
@@ -187,8 +189,13 @@ class WatchNextSyncer @Inject constructor(
             try {
                 val existing = queryExisting()
                 // One entry per series, the most recently played episode.
-                val candidates = continueWatching.distinctBy { it.SeriesId ?: it.Id }.take(MAX_ROWS)
-                val wanted = candidates.mapNotNull { item -> toWatchNextProgram(session, item)?.let { item.Id to it } }.toMap()
+                // Unfinished titles as CONTINUE, then the next episode of other
+                // shows being watched as NEXT; one entry per series.
+                val nextIds = upNext.map { it.Id }.toSet()
+                val candidates = (continueWatching + upNext).distinctBy { it.SeriesId ?: it.Id }.take(MAX_ROWS)
+                val wanted = candidates.mapNotNull { item ->
+                    toWatchNextProgram(session, item, next = item.Id in nextIds && item !in continueWatching)?.let { item.Id to it }
+                }.toMap()
 
                 wanted.forEach { (itemId, program) ->
                     val row = existing[itemId]
@@ -199,6 +206,8 @@ class WatchNextSyncer @Inject constructor(
                             context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
                             context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, valuesOf(program, itemId))
                         }
+                        // A NEXT entry has no progress to update; leave its time alone.
+                        program.watchNextType == TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT -> Unit
                         else -> context.contentResolver.update(TvContractCompat.buildWatchNextProgramUri(row.id), valuesOf(program, itemId), null, null)
                     }
                 }
@@ -232,7 +241,8 @@ class WatchNextSyncer @Inject constructor(
         if (!supported()) return
         val session = sessionManager.sessionFlow.first() ?: return
         val items = runCatching { repository.getContinueWatching(session.userId) }.getOrNull() ?: return
-        sync(session, items)
+        val upNext = runCatching { repository.getNextUp(session.userId) }.getOrDefault(emptyList())
+        sync(session, items, upNext)
     }
 
     // Sign out: nothing of this account stays on the launcher.

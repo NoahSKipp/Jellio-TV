@@ -217,7 +217,7 @@ class HomeViewModel @Inject constructor(
                     // Next row is real background bookkeeping, not
                     // something this screen's own load has any reason
                     // to wait on before it can render.
-                    launch { runCatching { watchNextSyncer.sync(session, continueWatching) } }
+                    launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNextDeferred.await()) } }
                     val upNext = upNextDeferred.await()
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through exclude below) every discovery row.
