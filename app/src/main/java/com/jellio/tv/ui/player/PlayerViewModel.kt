@@ -272,7 +272,7 @@ class PlayerViewModel @Inject constructor(
                 ?: source.MediaStreams.orEmpty().firstOrNull { it.Type == "Audio" }?.Language
                 ?: audioLanguagePreference
             failoverLanguage = language
-            val sources = runCatching { repository.getMediaSources(session.userId, id) }.getOrDefault(emptyList())
+            val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "failover") }.getOrDefault(emptyList())
             val candidates = sources.filter { it.Id != null && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
             fun pick(list: List<com.jellio.tv.data.model.MediaSourceDto>) = if (language != null) {
                 list.firstOrNull { hasAudioLanguage(it, language) } ?: list.firstOrNull()
@@ -432,7 +432,7 @@ class PlayerViewModel @Inject constructor(
                         transcodeSkippedFor = itemId
                     }
                     target.mediaSource.Id?.let { transcodeSkipped.add(it) }
-                    val others = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
+                    val others = runCatching { repository.getMediaSources(session.userId, itemId, reason = "transcode check") }.getOrDefault(emptyList())
                         .filter { it.Id != null && it.Id !in transcodeSkipped && !BadStreams.isBad(itemId, it) && !VideoTranscodePolicy.needsReencode(it) }
                     // One known to copy (probed, or by its name) before one nothing is known about.
                     val copyable = others.firstOrNull { videoInfoOf(it) != null } ?: others.firstOrNull()
@@ -566,7 +566,7 @@ class PlayerViewModel @Inject constructor(
                 // gating that file's own sources.length > 1 check
                 // applies before ever enabling sourceButton.
                 viewModelScope.launch {
-                    val sources = runCatching { repository.getMediaSources(session.userId, itemId) }.getOrNull()
+                    val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "player") }.getOrNull()
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
                     }

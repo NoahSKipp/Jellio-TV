@@ -259,6 +259,7 @@ private fun JellioTvApp(
     // history underneath the web build's own back button).
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
     val route = routeStack.last()
+    LaunchedEffect(route) { com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen") }
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }

@@ -58,7 +58,8 @@ import java.util.Locale
 // rate limits for titles nobody was ever about to open. Mirrors
 // components/card.js's own PREFETCH_DEBOUNCE_MS: only fires once focus
 // actually lingers past this, not on every transient landing.
-private const val PREFETCH_DEBOUNCE_MS = 200L
+// Only a card the viewer stays on: moving along a row never prefetches.
+private const val PREFETCH_DEBOUNCE_MS = 600L
 
 // Visible to RowExpandButton (PosterRow.kt), same package: its own
 // button height matches a real poster's own aspect-ratio height,
@@ -102,7 +103,7 @@ fun PosterCard(
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
             delay(PREFETCH_DEBOUNCE_MS)
-            prefetch(item)
+            if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) prefetch(item)
         }
     }
     Box(modifier = modifier.width(posterWidth)) {

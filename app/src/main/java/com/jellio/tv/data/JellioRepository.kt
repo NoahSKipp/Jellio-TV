@@ -55,6 +55,7 @@ import javax.inject.Singleton
 // the hero backdrop silently never loaded because this app never
 // asked the server whether one even existed), same real field
 // screens/home.js's own hero already knows to ask for.
+private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
@@ -187,7 +188,14 @@ class JellioRepository @Inject constructor(
     // reasoning this @Singleton's own clearCache() above already
     // applies to living longer than any one screen.
     private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val prefetchedItemIds = ConcurrentHashMap.newKeySet<String>()
+
+    // Stream lookups: reused across screens (SourceCache), one request per
+    // title at a time, and prefetches at most two at once, once per title
+    // every 8 minutes.
+    private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
+    private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
+    private val prefetchedAt = ConcurrentHashMap<String, Long>()
+    private val prefetchSlots = java.util.concurrent.Semaphore(2)
 
     // Real port of runtime/api.js's own clearCache(): every real cache
     // entry keyed off the previously signed in user (items, details,
@@ -199,7 +207,11 @@ class JellioRepository @Inject constructor(
     // signed in (connectAndLogin, quickSignIn) plus logout() itself, so
     // nothing cached under the outgoing account can leak into the next
     // one that signs in during this same real process.
-    fun clearCache() = cache.clear()
+    fun clearCache() {
+        cache.clear()
+        sourceCache.clear()
+        prefetchedAt.clear()
+    }
 
     // The one real server address a fresh install has never asked for
     // yet: null only before the very first successful connectAndLogin()
@@ -1011,9 +1023,31 @@ class JellioRepository @Inject constructor(
     // the list is never empty: no file behind it, no size, and named after
     // the title itself (or not at all) rather than by the addon the way a
     // real release is. It can't play, so it's dropped.
-    suspend fun getMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
+    suspend fun getMediaSources(userId: String, itemId: String, reason: String = "play"): List<MediaSourceDto> {
         // Stream lists are ranked and badged by it.
         loadVideoTranscodePolicy()
+        sourceCache.get(itemId, System.currentTimeMillis())?.let {
+            com.jellio.tv.data.streams.StreamLookupLog.cacheHit()
+            return it
+        }
+        val request = sourcesInFlight.computeIfAbsent(itemId) {
+            prefetchScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                val started = System.currentTimeMillis()
+                val sources = fetchMediaSources(userId, itemId)
+                sourceCache.put(itemId, sources, System.currentTimeMillis())
+                com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
+                sources
+            }
+        }
+        request.start()
+        try {
+            return request.await()
+        } finally {
+            sourcesInFlight.remove(itemId, request)
+        }
+    }
+
+    private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
         val item = api.getItem(userId, itemId, fields = "MediaSources")
         val titles = listOfNotNull(item.Name, item.SeriesName).map { it.trim().lowercase() }
         return (item.MediaSources ?: emptyList()).filterNot { source ->
@@ -1082,14 +1116,24 @@ class JellioRepository @Inject constructor(
     // a Composable's onFocusChanged callback is not itself a coroutine,
     // and a server without Gelato installed, or an old build without
     // this route yet, must fail silently here, never surface anywhere
-    // a reader could see it. itemId is deliberately never removed from
-    // prefetchedItemIds on failure the way the web version's is: a
-    // repeated focus on a card whose prefetch already failed once this
-    // session would otherwise keep re-firing the same doomed request.
+    // a reader could see it. A failed prefetch still counts for the
+    // 8 minute window, so a card refocused after a failure does not fire
+    // the same request again straight away.
     fun prefetchStreams(itemId: String) {
-        if (!prefetchedItemIds.add(itemId)) return
+        val now = System.currentTimeMillis()
+        val last = prefetchedAt[itemId]
+        if (last != null && now - last < PREFETCH_WINDOW_MS) return
+        if (sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)) return
+        // Two already running: skip, a later dwell on this card tries again.
+        if (!prefetchSlots.tryAcquire()) return
+        prefetchedAt[itemId] = now
+        com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
         prefetchScope.launch {
-            runCatching { api.prefetchGelatoStreams(itemId) }
+            try {
+                runCatching { api.prefetchGelatoStreams(itemId) }
+            } finally {
+                prefetchSlots.release()
+            }
         }
     }
 
