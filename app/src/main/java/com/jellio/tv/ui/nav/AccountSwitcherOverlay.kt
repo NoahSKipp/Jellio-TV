@@ -186,7 +186,7 @@ fun AccountSwitcherOverlay(
                         Surface(
                             onClick = onSignOut,
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                            colors = com.jellio.tv.ui.common.dangerButtonColors(),
                         ) {
                             Text(text = "Sign Out", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }

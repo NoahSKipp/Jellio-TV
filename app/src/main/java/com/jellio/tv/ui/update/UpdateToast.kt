@@ -85,7 +85,7 @@ fun UpdateToast(
                     onClick = onDownload,
                     enabled = !downloading,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     modifier = Modifier.focusRequester(downloadFocusRequester),
                 ) {
                     Text(text = if (downloading) "Downloading..." else "Download", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))

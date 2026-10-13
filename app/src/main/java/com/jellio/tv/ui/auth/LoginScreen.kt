@@ -150,7 +150,7 @@ private fun ServerAddressForm(
         Surface(
             onClick = { onContinue(serverAddress) },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(text = "Continue", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
@@ -318,7 +318,7 @@ private fun ManualLoginForm(
             onClick = { onLogin(serverAddress, username, password) },
             enabled = !uiState.isLoading,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(
                 text = if (uiState.isLoading) "Signing in..." else "Sign In",
@@ -369,7 +369,7 @@ private fun ForgotUsernameForm(
             onClick = { onSubmit(username) },
             enabled = !uiState.isRequestingReset,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(text = "Send reset code", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
@@ -429,7 +429,7 @@ private fun ForgotPinForm(
             onClick = { onSubmit(pin, newPassword, confirmPassword) },
             enabled = !uiState.isRedeemingReset,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(text = "Reset password", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }

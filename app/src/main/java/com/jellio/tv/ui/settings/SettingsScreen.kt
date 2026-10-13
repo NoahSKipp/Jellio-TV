@@ -245,7 +245,7 @@ fun SettingsScreen(
         Surface(
             onClick = onLogout,
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+            colors = com.jellio.tv.ui.common.dangerButtonColors(),
             border = ClickableSurfaceDefaults.border(
                 focusedBorder = Border(
                     border = BorderStroke(2.5.dp, Color.White),
@@ -625,7 +625,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     onClick = { viewModel.download() },
                     enabled = !updateState.downloading,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(
                             border = BorderStroke(2.5.dp, Color.White),

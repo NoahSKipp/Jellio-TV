@@ -210,7 +210,7 @@ fun ProfileScreen(
                             Surface(
                                 onClick = onLogout,
                                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                                colors = com.jellio.tv.ui.common.dangerButtonColors(),
                                 modifier = Modifier.padding(start = 48.dp, top = 32.dp, bottom = 48.dp),
                             ) {
                                 Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
@@ -267,7 +267,7 @@ private fun BioSection(
                 Surface(
                     onClick = onSave,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioSecondary, contentColor = JellioBg),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                 ) {
                     Text(text = if (isSaving) "Saving..." else "Save", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }

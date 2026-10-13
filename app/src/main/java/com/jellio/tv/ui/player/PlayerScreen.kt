@@ -1922,12 +1922,7 @@ private fun UpNextOverlay(
                 Surface(
                     onClick = onPlayNow,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = JellioSecondary,
-                        contentColor = JellioBg,
-                        focusedContainerColor = Color.White,
-                        focusedContentColor = JellioBg,
-                    ),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(
                             border = BorderStroke(2.5.dp, Color.White),
@@ -2111,12 +2106,7 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                 Surface(
                     onClick = onResume,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = JellioSecondary,
-                        contentColor = JellioBg,
-                        focusedContainerColor = Color.White,
-                        focusedContentColor = JellioBg,
-                    ),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(
                             border = BorderStroke(2.5.dp, Color.White),

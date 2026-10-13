@@ -306,12 +306,7 @@ fun OverscanCalibrationModal(
                         onDismiss()
                     },
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = JellioSecondary,
-                        contentColor = JellioBg,
-                        focusedContainerColor = Color.White,
-                        focusedContentColor = JellioBg,
-                    ),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(border = BorderStroke(2.5.dp, Color.White), shape = RoundedCornerShape(999.dp)),
                     ),
