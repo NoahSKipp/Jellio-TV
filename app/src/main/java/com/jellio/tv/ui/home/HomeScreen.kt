@@ -201,15 +201,17 @@ fun HomeScreen(
                         .height(topFixtureHeight + HeaderOverlap),
                 )
 
-                com.jellio.tv.ui.nowplaying.NowPlayingPill(
-                    activeCount = nowPlayingActiveCount,
-                    topSession = nowPlayingSessions.firstOrNull(),
-                    localPaused = nowPlayingLocalPaused,
-                    onClick = onOpenNowPlaying,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 28.dp, end = 40.dp),
-                )
+                if (com.jellio.tv.data.prefs.DisplayPreferences.showNowPlayingPill) {
+                    com.jellio.tv.ui.nowplaying.NowPlayingPill(
+                        activeCount = nowPlayingActiveCount,
+                        topSession = nowPlayingSessions.firstOrNull(),
+                        localPaused = nowPlayingLocalPaused,
+                        onClick = onOpenNowPlaying,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 28.dp, end = 40.dp),
+                    )
+                }
 
                 // Scrollable rows in the bottom viewport
                 val defaultScrollSpec = LocalBringIntoViewSpec.current.scrollAnimationSpec

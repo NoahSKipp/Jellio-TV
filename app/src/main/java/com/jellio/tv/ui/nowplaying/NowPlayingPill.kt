@@ -55,8 +55,6 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-private val CyanAccent = Color(0xFF17A7DD)
-private val MagentaAccent = Color(0xFFC657E3)
 private val GreenDot = Color(0xFF22C55E)
 
 @Composable
@@ -86,18 +84,18 @@ fun NowPlayingPill(
                 pressedScale = 0.97f,
             ),
             colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color(0xCC111422),
-                focusedContainerColor = Color(0xEE1E2338),
+                containerColor = Color.Black.copy(alpha = 0.70f),
+                focusedContainerColor = Color.White.copy(alpha = 0.22f),
                 contentColor = JellioText,
-                focusedContentColor = JellioText,
+                focusedContentColor = Color.White,
             ),
             border = ClickableSurfaceDefaults.border(
                 border = Border(
-                    border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(CyanAccent.copy(alpha = 0.35f), MagentaAccent.copy(alpha = 0.35f)))),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                     shape = pillShape,
                 ),
                 focusedBorder = Border(
-                    border = BorderStroke(2.dp, Brush.horizontalGradient(listOf(CyanAccent, MagentaAccent))),
+                    border = BorderStroke(2.dp, Color.White),
                     shape = pillShape,
                 ),
             ),
@@ -119,7 +117,7 @@ fun NowPlayingPill(
                     modifier = Modifier
                         .size(7.dp)
                         .clip(CircleShape)
-                        .background(if (localPaused != null && activeCount == 0) MagentaAccent else GreenDot),
+                        .background(if (localPaused != null && activeCount == 0) Color.White.copy(alpha = 0.40f) else GreenDot),
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -143,7 +141,7 @@ fun NowPlayingPill(
                         Text(
                             text = headline,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = if (isFocused) CyanAccent else JellioText,
+                            color = if (isFocused) Color.White else JellioText,
                             maxLines = 1,
                         )
                         if (isFocused) {
@@ -151,7 +149,7 @@ fun NowPlayingPill(
                             Text(
                                 text = "• " + Strings.get("now_playing_press_select"),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MagentaAccent,
+                                color = Color.White.copy(alpha = 0.75f),
                                 fontSize = 10.sp,
                             )
                         }
@@ -217,21 +215,21 @@ private fun EqualizerBars(isAnimating: Boolean) {
                 .width(3.dp)
                 .height(maxHeight * (if (isAnimating) bar1 else 0.4f))
                 .clip(RoundedCornerShape(1.5.dp))
-                .background(CyanAccent),
+                .background(Color.White),
         )
         Box(
             modifier = Modifier
                 .width(3.dp)
                 .height(maxHeight * (if (isAnimating) bar2 else 0.7f))
                 .clip(RoundedCornerShape(1.5.dp))
-                .background(Brush.verticalGradient(listOf(CyanAccent, MagentaAccent))),
+                .background(Color.White),
         )
         Box(
             modifier = Modifier
                 .width(3.dp)
                 .height(maxHeight * (if (isAnimating) bar3 else 0.5f))
                 .clip(RoundedCornerShape(1.5.dp))
-                .background(MagentaAccent),
+                .background(Color.White),
         )
     }
 }

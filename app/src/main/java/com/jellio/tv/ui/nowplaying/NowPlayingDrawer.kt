@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
@@ -453,6 +454,7 @@ fun NowPlayingDrawer(
                                 val isFirst = (localPaused == null && sessions.firstOrNull() == sess)
                                 SessionCard(
                                     session = sess,
+                                    currentSession = session,
                                     onHandoff = { onHandoff(sess) },
                                     onTuneIn = { channelId -> onTuneIn(channelId) },
                                     onJoinParty = { onJoinWatchParty(sess) },
@@ -661,6 +663,7 @@ private fun LocalPausedCard(
                     label = Strings.get("action_dismiss"),
                     primary = false,
                     onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -670,6 +673,7 @@ private fun LocalPausedCard(
 @Composable
 private fun SessionCard(
     session: NowPlayingSessionDto,
+    currentSession: Session,
     onHandoff: () -> Unit,
     onTuneIn: (String) -> Unit,
     onJoinParty: () -> Unit,
@@ -680,6 +684,16 @@ private fun SessionCard(
     val item = session.Item ?: return
     val isLive = session.Activity == "watching_live"
     val isReading = session.Activity == "reading"
+
+    val isOwnSession = remember(session.UserId, session.UserName, currentSession.userId, currentSession.userName) {
+        if (!session.UserId.isNullOrBlank() && currentSession.userId.isNotBlank()) {
+            session.UserId.replace("-", "").equals(currentSession.userId.replace("-", ""), ignoreCase = true)
+        } else if (!session.UserName.isNullOrBlank() && currentSession.userName.isNotBlank()) {
+            session.UserName.equals(currentSession.userName, ignoreCase = true)
+        } else {
+            false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -843,7 +857,11 @@ private fun SessionCard(
 
             // Action Buttons
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (isLive && !item.Id.isNullOrBlank()) {
+                val canHandoff = !item.Id.isNullOrBlank() && !isReading && isOwnSession
+                val canTuneIn = isLive && !item.Id.isNullOrBlank()
+                val canShowDetails = !item.Id.isNullOrBlank()
+
+                if (canTuneIn) {
                     DrawerActionButton(
                         label = Strings.get("now_playing_tune_in"),
                         icon = Icons.Filled.LiveTv,
@@ -851,7 +869,7 @@ private fun SessionCard(
                         onClick = { onTuneIn(item.Id) },
                         modifier = Modifier.weight(1f).then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                     )
-                } else if (!item.Id.isNullOrBlank() && !isReading) {
+                } else if (canHandoff) {
                     DrawerActionButton(
                         label = Strings.get("now_playing_handoff"),
                         icon = Icons.Filled.PlayArrow,
@@ -861,11 +879,16 @@ private fun SessionCard(
                     )
                 }
 
-                if (!item.Id.isNullOrBlank()) {
+                if (canShowDetails) {
+                    val isOnlyAction = !canTuneIn && !canHandoff
                     DrawerActionButton(
                         label = Strings.get("details_title"),
-                        primary = false,
+                        icon = Icons.Filled.Info,
+                        primary = isOnlyAction,
                         onClick = { onDetails(item.SeriesId ?: item.Id) },
+                        modifier = Modifier.weight(1f).then(
+                            if (focusRequester != null && isOnlyAction) Modifier.focusRequester(focusRequester) else Modifier
+                        ),
                     )
                 }
             }
@@ -893,9 +916,13 @@ private fun DrawerActionButton(
             containerColor = if (primary) Color.White else Color.White.copy(alpha = 0.08f),
             focusedContainerColor = if (primary) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.22f),
             contentColor = if (primary) Color.Black else JellioText,
-            focusedContentColor = if (primary) Color.Black else JellioText,
+            focusedContentColor = if (primary) Color.Black else Color.White,
         ),
         border = ClickableSurfaceDefaults.border(
+            border = Border(
+                border = BorderStroke(1.dp, if (primary) Color.Transparent else Color.White.copy(alpha = 0.10f)),
+                shape = shape,
+            ),
             focusedBorder = Border(
                 border = BorderStroke(2.dp, Color.White),
                 shape = shape,
@@ -920,6 +947,7 @@ private fun DrawerActionButton(
                 text = label,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

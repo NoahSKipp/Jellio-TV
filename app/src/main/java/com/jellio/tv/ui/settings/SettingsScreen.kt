@@ -820,6 +820,14 @@ fun SettingsScreen(
                         value = if (overscan == 0) string("settings_overscan_fullscreen") else formatString("settings_overscan_inset", overscan),
                         onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
                     )
+                    SettingsDivider()
+                    val showPill = com.jellio.tv.data.prefs.DisplayPreferences.showNowPlayingPill
+                    SettingsToggleRow(
+                        label = string("settings_show_now_playing_pill"),
+                        description = string("settings_show_now_playing_pill_desc"),
+                        checked = showPill,
+                        onToggle = { com.jellio.tv.data.prefs.DisplayPreferences.setShowNowPlayingPill(displayContext, !showPill) },
+                    )
                 }
                 }
                 SettingsCategory.SHORTCUTS -> {

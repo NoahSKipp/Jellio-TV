@@ -28,6 +28,7 @@ object DisplayPreferences {
     private const val PREFS = "jellio_display"
     private const val KEY_OVERSCAN = "overscan_percent"
     private const val KEY_DISPLAY_LANGUAGE = "display_language"
+    private const val KEY_SHOW_NOW_PLAYING_PILL = "show_now_playing_pill"
 
     const val MIN_PERCENT = 0
     const val MAX_PERCENT = 8
@@ -38,6 +39,9 @@ object DisplayPreferences {
     var displayLanguage by mutableStateOf(AppLanguage.ENGLISH)
         private set
 
+    var showNowPlayingPill by mutableStateOf(true)
+        private set
+
     var isCalibrating by mutableStateOf(false)
 
     fun init(context: Context) {
@@ -46,6 +50,16 @@ object DisplayPreferences {
         overscanPercent = sp.getInt(KEY_OVERSCAN, 0).coerceIn(MIN_PERCENT, MAX_PERCENT)
         val langCode = sp.getString(KEY_DISPLAY_LANGUAGE, "en")
         displayLanguage = AppLanguage.fromCode(langCode)
+        showNowPlayingPill = sp.getBoolean(KEY_SHOW_NOW_PLAYING_PILL, true)
+    }
+
+    fun setShowNowPlayingPill(context: Context, show: Boolean) {
+        showNowPlayingPill = show
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SHOW_NOW_PLAYING_PILL, show)
+            .apply()
     }
 
     fun setOverscan(context: Context, percent: Int) {

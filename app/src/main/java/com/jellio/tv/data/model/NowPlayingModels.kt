@@ -25,6 +25,7 @@ data class NowPlayingItemDto(
 @JsonClass(generateAdapter = true)
 data class NowPlayingSessionDto(
     val Id: String? = null,
+    val UserId: String? = null,
     val UserName: String? = null,
     val DeviceName: String? = null,
     val Client: String? = null,
