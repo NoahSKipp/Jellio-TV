@@ -56,7 +56,9 @@ import javax.inject.Singleton
 // asked the server whether one even existed), same real field
 // screens/home.js's own hero already knows to ask for.
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
-private const val PRELOAD_TTL_MS = 60_000L
+// How long a title page can be drawn from what was last seen of it, while
+// a fresh copy loads behind it.
+private const val PRELOAD_TTL_MS = 30 * 60_000L
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
@@ -210,6 +212,8 @@ class JellioRepository @Inject constructor(
     // one that signs in during this same real process.
     fun clearCache() {
         cache.clear()
+        preloaded.clear()
+        recentLists.clear()
         sourceCache.clear()
         prefetchedAt.clear()
     }
@@ -835,7 +839,10 @@ class JellioRepository @Inject constructor(
     suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
         cache.get("details:$itemId:$forPlayer", SHORT_CACHE_TTL_MS) {
             fetchItemInfo(userId, itemId, if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
-        }.also { previews[it.Id] = it }
+        }.also {
+            previews[it.Id] = it
+            if (!forPlayer) preloaded[itemId] = System.currentTimeMillis() to it
+        }
 
     // Full details fetched while the viewer rests on a card, so the title
     // page can open complete; fresh for a minute, the page still refreshes.
@@ -918,6 +925,19 @@ class JellioRepository @Inject constructor(
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { api.getSeasons(seriesId, userId).Items }
+            .also { recentLists["seasons:$seriesId"] = System.currentTimeMillis() to it }
+
+    // Seasons and episodes as last seen, to draw a series page at once.
+    private val recentLists = ConcurrentHashMap<String, Pair<Long, List<BaseItemDto>>>()
+
+    fun recentSeasons(seriesId: String): List<BaseItemDto>? = recentList("seasons:$seriesId")
+
+    fun recentEpisodes(seriesId: String, seasonId: String): List<BaseItemDto>? = recentList("episodes:$seriesId:$seasonId")
+
+    private fun recentList(key: String): List<BaseItemDto>? {
+        val entry = recentLists[key] ?: return null
+        return entry.second.takeIf { System.currentTimeMillis() - entry.first < PRELOAD_TTL_MS }
+    }
 
     // Real endpoint, runtime/recommend.js's own real seed history:
     // real Jellyfin Filters=IsPlayed, sorted by DatePlayed, real real
@@ -1001,7 +1021,11 @@ class JellioRepository @Inject constructor(
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
             api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
-        }.also { seedPreviews(it) }
+        }.also {
+            seedPreviews(it)
+            if (recentLists.size > 300) recentLists.clear()
+            recentLists["episodes:$seriesId:$seasonId"] = System.currentTimeMillis() to it
+        }
 
     // Real port of runtime/api.js's own getNextEpisode(): the next real
     // episode in this same season if this one is not the season's own

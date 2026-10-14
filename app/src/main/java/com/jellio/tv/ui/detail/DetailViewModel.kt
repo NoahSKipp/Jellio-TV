@@ -116,12 +116,19 @@ class DetailViewModel @Inject constructor(
             }
             try {
                 val started = System.currentTimeMillis()
+                // A series drawn from what was last seen starts on its seasons now.
+                if (preloaded?.Type == "Series") {
+                    loadSeasons(session, preloaded.Id)
+                    seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, preloaded.Id) }
+                }
                 val item = repository.getItemDetails(session.userId, itemId)
-                android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms")
+                android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms" + if (preloaded != null) " (drawn from memory first)" else "")
                 ratingTargetId = item.Id
-                _uiState.value = DetailUiState(
+                // Updates the page in place, keeping seasons and stream state.
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     item = item,
+                    error = null,
                     cast = item.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
                     trailers = item.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
                     isWatchlisted = item.UserData?.IsFavorite ?: false,
@@ -139,7 +146,7 @@ class DetailViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(likes = item.UserData?.Likes)
                 }
 
-                if (item.Type == "Series") {
+                if (item.Type == "Series" && preloaded?.Type != "Series") {
                     loadSeasons(session, item.Id)
                     // screens/detail.js's own real targetPromise: started
                     // once here, not per click, a tap on Play before this
@@ -149,7 +156,10 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
-                _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
+                // A page already drawn from memory stays up.
+                if (preloaded == null) {
+                    _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
+                }
             }
         }
     }
@@ -186,18 +196,33 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun loadSeasons(session: Session, seriesId: String) {
+        fun ordered(list: List<BaseItemDto>) = list.sortedBy { if (repository.isSpecialsSeason(it)) 1 else 0 }
+        repository.recentSeasons(seriesId)?.let { known ->
+            _uiState.value = _uiState.value.copy(seasons = ordered(known))
+            ordered(known).firstOrNull()?.let { selectSeason(session, seriesId, it.Id) }
+        }
         viewModelScope.launch {
-            val seasons = runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList())
-                .sortedBy { if (repository.isSpecialsSeason(it)) 1 else 0 }
+            val seasons = ordered(runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
+            if (seasons.isEmpty() && _uiState.value.seasons.isNotEmpty()) return@launch
             _uiState.value = _uiState.value.copy(seasons = seasons)
-            seasons.firstOrNull()?.let { selectSeason(session, seriesId, it.Id) }
+            val selected = _uiState.value.selectedSeasonId
+            if (selected == null || seasons.none { it.Id == selected }) {
+                seasons.firstOrNull()?.let { selectSeason(session, seriesId, it.Id) }
+            } else {
+                selectSeason(session, seriesId, selected)
+            }
         }
     }
 
     fun selectSeason(session: Session, seriesId: String, seasonId: String) {
-        _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId, selectedSeasonEpisodes = emptyList())
+        val known = repository.recentEpisodes(seriesId, seasonId)
+        val showing = _uiState.value.selectedSeasonId == seasonId && _uiState.value.selectedSeasonEpisodes.isNotEmpty()
+        _uiState.value = _uiState.value.copy(
+            selectedSeasonId = seasonId,
+            selectedSeasonEpisodes = known ?: if (showing) _uiState.value.selectedSeasonEpisodes else emptyList(),
+        )
         viewModelScope.launch {
-            val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrDefault(emptyList())
+            val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
             if (_uiState.value.selectedSeasonId == seasonId) {
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
             }
