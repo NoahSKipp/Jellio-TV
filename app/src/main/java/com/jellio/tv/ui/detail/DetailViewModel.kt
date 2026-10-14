@@ -47,6 +47,7 @@ data class DetailUiState(
     val loadingArt: TitleLoadingArtInfo? = null,
     // Shown under the actions while the stream lookup runs or found nothing.
     val streamStatus: String? = null,
+    val findingStreams: Boolean = false,
 )
 
 data class TitleLoadingArtInfo(val backdropUrl: String?, val logoUrl: String?, val title: String)
@@ -114,7 +115,9 @@ class DetailViewModel @Inject constructor(
                 DetailUiState(isLoading = true, loadingArt = repository.previewItem(itemId)?.let { loadingArt(session, it) })
             }
             try {
+                val started = System.currentTimeMillis()
                 val item = repository.getItemDetails(session.userId, itemId)
+                android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms")
                 ratingTargetId = item.Id
                 _uiState.value = DetailUiState(
                     isLoading = false,
@@ -245,11 +248,12 @@ class DetailViewModel @Inject constructor(
     // Streams are looked up only once the page is drawn; Play reuses this
     // same lookup (the repository shares it and caches the answer).
     private fun lookForStreams(session: Session, itemId: String) {
-        _uiState.value = _uiState.value.copy(streamStatus = "Finding streams…")
+        _uiState.value = _uiState.value.copy(findingStreams = true, streamStatus = null)
         viewModelScope.launch {
             val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
             if (_uiState.value.item?.Id != itemId) return@launch
             _uiState.value = _uiState.value.copy(
+                findingStreams = false,
                 streamStatus = when {
                     sources.isFailure -> "Could not check for streams."
                     sources.getOrNull().isNullOrEmpty() -> "No streams found yet."

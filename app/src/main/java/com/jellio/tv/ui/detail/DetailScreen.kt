@@ -256,12 +256,7 @@ fun DetailScreen(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    val art = uiState.loadingArt
-                    if (art != null) {
-                        com.jellio.tv.ui.common.TitleLoadingArt(art.backdropUrl, art.logoUrl, art.title)
-                    } else {
-                        Text(text = "Loading...", color = JellioTextSecondary)
-                    }
+                    DetailLoading(uiState.loadingArt)
                 }
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -616,7 +611,7 @@ private fun DetailHero(
                     onClick = { actionsExpanded = !actionsExpanded },
                 )
             }
-            state.streamStatus?.let { status ->
+            state.streamStatus?.takeIf { !state.findingStreams }?.let { status ->
                 Text(
                     text = status,
                     color = JellioTextSecondary,
@@ -624,6 +619,32 @@ private fun DetailHero(
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
+        }
+    }
+}
+
+// The title's backdrop, dimmed, with a spinner and its name while the page
+// loads.
+@Composable
+private fun DetailLoading(art: TitleLoadingArtInfo?) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        art?.backdropUrl?.let { url ->
+            coil3.compose.AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            com.jellio.tv.ui.common.ScreenSpinner(size = 44.dp)
+            Text(
+                text = art?.title?.takeIf { it.isNotBlank() }?.let { "Loading $it" } ?: "Loading",
+                color = JellioText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
         }
     }
 }
