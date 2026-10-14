@@ -237,8 +237,16 @@ class WatchNextSyncer @Inject constructor(
                             context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
                             context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, valuesOf(program, itemId))
                         }
-                        // A NEXT entry has no progress to update; leave its time alone.
-                        program.watchNextType == TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT -> Unit
+                        // A NEXT entry keeps its time; art and text still update.
+                        program.watchNextType == TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT ->
+                            context.contentResolver.update(
+                                TvContractCompat.buildWatchNextProgramUri(row.id),
+                                valuesOf(program, itemId).apply {
+                                    put(TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS, row.engagedAt)
+                                },
+                                null,
+                                null,
+                            )
                         else -> context.contentResolver.update(TvContractCompat.buildWatchNextProgramUri(row.id), valuesOf(program, itemId), null, null)
                     }
                 }
