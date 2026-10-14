@@ -820,10 +820,6 @@ class JellioRepository @Inject constructor(
 
     suspend fun searchSeries(term: String): List<BaseItemDto> = api.searchGelatoSeries(term)
 
-    // Newest movies and shows (new episodes grouped under their show).
-    suspend fun getRecentlyAdded(userId: String, limit: Int = 20): List<BaseItemDto> =
-        api.getLatestItems(userId, includeItemTypes = "Movie,Series", limit = limit, fields = "$ITEM_FIELDS,Overview")
-
     suspend fun getWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> =
         cache.get("watchlist:$userId:$limit", SHORT_CACHE_TTL_MS) {
             api.getItems(

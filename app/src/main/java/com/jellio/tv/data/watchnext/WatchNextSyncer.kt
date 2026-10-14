@@ -292,6 +292,33 @@ class WatchNextSyncer @Inject constructor(
 
     private val channelPrefs by lazy { context.getSharedPreferences("jellio_channels", Context.MODE_PRIVATE) }
 
+    @Volatile
+    private var topPicks: List<BaseItemDto>? = null
+
+    // Home's "Top Picks for You", once its recommendations are built.
+    suspend fun updateTopPicks(session: Session, picks: List<BaseItemDto>) {
+        if (!supported()) return
+        topPicks = picks
+        val spec = CHANNELS.first { it.key == "picks" }
+        locked {
+            runCatching {
+                val id = channelId(spec) ?: return@runCatching
+                context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
+                picks.take(CHANNEL_SIZE).forEachIndexed { index, item ->
+                    val program = toPreviewProgram(session, id, item, plays = false, weight = CHANNEL_SIZE - index, overview = null) ?: return@forEachIndexed
+                    context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+                }
+            }.onFailure { Log.w(TAG, "top picks channel failed", it) }
+        }
+    }
+
+    // A channel from an earlier version that is no longer published.
+    private fun dropChannel(key: String) {
+        val id = channelPrefs.getLong(key, -1L).takeIf { it >= 0 } ?: return
+        context.contentResolver.delete(TvContractCompat.buildChannelUri(id), null, null)
+        channelPrefs.edit().remove(key).apply()
+    }
+
     private fun channelId(spec: ChannelSpec): Long? {
         val known = channelPrefs.getLong(spec.key, -1L)
         if (known >= 0) {
@@ -372,16 +399,17 @@ class WatchNextSyncer @Inject constructor(
         overviews: Map<String, String>,
     ): Set<String> {
         val watchlist = runCatching { repository.getWatchlistItems(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
-        val latest = runCatching { repository.getRecentlyAdded(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
-        val lists = mapOf(
-            "continue" to continueWatching,
-            "nextup" to upNext,
-            "watchlist" to watchlist,
-            "latest" to latest,
-        )
+        dropChannel("latest")
+        val lists = buildMap {
+            put("continue", continueWatching)
+            put("nextup", upNext)
+            put("watchlist", watchlist)
+            // Left as they are until Home has worked out the picks.
+            topPicks?.let { put("picks", it) }
+        }
         val shown = mutableSetOf<String>()
         CHANNELS.forEach { spec ->
-            val items = lists[spec.key].orEmpty().take(CHANNEL_SIZE)
+            val items = lists[spec.key]?.take(CHANNEL_SIZE) ?: return@forEach
             val id = channelId(spec) ?: return@forEach
             context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
             items.forEachIndexed { index, item ->
@@ -438,7 +466,7 @@ class WatchNextSyncer @Inject constructor(
             ChannelSpec("continue", "Continue Watching", plays = true),
             ChannelSpec("nextup", "Next Up", plays = true),
             ChannelSpec("watchlist", "Watchlist", plays = false),
-            ChannelSpec("latest", "Recently Added", plays = false),
+            ChannelSpec("picks", "Top Picks for You", plays = false),
         )
     }
 }

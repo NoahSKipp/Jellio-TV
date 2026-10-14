@@ -372,6 +372,8 @@ class HomeViewModel @Inject constructor(
                         catalogRows.forEach { add(PosterHomeRow(it)) }
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
+                    val picks = (recommendationRows.firstOrNull { it.title == "Top Picks for You" } ?: recommendationRows.firstOrNull())?.items
+                    if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
 
                     _uiState.value = HomeUiState(
                         isLoading = false,
