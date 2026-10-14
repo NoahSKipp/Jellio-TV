@@ -19,7 +19,23 @@ class SettingsViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
+    private val recommendationPreferences: com.jellio.tv.data.prefs.RecommendationPreferences,
 ) : ViewModel() {
+
+    private val _communityRowEnabled = MutableStateFlow(true)
+    val communityRowEnabled: StateFlow<Boolean> = _communityRowEnabled.asStateFlow()
+
+    private val _communityUsers = MutableStateFlow<List<com.jellio.tv.data.model.CommunityUserDto>>(emptyList())
+    val communityUsers: StateFlow<List<com.jellio.tv.data.model.CommunityUserDto>> = _communityUsers.asStateFlow()
+
+    private val _excludedUserIds = MutableStateFlow<Set<String>>(emptySet())
+    val excludedUserIds: StateFlow<Set<String>> = _excludedUserIds.asStateFlow()
+
+    private val _allGenres = MutableStateFlow<List<String>>(emptyList())
+    val allGenres: StateFlow<List<String>> = _allGenres.asStateFlow()
+
+    private val _selectedGenres = MutableStateFlow<List<String>>(emptyList())
+    val selectedGenres: StateFlow<List<String>> = _selectedGenres.asStateFlow()
 
     val watchNextStatus = watchNextSyncer.status
 
@@ -273,6 +289,48 @@ class SettingsViewModel @Inject constructor(
                 _avatarPickerStatus.value = "Could not upload that picture."
                 _avatarBusyKey.value = null
             }
+        }
+    }
+
+    fun loadRecommendations(userId: String) {
+        viewModelScope.launch {
+            _communityRowEnabled.value = recommendationPreferences.isCommunityRowEnabled(userId)
+            _excludedUserIds.value = recommendationPreferences.getCommunityExcludedUsers(userId)
+            _selectedGenres.value = recommendationPreferences.getSelectedGenres(userId)
+
+            runCatching {
+                _communityUsers.value = repository.getCommunityUsers()
+            }
+            runCatching {
+                _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sorted()
+            }
+        }
+    }
+
+    fun setCommunityRowEnabled(userId: String, enabled: Boolean) {
+        _communityRowEnabled.value = enabled
+        viewModelScope.launch {
+            recommendationPreferences.setCommunityRowEnabled(userId, enabled)
+        }
+    }
+
+    fun toggleCommunityExcludedUser(userId: String, targetUserId: String) {
+        viewModelScope.launch {
+            recommendationPreferences.toggleCommunityExcludedUser(userId, targetUserId)
+            _excludedUserIds.value = recommendationPreferences.getCommunityExcludedUsers(userId)
+        }
+    }
+
+    fun toggleSelectedGenre(userId: String, genre: String) {
+        viewModelScope.launch {
+            _selectedGenres.value = recommendationPreferences.toggleSelectedGenre(userId, genre)
+        }
+    }
+
+    fun resetSelectedGenres(userId: String) {
+        _selectedGenres.value = emptyList()
+        viewModelScope.launch {
+            recommendationPreferences.setSelectedGenres(userId, emptyList())
         }
     }
 }

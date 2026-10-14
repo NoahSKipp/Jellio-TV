@@ -352,6 +352,14 @@ interface JellyfinApi {
     @POST("Jellio/next-up-hidden/{seriesId}")
     suspend fun hideSeriesFromNextUp(@Path("seriesId") seriesId: String)
 
+    @GET("Jellio/community/users")
+    suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto>
+
+    @GET("Jellio/community/watching")
+    suspend fun getCommunityWatching(
+        @Query("excludedUserIds") excludedUserIds: String? = null,
+    ): com.jellio.tv.data.model.CommunityWatchingResponse
+
     // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
     // }, confirmed against jellyfin-apiclient-javascript's own
     // updateUserPassword rather than guessed field names, the same

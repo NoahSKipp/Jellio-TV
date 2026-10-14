@@ -20,8 +20,13 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.MovieFilter
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
@@ -64,6 +69,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -102,6 +108,7 @@ private enum class LanguageField { AUDIO, SUBTITLE }
 private enum class SettingsCategory(val label: String, val icon: ImageVector) {
     ACCOUNT("Account", Icons.Filled.Person),
     PLAYBACK("Playback", Icons.Filled.PlayCircle),
+    RECOMMENDATIONS("Recommendations", Icons.Filled.AutoAwesome),
     DISPLAY("Display", Icons.Filled.Palette),
     ABOUT("About", Icons.Filled.Info),
 }
@@ -140,7 +147,10 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(session.userId) { viewModel.load(session) }
+    LaunchedEffect(session.userId) {
+        viewModel.load(session)
+        viewModel.loadRecommendations(session.userId)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
     // Categories down the left like the web settings' own menu, the
@@ -270,6 +280,112 @@ fun SettingsScreen(
                 SettingsSection(title = "Sleep Timer", icon = Icons.Filled.Bedtime, form = true) {
                     SleepTimerSection(viewModel = viewModel)
                 }
+                }
+                SettingsCategory.RECOMMENDATIONS -> {
+                    val communityRowEnabled by viewModel.communityRowEnabled.collectAsState()
+                    val communityUsers by viewModel.communityUsers.collectAsState()
+                    val excludedUsers by viewModel.excludedUserIds.collectAsState()
+                    val allGenres by viewModel.allGenres.collectAsState()
+                    val selectedGenres by viewModel.selectedGenres.collectAsState()
+
+                    SettingsSection(
+                        title = "What Others Are Watching",
+                        icon = Icons.Filled.Group,
+                        description = "Show titles currently being watched or recently finished by other users on this server.",
+                    ) {
+                        SettingsToggleRow(
+                            label = "Display row on Home",
+                            description = "Show the What Others Are Watching row among your home screen recommendations.",
+                            checked = communityRowEnabled,
+                            onToggle = { viewModel.setCommunityRowEnabled(session.userId, !communityRowEnabled) },
+                        )
+                        if (communityRowEnabled && communityUsers.isNotEmpty()) {
+                            SettingsDivider()
+                            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "Included Users",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = JellioText,
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                                Text(
+                                    text = "Choose whose activity appears in your community row. Toggle off any user to hide their activity.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = JellioTextSecondary,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                                communityUsers.forEach { user ->
+                                    val isIncluded = !excludedUsers.contains(user.Id)
+                                    val userAvatarUrl = if (!user.PrimaryImageTag.isNullOrEmpty()) {
+                                        val cleanServer = com.jellio.tv.di.normalizeServerAddress(session.serverAddress)
+                                        "$cleanServer/Users/${user.Id}/Images/Primary?maxWidth=64${if (session.accessToken.isNotEmpty()) "&ApiKey=${session.accessToken}&api_key=${session.accessToken}" else ""}"
+                                    } else null
+
+                                    SettingsRowSurface(onClick = { viewModel.toggleCommunityExcludedUser(session.userId, user.Id) }) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(JellioSecondary),
+                                        ) {
+                                            if (userAvatarUrl != null) {
+                                                AsyncImage(
+                                                    model = userAvatarUrl,
+                                                    contentDescription = user.Name,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = user.Name.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
+                                                    color = Color.White,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                )
+                                            }
+                                        }
+                                        SettingsRowText(label = user.Name, description = null)
+                                        SettingsSwitch(checked = isIncluded)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsSection(
+                        title = "Genre Recommendations",
+                        icon = Icons.Filled.MovieFilter,
+                        description = "Choose which genre rows appear on your Home screen. When none are selected, rows are chosen automatically based on your library.",
+                    ) {
+                        SettingsActionRow(
+                            label = "Reset to automatic",
+                            icon = Icons.Filled.Sync,
+                            description = if (selectedGenres.isEmpty()) "Currently using automatic discovery." else "${selectedGenres.size} genres selected. Click to reset to automatic.",
+                            onClick = { viewModel.resetSelectedGenres(session.userId) },
+                        )
+                        if (allGenres.isNotEmpty()) {
+                            SettingsDivider()
+                            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "Available Genres",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = JellioText,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                                allGenres.forEach { genre ->
+                                    val isSelected = selectedGenres.contains(genre)
+                                    SettingsRowSurface(onClick = { viewModel.toggleSelectedGenre(session.userId, genre) }) {
+                                        SettingsRowText(
+                                            label = genre,
+                                            description = if (isSelected) "Included in Home rows" else null,
+                                            color = if (isSelected) JellioSecondary else JellioText,
+                                        )
+                                        SettingsSwitch(checked = isSelected)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 SettingsCategory.DISPLAY -> {
                 SettingsSection(title = "Display", icon = Icons.Filled.Tv) {

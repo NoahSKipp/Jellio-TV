@@ -3,7 +3,9 @@ package com.jellio.tv.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,8 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
@@ -93,6 +97,7 @@ fun PosterCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onOptionsClick: (() -> Unit)? = null,
+    userImageUrl: ((String, String?) -> String)? = null,
 ) {
     // Real reference dp values, scaled to the actual TV this composed
     // on: PosterWidth.scaled()'s own header (ui/theme/TvScale.kt)
@@ -147,6 +152,16 @@ fun PosterCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
                 )
+                val watchers = item.Watchers
+                if (!watchers.isNullOrEmpty()) {
+                    WatchersBadge(
+                        watchers = watchers,
+                        userImageUrl = userImageUrl,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp),
+                    )
+                }
                 // Real port of js/libraryBrowse.js's own rating span
                 // (item.CommunityRating.toFixed(1)), css/library-browse.css's
                 // own .jellio-card-rating: top corner rather than that
@@ -158,7 +173,7 @@ fun PosterCard(
                         color = JellioText,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
                             .padding(6.dp)
                             .background(JellioBg.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -384,5 +399,78 @@ private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, danger: Boole
         modifier = Modifier.fillMaxWidth(),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))
+    }
+}
+
+@Composable
+private fun WatchersBadge(
+    watchers: List<com.jellio.tv.data.model.CommunityWatcherDto>,
+    userImageUrl: ((String, String?) -> String)?,
+    modifier: Modifier = Modifier,
+) {
+    if (watchers.isEmpty()) return
+
+    val displayWatchers = watchers.take(3)
+    val overflow = watchers.size - displayWatchers.size
+
+    Row(
+        modifier = modifier
+            .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy((-6).dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        displayWatchers.forEach { watcher ->
+            val avatarUrl = if (!watcher.PrimaryImageTag.isNullOrEmpty() && userImageUrl != null) {
+                userImageUrl(watcher.UserId, watcher.PrimaryImageTag)
+            } else null
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, JellioBg, CircleShape)
+                    .background(JellioSecondary),
+            ) {
+                if (avatarUrl != null) {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = watcher.UserName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val initial = watcher.UserName.firstOrNull()?.uppercaseChar()?.toString() ?: "U"
+                    Text(
+                        text = initial,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                    )
+                }
+            }
+        }
+        if (overflow > 0) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, JellioBg, CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f)),
+            ) {
+                Text(
+                    text = "+$overflow",
+                    color = JellioText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                )
+            }
+        }
     }
 }

@@ -142,6 +142,14 @@ fun HomeScreen(
     // Next" (mark this one episode played) vs "Remove Show from Up
     // Next" (hide the whole series server side).
     var removingTarget by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    val userImageUrl = remember(session) {
+        { userId: String, tag: String? ->
+            val cleanServer = com.jellio.tv.di.normalizeServerAddress(session.serverAddress)
+            val base = "$cleanServer/Users/$userId/Images/Primary?maxWidth=64"
+            val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
+            if (session.accessToken.isNotEmpty()) "$withTag&ApiKey=${session.accessToken}&api_key=${session.accessToken}" else withTag
+        }
+    }
     // Real port of components/cardOptionsMenu.js's own window.confirm()
     // step before deleteItem() ever fires: the card options menu itself
     // only ever sets this, RemoveFromLibraryConfirm below owns the
@@ -440,6 +448,7 @@ fun HomeScreen(
                                             onItemClick = onItemClick,
                                             onItemOptions = onRowOptions,
                                             onTitleClick = onRowTitle,
+                                            userImageUrl = userImageUrl,
                                         )
                                     }
                                 }

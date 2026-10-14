@@ -48,6 +48,7 @@ fun PosterRow(
     modifier: Modifier = Modifier,
     onItemOptions: ((BaseItemDto) -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
+    userImageUrl: ((String, String?) -> String)? = null,
 ) {
     val rowItems = remember(section.items) { section.items.take(10) }
     if (rowItems.isEmpty()) return
@@ -77,6 +78,7 @@ fun PosterRow(
                         imageUrl = imageUrl,
                         onClick = onCardClick,
                         onOptionsClick = onCardOptions,
+                        userImageUrl = userImageUrl,
                     )
                 }
             }

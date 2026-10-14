@@ -728,6 +728,17 @@ class JellioRepository @Inject constructor(
             fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating",
         ).Items
 
+    suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto> =
+        api.getCommunityUsers()
+
+    suspend fun getCommunityWatching(excludedUserIds: List<String> = emptyList()): List<BaseItemDto> {
+        val excludedParam = if (excludedUserIds.isNotEmpty()) excludedUserIds.joinToString(",") else null
+        val response = api.getCommunityWatching(excludedParam)
+        return response.Items.map { entry ->
+            entry.Item.copy(Watchers = entry.Watchers)
+        }
+    }
+
     suspend fun searchItems(userId: String, term: String, limit: Int = 50): List<BaseItemDto> {
         if (term.isBlank()) return emptyList()
         return api.getItems(

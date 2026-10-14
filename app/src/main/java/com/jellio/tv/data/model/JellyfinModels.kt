@@ -216,6 +216,37 @@ data class BaseItemDto(
     // as 0 children, dropping every real catalog row and hub tile
     // both silently.
     val ChildCount: Int? = null,
+    val Watchers: List<CommunityWatcherDto>? = null,
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CommunityWatcherDto(
+    val UserId: String,
+    val UserName: String,
+    val PrimaryImageTag: String? = null,
+    val Activity: String? = null,
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CommunityWatchingItem(
+    val Item: BaseItemDto,
+    val Watchers: List<CommunityWatcherDto> = emptyList(),
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CommunityWatchingResponse(
+    val Items: List<CommunityWatchingItem> = emptyList(),
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class CommunityUserDto(
+    val Id: String,
+    val Name: String,
+    val PrimaryImageTag: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

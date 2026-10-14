@@ -11,10 +11,12 @@ import com.jellio.tv.data.model.serviceOf
 import com.jellio.tv.data.recommend.RecommendationDataSource
 import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
+import com.jellio.tv.data.prefs.RecommendationPreferences
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.watchnext.WatchNextSyncer
 import com.jellio.tv.ui.seasonal.activeSeasonalTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -163,6 +165,7 @@ class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val customizationStore: HomeCustomizationStore,
     private val watchNextSyncer: WatchNextSyncer,
+    private val recommendationPreferences: RecommendationPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -322,12 +325,33 @@ class HomeViewModel @Inject constructor(
                     // Promise.all.
                     val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
                     val recommendationDeferred = async { runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList()) }
+                    val isCommunityEnabled = recommendationPreferences.isCommunityRowEnabled(session.userId)
+                    val communityExcluded = recommendationPreferences.getCommunityExcludedUsers(session.userId).toList()
+                    val communityDeferred: Deferred<List<BaseItemDto>>? = if (isCommunityEnabled) {
+                        async { runCatching { repository.getCommunityWatching(communityExcluded) }.getOrDefault(emptyList()) }
+                    } else null
                     val catalogDataDeferred = async { runCatching { fetchCatalogRowData(session.userId, collections) }.getOrDefault(emptyList()) }
                     val genreDataDeferred = async { runCatching { fetchGenreRowData(session.userId) }.getOrDefault(emptyList()) }
 
                     val recommendationRows = recommendationDeferred.await()
+                    val rawCommunity = communityDeferred?.await() ?: emptyList()
                     val catalogData = catalogDataDeferred.await()
                     val genreData = genreDataDeferred.await()
+
+                    val communitySection = if (rawCommunity.isNotEmpty()) {
+                        val eligible = rawCommunity.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+                        eligible.forEach {
+                            exclude.add(it.Id)
+                            exclude.add(titleKey(it))
+                        }
+                        if (eligible.isNotEmpty()) {
+                            HomeSection(
+                                title = "What Others Are Watching",
+                                items = eligible.take(24),
+                                key = "rec:What Others Are Watching",
+                            )
+                        } else null
+                    } else null
 
                     val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
                     val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
@@ -368,6 +392,8 @@ class HomeViewModel @Inject constructor(
                         if (seasonalSection != null && !seasonalInserted) {
                             add(PosterHomeRow(seasonalSection))
                         }
+
+                        communitySection?.let { add(PosterHomeRow(it)) }
 
                         catalogRows.forEach { add(PosterHomeRow(it)) }
                         genreRows.forEach { add(PosterHomeRow(it)) }
@@ -619,7 +645,12 @@ class HomeViewModel @Inject constructor(
     // the catalog collections above), not one genre waiting on the
     // last.
     private suspend fun fetchGenreRowData(userId: String): List<GenreRowEntry> = coroutineScope {
-        val genres = repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
+        val selected = recommendationPreferences.getSelectedGenres(userId)
+        val genres = if (selected.isNotEmpty()) {
+            selected
+        } else {
+            repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
+        }
         genres.map { genre ->
             async {
                 val items = runCatching { repository.getGenreItems(userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.getOrDefault(emptyList())
