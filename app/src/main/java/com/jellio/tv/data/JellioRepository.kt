@@ -885,12 +885,11 @@ class JellioRepository @Inject constructor(
     suspend fun getItem(userId: String, itemId: String): BaseItemDto =
         cache.get("item:$itemId", CACHE_TTL_MS) { fetchItemInfo(userId, itemId, null) }
 
-    // Overviews for several items in one request (Watch Next cards).
-    suspend fun getOverviews(userId: String, ids: List<String>): Map<String, String> {
+    // Overview and artwork for several items in one request (launcher cards).
+    suspend fun getItemsInfo(userId: String, ids: List<String>): Map<String, BaseItemDto> {
         if (ids.isEmpty()) return emptyMap()
-        return api.getItemsByIds(userId, ids.distinct().joinToString(","), "Overview").Items
-            .mapNotNull { item -> item.Overview?.takeIf { it.isNotBlank() }?.let { item.Id to it } }
-            .toMap()
+        return api.getItemsByIds(userId, ids.distinct().joinToString(","), "Overview,BackdropImageTags").Items
+            .associateBy { it.Id }
     }
 
     // Title info through /Items?ids=, never with MediaSources or

@@ -98,6 +98,13 @@ class WatchNextSyncer @Inject constructor(
             val backdropOwner = item.ParentBackdropItemId
             val backdropTag = item.ParentBackdropImageTags?.firstOrNull()
             if (backdropOwner != null && backdropTag != null) return Art(backdropOwner, backdropTag, "Backdrop", true)
+            // The episode didn't carry its show's art: ask the show itself.
+            showInfo[item.SeriesId]?.let { show ->
+                val showTags = show.ImageTags.orEmpty()
+                showTags["Thumb"]?.let { return Art(show.Id, it, "Thumb", true) }
+                show.BackdropImageTags?.firstOrNull()?.let { return Art(show.Id, it, "Backdrop", true) }
+                showTags["Primary"]?.let { return Art(show.Id, it, "Primary", false) }
+            }
             return tags["Primary"]?.let { Art(item.Id, it, "Primary", true) }
         }
         tags["Thumb"]?.let { return Art(item.Id, it, "Thumb", true) }
@@ -105,6 +112,10 @@ class WatchNextSyncer @Inject constructor(
         tags["Primary"]?.let { return Art(item.Id, it, "Primary", false) }
         return null
     }
+
+    // Shows (and items) looked up for the current sync, by id.
+    @Volatile
+    private var showInfo: Map<String, BaseItemDto> = emptyMap()
 
     private fun artDir(): File = File(context.filesDir, WatchNextArtProvider.DIR).apply { mkdirs() }
 
@@ -202,10 +213,14 @@ class WatchNextSyncer @Inject constructor(
                 val nexts = upNext.filter { (it.SeriesId ?: it.Id) !in seen }.distinctBy { it.SeriesId ?: it.Id }
                 val candidates = (continuing + nexts).take(MAX_ROWS)
                 val oldest = continuing.minOfOrNull { engagedAt(it) } ?: System.currentTimeMillis()
-                // Rows don't carry overviews: the title's own, else its show's.
-                val overviews = runCatching {
-                    repository.getOverviews(session.userId, candidates.map { it.Id } + candidates.mapNotNull { it.SeriesId })
+                // Rows carry neither overviews nor always their show's art:
+                // one lookup covers every listed title and its show.
+                val listed = (continueWatching.take(CHANNEL_SIZE) + upNext.take(CHANNEL_SIZE))
+                val info = runCatching {
+                    repository.getItemsInfo(session.userId, listed.flatMap { listOfNotNull(it.Id, it.SeriesId) })
                 }.getOrDefault(emptyMap())
+                showInfo = info
+                val overviews = info.mapNotNull { (id, found) -> found.Overview?.takeIf { it.isNotBlank() }?.let { id to it } }.toMap()
                 val wanted = candidates.mapIndexedNotNull { index, item ->
                     val next = index >= continuing.size
                     val engaged = if (next) oldest - (index + 1) * 60_000L else engagedAt(item)
