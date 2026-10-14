@@ -758,6 +758,10 @@ internal fun SourceCard(
 // isn't out digitally yet.
 private fun noStreamsHint(premiereDate: String?): String {
     val released = premiereDate?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+    if (released != null && released.isAfter(java.time.Instant.now())) {
+        val day = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withZone(java.time.ZoneId.systemDefault()).format(released)
+        return "Releases on $day. Streams usually show up once it's out on digital."
+    }
     val recent = released != null && java.time.Duration.between(released, java.time.Instant.now()).toDays() < 120
     return if (released == null || recent) {
         "There may not be a digital release yet. Check back once it's out on digital."

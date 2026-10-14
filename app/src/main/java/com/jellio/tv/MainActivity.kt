@@ -332,7 +332,8 @@ private fun JellioTvApp(
             when (val action = runCatching { appViewModel.resolvePlayAction(session, item) }.getOrNull()) {
                 is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
                 is PlayAction.ShowPicker -> streamPickerItem = action.item
-                null -> onPlayDirect(item.Id, null)
+                // The lookup failed: the picker says why and can try again.
+                null -> streamPickerItem = item
             }
         }
     }

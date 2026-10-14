@@ -1115,13 +1115,17 @@ class JellioRepository @Inject constructor(
     }
 
     private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
-        val item = api.getItem(userId, itemId, fields = "MediaSources")
-        val titles = listOfNotNull(item.Name, item.SeriesName).map { it.trim().lowercase() }
+        val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle")
+        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { it.trim().lowercase() }
+        // Not out yet: nothing without a file can be a real release.
+        val unreleased = item.PremiereDate?.let { date ->
+            runCatching { java.time.OffsetDateTime.parse(date).toInstant().isAfter(java.time.Instant.now()) }.getOrNull()
+        } == true
         return (item.MediaSources ?: emptyList()).filterNot { source ->
             val path = source.Path.orEmpty()
             val noFile = path.isEmpty() || path == "/stub" || path.startsWith("gelato", ignoreCase = true) || path.startsWith("stremio", ignoreCase = true)
             val name = source.Name.orEmpty().trim().lowercase()
-            noFile && (source.Size ?: 0L) == 0L && (name.isEmpty() || name in titles)
+            noFile && (source.Size ?: 0L) == 0L && (unreleased || name.isEmpty() || name in titles)
         }
     }
 

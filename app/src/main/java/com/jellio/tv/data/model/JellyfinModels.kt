@@ -180,6 +180,7 @@ data class BaseItemDto(
     val SeasonId: String? = null,
     val ProductionYear: Int? = null,
     val PremiereDate: String? = null,
+    val OriginalTitle: String? = null,
     val Overview: String? = null,
     val OfficialRating: String? = null,
     val CommunityRating: Double? = null,
