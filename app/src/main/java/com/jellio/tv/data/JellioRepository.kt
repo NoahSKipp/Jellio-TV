@@ -820,6 +820,10 @@ class JellioRepository @Inject constructor(
 
     suspend fun searchSeries(term: String): List<BaseItemDto> = api.searchGelatoSeries(term)
 
+    // Newest movies and shows (new episodes grouped under their show).
+    suspend fun getRecentlyAdded(userId: String, limit: Int = 20): List<BaseItemDto> =
+        api.getLatestItems(userId, includeItemTypes = "Movie,Series", limit = limit, fields = "$ITEM_FIELDS,Overview")
+
     suspend fun getWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> =
         cache.get("watchlist:$userId:$limit", SHORT_CACHE_TTL_MS) {
             api.getItems(
@@ -877,6 +881,14 @@ class JellioRepository @Inject constructor(
 
     suspend fun getItem(userId: String, itemId: String): BaseItemDto =
         cache.get("item:$itemId", CACHE_TTL_MS) { fetchItemInfo(userId, itemId, null) }
+
+    // Overviews for several items in one request (Watch Next cards).
+    suspend fun getOverviews(userId: String, ids: List<String>): Map<String, String> {
+        if (ids.isEmpty()) return emptyMap()
+        return api.getItemsByIds(userId, ids.distinct().joinToString(","), "Overview").Items
+            .mapNotNull { item -> item.Overview?.takeIf { it.isNotBlank() }?.let { item.Id to it } }
+            .toMap()
+    }
 
     // Title info through /Items?ids=, never with MediaSources or
     // MediaStreams. A title Gelato has not imported yet only exists once

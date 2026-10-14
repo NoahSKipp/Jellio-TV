@@ -10,6 +10,8 @@
         android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Home screen channels (Continue Watching, Next Up, ...). -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- AppUpdateViewModel's own real install step: DownloadManager
@@ -58,6 +60,14 @@
                     android:scheme="https"
                     android:host="jellio.tv"
                     android:pathPrefix="/play" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/item" />
+                <data
+                    android:scheme="https"
+                    android:host="jellio.tv"
+                    android:pathPrefix="/home" />
             </intent-filter>
         </activity>
 

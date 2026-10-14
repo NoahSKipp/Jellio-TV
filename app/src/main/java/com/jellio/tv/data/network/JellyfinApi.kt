@@ -147,6 +147,14 @@ interface JellyfinApi {
         @Query("Fields") fields: String? = null,
     ): ItemsResultDto
 
+    @GET("Users/{userId}/Items/Latest")
+    suspend fun getLatestItems(
+        @Path("userId") userId: String,
+        @Query("IncludeItemTypes") includeItemTypes: String? = null,
+        @Query("Limit") limit: Int = 20,
+        @Query("Fields") fields: String? = null,
+    ): List<BaseItemDto>
+
     @GET("Users/{userId}/Items/{itemId}")
     suspend fun getItem(
         @Path("userId") userId: String,

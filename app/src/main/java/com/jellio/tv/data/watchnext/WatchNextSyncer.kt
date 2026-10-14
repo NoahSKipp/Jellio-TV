@@ -75,27 +75,30 @@ class WatchNextSyncer @Inject constructor(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) put(android.media.tv.TvContract.WatchNextPrograms.COLUMN_CONTENT_ID, itemId)
         }
 
-    private fun deepLinkUri(itemId: String): Uri {
-        val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://jellio.tv/play?id=$itemId"))
-            .setPackage(context.packageName)
-        return Uri.parse(playIntent.toUri(Intent.URI_INTENT_SCHEME))
+    private fun deepLinkUri(itemId: String): Uri = appLink("https://jellio.tv/play?id=$itemId")
+
+    private fun detailLinkUri(itemId: String): Uri = appLink("https://jellio.tv/item?id=$itemId")
+
+    private fun appLink(url: String): Uri {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(context.packageName)
+        return Uri.parse(intent.toUri(Intent.URI_INTENT_SCHEME))
     }
 
     private class Art(val itemId: String, val tag: String, val type: String, val landscape: Boolean)
 
-    // Google TV's Continue Watching row is landscape: an episode's own
-    // still, a movie's Thumb or backdrop, the poster only as a last resort.
+    // Google TV's Continue Watching row is landscape: an episode's show
+    // Thumb or backdrop, a movie's Thumb or backdrop, the poster last.
     private fun artFor(item: BaseItemDto): Art? {
         val tags = item.ImageTags.orEmpty()
         if (item.Type == "Episode") {
-            tags["Primary"]?.let { return Art(item.Id, it, "Primary", true) }
+            // The show's art, the episode's own still only as a last resort.
             val thumbOwner = item.ParentThumbItemId
             val thumbTag = item.ParentThumbImageTag
             if (thumbOwner != null && thumbTag != null) return Art(thumbOwner, thumbTag, "Thumb", true)
             val backdropOwner = item.ParentBackdropItemId
             val backdropTag = item.ParentBackdropImageTags?.firstOrNull()
             if (backdropOwner != null && backdropTag != null) return Art(backdropOwner, backdropTag, "Backdrop", true)
-            return null
+            return tags["Primary"]?.let { Art(item.Id, it, "Primary", true) }
         }
         tags["Thumb"]?.let { return Art(item.Id, it, "Thumb", true) }
         item.BackdropImageTags?.firstOrNull()?.let { return Art(item.Id, it, "Backdrop", true) }
@@ -142,7 +145,7 @@ class WatchNextSyncer @Inject constructor(
         return runCatching { parseInstant(raw) }.getOrDefault(System.currentTimeMillis())
     }
 
-    private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean, engaged: Long): WatchNextProgram? {
+    private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean, engaged: Long, overview: String?): WatchNextProgram? {
         val runtimeMs = ((item.RunTimeTicks ?: 0L) / 10_000).toInt()
         val positionMs = ((item.UserData?.PlaybackPositionTicks ?: 0L) / 10_000).toInt()
         if (runtimeMs <= 0) return null
@@ -168,7 +171,7 @@ class WatchNextSyncer @Inject constructor(
             .setDurationMillis(runtimeMs)
             .setLastPlaybackPositionMillis(positionMs)
             .setLastEngagementTimeUtcMillis(engaged)
-        item.Overview?.takeIf { it.isNotBlank() }?.let { builder.setDescription(it) }
+        overview?.let { builder.setDescription(it) }
         if (item.Type == "Episode") {
             item.ParentIndexNumber?.let { builder.setSeasonNumber(it) }
             item.IndexNumber?.let { builder.setEpisodeNumber(it) }
@@ -199,10 +202,15 @@ class WatchNextSyncer @Inject constructor(
                 val nexts = upNext.filter { (it.SeriesId ?: it.Id) !in seen }.distinctBy { it.SeriesId ?: it.Id }
                 val candidates = (continuing + nexts).take(MAX_ROWS)
                 val oldest = continuing.minOfOrNull { engagedAt(it) } ?: System.currentTimeMillis()
+                // Rows don't carry overviews: the title's own, else its show's.
+                val overviews = runCatching {
+                    repository.getOverviews(session.userId, candidates.map { it.Id } + candidates.mapNotNull { it.SeriesId })
+                }.getOrDefault(emptyMap())
                 val wanted = candidates.mapIndexedNotNull { index, item ->
                     val next = index >= continuing.size
                     val engaged = if (next) oldest - (index + 1) * 60_000L else engagedAt(item)
-                    toWatchNextProgram(session, item, next, engaged)?.let { item.Id to it }
+                    val overview = item.Overview ?: overviews[item.Id] ?: item.SeriesId?.let { overviews[it] }
+                    toWatchNextProgram(session, item, next, engaged, overview)?.let { item.Id to it }
                 }.toMap()
 
                 wanted.forEach { (itemId, program) ->
@@ -225,7 +233,10 @@ class WatchNextSyncer @Inject constructor(
                         context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
                     }
                 }
-                val keep = wanted.keys.map { safe(it) + "-" }
+                val channelIds = runCatching { syncChannels(session, continueWatching, upNext, overviews) }
+                    .onFailure { Log.w(TAG, "channels failed", it) }
+                    .getOrDefault(emptySet())
+                val keep = (wanted.keys + channelIds).map { safe(it) + "-" }
                 artDir().listFiles()?.forEach { file -> if (keep.none { file.name.startsWith(it) }) file.delete() }
                 val after = queryExisting()
                 _status.value = WatchNextStatus(
@@ -261,9 +272,127 @@ class WatchNextSyncer @Inject constructor(
                 queryExisting().values.forEach { row ->
                     context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
                 }
+                CHANNELS.forEach { channel ->
+                    channelPrefs.getLong(channel.key, -1L).takeIf { it >= 0 }?.let { id ->
+                        context.contentResolver.delete(TvContractCompat.buildChannelUri(id), null, null)
+                    }
+                }
+                channelPrefs.edit().clear().apply()
                 artDir().listFiles()?.forEach { it.delete() }
             }
         }
+    }
+
+    // ---- Home screen channels -------------------------------------------
+    // Launchers that show app channels (Projectivy, the Android TV home)
+    // get a row per list. Continue Watching and Next Up play straight
+    // away; Watchlist and Recently Added open the title page.
+
+    private class ChannelSpec(val key: String, val name: String, val plays: Boolean)
+
+    private val channelPrefs by lazy { context.getSharedPreferences("jellio_channels", Context.MODE_PRIVATE) }
+
+    private fun channelId(spec: ChannelSpec): Long? {
+        val known = channelPrefs.getLong(spec.key, -1L)
+        if (known >= 0) {
+            val exists = context.contentResolver.query(TvContractCompat.buildChannelUri(known), null, null, null, null)
+                ?.use { it.count > 0 } == true
+            if (exists) return known
+        }
+        val channel = androidx.tvprovider.media.tv.Channel.Builder()
+            .setType(TvContractCompat.Channels.TYPE_PREVIEW)
+            .setDisplayName(spec.name)
+            .setAppLinkIntentUri(appLink("https://jellio.tv/home"))
+            .setInternalProviderId(spec.key)
+            .build()
+        val uri = context.contentResolver.insert(TvContractCompat.Channels.CONTENT_URI, channel.toContentValues()) ?: return null
+        val id = android.content.ContentUris.parseId(uri)
+        channelPrefs.edit().putLong(spec.key, id).apply()
+        runCatching {
+            val logo = androidx.core.content.ContextCompat.getDrawable(context, com.jellio.tv.R.mipmap.ic_launcher)
+            if (logo != null) {
+                val bitmap = android.graphics.Bitmap.createBitmap(160, 160, android.graphics.Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(bitmap)
+                logo.setBounds(0, 0, 160, 160)
+                logo.draw(canvas)
+                androidx.tvprovider.media.tv.ChannelLogoUtils.storeChannelLogo(context, id, bitmap)
+            }
+        }
+        // Only the first channel may ask to be shown; the rest are turned on
+        // in the launcher's channel settings.
+        if (spec.key == CHANNELS.first().key) runCatching { TvContractCompat.requestChannelBrowsable(context, id) }
+        return id
+    }
+
+    private fun toPreviewProgram(
+        session: Session,
+        channelId: Long,
+        item: BaseItemDto,
+        plays: Boolean,
+        weight: Int,
+        overview: String?,
+    ): androidx.tvprovider.media.tv.PreviewProgram? {
+        val art = artFor(item) ?: return null
+        val file = ensureArt(session, item, art) ?: return null
+        val type = when (item.Type) {
+            "Episode" -> TvContractCompat.PreviewPrograms.TYPE_TV_EPISODE
+            "Series" -> TvContractCompat.PreviewPrograms.TYPE_TV_SERIES
+            else -> TvContractCompat.PreviewPrograms.TYPE_MOVIE
+        }
+        val builder = androidx.tvprovider.media.tv.PreviewProgram.Builder()
+            .setChannelId(channelId)
+            .setType(type)
+            .setTitle(displayTitle(item))
+            .setPosterArtUri(WatchNextArtProvider.uriFor(context, file))
+            .setPosterArtAspectRatio(
+                if (art.landscape) TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9 else TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER,
+            )
+            .setIntentUri(if (plays) deepLinkUri(item.Id) else detailLinkUri(item.Id))
+            .setInternalProviderId(item.Id)
+            .setWeight(weight)
+        (overview ?: item.Overview)?.takeIf { it.isNotBlank() }?.let { builder.setDescription(it) }
+        val runtimeMs = ((item.RunTimeTicks ?: 0L) / 10_000).toInt()
+        if (runtimeMs > 0) builder.setDurationMillis(runtimeMs)
+        val positionMs = ((item.UserData?.PlaybackPositionTicks ?: 0L) / 10_000).toInt()
+        if (positionMs > 0) builder.setLastPlaybackPositionMillis(positionMs)
+        if (item.Type == "Episode") {
+            item.ParentIndexNumber?.let { builder.setSeasonNumber(it) }
+            item.IndexNumber?.let { builder.setEpisodeNumber(it) }
+            item.Name?.let { builder.setEpisodeTitle(it) }
+        }
+        return builder.build()
+    }
+
+    // Replaces each channel's programs; returns every item id shown, so
+    // their artwork is kept.
+    private suspend fun syncChannels(
+        session: Session,
+        continueWatching: List<BaseItemDto>,
+        upNext: List<BaseItemDto>,
+        overviews: Map<String, String>,
+    ): Set<String> {
+        val watchlist = runCatching { repository.getWatchlistItems(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
+        val latest = runCatching { repository.getRecentlyAdded(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
+        val lists = mapOf(
+            "continue" to continueWatching,
+            "nextup" to upNext,
+            "watchlist" to watchlist,
+            "latest" to latest,
+        )
+        val shown = mutableSetOf<String>()
+        CHANNELS.forEach { spec ->
+            val items = lists[spec.key].orEmpty().take(CHANNEL_SIZE)
+            val id = channelId(spec) ?: return@forEach
+            context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
+            items.forEachIndexed { index, item ->
+                val overview = overviews[item.Id] ?: item.SeriesId?.let { overviews[it] }
+                val program = toPreviewProgram(session, id, item, spec.plays, items.size - index, overview) ?: return@forEachIndexed
+                context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+                shown += item.Id
+            }
+        }
+        Log.i(TAG, "channels: " + lists.entries.joinToString { it.key + " " + it.value.size.coerceAtMost(CHANNEL_SIZE) })
+        return shown
     }
 
     private class Row(val id: Long, val browsable: Boolean, val engagedAt: Long)
@@ -304,5 +433,12 @@ class WatchNextSyncer @Inject constructor(
     private companion object {
         const val TAG = "JellioWatchNext"
         const val MAX_ROWS = 5
+        const val CHANNEL_SIZE = 15
+        private val CHANNELS = listOf(
+            ChannelSpec("continue", "Continue Watching", plays = true),
+            ChannelSpec("nextup", "Next Up", plays = true),
+            ChannelSpec("watchlist", "Watchlist", plays = false),
+            ChannelSpec("latest", "Recently Added", plays = false),
+        )
     }
 }

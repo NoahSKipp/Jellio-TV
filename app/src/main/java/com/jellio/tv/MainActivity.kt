@@ -132,8 +132,11 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
-        if (uri.host == "jellio.tv" && uri.path == "/play") {
-            uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
+        if (uri.host != "jellio.tv") return
+        // A channel's title opens its page; Watch Next and play links play it.
+        when (uri.path) {
+            "/play" -> uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
+            "/item" -> uri.getQueryParameter("id")?.let { deepLinkItemId.value = "detail:$it" }
         }
     }
 }
@@ -352,7 +355,7 @@ private fun JellioTvApp(
     // Home first the way a cold app open otherwise would.
     LaunchedEffect(deepLinkItemId) {
         val itemId = deepLinkItemId ?: return@LaunchedEffect
-        onPlayId(itemId, false)
+        if (itemId.startsWith("detail:")) onNavigateToDetail(itemId.removePrefix("detail:")) else onPlayId(itemId, false)
         onDeepLinkConsumed()
     }
 
