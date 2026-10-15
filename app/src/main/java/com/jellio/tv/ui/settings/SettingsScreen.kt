@@ -245,6 +245,20 @@ fun SettingsScreen(
                         onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
                     )
                     SettingsDivider()
+                    SettingsToggleRow(
+                        label = "Dialogue Boost / Night Mode",
+                        description = "Boosts speech frequencies and compresses dynamic range so quiet dialogue is clear without loud action jumps.",
+                        checked = PlayerPrefs.dialogueBoost,
+                        onToggle = { PlayerPrefs.setDialogueBoost(playerContext, !PlayerPrefs.dialogueBoost) },
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        label = "Audio passthrough (HDMI)",
+                        description = "Pass multichannel audio bitstreams directly to your AV receiver or soundbar without software downmixing.",
+                        checked = PlayerPrefs.audioPassthrough,
+                        onToggle = { PlayerPrefs.setAudioPassthrough(playerContext, !PlayerPrefs.audioPassthrough) },
+                    )
+                    SettingsDivider()
                     // Each press steps to the next level.
                     SettingsPickerRow(
                         label = "Pre-buffer",

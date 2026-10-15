@@ -31,6 +31,23 @@ import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.home.SkeletonPoster
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Icon
+import androidx.tv.material3.Surface
+import androidx.compose.ui.graphics.Color
+import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioText
+
 // Mirrors screens/search.js's own real live-search shape: a query box
 // over a results grid, Movie/Series only, the same real endpoint
 // runtime/api.js's own searchItems() calls.
@@ -45,6 +62,16 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
     LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!spoken.isNullOrBlank()) {
+                viewModel.onQueryChange(session, spoken)
+            }
+        }
+    }
     val openItemOptions = rememberCardOptionsHost(
         canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
@@ -58,12 +85,43 @@ fun SearchScreen(
             .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
         Text(text = "Search", style = MaterialTheme.typography.titleLarge)
-        JellioTextField(
-            value = uiState.query,
-            onValueChange = { viewModel.onQueryChange(session, it) },
-            label = "Search movies and shows",
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp).width(480.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+        ) {
+            JellioTextField(
+                value = uiState.query,
+                onValueChange = { viewModel.onQueryChange(session, it) },
+                label = "Search movies and shows",
+                modifier = Modifier.width(480.dp),
+            )
+            Surface(
+                onClick = {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak a title to search...")
+                    }
+                    speechLauncher.launch(intent)
+                },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = JellioBgElevated,
+                    focusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    contentColor = JellioText,
+                ),
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = "Voice search",
+                        tint = JellioText,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
 
         when {
             // Results show as each search answers (SearchViewModel), with

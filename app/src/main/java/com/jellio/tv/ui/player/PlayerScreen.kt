@@ -101,6 +101,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
+import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioCapabilities
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
@@ -476,7 +484,23 @@ private fun PlayerSurface(
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
 
-        ExoPlayer.Builder(context)
+        val audioSink = DefaultAudioSink.Builder(context)
+            .setAudioCapabilities(
+                if (PlayerPrefs.audioPassthrough) {
+                    AudioCapabilities.getCapabilities(context)
+                } else {
+                    AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES
+                }
+            )
+            .build()
+        val renderersFactory = object : DefaultRenderersFactory(context) {
+            @OptIn(UnstableApi::class)
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
+                return audioSink
+            }
+        }
+
+        ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
             .setAudioAttributes(audioAttributes, true)
@@ -491,6 +515,26 @@ private fun PlayerSurface(
             setWakeMode(C.WAKE_MODE_NETWORK)
             playWhenReady = !showResumePrompt
             prepare()
+        }
+    }
+
+    val playerContext = LocalContext.current
+    var loudnessEnhancer by remember { mutableStateOf<android.media.audiofx.LoudnessEnhancer?>(null) }
+    DisposableEffect(player, PlayerPrefs.dialogueBoost) {
+        val sessionId = player.audioSessionId
+        if (sessionId != C.AUDIO_SESSION_ID_UNSET && PlayerPrefs.dialogueBoost) {
+            try {
+                loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(sessionId).apply {
+                    setTargetGain(600)
+                    enabled = true
+                }
+            } catch (_: Exception) {}
+        }
+        onDispose {
+            try {
+                loudnessEnhancer?.release()
+            } catch (_: Exception) {}
+            loudnessEnhancer = null
         }
     }
 
@@ -1216,7 +1260,7 @@ private fun PlayerSurface(
                 positionMs = positionMs,
                 durationMs = durationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
-                hasAudioTracks = audioTracks.size > 1,
+                hasAudioTracks = true,
                 hasSourceOptions = sourceOptions.size > 1,
                 hasEpisodes = seasons.isNotEmpty(),
                 scrubFrame = scrubFrame,
@@ -1253,10 +1297,7 @@ private fun PlayerSurface(
             )
         }
 
-        // Real port of that file's own rebuildAudioMenu() early return:
-        // audioButton.disabled = true whenever this source carries one
-        // real audio track or fewer, nothing worth a real menu for.
-        if (showAudioMenu && audioTracks.size > 1) {
+        if (showAudioMenu) {
             AudioMenu(
                 tracks = audioTracks,
                 selectedStreamIndex = selectedAudioStreamIndex,
@@ -1264,6 +1305,11 @@ private fun PlayerSurface(
                 onSelect = { streamIndex ->
                     showAudioMenu = false
                     onSelectAudioTrack(streamIndex, realPositionMs() * TICKS_PER_MS)
+                },
+                onToggleDialogueBoost = {
+                    val next = !PlayerPrefs.dialogueBoost
+                    PlayerPrefs.setDialogueBoost(playerContext, next)
+                    onShowToast(if (next) "Dialogue Boost enabled (night mode dynamic compression)" else "Dialogue Boost disabled")
                 },
                 onDismiss = { showAudioMenu = false },
             )
@@ -2429,6 +2475,7 @@ private fun AudioMenu(
     selectedStreamIndex: Int?,
     defaultStreamIndex: Int?,
     onSelect: (Int) -> Unit,
+    onToggleDialogueBoost: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -2484,6 +2531,20 @@ private fun AudioMenu(
                     )
                 }
             }
+            if (tracks.isNotEmpty()) {
+                Box(
+                    Modifier
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Color.White.copy(alpha = 0.12f))
+                )
+            }
+            SubtitleMenuRow(
+                label = "Dialogue Boost: " + if (PlayerPrefs.dialogueBoost) "On" else "Off",
+                isSelected = PlayerPrefs.dialogueBoost,
+                onClick = onToggleDialogueBoost,
+            )
         }
     }
 }

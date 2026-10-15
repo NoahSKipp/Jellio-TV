@@ -76,6 +76,18 @@ class MainActivity : ComponentActivity() {
     // instance (onNewIntent below) rather than a fresh one stacking
     // underneath whatever screen was already open.
     private val deepLinkItemId = mutableStateOf<String?>(null)
+    private var isPlayerActive: Boolean = false
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isPlayerActive && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+                try {
+                    enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build())
+                } catch (_: Exception) {}
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,6 +122,7 @@ class MainActivity : ComponentActivity() {
                             JellioTvRoot(
                                 deepLinkItemId = deepLinkItemId.value,
                                 onDeepLinkConsumed = { deepLinkItemId.value = null },
+                                onPlayerActiveChanged = { isPlayerActive = it },
                             )
                         }
 
@@ -145,6 +158,7 @@ class MainActivity : ComponentActivity() {
 private fun JellioTvRoot(
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
+    onPlayerActiveChanged: (Boolean) -> Unit = {},
     appViewModel: AppViewModel = hiltViewModel(),
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
@@ -171,6 +185,7 @@ private fun JellioTvRoot(
                 appViewModel = appViewModel,
                 deepLinkItemId = deepLinkItemId,
                 onDeepLinkConsumed = onDeepLinkConsumed,
+                onPlayerActiveChanged = onPlayerActiveChanged,
             )
         }
 
@@ -206,6 +221,7 @@ private fun AppBootGate(
     appViewModel: AppViewModel,
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
+    onPlayerActiveChanged: (Boolean) -> Unit = {},
     homeViewModel: HomeViewModel = hiltViewModel(),
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -242,6 +258,7 @@ private fun AppBootGate(
             appViewModel = appViewModel,
             deepLinkItemId = deepLinkItemId,
             onDeepLinkConsumed = onDeepLinkConsumed,
+            onPlayerActiveChanged = onPlayerActiveChanged,
         )
     }
 }
@@ -253,6 +270,7 @@ private fun JellioTvApp(
     appViewModel: AppViewModel,
     deepLinkItemId: String?,
     onDeepLinkConsumed: () -> Unit,
+    onPlayerActiveChanged: (Boolean) -> Unit = {},
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
 ) {
     // A plain real back stack rather than Navigation Compose: the
@@ -262,7 +280,10 @@ private fun JellioTvApp(
     // history underneath the web build's own back button).
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
     val route = routeStack.last()
-    LaunchedEffect(route) { com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen") }
+    LaunchedEffect(route) {
+        com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen")
+        onPlayerActiveChanged(route is JellioRoute.Player)
+    }
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }
