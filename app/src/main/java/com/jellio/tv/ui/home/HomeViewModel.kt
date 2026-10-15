@@ -626,11 +626,8 @@ class HomeViewModel @Inject constructor(
         return usable.take(MAX_CATALOG_ROWS)
     }
 
-    // Mirrors screens/home.js's own buildCatalogRows(): the real
-    // synchronous dedupe step, run as each catalog row's own
-    // real network phase above (and its sibling recommendation/genre
-    // phases) have all already resolved, same real priority order that
-    // file's own comment documents.
+    // One catalog row once its items arrive: titles a row already on
+    // screen shows are left out, in the order rows arrive.
     private fun catalogSection(userId: String, entry: CatalogRowEntry, exclude: MutableSet<String>): HomeSection? {
         val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
         deduped.forEach { item ->
