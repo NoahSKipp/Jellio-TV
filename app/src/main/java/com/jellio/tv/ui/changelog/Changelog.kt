@@ -24,10 +24,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -69,47 +73,102 @@ data class ChangelogRelease(
     val features: List<ChangelogFeature>,
 )
 
-val CURRENT_CHANGELOG = ChangelogRelease(
-    version = "0.41.0",
-    title = "What's New in Jellio TV",
-    subtitle = "Version 0.41.0",
-    features = listOf(
-        ChangelogFeature(
-            icon = Icons.Filled.Group,
-            title = "What Others Are Watching",
-            description = "A new home screen row shows what friends and family are streaming in real-time or recently completed, featuring viewer avatars on every card.",
+// Helper to determine whether a release version is a big release (e.g. 1.4X.0, 0.42.0)
+// as opposed to a small bugfix patch release (e.g. 1.4X.1, 0.42.1).
+fun isBigRelease(version: String): Boolean {
+    val clean = version.trim().removePrefix("v").removePrefix("V")
+    val parts = clean.split(".")
+    if (parts.size >= 3) {
+        val patch = parts[2].toIntOrNull() ?: return false
+        val build = if (parts.size > 3) parts[3].toIntOrNull() ?: 0 else 0
+        return patch == 0 && build == 0
+    }
+    return parts.size == 2
+}
+
+val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "0.42.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.42.0",
+        features = listOf(
+            ChangelogFeature(
+                icon = Icons.Filled.Bedtime,
+                title = "Dialogue Boost / Night Mode",
+                description = "Enhances spoken voices and softens loud audio during nighttime viewing, accessible in player audio settings.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.GraphicEq,
+                title = "Audio Passthrough (HDMI)",
+                description = "Direct bitstream audio output over HDMI for AV receivers and surround sound setups.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Mic,
+                title = "Remote Voice Search",
+                description = "Speak directly into your remote control microphone to search your entire media library.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Tv,
+                title = "Picture-in-Picture",
+                description = "Seamlessly continue watching media in a floating window while navigating away from the player.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Speed,
+                title = "Faster Performance",
+                description = "Ahead-of-Time baseline profiles and optimized media caching deliver fluid 60fps scrolling.",
+            ),
         ),
-        ChangelogFeature(
-            icon = Icons.Filled.Tune,
-            title = "Recommendations Settings",
-            description = "A new dedicated Settings tab lets you choose which users appear in your social watching row, or toggle the row off entirely.",
-        ),
-        ChangelogFeature(
-            icon = Icons.Filled.Palette,
-            title = "Genre Row Customization",
-            description = "Personalize your home screen feed by choosing and reordering your favorite genre recommendation rows.",
-        ),
-        ChangelogFeature(
-            icon = Icons.Filled.Speed,
-            title = "Faster Performance",
-            description = "Parallel row loading and stream prefetching deliver faster startup and fluid navigation across all your media.",
+    ),
+    ChangelogRelease(
+        version = "0.41.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.41.0",
+        features = listOf(
+            ChangelogFeature(
+                icon = Icons.Filled.Group,
+                title = "What Others Are Watching",
+                description = "A new home screen row shows what friends and family are streaming in real-time or recently completed, featuring viewer avatars on every card.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Tune,
+                title = "Recommendations Settings",
+                description = "A new dedicated Settings tab lets you choose which users appear in your social watching row, or toggle the row off entirely.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Palette,
+                title = "Genre Row Customization",
+                description = "Personalize your home screen feed by choosing and reordering your favorite genre recommendation rows.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.Speed,
+                title = "Faster Performance",
+                description = "Parallel row loading and stream prefetching deliver faster startup and fluid navigation across all your media.",
+            ),
         ),
     ),
 )
+
+val CURRENT_CHANGELOG = CHANGELOG_RELEASES.first()
+val LATEST_BIG_CHANGELOG = CHANGELOG_RELEASES.firstOrNull { isBigRelease(it.version) } ?: CURRENT_CHANGELOG
 
 object ChangelogPrefs {
     private const val PREFS = "jellio_changelog"
     private const val KEY_LAST_SEEN = "last_seen_version"
 
     fun shouldShowChangelog(context: Context): Boolean {
+        // What's new popup dialog is ONLY triggered by big releases (1.4X.0, where patch is 0)
+        val targetRelease = LATEST_BIG_CHANGELOG
+        if (!isBigRelease(targetRelease.version)) {
+            return false
+        }
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val lastSeen = prefs.getString(KEY_LAST_SEEN, null)
-        return lastSeen != CURRENT_CHANGELOG.version
+        return lastSeen != targetRelease.version
     }
 
-    fun markSeen(context: Context) {
+    fun markSeen(context: Context, version: String = LATEST_BIG_CHANGELOG.version) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_LAST_SEEN, CURRENT_CHANGELOG.version).apply()
+        prefs.edit().putString(KEY_LAST_SEEN, version).apply()
     }
 }
 

@@ -290,6 +290,7 @@ private fun JellioTvApp(
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    var changelogReleaseToDisplay by remember { mutableStateOf(com.jellio.tv.ui.changelog.CURRENT_CHANGELOG) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
     // Real feedback live: SidebarNav's own items stayed reachable while
@@ -302,6 +303,7 @@ private fun JellioTvApp(
 
     LaunchedEffect(session.userId) {
         if (com.jellio.tv.ui.changelog.ChangelogPrefs.shouldShowChangelog(context)) {
+            changelogReleaseToDisplay = com.jellio.tv.ui.changelog.LATEST_BIG_CHANGELOG
             showChangelog = true
         }
     }
@@ -515,7 +517,10 @@ private fun JellioTvApp(
                 session = session,
                 onLogout = { appViewModel.logout() },
                 onViewProfile = { push(JellioRoute.Profile()) },
-                onShowChangelog = { showChangelog = true },
+                onShowChangelog = {
+                    changelogReleaseToDisplay = com.jellio.tv.ui.changelog.CURRENT_CHANGELOG
+                    showChangelog = true
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Detail -> DetailScreen(
@@ -683,8 +688,9 @@ private fun JellioTvApp(
             }
             if (showChangelog) {
                 com.jellio.tv.ui.changelog.ChangelogPopup(
+                    release = changelogReleaseToDisplay,
                     onDismiss = {
-                        com.jellio.tv.ui.changelog.ChangelogPrefs.markSeen(context)
+                        com.jellio.tv.ui.changelog.ChangelogPrefs.markSeen(context, changelogReleaseToDisplay.version)
                         showChangelog = false
                     },
                 )
