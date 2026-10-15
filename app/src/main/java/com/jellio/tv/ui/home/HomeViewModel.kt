@@ -376,12 +376,9 @@ class HomeViewModel @Inject constructor(
                     if (isCommunityEnabled) {
                         launch {
                             val raw = runCatching { repository.getCommunityWatching(communityExcluded) }.getOrDefault(emptyList())
-                            val eligible = raw.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+                            // Lands after the other rows, so filtering against them would usually empty it.
+                            val eligible = raw.distinctBy { it.Id }
                             if (eligible.isEmpty()) return@launch
-                            eligible.forEach {
-                                exclude.add(it.Id)
-                                exclude.add(titleKey(it))
-                            }
                             communitySection = HomeSection(
                                 title = "What Others Are Watching",
                                 items = eligible.take(24),
