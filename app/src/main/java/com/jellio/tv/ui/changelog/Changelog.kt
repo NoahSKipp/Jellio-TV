@@ -93,6 +93,23 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.43.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.43.0",
+        features = listOf(
+            ChangelogFeature(
+                icon = Icons.Filled.Speed,
+                title = "Instant Next Episode Autoplay",
+                description = "Pre-warms video buffers and stream negotiation in the background before the current episode ends for zero-delay binge watching.",
+            ),
+            ChangelogFeature(
+                icon = Icons.Filled.AutoAwesome,
+                title = "Expandable Version History",
+                description = "Settings > About now features cleanly organized, collapsible release notes for past versions.",
+            ),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.42.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.42.0",
@@ -168,12 +185,22 @@ object ChangelogPrefs {
         }
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val lastSeen = prefs.getString(KEY_LAST_SEEN, null)
-        return lastSeen != targetRelease.version
+        // If an older release was stored, clear it so the new big release is displayed
+        if (lastSeen != null && lastSeen != targetRelease.version) {
+            prefs.edit().remove(KEY_LAST_SEEN).apply()
+            return true
+        }
+        return lastSeen == null
     }
 
     fun markSeen(context: Context, version: String = LATEST_BIG_CHANGELOG.version) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_LAST_SEEN, version).apply()
+    }
+
+    fun clearPreviousChangelogs(context: Context) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit().remove(KEY_LAST_SEEN).apply()
     }
 }
 

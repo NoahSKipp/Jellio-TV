@@ -69,7 +69,7 @@ class AnnouncementViewModel @Inject constructor(
                 runCatching { repository.getJellioNotifications() }.onSuccess { list ->
                     val seen = prefs.getStringSet("seen", emptySet()).orEmpty().toMutableSet()
                     val now = System.currentTimeMillis()
-                    list.filter { it.Kind == "announcement" && it.Id !in seen }
+                    list.filter { it.Kind == "announcement" && it.Id !in seen && !it.Id.startsWith("changelog:") }
                         .sortedBy { it.CreatedUtc.orEmpty() }
                         .forEach { entry ->
                             seen.add(entry.Id)

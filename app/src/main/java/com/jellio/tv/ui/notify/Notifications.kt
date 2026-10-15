@@ -41,7 +41,9 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
     // Manga lives on the web and desktop only, so its alerts stay there.
     fun load() {
         viewModelScope.launch {
-            _items.value = runCatching { api.getJellioNotifications() }.getOrDefault(emptyList()).filter { it.Kind != "manga" }
+            _items.value = runCatching { api.getJellioNotifications() }
+                .getOrDefault(emptyList())
+                .filter { it.Kind != "manga" && !it.Id.orEmpty().startsWith("changelog:") }
             runCatching { api.markJellioNotificationsRead() }
         }
     }

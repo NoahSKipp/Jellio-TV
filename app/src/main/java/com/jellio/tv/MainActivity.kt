@@ -304,6 +304,7 @@ private fun JellioTvApp(
     LaunchedEffect(session.userId) {
         if (com.jellio.tv.ui.changelog.ChangelogPrefs.shouldShowChangelog(context)) {
             changelogReleaseToDisplay = com.jellio.tv.ui.changelog.LATEST_BIG_CHANGELOG
+            showNotifications = false
             showChangelog = true
         }
     }
