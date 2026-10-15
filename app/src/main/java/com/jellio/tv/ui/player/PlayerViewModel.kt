@@ -425,11 +425,9 @@ class PlayerViewModel @Inject constructor(
                 var target = prewarmed?.target ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
                 // The reader's audio language wins over the file's default
                 // when the file has it; a transcode has to be asked for it.
-                if (prewarmed == null) {
-                    val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
-                    if (preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
-                        target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
-                    }
+                val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
+                if (prewarmed == null && preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
+                    target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
                 }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
                     "S${item.ParentIndexNumber} E${item.IndexNumber} · "
