@@ -11,6 +11,10 @@ import com.jellio.tv.data.model.serviceOf
 import com.jellio.tv.data.recommend.RecommendationDataSource
 import com.jellio.tv.data.recommend.buildRecommendationRows
 import com.jellio.tv.data.recommend.titleKey
+import com.jellio.tv.data.cache.HomeSnapshot
+import com.jellio.tv.data.cache.RowSnapshotStore
+import com.jellio.tv.data.cache.toCachedRowDto
+import com.jellio.tv.data.cache.toHomeRow
 import com.jellio.tv.data.prefs.RecommendationPreferences
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.watchnext.WatchNextSyncer
@@ -166,6 +170,7 @@ class HomeViewModel @Inject constructor(
     private val customizationStore: HomeCustomizationStore,
     private val watchNextSyncer: WatchNextSyncer,
     private val recommendationPreferences: RecommendationPreferences,
+    private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -190,7 +195,20 @@ class HomeViewModel @Inject constructor(
         val isReturningVisit = loadedForUserId == session.userId
         loadedForUserId = session.userId
         viewModelScope.launch {
-            if (!isReturningVisit) _uiState.value = HomeUiState(isLoading = true)
+            if (!isReturningVisit) {
+                val cachedSnapshot = runCatching { rowSnapshotStore.loadHomeSnapshot(session.userId) }.getOrNull()
+                if (cachedSnapshot != null && (cachedSnapshot.rows.isNotEmpty() || cachedSnapshot.heroItems.isNotEmpty())) {
+                    _uiState.value = HomeUiState(
+                        isLoading = false,
+                        heroItems = cachedSnapshot.heroItems,
+                        greeting = cachedSnapshot.greeting.ifEmpty { greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), null) },
+                        rows = cachedSnapshot.rows.map { it.toHomeRow() },
+                        loadingMore = true,
+                    )
+                } else {
+                    _uiState.value = HomeUiState(isLoading = true)
+                }
+            }
             try {
                 coroutineScope {
                     // Real port of screens/home.js's own buildHomeSections():
@@ -432,6 +450,17 @@ class HomeViewModel @Inject constructor(
                     genreJob.await()
                     finished = true
                     publish()
+                    val finalRows = assembled()
+                    launch {
+                        rowSnapshotStore.saveHomeSnapshot(
+                            session.userId,
+                            HomeSnapshot(
+                                greeting = greeting,
+                                heroItems = heroCandidates,
+                                rows = finalRows.map { it.toCachedRowDto() },
+                            ),
+                        )
+                    }
                 }
             } catch (err: Exception) {
                 // A quiet returning-visit refresh failing (a transient

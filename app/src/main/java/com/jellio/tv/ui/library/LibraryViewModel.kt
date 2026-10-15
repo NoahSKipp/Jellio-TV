@@ -7,6 +7,10 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.ShowsEditorial
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.showsEditorial
+import com.jellio.tv.data.cache.LibrarySnapshot
+import com.jellio.tv.data.cache.RowSnapshotStore
+import com.jellio.tv.data.cache.toCachedRowDto
+import com.jellio.tv.data.cache.toHomeSection
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.HomeSection
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -80,6 +84,7 @@ data class LibraryUiState(
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
@@ -111,9 +116,26 @@ class LibraryViewModel @Inject constructor(
         currentLibrary = library
         currentItemType = if (library.CollectionType == "movies") "Movie" else "Series"
         viewModelScope.launch {
-            if (!isReturningVisit) _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
+            if (!isReturningVisit) {
+                val cached = rowSnapshotStore.loadLibrarySnapshot(session.userId, library.Id)
+                if (cached != null && (cached.coverflowItems.isNotEmpty() || cached.sections.isNotEmpty())) {
+                    _uiState.value = LibraryUiState(
+                        isLoading = false,
+                        title = cached.title.ifEmpty { library.Name ?: "Library" },
+                        coverflowItems = cached.coverflowItems,
+                        coverflowBadge = cached.coverflowBadge,
+                        mainRow = cached.mainRowTitle?.let { HomeSection(it, cached.mainRowItems) },
+                        sections = cached.sections.map { it.toHomeSection() },
+                        genreOptions = cached.genreOptions,
+                        selectedSort = cached.selectedSort,
+                        selectedGenre = cached.selectedGenre,
+                    )
+                } else {
+                    _uiState.value = LibraryUiState(isLoading = true, title = library.Name ?: "Library")
+                }
+            }
             if (repository.isAnimeLibrary(library)) {
-                loadAnime(session)
+                loadAnime(session, library.Id)
             } else {
                 loadLibrary(session, library)
             }
@@ -210,6 +232,8 @@ class LibraryViewModel @Inject constructor(
             null
         }
 
+        val allGenres = allGenresDeferred.await().ifEmpty { genres }
+        val canDelete = canDeleteDeferred.await()
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = library.Name ?: "Library",
@@ -217,10 +241,20 @@ class LibraryViewModel @Inject constructor(
             editorial = editorial,
             mainRow = mainRow,
             // Every genre the library has, not just the few with rows.
-            genreOptions = allGenresDeferred.await().ifEmpty { genres },
+            genreOptions = allGenres,
             sections = sections,
-            canDeleteItems = canDeleteDeferred.await(),
+            canDeleteItems = canDelete,
         )
+        val snapshot = LibrarySnapshot(
+            title = library.Name ?: "Library",
+            coverflowItems = coverflowItems,
+            coverflowBadge = null,
+            mainRowTitle = mainRow?.title,
+            mainRowItems = mainRow?.items ?: emptyList(),
+            sections = sections.map { it.toCachedRowDto() },
+            genreOptions = allGenres,
+        )
+        rowSnapshotStore.saveLibrarySnapshot(session.userId, library.Id, snapshot)
     }
 
     private var animeIds: Set<String> = emptySet()
@@ -278,7 +312,7 @@ class LibraryViewModel @Inject constructor(
     // non-anime show included), reported live against a screenshot;
     // showing nothing is the honest outcome when no catalog is
     // configured, not a copy of the Shows page.
-    private suspend fun loadAnime(session: Session) = coroutineScope {
+    private suspend fun loadAnime(session: Session, libraryId: String) = coroutineScope {
         val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
         val collections = runCatching { repository.getCollections(session.userId) }
             .getOrDefault(emptyList())
@@ -345,14 +379,23 @@ class LibraryViewModel @Inject constructor(
             return@coroutineScope
         }
 
+        val badge = if (coverflowIsTrending) "Trending on AniList" else null
+        val canDelete = canDeleteDeferred.await()
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = "Anime",
             coverflowItems = coverflowSource,
-            coverflowBadge = if (coverflowIsTrending) "Trending on AniList" else null,
+            coverflowBadge = badge,
             sections = sections,
-            canDeleteItems = canDeleteDeferred.await(),
+            canDeleteItems = canDelete,
         )
+        val snapshot = LibrarySnapshot(
+            title = "Anime",
+            coverflowItems = coverflowSource,
+            coverflowBadge = badge,
+            sections = sections.map { it.toCachedRowDto() },
+        )
+        rowSnapshotStore.saveLibrarySnapshot(session.userId, libraryId, snapshot)
     }
 
     // Real port of components/cardOptionsMenu.js's own Watchlist/Mark

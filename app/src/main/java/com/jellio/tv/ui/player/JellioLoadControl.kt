@@ -67,6 +67,13 @@ fun buildLoadControl(level: String): LoadControl {
             pausedMaxUs = 10L * 60 * 1_000_000,
             pausedBytes = capped(640, 0.5),
         )
-        else -> DefaultLoadControl()
+        else -> DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 50_000,
+                /* bufferForPlaybackMs = */ 1_000,
+                /* bufferForPlaybackAfterRebufferMs = */ 2_500,
+            )
+            .build()
     }
 }
