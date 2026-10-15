@@ -28,8 +28,11 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
@@ -93,20 +96,29 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.44.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.44.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Complete Version History", "Settings > About now features complete collapsible release notes across all previous versions."),
+            ChangelogFeature(Icons.Filled.Tune, "Notification Cleanup", "Stale changelog and server alerts are automatically cleaned up on major updates."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.43.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.43.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Scope preferredAudio variable in load"),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.43.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.43.0",
         features = listOf(
-            ChangelogFeature(
-                icon = Icons.Filled.Speed,
-                title = "Instant Next Episode Autoplay",
-                description = "Pre-warms video buffers and stream negotiation in the background before the current episode ends for zero-delay binge watching.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.AutoAwesome,
-                title = "Expandable Version History",
-                description = "Settings > About now features cleanly organized, collapsible release notes for past versions.",
-            ),
+            ChangelogFeature(Icons.Filled.Speed, "Instant Next Episode Autoplay", "Pre-warms video buffers and stream negotiation in the background before the current episode ends for zero-delay binge watching."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Expandable Version History", "Settings > About now features cleanly organized, collapsible release notes for past versions."),
         ),
     ),
     ChangelogRelease(
@@ -114,31 +126,11 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.42.0",
         features = listOf(
-            ChangelogFeature(
-                icon = Icons.Filled.Bedtime,
-                title = "Dialogue Boost / Night Mode",
-                description = "Enhances spoken voices and softens loud audio during nighttime viewing, accessible in player audio settings.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.GraphicEq,
-                title = "Audio Passthrough (HDMI)",
-                description = "Direct bitstream audio output over HDMI for AV receivers and surround sound setups.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Mic,
-                title = "Remote Voice Search",
-                description = "Speak directly into your remote control microphone to search your entire media library.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Tv,
-                title = "Picture-in-Picture",
-                description = "Seamlessly continue watching media in a floating window while navigating away from the player.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Speed,
-                title = "Faster Performance",
-                description = "Ahead-of-Time baseline profiles and optimized media caching deliver fluid 60fps scrolling.",
-            ),
+            ChangelogFeature(Icons.Filled.Bedtime, "Dialogue Boost / Night Mode", "Enhances spoken voices and softens loud audio during nighttime viewing, accessible in player audio settings."),
+            ChangelogFeature(Icons.Filled.GraphicEq, "Audio Passthrough (HDMI)", "Direct bitstream audio output over HDMI for AV receivers and surround sound setups."),
+            ChangelogFeature(Icons.Filled.Mic, "Remote Voice Search", "Speak directly into your remote control microphone to search your entire media library."),
+            ChangelogFeature(Icons.Filled.Tv, "Picture-in-Picture", "Seamlessly continue watching media in a floating window while navigating away from the player."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Performance", "Ahead-of-Time baseline profiles and optimized media caching deliver fluid 60fps scrolling."),
         ),
     ),
     ChangelogRelease(
@@ -146,26 +138,1094 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.41.0",
         features = listOf(
-            ChangelogFeature(
-                icon = Icons.Filled.Group,
-                title = "What Others Are Watching",
-                description = "A new home screen row shows what friends and family are streaming in real-time or recently completed, featuring viewer avatars on every card.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Tune,
-                title = "Recommendations Settings",
-                description = "A new dedicated Settings tab lets you choose which users appear in your social watching row, or toggle the row off entirely.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Palette,
-                title = "Genre Row Customization",
-                description = "Personalize your home screen feed by choosing and reordering your favorite genre recommendation rows.",
-            ),
-            ChangelogFeature(
-                icon = Icons.Filled.Speed,
-                title = "Faster Performance",
-                description = "Parallel row loading and stream prefetching deliver faster startup and fluid navigation across all your media.",
-            ),
+            ChangelogFeature(Icons.Filled.Group, "What Others Are Watching", "A new home screen row shows what friends and family are streaming in real-time or recently completed, featuring viewer avatars on every card."),
+            ChangelogFeature(Icons.Filled.Tune, "Recommendations Settings", "A new dedicated Settings tab lets you choose which users appear in your social watching row, or toggle the row off entirely."),
+            ChangelogFeature(Icons.Filled.Palette, "Genre Row Customization", "Personalize your home screen feed by choosing and reordering your favorite genre recommendation rows."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Performance", "Parallel row loading and stream prefetching deliver faster startup and fluid navigation across all your media."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Show What Others Are Watching again"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Describe the per-row catalog dedupe"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Show each row as soon as its own data arrives"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Don't wait on the community row, use the server's cached genres"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add 'What Others Are Watching' recommendation row and recommendations settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Launcher", "Use the show's art when an episode doesn't carry it"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Watchnext", "Refresh art and text on next-episode cards"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Streams", "Never start the player without a stream"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Plain loading screen and no stream line"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Reopen title pages instantly from what was last seen"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.40.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.40.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Launcher", "Banner with the Jellio wordmark"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.39.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.39.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Launcher", "Replace the Recently Added channel with Top Picks for You"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.38.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.38.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Launcher", "Home screen channels for Continue Watching, Next Up, Watchlist and Recently Added"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Show art and descriptions on Continue Watching cards"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Open title pages without waiting for streams"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Keep episode stills on the app's own episode cards"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.37.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.37.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Watchnext", "Add the next episode of shows being watched"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Watchnext", "Set the content id, one entry per series, show sync status"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Watchnext", "Publish at most five, unfinished titles first"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Streams", "Stop resolving the same title over and over"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Preload title pages and the next episode's streams"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.36.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.36.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Settings, "Settings", "Match the web settings look"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Build rows a screen ahead and stop per-frame redraws while scrolling"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.35.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.35.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Watchnext", "Show Continue Watching on the Google TV home"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Calendar", "Say watched shows appear too when nothing is upcoming"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.35.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.35.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Seasonal", "Still and off levels, lighter reduced scenes"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Open a row's view all as a poster grid"),
+            ChangelogFeature(Icons.Filled.Settings, "Settings", "Split settings into Account, Playback, Display and About categories"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Enter rows on their first or last used card"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Ui", "Give resting buttons a visible pill again"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.34.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.34.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Mic, "Search", "Show results as they arrive, library titles first"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Ui", "Stop solid buttons from looking focused at rest"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Build rows ahead so scrolling between them stays smooth"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.33.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.33.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Display", "Trap focus in overscan calibration and render at true full-screen root"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.33.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.33.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Settings, "Settings", "Add TV overscan safe area calibration and eliminate 4K scroll lag"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.32.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.32.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Show the subtitle track that was picked"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Show the bouncing title loader instead of a stretched still"),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Contrast on next episode button and overlay rendering during playback"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Open title pages as fast as on web"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Stabilize models and memoize row callbacks for smooth 4K scrolling"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.32.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.32.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Clearer stream badges, HD detection and failover notice"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.32.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.32.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Follow the server's video transcode policy"),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Mark streams that need a video re-encode in the Sources panel"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.31.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.31.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Episode panel opens on the current episode"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.31.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.31.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Try the next stream when one doesn't play"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.30.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.30.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Remember subtitles between episodes"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.30.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.30.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "End screen and a tidier Up Next card"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.29.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.29.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Player", "Pre-buffer setting with deeper loading while paused"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Docs", "Explain installing on Fire TV and Google TV with Downloader"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.28.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.28.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Profile menu buttons wrap instead of squeezing, focused panel buttons no longer clipped"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Streams", "Recognise Gelato's placeholder by the title's own name"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.28.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.28.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Smaller Home skeletons, a bell for Notifications, panels that fit"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.28.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.28.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Group Watch and Notifications panels in the profile menu"),
+            ChangelogFeature(Icons.Filled.Tv, "Home", "Show Home right away with loading skeletons"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.27.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.27.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Group Watch on TV"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.26.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.26.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Detail", "Keep focus off the sidebar while a title loads"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Open to Home sooner"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.26.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.26.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Settings, "Settings", "Fold the password fields behind a Change password button"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.26.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.26.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Update", "Check for updates in the background"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.25.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.25.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Streams", "Say no streams are available instead of offering Gelato's placeholder"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Streams", "Show no streams in the picker from every play button"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.25.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.25.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Share one prefetch across cards and install bundled performance profiles"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.25.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.25.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Show an announcement's picture in its toast"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.24.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.24.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "All feed type chips back on the TV, with books, manga and audiobooks off by default"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.24.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.24.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Library nav buttons use the same icons as Jellio web"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.24.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.24.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Server announcements as toasts on every screen, and stay awake while playing"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Left/Right jump without bringing up the player controls"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Subtitle selection that actually sticks, and say why when it can't"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.23.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.23.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Video freezing after stream changes, audio and subtitle selection"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.23.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.23.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Drop Watching now and keep books, manga and audiobooks out of the TV feed"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.23.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.23.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Libraries as their own nav buttons, Watchlist rows on Home, anime kept to the Anime library"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Feed filters by content type, books, manga and audiobooks off by default"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Call shows Shows everywhere, matching the server's library name"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.22.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.22.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Skip buttons, stream switch feedback and remote focus on Home and the nav rail"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Keep playback going through audio switches and seeks, and make carousels one selectable card"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.22.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.22.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Smaller, centered launcher icon on a slate background"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Episode sleep timer options and stream filters in the player's sources panel"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Watching now screen showing who plays what on which device"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Load images when the server address was saved with an uppercase scheme"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Detect slower devices and calm the seasonal scenes there, plus an auto-skip intros setting"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.21.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.21.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Navigable player controls with skip buttons and a scrubbable seek bar"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.20.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.20.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Port the full web seasonal scenes for Halloween, Christmas and New Year"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add an image loading test to settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add quality filter chips that combine with language chips in the stream picker"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Only log image and API requests in debug builds"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Keep the remote usable on empty screens and open the nav rail at Home"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Show the title's artwork while a stream loads and explain playback errors"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Use the focus direction property the focus enter scope provides"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Info, "Release Notes", "### Changes in 0.19.5  � **Audio & Language Menu Redesign**: Replaced the awkward top-right floating menu with an elegant, full-height right-side TV Leanback drawer matching the Subtitles drawer. Features semi-transparent scrim backdrop, clear header title, and auto-focuses the currently active audio track upon opening. � **All Player Overlays Aligned**: Standardized Sources, Episodes, Playback Speed, and Sleep Timer menus to use clean right-aligned drawer panels with scrim backdrops for a unified 10-foot TV experience. � **Audio Track Switching & Server Re-negotiation**: Fixed audio track selection in `PlayerViewModel` by removing the `directPlay` short-circuit that skipped server negotiation. Selecting an audio track now immediately re-negotiates with Jellyfin (`resolvePlayback`) at the current playback position. � **Seamless Mid-Stream Reloading**: Fixed ExoPlayer stream reload lifecycle in `PlayerScreen` to prepare and buffer directly at the current playback timestamp, preserving play state without triggering the initial \"Resume or Start Over\" dialog. � **Multi-Audio Track Selection**: Implemented robust audio track matching across all ExoPlayer audio groups and formats by language code and ordinal index, ensuring exact track selection overrides."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Info, "Release Notes", "### Changes in 0.19.4 - **Home Hero Gap**: Fixed empty gap above hero section by removing padding on LazyColumn; hero section now sits flush at the screen top ( = 0\$). - **Seasonal Animations**: Restored GPU-accelerated animated seasonal layer (glowing floating embers, drifting bats, ghosts, falling snow, bubbles, hearts) running smoothly at 60 FPS on Compose Canvas on top of the ambient dual radial gradient wash. - **Image Loading on Google TV & Local Networks**: Added explicit network security configuration allowing cleartext HTTP on local subnets (Android 14 / targetSdk 36 compatibility), added synchronous SharedPreferences backing in SessionManager to prevent OkHttp interceptor deadlocks on launch, configured LAN SSL tolerance, and passed dual ApiKey/api_key query parameters. - **Playback Error 500 Fix**: Enforced SupportsDirectPlay requirement in canDirectPlay to prevent invalid Static=true direct streaming requests, added ApiKey query parameter, and configured ExoPlayer's DefaultHttpDataSource with authenticated Authorization and X-Emby-Token headers."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Highlights & Features", "**Player Overlay Navigation & Stream Change Fix**: Fixed focus trapping where opening \"Change Stream\" or other player menus trapped D-pad focus in bottom player controls. Overlays now immediately autofocus their first item on mount, disable background control focus while open, and dismiss cleanly with Back button or tap gestures."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Highlights & Features", "**High-Contrast TV Focus Rings**: Added crisp 2.5dp and 2.0dp white focus borders and brightened container highlights across PosterCard, LandscapeCard, StreamPicker cards, Sidebar navigation, Detail action buttons, and Settings rows so the selected element is unmistakably visible on 10-foot TV displays."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Highlights & Features", "**Media Tech Badges**: Ported technical media badges from Jellio Web (4K UHD, 1080p, 720p, Dolby Vision, HDR10+, HDR10, HEVC, AV1, Dolby Atmos, DTS:X, TrueHD, DTS-HD, 7.1, 5.1, Stereo) and mounted them on DetailScreen and the Home Hero carousel."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Highlights & Features", "**Home Hero Actions & TV D-Pad Navigation**: Upgraded the Home Hero carousel to include primary Play (direct playback), Watchlist (bookmark toggle with live state sync), and View Details buttons with seamless horizontal D-pad navigation across previous chevron, action buttons, and next chevron."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Highlights & Features", "**Seasonal Recommendations Row**: Ported seasonal recommendations matching active seasonal themes (e.g. \"Spooky Season\" with unplayed horror and mystery titles during Halloween), dynamically rendered below Top Picks on the Home screen."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Fix media playback remote button default focus to pause on click"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Fix audio playback by acquiring media audio focus and transcoding unsupported codecs to AAC"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Fix Coil 3 image loading by configuring OkHttp network fetcher and auth query parameter for thumbnails and avatars"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Sign published APKs with repository keystore secrets so updates install smoothly over existing installs"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.19.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.19.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Expose playback to the system media session"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.27",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.27",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.26",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.26",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.25",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.25",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.24",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.24",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.23",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.23",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Internal improvements and bug fixes."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.22",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.22",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Give the stream list a focusRestorer() instead of forcing requestFocus()"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Replace stream picker's LazyColumn with a plain Column"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Switch audio tracks locally on a Direct Play source instead of re-transcoding"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Prefetch Gelato streams on poster focus"),
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Split search into independent Movies/Series requests"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Add temporary Logcat diagnostics for stream picker Down navigation"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Add temporary diagnostic isolating whether SourceCard can ever take programmatic focus"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Test focusRestorer() as the reason direct requestFocus() into SourceCard does nothing"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.21",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.21",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Track stream picker top-section focus per-leaf, not via an ancestor Column"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.20",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.20",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Intercept stream picker Down/Up at the Activity's dispatchKeyEvent"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.19",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.19",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Force stream picker nav through a top-level key handler, whiten hub logos"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.18",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.18",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Use onPreviewKeyEvent so stream picker down-navigation actually fires"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Keep sidebar nav visible on Detail/Person/Service pages"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.17",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.17",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Force stream picker focus navigation, fix language chip focus scale"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.16",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.16",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Stream picker up-navigation/contrast, rebuild player controls as one pill"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.15",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.15",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Studio hub logos, watchlist icon, profile/nav focus, privacy toggle, stream picker"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.14",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.14",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Maintenance", "Fix commit type on the Now Playing removal for conventional-commits CI"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Other", "Now Playing feature entirely"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.13",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.13",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Restore focus after popovers close, unbreak overflowing lists, drop redundant back UI"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Hoist changeAvatarFocusRequester out of the scrollable Column"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.12",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.12",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Physically block scroll while hero/coverflow holds focus, not just react to it"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.11",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.11",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Reactively watch scroll position instead of guessing a correction delay"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.10",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.10",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Replace indefinite scroll-to-top polling with two targeted assertions"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.9",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.9",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Keep reasserting scroll-to-top for as long as the hero/coverflow holds focus"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.8",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.8",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Close arrow-to-View-Details focus jitter on Home hero and Library coverflow"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Correct focusProperties left/right assignment type"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Reassert scroll-to-top a few times to close a remaining race on entry"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Redirect coverflow entry focus declaratively instead of racing it"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Decouple hero info from its buttons, bottom-align library arrows, claim initial coverflow focus"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Align hero/coverflow arrows with View Details, fix Left/Right and stale scroll on library switch"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Un-distort the library coverflow, replace filter chips with fields"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Correct an invalid Modifier.padding overload"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Shrink the library coverflow so the first row fits on initial open"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Suppress default bring-into-view instead of racing it, bump Settings icon further"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Opt in to the experimental BringIntoViewSpec API"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.18.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.18.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Port the full jellio-mark-animated.svg to the boot splash"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Profile navigation, watched-state refresh, contrast sweep round 2"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Store jellyfish path-morph frames as parsed strings, not array literals"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.17.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.17.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Port the real wake-trail bubbles onto the boot splash jellyfish"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Coverflow arrows hidden behind zIndex, ongoing scroll-pin, icon"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Use the real web loading spinner instead of the sweep bar"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.16.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.16.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Carousel focus jitter, Anime coverflow arrows, account switcher"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.16.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.16.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Sidebar nav parity and profile/settings cleanup"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Trap focus inside overlays, animated avatars, always show Anime"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Give plain elevated surfaces an explicit focused contrast pair"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Hero carousel focus/scroll, profile badges focus trap"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Add missing fillMaxSize import in HeroSection"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.16.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.16.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add a Feed screen and rebuild Profile with achievements, banner and bio"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add a Privacy toggle and a View profile row to Settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Credit real watches and mark native played state from the player"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Correct Surface shape wrapping and a Dp*Int order bug in ProfileScreen"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Enlarge Settings sidebar icon to match its siblings"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.15.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.15.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "TV polish pass � Group Watch removal, sidebar, focus, contrast (#34)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.15.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.15.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Populate Google TV's Watch Next row from Continue Watching (#33)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.14.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.14.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Remove Show from Up Next, hiding the whole series (#32)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.13.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.13.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Authenticate avatar preset image requests with api_key (#31)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.13.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.13.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Group preset avatars by their own real category (#30)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.12.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.12.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Docs", "Add a session handoff doc for the next agent (#29)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.12.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.12.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Real app icon and animated vector boot splash mark (#28)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.11.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.11.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Replace pill nav with a collapsible sidebar rail (#27)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.10.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.10.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Move row \"view all\" off the title onto its own button (#26)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.9.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.9.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Real down-navigation and Settings scroll regressions (#25)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.9.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.9.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Serve the boot splash video as webm (#24)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.9.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.9.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Play the jellyfish logo reveal instead of the plain boot splash"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.8.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.8.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Drop the one invented accent color, checked against Nuvio directly"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.8.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.8.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Ask for the server address before username and password"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.8.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.8.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Check GitHub for new releases and offer an in-app update"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.7.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.7.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Match pill's mobile tab order, prefetch Home behind a boot splash"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.7.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.7.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Close mobile-web parity gaps found in a fresh comparison pass"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.6.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.6.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Full-bleed pill navigation, icon-mode fade, reactive card sizing"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.6.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.6.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Port the detail hero's own collapse/expand action row (#16)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.5.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.5.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Long-press card options, row modal navigation, Customize mode lock, pill polish (#15)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Revert", "Drop the graphicsLayer full-bleed offset (#14)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Cold-start focus, library picker trap, immersive screen focus, full-bleed gap (#13)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Clear the nav pill's own bounds on Home and Library (#12)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Give scrollable screens a real default D-pad entry point (#11)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Drop focusGroup blocking default entry into scroll containers (#10)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Drop the broken shared focus-requester down override (#9)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Coverflow anime leak, exact Library icon, real nav pill centering fix (#8)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.4.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.4.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Match web's real three-wide overlapping coverflow stage (#7)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.3.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.3.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "D-pad dead end, Group Watch focus trap, nav pill centering, Library icon (#6)"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.3.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.3.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Performance", "Add an in-memory response cache to JellioRepository"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.3.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.3.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add sort and genre filter chips to the library's main row"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.2.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.2.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Wire the app to a real Jellio-Plugin backend"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Extend data layer for detail, playback, search and library"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Real navigation stack, Detail/Player routes, card click-through"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add the Detail screen and stream picker"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add real playback with Media3 ExoPlayer"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Search, Watchlist, Library, Settings and Calendar screens"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Person screen, remember-stream-choice, Change Stream button"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Port the real recommendation engine to Home"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add subtitle support to the player"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Settings language preference section"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add library coverflow carousel"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Home Coming Soon and catalog rows"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Studio Hub strip and Service screen"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Home genre rows, drop per-library stand-in"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add ServiceScreen genre/type filter chips"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Stream picker cards gain bitrate/description/language tags"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Stream picker gains a Resume button and backdrop fallback"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Stream picker gains a language filter chip bar"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Shows library coverflow gets its real time-of-day editorial text"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Nav pill collapses to icons on scroll, real mobile-nav parity"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Home never had its own real greeting header"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Continue Watching/Up Next render as plain posters, not landscape"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add per-card watchlist/watched quick actions to Home poster rows"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player pause overlay and resume/start-over prompt"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player Up Next overlay with countdown"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Intro Skipper skip button and Credits-aware Up Next timing"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add row-title browse-all modal to Home and Library"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Now Playing panel showing active server sessions"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Wire fetchAll into Home's row-list modal for catalog/genre rows"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player Speed selector"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player sleep timer"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player audio track switching"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add in-player source switching panel"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add in-player episodes side panel"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add trickplay scrub preview to seek"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add player toast chrome for re-negotiation failures"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Wire row list modal into service screen"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Wire fetchAll into library rows"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add home row customization"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Surface sleep timer status in settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add avatar picker to settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add context-aware card options menu"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Group Watch membership and chat"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Surface admin dashboard link in settings"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add subtitle style controls to the player"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add who's watching profile picker to login"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add forgot password flow to login"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add shard shatter animation to card removal"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add seasonal effects drift particle overlay"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Friday the 13th seasonal effect"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add frost seasonal effect"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add film noir seasonal effect"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add New Year fireworks seasonal effect"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add star wars hyperspace seasonal effect"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Rotate the home hero through every real candidate"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Add Remove from Library to the home card options menu"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Wire the card options menu into Library, Watchlist, Search and Service"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Hero backdrop, TV-scale sizing, consolidate library nav"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Clamp pill height, port real Anime library detection"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Let D-pad down escape the top nav pill into home content"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Source hero from real Movie/Series candidates, add Up Next row"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Correct focusGroup's real package"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Tv-material3 has no CircularProgressIndicator, ColumnScope typo"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Missing MediaStreamDto import, invalid padding overload"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Wrap coverflow dot's shape in ClickableSurfaceDefaults"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Detail screen real gaps against screens/detail.js"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Anime library regresses to full unfiltered TV catalog"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "PosterCard never shows watched/progress state"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "StreamPickerOverlay crashes unhandled on a load failure"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "A failed search looks identical to no results"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "D-pad Down from the nav pill only ever worked on Home"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Home and library loads sequentially awaited every real fetch"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Row titles missing their real underline accent"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Nav pill clips Settings and its own selection reads too small"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "CI failure, missing padding import in HomeScreen"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Wire onPlayDirect/onPlayManually into the Home route, not Library"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Drop stray weight import shadowing the real ColumnScope/RowScope extension"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Correct graphicsLayer import in card shatter animation"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Import the animateFloat extension in Friday 13th overlay"),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.1.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.1.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Feature", "Scaffold the Android TV client"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Migrate jvmTarget to the compilerOptions DSL"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Bump compileSdk/targetSdk to 36"),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Bug Fix", "Tolerate a no-op version bump in make release"),
         ),
     ),
 )
@@ -459,21 +1519,15 @@ fun ChangelogPopup(
                 onClick = onDismiss,
                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),
                 colors = ClickableSurfaceDefaults.colors(
-                    containerColor = Color.White.copy(alpha = 0.12f),
-                    contentColor = JellioText,
+                    containerColor = JellioRarityEpic,
+                    contentColor = Color.White,
                     focusedContainerColor = Color.White,
                     focusedContentColor = Color.Black,
                 ),
-                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-                border = ClickableSurfaceDefaults.border(
-                    focusedBorder = Border(
-                        border = BorderStroke(2.dp, Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(48.dp)
                     .focusRequester(buttonFocusRequester),
             ) {
                 Box(
@@ -481,8 +1535,8 @@ fun ChangelogPopup(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Got it",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        text = "Continue",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     )
                 }
             }
