@@ -334,24 +334,8 @@ class HomeViewModel @Inject constructor(
                     val genreDataDeferred = async { runCatching { fetchGenreRowData(session.userId) }.getOrDefault(emptyList()) }
 
                     val recommendationRows = recommendationDeferred.await()
-                    val rawCommunity = communityDeferred?.await() ?: emptyList()
                     val catalogData = catalogDataDeferred.await()
                     val genreData = genreDataDeferred.await()
-
-                    val communitySection = if (rawCommunity.isNotEmpty()) {
-                        val eligible = rawCommunity.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
-                        eligible.forEach {
-                            exclude.add(it.Id)
-                            exclude.add(titleKey(it))
-                        }
-                        if (eligible.isNotEmpty()) {
-                            HomeSection(
-                                title = "What Others Are Watching",
-                                items = eligible.take(24),
-                                key = "rec:What Others Are Watching",
-                            )
-                        } else null
-                    } else null
 
                     val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
                     val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
@@ -393,8 +377,6 @@ class HomeViewModel @Inject constructor(
                             add(PosterHomeRow(seasonalSection))
                         }
 
-                        communitySection?.let { add(PosterHomeRow(it)) }
-
                         catalogRows.forEach { add(PosterHomeRow(it)) }
                         genreRows.forEach { add(PosterHomeRow(it)) }
                     }
@@ -409,6 +391,27 @@ class HomeViewModel @Inject constructor(
                         customization = customization,
                         canDeleteItems = canDeleteItems,
                     )
+
+                    // What Others Are Watching never holds the other rows
+                    // up: it joins after the recommendation rows when it
+                    // arrives.
+                    communityDeferred?.let { pending ->
+                        launch {
+                            val raw = pending.await()
+                            val eligible = raw.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+                            if (eligible.isEmpty()) return@launch
+                            val section = HomeSection(
+                                title = "What Others Are Watching",
+                                items = eligible.take(24),
+                                key = "rec:What Others Are Watching",
+                            )
+                            val current = _uiState.value.rows
+                            if (current.any { it.key == section.key }) return@launch
+                            val lastRecommendation = current.indexOfLast { it.key.startsWith("rec:") || it.key.startsWith("seasonal:") }
+                            val at = if (lastRecommendation >= 0) lastRecommendation + 1 else minOf(topRows.size, current.size)
+                            _uiState.value = _uiState.value.copy(rows = current.toMutableList().apply { add(at, PosterHomeRow(section)) })
+                        }
+                    }
                 }
             } catch (err: Exception) {
                 // A quiet returning-visit refresh failing (a transient

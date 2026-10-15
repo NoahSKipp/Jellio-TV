@@ -352,6 +352,21 @@ interface JellyfinApi {
     @POST("Jellio/next-up-hidden/{seriesId}")
     suspend fun hideSeriesFromNextUp(@Path("seriesId") seriesId: String)
 
+    // Cached on the server: the genre list with counts, and a genre row.
+    @GET("Jellio/genres")
+    suspend fun getGenreCounts(
+        @Query("types") types: String,
+        @Query("parentId") parentId: String? = null,
+    ): com.jellio.tv.data.model.GenreCountsDto
+
+    @GET("Jellio/genres/items")
+    suspend fun getCachedGenreItems(
+        @Query("genre") genre: String,
+        @Query("types") types: String,
+        @Query("parentId") parentId: String? = null,
+        @Query("limit") limit: Int = 20,
+    ): ItemsResultDto
+
     @GET("Jellio/community/users")
     suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto>
 

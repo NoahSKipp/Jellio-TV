@@ -678,6 +678,10 @@ class JellioRepository @Inject constructor(
     // that file directly: the count itself was never actually sorted
     // on before this).
     suspend fun discoverGenres(userId: String, parentId: String?, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
+        // The server's cached genre list first; sampling items is the fallback.
+        runCatching { api.getGenreCounts(itemType, parentId).Genres }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { counts ->
+            return counts.filter { it.Count >= minCount }.sortedByDescending { it.Count }.map { it.Name }.take(limit)
+        }
         val sample = api.getItems(
             userId = userId,
             parentId = parentId,
@@ -715,8 +719,10 @@ class JellioRepository @Inject constructor(
             .mapNotNull { it.Name?.trim()?.ifBlank { null } }
             .distinct()
 
+    // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
-        api.getItems(
+        runCatching { api.getCachedGenreItems(genre, itemType, parentId, limit).Items }.getOrNull()
+            ?: api.getItems(
             userId = userId,
             parentId = parentId,
             includeItemTypes = itemType,

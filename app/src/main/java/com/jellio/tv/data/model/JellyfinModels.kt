@@ -235,6 +235,13 @@ data class CommunityWatchingItem(
     val Watchers: List<CommunityWatcherDto> = emptyList(),
 )
 
+// The plugin's cached genre list (Controllers/GenresController.cs).
+@JsonClass(generateAdapter = true)
+data class GenreCountDto(val Name: String = "", val Count: Int = 0)
+
+@JsonClass(generateAdapter = true)
+data class GenreCountsDto(val Genres: List<GenreCountDto> = emptyList())
+
 @Immutable
 @JsonClass(generateAdapter = true)
 data class CommunityWatchingResponse(
