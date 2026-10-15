@@ -324,94 +324,124 @@ class HomeViewModel @Inject constructor(
                     // next, same real port of that file's own second
                     // Promise.all.
                     val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
-                    val recommendationDeferred = async { runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList()) }
                     val isCommunityEnabled = recommendationPreferences.isCommunityRowEnabled(session.userId)
                     val communityExcluded = recommendationPreferences.getCommunityExcludedUsers(session.userId).toList()
-                    val communityDeferred: Deferred<List<BaseItemDto>>? = if (isCommunityEnabled) {
-                        async { runCatching { repository.getCommunityWatching(communityExcluded) }.getOrDefault(emptyList()) }
-                    } else null
-                    val catalogDataDeferred = async { runCatching { fetchCatalogRowData(session.userId, collections) }.getOrDefault(emptyList()) }
-                    val genreDataDeferred = async { runCatching { fetchGenreRowData(session.userId) }.getOrDefault(emptyList()) }
 
-                    val recommendationRows = recommendationDeferred.await()
-                    val catalogData = catalogDataDeferred.await()
-                    val genreData = genreDataDeferred.await()
+                    // On a first open every row below goes on screen the
+                    // moment its own data arrives, in a fixed place:
+                    // recommendations (the seasonal row after Top Picks),
+                    // What Others Are Watching, catalogs, then genres. A
+                    // title a row already showed isn't repeated further
+                    // down. A returning visit still swaps everything in once
+                    // the refresh is done, so rows don't move under the
+                    // viewer.
+                    var recommendationRows: List<HomeSection> = emptyList()
+                    var seasonalSection: HomeSection? = null
+                    var communitySection: HomeSection? = null
+                    val catalogSections = sortedMapOf<Int, HomeSection>()
+                    val genreSections = sortedMapOf<Int, HomeSection>()
+                    var finished = false
 
-                    val catalogRows = buildCatalogRowsFromData(session.userId, catalogData, exclude)
-                    val genreRows = buildGenreRowsFromData(session.userId, genreData, exclude)
-
-                    val seasonalResult = seasonalDeferred?.await()
-                    val seasonalSection = seasonalResult?.let { (title, rawItems) ->
-                        val eligible = rawItems.filter { it.UserData?.Played != true && !exclude.contains(it.Id) }
-                        eligible.forEach { exclude.add(it.Id) }
-                        if (eligible.isNotEmpty()) {
-                            HomeSection(
-                                title = title,
-                                items = eligible.take(24),
-                                key = "seasonal:$activeTheme",
-                            )
-                        } else null
-                    }
-
-                    // Real port of screens/home.js's own real
-                    // wrapRowForCustomization() call order: Continue
-                    // Watching, Up Next, Coming Soon, Streaming
-                    // Services, then every recommendation/catalog/genre
-                    // row, same real sequence that file's own header
-                    // comments document at each real call site.
-                    val rows = buildList<HomeRow> {
+                    fun assembled(): List<HomeRow> = buildList {
                         addAll(topRows)
-
-                        // Ported from runtime/recommend.js:
-                        // Seasonal recommendation row (e.g. "Spooky Season", "Holiday Favorites")
-                        // sits directly below "Top Picks for You".
+                        val seasonal = seasonalSection
                         var seasonalInserted = false
                         recommendationRows.forEach { rec ->
-                            add(PosterHomeRow(rec.copy(key = "rec:${rec.title}")))
-                            if (rec.title == "Top Picks for You" && seasonalSection != null && !seasonalInserted) {
-                                add(PosterHomeRow(seasonalSection))
+                            add(PosterHomeRow(rec))
+                            if (rec.title == "Top Picks for You" && seasonal != null && !seasonalInserted) {
+                                add(PosterHomeRow(seasonal))
                                 seasonalInserted = true
                             }
                         }
-                        if (seasonalSection != null && !seasonalInserted) {
-                            add(PosterHomeRow(seasonalSection))
-                        }
-
-                        catalogRows.forEach { add(PosterHomeRow(it)) }
-                        genreRows.forEach { add(PosterHomeRow(it)) }
+                        if (seasonal != null && !seasonalInserted) add(PosterHomeRow(seasonal))
+                        communitySection?.let { add(PosterHomeRow(it)) }
+                        catalogSections.values.forEach { add(PosterHomeRow(it)) }
+                        genreSections.values.forEach { add(PosterHomeRow(it)) }
                     }
-                    val picks = (recommendationRows.firstOrNull { it.title == "Top Picks for You" } ?: recommendationRows.firstOrNull())?.items
-                    if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
 
-                    _uiState.value = HomeUiState(
-                        isLoading = false,
-                        heroItems = heroCandidates,
-                        greeting = greeting,
-                        rows = rows,
-                        customization = customization,
-                        canDeleteItems = canDeleteItems,
-                    )
+                    fun publish() {
+                        if (isReturningVisit && !finished) return
+                        _uiState.value = HomeUiState(
+                            isLoading = false,
+                            heroItems = heroCandidates,
+                            greeting = greeting,
+                            rows = assembled(),
+                            customization = customization,
+                            canDeleteItems = canDeleteItems,
+                            loadingMore = !finished,
+                        )
+                    }
 
-                    // What Others Are Watching never holds the other rows
-                    // up: it joins after the recommendation rows when it
-                    // arrives.
-                    communityDeferred?.let { pending ->
+                    // Never awaited: a slow community lookup holds nothing up.
+                    if (isCommunityEnabled) {
                         launch {
-                            val raw = pending.await()
+                            val raw = runCatching { repository.getCommunityWatching(communityExcluded) }.getOrDefault(emptyList())
                             val eligible = raw.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
                             if (eligible.isEmpty()) return@launch
-                            val section = HomeSection(
+                            eligible.forEach {
+                                exclude.add(it.Id)
+                                exclude.add(titleKey(it))
+                            }
+                            communitySection = HomeSection(
                                 title = "What Others Are Watching",
                                 items = eligible.take(24),
                                 key = "rec:What Others Are Watching",
                             )
-                            val current = _uiState.value.rows
-                            if (current.any { it.key == section.key }) return@launch
-                            val lastRecommendation = current.indexOfLast { it.key.startsWith("rec:") || it.key.startsWith("seasonal:") }
-                            val at = if (lastRecommendation >= 0) lastRecommendation + 1 else minOf(topRows.size, current.size)
-                            _uiState.value = _uiState.value.copy(rows = current.toMutableList().apply { add(at, PosterHomeRow(section)) })
+                            publish()
                         }
                     }
+
+                    val recommendationJob = async {
+                        val recs = runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList())
+                        recommendationRows = recs.map { it.copy(key = "rec:${it.title}") }
+                        val picks = (recs.firstOrNull { it.title == "Top Picks for You" } ?: recs.firstOrNull())?.items
+                        if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
+                        publish()
+                    }
+
+                    val seasonalJob = seasonalDeferred?.let { pending ->
+                        async {
+                            val (title, rawItems) = pending.await() ?: return@async
+                            val eligible = rawItems.filter { it.UserData?.Played != true && !exclude.contains(it.Id) }
+                            eligible.forEach { exclude.add(it.Id) }
+                            if (eligible.isNotEmpty()) {
+                                seasonalSection = HomeSection(title = title, items = eligible.take(24), key = "seasonal:$activeTheme")
+                                publish()
+                            }
+                        }
+                    }
+
+                    val catalogJobs = chooseCatalogs(collections).mapIndexed { index, collection ->
+                        async {
+                            val kind = repository.collectionKind(collection)
+                            val items = runCatching { repository.getCollectionItems(session.userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.getOrDefault(emptyList())
+                            val entry = CatalogRowEntry(title = titleFor(collection.Name, kind), items = items, collectionId = collection.Id, kind = kind)
+                            catalogSection(session.userId, entry, exclude)?.let {
+                                catalogSections[index] = it
+                                publish()
+                            }
+                        }
+                    }
+
+                    val genreJob = async {
+                        val genres = runCatching { chooseGenres(session.userId) }.getOrDefault(emptyList())
+                        genres.mapIndexed { index, genre ->
+                            async {
+                                val items = runCatching { repository.getGenreItems(session.userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.getOrDefault(emptyList())
+                                genreSection(session.userId, GenreRowEntry(genre = genre, items = items), exclude)?.let {
+                                    genreSections[index] = it
+                                    publish()
+                                }
+                            }
+                        }.awaitAll()
+                    }
+
+                    recommendationJob.await()
+                    seasonalJob?.await()
+                    catalogJobs.awaitAll()
+                    genreJob.await()
+                    finished = true
+                    publish()
                 }
             } catch (err: Exception) {
                 // A quiet returning-visit refresh failing (a transient
@@ -580,7 +610,7 @@ class HomeViewModel @Inject constructor(
     // own behind that tile, same real reason fetchCatalogRows() itself
     // excludes it, a Netflix row directly under the Netflix tile would
     // be the same content twice.
-    private suspend fun fetchCatalogRowData(userId: String, collections: List<BaseItemDto>): List<CatalogRowEntry> = coroutineScope {
+    private fun chooseCatalogs(collections: List<BaseItemDto>): List<BaseItemDto> {
         var usable = collections.filter { serviceOf(it.Name) == null && (it.ChildCount ?: 0) >= MIN_CATALOG_ITEMS }
         usable = usable.sortedWith(
             compareBy<BaseItemDto> { leadIndex(it.Name) }.thenByDescending { it.ChildCount ?: 0 },
@@ -593,42 +623,27 @@ class HomeViewModel @Inject constructor(
             animeSeen <= MAX_ANIME_CATALOG_ROWS
         }
 
-        usable = usable.take(MAX_CATALOG_ROWS)
-
-        usable.map { collection ->
-            async {
-                val kind = repository.collectionKind(collection)
-                val items = runCatching { repository.getCollectionItems(userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.getOrDefault(emptyList())
-                CatalogRowEntry(title = titleFor(collection.Name, kind), items = items, collectionId = collection.Id, kind = kind)
-            }
-        }.awaitAll()
+        return usable.take(MAX_CATALOG_ROWS)
     }
 
     // Mirrors screens/home.js's own buildCatalogRows(): the real
-    // synchronous dedupe step, run only after fetchCatalogRowData's own
+    // synchronous dedupe step, run as each catalog row's own
     // real network phase above (and its sibling recommendation/genre
     // phases) have all already resolved, same real priority order that
     // file's own comment documents.
-    private fun buildCatalogRowsFromData(userId: String, data: List<CatalogRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
-        val sections = mutableListOf<HomeSection>()
-        data.forEach { entry ->
-            val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
-            deduped.forEach { item ->
-                exclude.add(item.Id)
-                exclude.add(titleKey(item))
-            }
-            if (deduped.isNotEmpty()) {
-                sections.add(
-                    HomeSection(
-                        title = entry.title,
-                        items = deduped,
-                        fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
-                        key = "catalog:${entry.collectionId}",
-                    ),
-                )
-            }
+    private fun catalogSection(userId: String, entry: CatalogRowEntry, exclude: MutableSet<String>): HomeSection? {
+        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        deduped.forEach { item ->
+            exclude.add(item.Id)
+            exclude.add(titleKey(item))
         }
-        return sections
+        if (deduped.isEmpty()) return null
+        return HomeSection(
+            title = entry.title,
+            items = deduped,
+            fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
+            key = "catalog:${entry.collectionId}",
+        )
     }
 
     private var animeIds: Set<String> = emptySet()
@@ -647,44 +662,27 @@ class HomeViewModel @Inject constructor(
     // discoverGenres() itself resolves (a real data dependency, unlike
     // the catalog collections above), not one genre waiting on the
     // last.
-    private suspend fun fetchGenreRowData(userId: String): List<GenreRowEntry> = coroutineScope {
+    private suspend fun chooseGenres(userId: String): List<String> {
         val selected = recommendationPreferences.getSelectedGenres(userId)
-        val genres = if (selected.isNotEmpty()) {
-            selected
-        } else {
-            repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
-        }
-        genres.map { genre ->
-            async {
-                val items = runCatching { repository.getGenreItems(userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.getOrDefault(emptyList())
-                GenreRowEntry(genre = genre, items = items)
-            }
-        }.awaitAll()
+        return if (selected.isNotEmpty()) selected else repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
     }
 
     // Mirrors screens/home.js's own buildGenreRows(): last in line for
     // the shared exclude set, same real priority order that file's own
     // comment documents (recommendation rows first pick, then catalog,
     // genre rows last).
-    private fun buildGenreRowsFromData(userId: String, data: List<GenreRowEntry>, exclude: MutableSet<String>): List<HomeSection> {
-        val sections = mutableListOf<HomeSection>()
-        data.forEach { entry ->
-            val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
-            deduped.forEach { item ->
-                exclude.add(item.Id)
-                exclude.add(titleKey(item))
-            }
-            if (deduped.isNotEmpty()) {
-                sections.add(
-                    HomeSection(
-                        title = entry.genre,
-                        items = deduped,
-                        fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
-                        key = "genre:${entry.genre}",
-                    ),
-                )
-            }
+    private fun genreSection(userId: String, entry: GenreRowEntry, exclude: MutableSet<String>): HomeSection? {
+        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        deduped.forEach { item ->
+            exclude.add(item.Id)
+            exclude.add(titleKey(item))
         }
-        return sections
+        if (deduped.isEmpty()) return null
+        return HomeSection(
+            title = entry.genre,
+            items = deduped,
+            fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
+            key = "genre:${entry.genre}",
+        )
     }
 }
