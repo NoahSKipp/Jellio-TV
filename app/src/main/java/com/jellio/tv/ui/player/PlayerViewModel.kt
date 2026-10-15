@@ -3,6 +3,7 @@ package com.jellio.tv.ui.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.PlaybackTarget
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
@@ -15,6 +16,7 @@ import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.prefs.SubtitleStylePreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -373,6 +375,15 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    data class PrewarmedPlayback(
+        val itemId: String,
+        val item: BaseItemDto,
+        val target: PlaybackTarget,
+        val audioPreference: String?,
+    )
+
+    private var prewarmedPlayback: PrewarmedPlayback? = null
+
     fun retry(session: Session) {
         val id = itemId ?: return
         loadedItemId = null
@@ -394,7 +405,12 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
             try {
-                val item = repository.getItemDetails(session.userId, itemId, forPlayer = true)
+                val prewarmed = if (mediaSourceId == null && !fromFailover && prewarmedPlayback?.itemId == itemId) {
+                    prewarmedPlayback.also { prewarmedPlayback = null }
+                } else {
+                    null
+                }
+                val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId, forPlayer = true)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
                 // is still being prepared, not a blank screen.
@@ -404,14 +420,16 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
-                val audioPreference = repository.getAudioLanguagePreference(session.userId)
+                val audioPreference = prewarmed?.audioPreference ?: repository.getAudioLanguagePreference(session.userId)
                 audioLanguagePreference = audioPreference
-                var target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
+                var target = prewarmed?.target ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
                 // The reader's audio language wins over the file's default
                 // when the file has it; a transcode has to be asked for it.
-                val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
-                if (preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
-                    target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
+                if (prewarmed == null) {
+                    val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
+                    if (preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
+                        target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
+                    }
                 }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
                     "S${item.ParentIndexNumber} E${item.IndexNumber} · "
@@ -1122,11 +1140,37 @@ class PlayerViewModel @Inject constructor(
     // once markRealWatchComplete() already ran keeps native Jellyfin's
     // own math in its own "ignore progress during the beginning" branch
     // instead, which only ever touches positionTicks, never Played.
-    // The next episode's stream list, fetched once when its Up Next card
-    // appears so autoplay finds it cached instead of resolving then.
+    // Pre-warms the next episode stream, playback info, and network buffer
+    fun prewarmNextEpisode(session: Session) {
+        val nextId = _uiState.value.upNextInfo?.itemId ?: return
+        if (prewarmedPlayback?.itemId == nextId) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val nextItem = repository.getItemDetails(session.userId, nextId, forPlayer = true)
+                val audioPref = repository.getAudioLanguagePreference(session.userId)
+                val startTicks = nextItem.UserData?.PlaybackPositionTicks ?: 0L
+                var target = repository.resolvePlayback(session.userId, nextId, null, startTicks)
+                val preferredAudio = preferredAudioIndex(target.mediaSource, audioPref)
+                if (preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
+                    target = repository.resolvePlayback(session.userId, nextId, null, startTicks, audioStreamIndex = preferredAudio)
+                }
+                prewarmedPlayback = PrewarmedPlayback(
+                    itemId = nextId,
+                    item = nextItem,
+                    target = target,
+                    audioPreference = audioPref,
+                )
+                repository.prewarmStreamUrl(target.streamUrl)
+            }
+        }
+    }
+
+    // The next episode's stream list and playback targets, pre-warmed once when
+    // its Up Next card appears so autoplay starts instantaneously without delay.
     fun preloadUpNextSources(session: Session) {
         val nextId = _uiState.value.upNextInfo?.itemId ?: return
         viewModelScope.launch { runCatching { repository.getMediaSources(session.userId, nextId, reason = "up next") } }
+        prewarmNextEpisode(session)
     }
 
     fun reportStopped(positionTicks: Long) {

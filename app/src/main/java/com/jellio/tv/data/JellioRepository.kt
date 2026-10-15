@@ -1210,6 +1210,29 @@ class JellioRepository @Inject constructor(
         }
     }
 
+    // Pre-warms the stream connection and Usenet/nzbdav reader for the upcoming episode.
+    fun prewarmStreamUrl(streamUrl: String) {
+        prefetchScope.launch {
+            runCatching {
+                val url = java.net.URL(streamUrl)
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("Range", "bytes=0-65535")
+                conn.connect()
+                val code = conn.responseCode
+                if (code in 200..206) {
+                    val stream = conn.inputStream
+                    val buf = ByteArray(8192)
+                    stream.read(buf)
+                    stream.close()
+                }
+                conn.disconnect()
+            }
+        }
+    }
+
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
 
     // Plain passthrough, same as getCalendarEntries above: FeedViewModel's

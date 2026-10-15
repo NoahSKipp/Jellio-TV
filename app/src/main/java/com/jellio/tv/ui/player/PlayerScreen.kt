@@ -973,6 +973,7 @@ private fun PlayerSurface(
         val next = upNextInfo ?: return@LaunchedEffect
         // The card's countdown already runs on into the end screen.
         if (upNextShown || upNextDismissed) return@LaunchedEffect
+        onUpNextShown()
         endCountdown = UPNEXT_COUNTDOWN_SECONDS
         while ((endCountdown ?: 0) > 0) {
             delay(1000)
