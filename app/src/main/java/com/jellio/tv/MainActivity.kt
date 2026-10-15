@@ -268,6 +268,7 @@ private fun JellioTvApp(
     var showAccountSwitcher by remember { mutableStateOf(false) }
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
+    var showChangelog by remember { mutableStateOf(false) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
     // Real feedback live: SidebarNav's own items stayed reachable while
@@ -276,6 +277,13 @@ private fun JellioTvApp(
     // way. Threaded down the same real way SidebarNav's own enabled is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(session.userId) {
+        if (com.jellio.tv.ui.changelog.ChangelogPrefs.shouldShowChangelog(context)) {
+            showChangelog = true
+        }
+    }
 
     LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
@@ -486,6 +494,7 @@ private fun JellioTvApp(
                 session = session,
                 onLogout = { appViewModel.logout() },
                 onViewProfile = { push(JellioRoute.Profile()) },
+                onShowChangelog = { showChangelog = true },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Detail -> DetailScreen(
@@ -648,6 +657,14 @@ private fun JellioTvApp(
                         selectedLibrary = library
                         showLibraryPicker = false
                         switchTab(JellioRoute.Library)
+                    },
+                )
+            }
+            if (showChangelog) {
+                com.jellio.tv.ui.changelog.ChangelogPopup(
+                    onDismiss = {
+                        com.jellio.tv.ui.changelog.ChangelogPrefs.markSeen(context)
+                        showChangelog = false
                     },
                 )
             }

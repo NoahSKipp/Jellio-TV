@@ -126,6 +126,7 @@ fun SettingsScreen(
     session: Session,
     onLogout: () -> Unit,
     onViewProfile: () -> Unit,
+    onShowChangelog: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     // AppBootGate's own hiltViewModel() call already checks once per
@@ -413,6 +414,12 @@ fun SettingsScreen(
                 SettingsCategory.ABOUT -> {
                 SettingsSection(title = "About", icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
                     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                        SettingsActionRow(
+                            label = "What's New",
+                            icon = Icons.Filled.AutoAwesome,
+                            description = "View new features and improvements in version " + BuildConfig.VERSION_NAME,
+                            onClick = onShowChangelog,
+                        )
                         UpdateCheckRow(viewModel = appUpdateViewModel)
                         ImageCheckRow(session = session)
                     }
