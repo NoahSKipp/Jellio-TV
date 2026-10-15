@@ -1020,20 +1020,6 @@ class JellioRepository @Inject constructor(
         return byId.values.toList()
     }
 
-    // Every real item crediting one specific person as Actor or
-    // Director, real "More with [actor]" row aggregate.
-    suspend fun getPersonItems(userId: String, personId: String, limit: Int): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            includeItemTypes = "Movie,Series",
-            recursive = true,
-            limit = limit,
-            sortBy = "CommunityRating",
-            sortOrder = "Descending",
-            fields = "ProductionYear,CommunityRating,Genres",
-            personIds = personId,
-        ).Items
-
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
             api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items

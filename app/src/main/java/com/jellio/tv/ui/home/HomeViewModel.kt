@@ -311,7 +311,6 @@ class HomeViewModel @Inject constructor(
                         getNextUp = { limit -> repository.getNextUp(session.userId, limit) },
                         getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
                         getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
-                        getPersonItems = { personId, limit -> repository.getPersonItems(session.userId, personId, limit) },
                     )
                     // Shared across recommendation, catalog and genre rows,
                     // same real reasoning screens/home.js's own shared
@@ -344,17 +343,11 @@ class HomeViewModel @Inject constructor(
 
                     fun assembled(): List<HomeRow> = buildList {
                         addAll(topRows)
-                        val seasonal = seasonalSection
-                        var seasonalInserted = false
-                        recommendationRows.forEach { rec ->
-                            add(PosterHomeRow(rec))
-                            if (rec.title == "Top Picks for You" && seasonal != null && !seasonalInserted) {
-                                add(PosterHomeRow(seasonal))
-                                seasonalInserted = true
-                            }
-                        }
-                        if (seasonal != null && !seasonalInserted) add(PosterHomeRow(seasonal))
+                        val (topPicks, perTitle) = recommendationRows.partition { it.title == "Top Picks for You" }
+                        topPicks.forEach { add(PosterHomeRow(it)) }
+                        seasonalSection?.let { add(PosterHomeRow(it)) }
                         communitySection?.let { add(PosterHomeRow(it)) }
+                        perTitle.forEach { add(PosterHomeRow(it)) }
                         catalogSections.values.forEach { add(PosterHomeRow(it)) }
                         genreSections.values.forEach { add(PosterHomeRow(it)) }
                     }

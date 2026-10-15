@@ -43,9 +43,7 @@ private const val MAX_PER_GENRE = 3
 
 private const val MIN_RATING = 5.0
 private const val MIN_GENRE_COUNT = 3
-private const val MIN_PERSON_COUNT = 2
 private const val MAX_GENRE_ROWS = 1
-private const val MAX_PERSON_ROWS = 1
 
 private const val TICKS_PER_HOUR = 10000000L * 3600L
 
@@ -164,21 +162,6 @@ private fun topGenres(history: List<BaseItemDto>): List<String> {
     return counts.filterValues { it >= MIN_GENRE_COUNT }.entries.sortedByDescending { it.value }.map { it.key }
 }
 
-private data class PersonCount(val id: String, val name: String, val count: Int)
-
-private fun topPeople(history: List<BaseItemDto>): List<PersonCount> {
-    val counts = linkedMapOf<String, PersonCount>()
-    history.forEach { item ->
-        item.People?.forEach { person ->
-            val id = person.Id
-            if (person.Type != "Actor" && person.Type != "Director") return@forEach
-            val existing = counts[id]
-            counts[id] = if (existing != null) existing.copy(count = existing.count + 1) else PersonCount(id, person.Name ?: "", 1)
-        }
-    }
-    return counts.values.filter { it.count >= MIN_PERSON_COUNT }.sortedByDescending { it.count }
-}
-
 // Real callback dependency injection rather than a repository
 // reference held directly: keeps this file pure real scoring logic,
 // same real separation runtime/recommend.js itself draws against
@@ -188,7 +171,6 @@ class RecommendationDataSource(
     val getNextUp: suspend (limit: Int) -> List<BaseItemDto>,
     val getRecommendationCandidates: suspend (seed: BaseItemDto, limit: Int) -> List<CandidateEntry>,
     val getGenreItems: suspend (genre: String, limit: Int) -> List<BaseItemDto>,
-    val getPersonItems: suspend (personId: String, limit: Int) -> List<BaseItemDto>,
 )
 
 // Fetching each seed's own candidates has no dependency on exclude at
@@ -231,18 +213,6 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
     return rows
 }
 
-private suspend fun buildTopPersonRows(source: RecommendationDataSource, history: List<BaseItemDto>, exclude: MutableSet<String>): List<HomeSection> {
-    val people = topPeople(history).take(MAX_PERSON_ROWS)
-    val rows = mutableListOf<HomeSection>()
-    people.forEach { person ->
-        val items = runCatching {
-            dedupe(source.getPersonItems(person.id, ROW_SIZE).filter(::notPlayed), exclude)
-        }.getOrDefault(emptyList())
-        if (items.isNotEmpty()) rows.add(HomeSection("More with ${person.name}", items))
-    }
-    return rows
-}
-
 private fun notDisliked(seed: BaseItemDto): Boolean = seed.UserData?.Likes != false
 
 // Every personalized row this app builds without a second backend: one
@@ -265,7 +235,6 @@ suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: M
     val nextUpRows = buildSeedRows(source, nextUp.filter(::notDisliked), { seed -> "Because you're watching ${seed.SeriesName ?: seed.Name}" }, exclude)
 
     val genreRows = buildTopGenreRows(source, history, exclude)
-    val personRows = buildTopPersonRows(source, history, exclude)
 
-    genreRows + completedRows + nextUpRows + personRows
+    genreRows + completedRows + nextUpRows
 }
