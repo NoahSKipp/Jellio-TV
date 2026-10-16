@@ -87,8 +87,14 @@ class AppViewModel @Inject constructor(
     // Backdrop type that was never going to exist server side.
     fun imageUrl(session: Session, item: BaseItemDto, imageType: String, maxWidth: Int): String {
         val backdropTag = item.BackdropImageTags?.firstOrNull()
-        val resolvedType = if (imageType == "Backdrop" && backdropTag == null) "Primary" else imageType
-        val tag = if (resolvedType == "Backdrop") backdropTag else item.ImageTags?.get(resolvedType)
+        val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
+        val resolvedType = if (imageType == "Backdrop" && backdropTag == null && primaryTag != null) "Primary" else imageType
+        val tag = when (resolvedType) {
+            "Backdrop" -> backdropTag
+            "Primary" -> primaryTag
+            "Thumb" -> item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
+            else -> item.ImageTags?.get(resolvedType)
+        }
         return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth, session.accessToken)
     }
 

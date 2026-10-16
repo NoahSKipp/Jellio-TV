@@ -2,6 +2,7 @@ package com.jellio.tv.ui.search
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,13 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
@@ -26,10 +26,16 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.home.PosterCard
+import com.jellio.tv.ui.home.PosterWidth
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.common.JellioTextField
+import com.jellio.tv.ui.common.RegisterGridFocusItem
+import com.jellio.tv.ui.common.gridColumnFocus
+import com.jellio.tv.ui.common.rememberGridFocusController
+import com.jellio.tv.ui.common.rememberTvGridState
 import com.jellio.tv.ui.home.SkeletonPoster
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 
 import android.app.Activity
 import android.content.Intent
@@ -51,6 +57,7 @@ import com.jellio.tv.ui.theme.JellioText
 // Mirrors screens/search.js's own real live-search shape: a query box
 // over a results grid, Movie/Series only, the same real endpoint
 // runtime/api.js's own searchItems() calls.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchScreen(
     session: Session,
@@ -60,7 +67,8 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val gridState = rememberLazyGridState()
+    val gridState = rememberTvGridState()
+    val focusController = rememberGridFocusController()
     LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -133,19 +141,40 @@ fun SearchScreen(
                     uiState.results.isEmpty() -> 12
                     else -> 4
                 }
-                LazyVerticalGrid(
-                    state = gridState,
-                    columns = GridCells.Adaptive(minSize = 170.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 48.dp),
-                    modifier = Modifier.fillMaxSize().focusRestorer(),
-                ) {
-                    items(uiState.results, key = { it.Id }, contentType = { "poster_card" }) { item ->
-                        PosterCard(item = item, imageUrl = imageUrl, onClick = { onItemClick(item) }, onOptionsClick = { openItemOptions(item) })
-                    }
-                    items(placeholders, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
-                        SkeletonPoster()
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val scaledPosterWidth = PosterWidth.scaled()
+                    val spacing = 16.dp
+                    val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
+                    val totalCount = uiState.results.size
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(columnCount),
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 48.dp),
+                        modifier = Modifier.fillMaxSize().focusRestorer(focusController.requesterFor(0)),
+                    ) {
+                        items(totalCount, key = { uiState.results[it].Id }, contentType = { "poster_card" }) { index ->
+                            val item = uiState.results[index]
+                            RegisterGridFocusItem(focusController, index)
+                            PosterCard(
+                                item = item,
+                                imageUrl = imageUrl,
+                                onClick = { onItemClick(item) },
+                                onOptionsClick = { openItemOptions(item) },
+                                modifier = Modifier.gridColumnFocus(
+                                    controller = focusController,
+                                    index = index,
+                                    totalCount = totalCount,
+                                    columnCount = columnCount,
+                                    allowExitUp = true,
+                                    allowExitLeft = true,
+                                ),
+                            )
+                        }
+                        items(placeholders, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
+                            SkeletonPoster()
+                        }
                     }
                 }
             }

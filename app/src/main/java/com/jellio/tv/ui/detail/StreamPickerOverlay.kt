@@ -21,7 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VideocamOff
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
@@ -384,37 +384,104 @@ fun StreamPickerOverlay(
                     RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
                 }
                 is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
-                    // Shown in the box the streams would fill, no buttons:
-                    // Back closes it. Focusable so the D-pad stays here
-                    // instead of wandering into the page underneath.
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .padding(top = 32.dp)
-                            .fillMaxWidth()
-                            .background(JellioBgElevated.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
-                            .focusRequester(initialFocusRequester)
-                            .focusable()
-                            .padding(horizontal = 28.dp, vertical = 32.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.VideocamOff,
-                            contentDescription = null,
-                            tint = JellioTextSecondary,
-                            modifier = Modifier.size(44.dp),
-                        )
-                        Text(
-                            text = "No streams available",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = JellioText,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        Text(
-                            text = noStreamsHint(item.PremiereDate),
-                            color = JellioTextSecondary,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
+                    val refreshRequester = remember { FocusRequester() }
+                    val allChipRequester = remember { FocusRequester() }
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .padding(top = 20.dp)
+                                .focusProperties { up = FocusRequester.Cancel },
+                        ) {
+                            Surface(
+                                onClick = { reloadKey++ },
+                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                colors = ClickableSurfaceDefaults.colors(
+                                    containerColor = JellioBgElevated,
+                                    contentColor = JellioText,
+                                    focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                                    focusedContentColor = JellioText,
+                                ),
+                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                                modifier = Modifier
+                                    .focusRequester(refreshRequester)
+                                    .focusProperties {
+                                        down = initialFocusRequester
+                                        right = allChipRequester
+                                        left = FocusRequester.Cancel
+                                    },
+                            ) {
+                                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Refresh,
+                                        contentDescription = "Refresh streams",
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                            Surface(
+                                onClick = {},
+                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                colors = ClickableSurfaceDefaults.colors(
+                                    containerColor = JellioSecondary,
+                                    contentColor = JellioBg,
+                                    focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                                    focusedContentColor = JellioText,
+                                ),
+                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                                modifier = Modifier
+                                    .focusRequester(allChipRequester)
+                                    .focusProperties {
+                                        down = initialFocusRequester
+                                        left = refreshRequester
+                                        right = FocusRequester.Cancel
+                                    },
+                            ) {
+                                Text(text = "All", modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+                            }
+                        }
+                        Surface(
+                            onClick = { reloadKey++ },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = JellioBgElevated,
+                                contentColor = JellioText,
+                                focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                                focusedContentColor = JellioText,
+                            ),
+                            border = ClickableSurfaceDefaults.border(
+                                focusedBorder = androidx.tv.material3.Border(
+                                    border = androidx.compose.foundation.BorderStroke(2.5.dp, Color.White),
+                                    shape = RoundedCornerShape(12.dp),
+                                ),
+                            ),
+                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+                            modifier = Modifier
+                                .padding(top = 20.dp)
+                                .fillMaxWidth()
+                                .focusRequester(initialFocusRequester)
+                                .focusProperties {
+                                    up = refreshRequester
+                                    down = FocusRequester.Cancel
+                                    left = FocusRequester.Cancel
+                                    right = FocusRequester.Cancel
+                                },
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "📅 Digital Release Filter",
+                                    color = JellioText,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = "⚠ No streams found. Perhaps there is no digital release available for this media yet.",
+                                    color = JellioTextSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
                     }
                 } else {
                     // Real Jellyfin field, the same one the player's own
@@ -751,22 +818,6 @@ internal fun SourceCard(
                 Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             }
         }
-    }
-}
-
-// Like Nuvio: with nothing found, a recent or undated title most likely
-// isn't out digitally yet.
-private fun noStreamsHint(premiereDate: String?): String {
-    val released = premiereDate?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
-    if (released != null && released.isAfter(java.time.Instant.now())) {
-        val day = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy").withZone(java.time.ZoneId.systemDefault()).format(released)
-        return "Releases on $day. Streams usually show up once it's out on digital."
-    }
-    val recent = released != null && java.time.Duration.between(released, java.time.Instant.now()).toDays() < 120
-    return if (released == null || recent) {
-        "There may not be a digital release yet. Check back once it's out on digital."
-    } else {
-        "Nothing was found for this title right now. Try again later."
     }
 }
 

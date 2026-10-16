@@ -731,7 +731,7 @@ class JellioRepository @Inject constructor(
             genres = genre,
             sortBy = "CommunityRating",
             sortOrder = "Descending",
-            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating",
+            fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
         ).Items
 
     suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto> =
@@ -753,7 +753,7 @@ class JellioRepository @Inject constructor(
             recursive = true,
             limit = limit,
             searchTerm = term,
-            fields = "PrimaryImageAspectRatio",
+            fields = ITEM_FIELDS,
         ).Items
     }
 
@@ -833,7 +833,7 @@ class JellioRepository @Inject constructor(
             recursive = true,
             limit = 50,
             searchTerm = "local:$term",
-            fields = "PrimaryImageAspectRatio,ProviderIds,ProductionYear",
+            fields = "$ITEM_FIELDS,ProviderIds,ProductionYear",
         ).Items
     }
 
@@ -939,7 +939,7 @@ class JellioRepository @Inject constructor(
                 limit = limit,
                 sortBy = "PremiereDate",
                 sortOrder = "Descending",
-                fields = "PrimaryImageAspectRatio,ProductionYear",
+                fields = "$ITEM_FIELDS,ProductionYear",
                 personIds = personId,
             ).Items
         }
@@ -997,7 +997,7 @@ class JellioRepository @Inject constructor(
                     recursive = true,
                     limit = limit,
                     sortBy = "Random",
-                    fields = "Genres,ProductionYear,CommunityRating,RunTimeTicks",
+                    fields = "$ITEM_FIELDS,Genres,ProductionYear,CommunityRating,RunTimeTicks",
                     genres = genres.joinToString("|"),
                 ).Items
             }.getOrDefault(emptyList()).forEach { item ->
@@ -1013,7 +1013,7 @@ class JellioRepository @Inject constructor(
                     recursive = true,
                     limit = limit,
                     sortBy = "Random",
-                    fields = "Genres,ProductionYear,CommunityRating,RunTimeTicks",
+                    fields = "$ITEM_FIELDS,Genres,ProductionYear,CommunityRating,RunTimeTicks",
                     personIds = people.joinToString(",") { it.Id },
                 ).Items
             }.getOrDefault(emptyList()).forEach { item ->
@@ -1108,7 +1108,9 @@ class JellioRepository @Inject constructor(
             prefetchScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
                 val started = System.currentTimeMillis()
                 val sources = fetchMediaSources(userId, itemId)
-                sourceCache.put(itemId, sources, System.currentTimeMillis())
+                if (sources.isNotEmpty()) {
+                    sourceCache.put(itemId, sources, System.currentTimeMillis())
+                }
                 com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
                 sources
             }
@@ -1121,57 +1123,50 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    private fun normalizeTitle(s: String): String =
-        s.lowercase()
-            .replace(Regex("\\.(strm|mkv|mp4|avi)$", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\s*\\(\\d{4}\\)$"), "")
-            .replace(Regex("\\s+\\d{4}$"), "")
-            .replace(Regex("[^a-z0-9]"), "")
-            .trim()
+    private val streamInfoNamePattern = Regex(
+        "(^|[^a-z0-9])(2160p|1440p|1080[pi]|720p|576p|540p|480p|360p|240p|4k|uhd|ultra[ .-]?hd|qhd|2k|fhd|full[ .-]?hd|hd|sd|dvdrip|web-?dl|web-?rip|bluray|blu-ray|bdrip|brrip|remux|hdtv|hevc|[xh]\\.?265|[xh]\\.?264|avc|av1|vp9|hdr10?\\+?|dv|dovi|dolby|hlg|10\\s?bit|aac|e?-?ac-?3|ddp|dd\\+|dts(-?hd|-?x)?|truehd|atmos|flac|opus|mp3|l?pcm|[257]\\.[01]|stereo|mono|multi|dual([-.\\s]?audio)?|\\d+(\\.\\d+)?\\s*(gb|mb|gib|mib|mbps|kbps))([^a-z0-9]|$)",
+        RegexOption.IGNORE_CASE,
+    )
 
-    private fun isReleaseName(name: String): Boolean {
-        if (name.isBlank()) return false
-        val lower = name.lowercase()
-        return Regex("\\b(1080p|720p|2160p|4k|uhd|fhd|hd|web-?dl|web-?rip|bluray|bdrip|remux|hdr10?\\+?|dv|dolby|x264|x265|h264|h265|hevc|av1|torrentio|debrid|realdebrid|alldebrid|premiumize)\\b|s\\d{1,2}e\\d{1,2}", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+    private fun hasFlagEmoji(text: String): Boolean {
+        if (text.isEmpty()) return false
+        val points = text.codePoints().toArray()
+        for (i in 0 until points.size - 1) {
+            val a = points[i]
+            val b = points[i + 1]
+            if (a in 0x1F1E6..0x1F1FF && b in 0x1F1E6..0x1F1FF) return true
+        }
+        return false
+    }
+
+    private fun hasStreamInfo(source: MediaSourceDto): Boolean {
+        if (com.jellio.tv.ui.detail.sourceQuality(source) != null) return true
+        if ((source.Size ?: 0L) > 0L || (source.Bitrate ?: 0L) > 0L) return true
+
+        val hasProbedStream = source.MediaStreams?.any { s ->
+            when (s.Type) {
+                "Video" -> (s.Width ?: 0) > 0 || (s.Height ?: 0) > 0 || !s.Codec.isNullOrBlank() || (s.BitRate ?: 0L) > 0L || !s.VideoRange.isNullOrBlank() || !s.VideoRangeType.isNullOrBlank()
+                "Audio" -> !s.Codec.isNullOrBlank() || (s.Channels ?: 0) > 0 || !s.Language.isNullOrBlank() || (s.BitRate ?: 0L) > 0L
+                "Subtitle" -> true
+                else -> false
+            }
+        } == true
+        if (hasProbedStream) return true
+
+        val name = source.Name.orEmpty()
+        if (streamInfoNamePattern.containsMatchIn(name)) return true
+        if (hasFlagEmoji(name)) return true
+
+        return false
     }
 
     private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
         val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear")
-        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { normalizeTitle(it) }.filter { it.isNotEmpty() }
-        val unreleased = item.PremiereDate?.let { date ->
-            runCatching { java.time.OffsetDateTime.parse(date).toInstant().isAfter(java.time.Instant.now()) }.getOrNull()
-        } == true
-        return (item.MediaSources ?: emptyList()).filterNot { source ->
-            // If the source has a probed video stream, it is a real playable media source
-            if (source.MediaStreams?.any { it.Type == "Video" && (it.Width ?: 0) > 0 } == true) {
-                return@filterNot false
-            }
-
-            val rawName = source.Name.orEmpty().trim()
-            // If the release name carries standard release indicators, it is a real release
-            if (isReleaseName(rawName)) {
-                return@filterNot false
-            }
-
-            val path = source.Path.orEmpty().trim()
-            val normName = normalizeTitle(rawName)
-
-            val isExplicitStub = path.isEmpty() ||
-                path == "/stub" ||
-                path.contains("/stub", ignoreCase = true) ||
-                path.startsWith("gelato://", ignoreCase = true) ||
-                path.startsWith("stremio://", ignoreCase = true)
-
-            // Unreleased titles: any stub or zero-byte placeholder without release indicators is fake
-            if (unreleased && (isExplicitStub || (source.Size ?: 0L) == 0L || normName.isEmpty() || normName in titles)) {
-                return@filterNot true
-            }
-
-            val isBareTitle = normName.isEmpty() || normName in titles
-            val hasNoRealFile = isExplicitStub || (source.Size ?: 0L) == 0L
-
-            isBareTitle && hasNoRealFile
+        val sources = item.MediaSources ?: emptyList()
+        if (sources.size == 1 && !hasStreamInfo(sources[0])) {
+            return emptyList()
         }
+        return sources
     }
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
@@ -1678,7 +1673,7 @@ class JellioRepository @Inject constructor(
         accessToken: String? = null,
     ): String {
         val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth"
+        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=85"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
         return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
     }

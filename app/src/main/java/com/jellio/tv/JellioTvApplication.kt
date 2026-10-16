@@ -57,27 +57,46 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val sessionManager = entryPoint.sessionManager()
 
         val imageDispatcher = okhttp3.Dispatcher().apply {
-            maxRequests = 64
-            maxRequestsPerHost = 16
+            maxRequests = 128
+            maxRequestsPerHost = 32
         }
 
         val imageOkHttpClient = OkHttpClient.Builder()
             .dispatcher(imageDispatcher)
+            .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val original = chain.request()
                 val token = sessionManager.getCachedAccessToken()
                 val deviceId = sessionManager.getCachedDeviceId()
+                val serverHost = sessionManager.getCachedServerAddress()
+                    ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
                 val requestBuilder = original.newBuilder()
 
-                if (!token.isNullOrEmpty()) {
+                val isServerHost = serverHost == null || original.url.host.equals(serverHost, ignoreCase = true)
+                if (!token.isNullOrEmpty() && isServerHost) {
                     requestBuilder.header("X-Emby-Token", token)
                     requestBuilder.header("Authorization", buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token))
                 }
                 chain.proceed(requestBuilder.build())
+            }
+            .addNetworkInterceptor { chain ->
+                val req = chain.request()
+                val serverHost = sessionManager.getCachedServerAddress()
+                    ?.let { runCatching { java.net.URI(it).host }.getOrNull() }
+                if (serverHost != null && !req.url.host.equals(serverHost, ignoreCase = true)) {
+                    chain.proceed(
+                        req.newBuilder()
+                            .removeHeader("X-Emby-Token")
+                            .removeHeader("Authorization")
+                            .build()
+                    )
+                } else {
+                    chain.proceed(req)
+                }
             }
             .apply {
                 try {

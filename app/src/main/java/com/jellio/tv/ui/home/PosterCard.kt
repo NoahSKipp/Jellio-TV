@@ -70,6 +70,71 @@ private const val PREFETCH_DEBOUNCE_MS = 600L
 // nothing to duplicate the 170.dp itself for.
 internal val PosterWidth = 170.dp
 
+// Ordered fallback list of candidate image URLs for a poster card, matching
+// Jellio Web components/card.js cardImageCandidates(): tries tagged Primary,
+// untagged Primary (bypassing stale tags or transient first-hit remote fetch
+// timeouts), Series Primary, Parent Thumb, Parent Primary, Album Primary,
+// Thumb, Backdrop, and Parent Backdrop.
+internal fun posterImageCandidates(
+    item: BaseItemDto,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    maxWidth: Int = 400,
+): List<String> {
+    val urls = LinkedHashSet<String>()
+    fun buildUrl(targetId: String, tag: String?, type: String): String {
+        val synthetic = BaseItemDto(
+            Id = targetId,
+            ImageTags = if (!tag.isNullOrEmpty() && type != "Backdrop") mapOf(type to tag) else emptyMap(),
+            BackdropImageTags = if (!tag.isNullOrEmpty() && type == "Backdrop") listOf(tag) else emptyList(),
+        )
+        return imageUrl(synthetic, type, maxWidth)
+    }
+    fun push(targetId: String?, tag: String?, type: String = "Primary", includeUntagged: Boolean = true) {
+        if (targetId.isNullOrBlank()) return
+        if (!tag.isNullOrBlank()) {
+            val tagged = buildUrl(targetId, tag, type)
+            if (tagged.isNotBlank()) urls.add(tagged)
+        }
+        if (includeUntagged) {
+            val untagged = buildUrl(targetId, null, type)
+            if (untagged.isNotBlank()) urls.add(untagged)
+        }
+    }
+
+    val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
+    push(item.Id, primaryTag, "Primary", includeUntagged = true)
+
+    val seriesPrimaryTag = item.SeriesPrimaryImageTag ?: item.ImageTags?.get("SeriesPrimary")
+    push(item.SeriesId, seriesPrimaryTag, "Primary", includeUntagged = true)
+
+    push(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb", includeUntagged = true)
+
+    val parentPrimaryId = item.ParentPrimaryImageItemId ?: item.ParentId
+    push(parentPrimaryId, item.ParentPrimaryImageTag, "Primary", includeUntagged = true)
+
+    push(item.AlbumId, item.AlbumPrimaryImageTag, "Primary", includeUntagged = true)
+
+    val thumbTag = item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
+    if (!thumbTag.isNullOrBlank()) {
+        push(item.Id, thumbTag, "Thumb", includeUntagged = true)
+    }
+
+    val backdropTag = item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop")
+    if (!backdropTag.isNullOrBlank()) {
+        push(item.Id, backdropTag, "Backdrop", includeUntagged = true)
+    }
+
+    val parentBackdropTag = item.ParentBackdropImageTags?.firstOrNull()
+    if (!item.ParentBackdropItemId.isNullOrBlank() && !parentBackdropTag.isNullOrBlank()) {
+        push(item.ParentBackdropItemId, parentBackdropTag, "Backdrop", includeUntagged = true)
+    }
+
+    push(item.Id, null, "Thumb", includeUntagged = true)
+    push(item.Id, null, "Backdrop", includeUntagged = true)
+
+    return urls.toList()
+}
+
 // Mirrors components/card.js's own poster shape: a 2:3 poster, no
 // text underneath (the real title only shows up in the row's own
 // heading and, later, a focused card's own detail panel), the same
@@ -106,6 +171,9 @@ fun PosterCard(
     val prefetch = LocalGelatoPrefetch.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
+    val candidates = remember(item, imageUrl) { posterImageCandidates(item, imageUrl, 400) }
+    var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeUrl = candidates.getOrNull(candidateIndex)
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
             delay(PREFETCH_DEBOUNCE_MS)
@@ -146,12 +214,37 @@ fun PosterCard(
                 .onFocusChanged { state -> isFocused = state.isFocused },
         ) {
             Box(modifier = Modifier.width(posterWidth).aspectRatio(2f / 3f)) {
-                AsyncImage(
-                    model = imageUrl(item, "Primary", 400),
-                    contentDescription = item.Name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
-                )
+                if (activeUrl != null) {
+                    AsyncImage(
+                        model = activeUrl,
+                        contentDescription = item.Name,
+                        contentScale = ContentScale.Crop,
+                        onError = {
+                            if (candidateIndex < candidates.size) {
+                                candidateIndex += 1
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(JellioBgElevated)
+                            .padding(12.dp),
+                    ) {
+                        Text(
+                            text = item.Name ?: item.SeriesName ?: "",
+                            color = JellioText.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+                }
                 val watchers = item.Watchers
                 if (!watchers.isNullOrEmpty()) {
                     WatchersBadge(

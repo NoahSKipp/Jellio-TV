@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,9 +28,14 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.ui.common.RegisterGridFocusItem
+import com.jellio.tv.ui.common.gridColumnFocus
+import com.jellio.tv.ui.common.rememberGridFocusController
+import com.jellio.tv.ui.common.rememberTvGridState
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 
 // A row's "view all": every item the row loaded, as a full-screen poster
 // grid (it used to be a vertical list), rendered by the calling screen
@@ -67,21 +73,31 @@ fun RowListModal(
     BackHandler(onBack = onDismiss)
     var displayedItems by remember(items) { mutableStateOf(items) }
     var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null) }
+    var initialFocusRequested by remember(items) { mutableStateOf(false) }
     val listFocusRequester = remember { FocusRequester() }
+    val gridState = rememberTvGridState()
+    val focusController = rememberGridFocusController()
     LaunchedEffect(items, fetchAll) {
         if (fetchAll == null) return@LaunchedEffect
         val fullItems = runCatching { fetchAll() }.getOrNull()
         isLoadingRest = false
-        if (fullItems != null && fullItems.size > items.size) {
-            displayedItems = fullItems
+        if (fullItems != null) {
+            val existingIds = items.mapTo(hashSetOf()) { it.Id }
+            val merged = items + fullItems.filterNot { it.Id in existingIds }
+            if (merged.size > items.size) {
+                displayedItems = merged
+            }
         }
     }
-    LaunchedEffect(displayedItems) {
-        if (displayedItems.isNotEmpty()) listFocusRequester.requestFocus()
+    LaunchedEffect(displayedItems.isNotEmpty()) {
+        if (!initialFocusRequested && displayedItems.isNotEmpty()) {
+            initialFocusRequested = true
+            listFocusRequester.requestFocus()
+        }
     }
     // A page of its own: the row's title over a poster grid, like a
     // library page, the rest filling in when fetchAll lands.
-    val firstCard = remember { FocusRequester() }
+    val firstCard = focusController.requesterFor(0)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -103,31 +119,46 @@ fun RowListModal(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 20.dp),
             )
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = PosterWidth),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusRequester(listFocusRequester)
-                    .focusRestorer(firstCard),
-            ) {
-                items(displayedItems.size, key = { "${displayedItems[it].Id}-$it" }, contentType = { "poster_card" }) { index ->
-                    val item = displayedItems[index]
-                    PosterCard(
-                        item = item,
-                        imageUrl = imageUrl,
-                        onClick = {
-                            onDismiss()
-                            onItemClick(item)
-                        },
-                        modifier = if (index == 0) Modifier.focusRequester(firstCard) else Modifier,
-                    )
-                }
-                if (isLoadingRest) {
-                    items(6, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
-                        SkeletonPoster()
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val scaledPosterWidth = PosterWidth.scaled()
+                val spacing = 16.dp
+                val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
+                val totalCount = displayedItems.size
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(columnCount),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 48.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusRequester(listFocusRequester)
+                        .focusRestorer(firstCard),
+                ) {
+                    items(totalCount, key = { "${displayedItems[it].Id}-$it" }, contentType = { "poster_card" }) { index ->
+                        val item = displayedItems[index]
+                        RegisterGridFocusItem(focusController, index)
+                        PosterCard(
+                            item = item,
+                            imageUrl = imageUrl,
+                            onClick = {
+                                onDismiss()
+                                onItemClick(item)
+                            },
+                            modifier = Modifier.gridColumnFocus(
+                                controller = focusController,
+                                index = index,
+                                totalCount = totalCount,
+                                columnCount = columnCount,
+                                allowExitUp = false,
+                                allowExitLeft = false,
+                            ),
+                        )
+                    }
+                    if (isLoadingRest) {
+                        items(6, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
+                            SkeletonPoster()
+                        }
                     }
                 }
             }

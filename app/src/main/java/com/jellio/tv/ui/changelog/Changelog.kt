@@ -96,6 +96,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.46.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Digital Release Filter Card", "When no playable streams are found, the stream picker now displays a Digital Release Filter card with refresh and provider controls."),
+            ChangelogFeature(Icons.Filled.Speed, "Column-Locked Grid Scrolling", "Vertical D-pad navigation in View All and Search grids stays locked to your current column without drifting sideways."),
+            ChangelogFeature(Icons.Filled.Tune, "Cover Art Fallback Chain", "Poster and landscape cards now step through Primary, Thumb, Backdrop, and Series image tags and preserve CDN redirects so cover art loads reliably."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.1",

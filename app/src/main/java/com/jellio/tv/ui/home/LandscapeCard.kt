@@ -121,16 +121,43 @@ fun LandscapeRow(
 // ParentThumbItemId/ParentThumbImageTag and ParentBackdropItemId/
 // ParentBackdropImageTags fallback that file's own buildEpisodeCard()
 // already uses.
-private fun landscapeImageUrl(item: BaseItemDto, imageUrl: (String, String?, String, Int) -> String): String? {
-    item.BackdropImageTags?.firstOrNull()?.let { return imageUrl(item.Id, it, "Backdrop", 500) }
-    item.ImageTags?.get("Primary")?.let { return imageUrl(item.Id, it, "Primary", 500) }
+private fun landscapeImageCandidates(
+    item: BaseItemDto,
+    imageUrl: (String, String?, String, Int) -> String,
+): List<String> {
+    val urls = LinkedHashSet<String>()
+    fun push(targetId: String?, tag: String?, type: String) {
+        if (targetId.isNullOrBlank()) return
+        if (!tag.isNullOrBlank()) {
+            val tagged = imageUrl(targetId, tag, type, 500)
+            if (tagged.isNotBlank()) urls.add(tagged)
+        }
+        val untagged = imageUrl(targetId, null, type, 500)
+        if (untagged.isNotBlank()) urls.add(untagged)
+    }
+
+    item.BackdropImageTags?.firstOrNull()?.let { push(item.Id, it, "Backdrop") }
+    val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
+    if (!primaryTag.isNullOrBlank()) push(item.Id, primaryTag, "Primary")
     val parentThumbId = item.ParentThumbItemId
     val parentThumbTag = item.ParentThumbImageTag
-    if (parentThumbId != null && parentThumbTag != null) return imageUrl(parentThumbId, parentThumbTag, "Thumb", 500)
+    if (!parentThumbId.isNullOrBlank() && !parentThumbTag.isNullOrBlank()) {
+        push(parentThumbId, parentThumbTag, "Thumb")
+    }
     val parentBackdropId = item.ParentBackdropItemId
     val parentBackdropTag = item.ParentBackdropImageTags?.firstOrNull()
-    if (parentBackdropId != null && parentBackdropTag != null) return imageUrl(parentBackdropId, parentBackdropTag, "Backdrop", 500)
-    return null
+    if (!parentBackdropId.isNullOrBlank() && !parentBackdropTag.isNullOrBlank()) {
+        push(parentBackdropId, parentBackdropTag, "Backdrop")
+    }
+    val thumbTag = item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
+    if (!thumbTag.isNullOrBlank()) push(item.Id, thumbTag, "Thumb")
+    if (!item.SeriesId.isNullOrBlank()) {
+        push(item.SeriesId, item.SeriesPrimaryImageTag ?: item.ImageTags?.get("SeriesPrimary"), "Primary")
+    }
+    push(item.Id, null, "Backdrop")
+    push(item.Id, null, "Primary")
+
+    return urls.toList()
 }
 
 // Real port of components/card.js's own remainingLabel(): blank
@@ -170,11 +197,14 @@ fun LandscapeCard(
     val eyebrow = if (isEpisode && hasSeason && hasEpisode) "S${item.ParentIndexNumber} E${item.IndexNumber}" else ""
     val remaining = remainingLabel(item)
     val percentage = item.UserData?.PlayedPercentage
+    val candidates = remember(item, imageUrl) { landscapeImageCandidates(item, imageUrl) }
+    val candidateIndexState = remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeUrl = candidates.getOrNull(candidateIndexState.intValue)
 
     val landscapeCardWidth = LandscapeCardWidth.scaled()
     Box(modifier = modifier.width(landscapeCardWidth)) {
     if (isRemoving) {
-        val shatterUrl = landscapeImageUrl(item, imageUrl)
+        val shatterUrl = activeUrl ?: candidates.firstOrNull()
         if (shatterUrl != null) {
             CardShatterOverlay(
                 imageUrl = shatterUrl,
@@ -206,12 +236,16 @@ fun LandscapeCard(
         modifier = Modifier.width(landscapeCardWidth),
     ) {
         Box(modifier = Modifier.width(landscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
-            val url = landscapeImageUrl(item, imageUrl)
-            if (url != null) {
+            if (activeUrl != null) {
                 AsyncImage(
-                    model = url,
+                    model = activeUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    onError = {
+                        if (candidateIndexState.intValue < candidates.size) {
+                            candidateIndexState.intValue += 1
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 )
             } else {
