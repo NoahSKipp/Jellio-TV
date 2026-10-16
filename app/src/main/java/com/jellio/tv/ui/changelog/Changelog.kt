@@ -96,6 +96,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.46.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Snappy Remote Scrolling", "Remote navigation and focus scrolling now respond in 90ms with comfortable viewing margins."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Instant Episode & Movie Loading", "Initial player loading no longer queries trickplay sheets up front, starting video playback without delay."),
+            ChangelogFeature(Icons.Filled.Tune, "Stream Detection Fix", "Refined stream detection preserves .strm and debrid releases while cleanly filtering placeholder stubs."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.0",
