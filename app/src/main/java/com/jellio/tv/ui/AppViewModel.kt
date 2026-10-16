@@ -126,7 +126,8 @@ class AppViewModel @Inject constructor(
     // components/streamPicker.js's own real source list, resolved once
     // MainActivity's own picker overlay actually opens rather than
     // eagerly for every item this screen ever renders.
-    suspend fun getMediaSources(session: Session, itemId: String) = repository.getMediaSources(session.userId, itemId)
+    suspend fun getMediaSources(session: Session, itemId: String, forceFresh: Boolean = false) =
+        repository.getMediaSources(session.userId, itemId, forceFresh = forceFresh)
 
     // The picker's own real onSelect, components/streamPicker.js's own
     // rememberSourceChoice(): only actually written when the reader's
@@ -147,12 +148,13 @@ class AppViewModel @Inject constructor(
         runCatching { repository.getItem(session.userId, itemId) }.getOrNull()
 
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
-        val sources = getMediaSources(session, item.Id)
-        if (sources.isEmpty()) return PlayAction.ShowPicker(item)
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
-            if (remembered != null && sources.any { it.Id == remembered }) {
-                return PlayAction.Direct(item.Id, remembered)
+            if (remembered != null) {
+                val sources = getMediaSources(session, item.Id)
+                if (sources.any { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }) {
+                    return PlayAction.Direct(item.Id, remembered)
+                }
             }
         }
         return PlayAction.ShowPicker(item)

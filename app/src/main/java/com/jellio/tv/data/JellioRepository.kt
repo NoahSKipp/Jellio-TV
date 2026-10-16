@@ -1097,12 +1097,19 @@ class JellioRepository @Inject constructor(
     // the list is never empty: no file behind it, no size, and named after
     // the title itself (or not at all) rather than by the addon the way a
     // real release is. It can't play, so it's dropped.
-    suspend fun getMediaSources(userId: String, itemId: String, reason: String = "play"): List<MediaSourceDto> {
+    suspend fun getMediaSources(
+        userId: String,
+        itemId: String,
+        reason: String = "play",
+        forceFresh: Boolean = false,
+    ): List<MediaSourceDto> {
         // Stream lists are ranked and badged by it.
         loadVideoTranscodePolicy()
-        sourceCache.get(itemId, System.currentTimeMillis())?.let {
-            com.jellio.tv.data.streams.StreamLookupLog.cacheHit()
-            return it
+        if (!forceFresh) {
+            sourceCache.get(itemId, System.currentTimeMillis())?.let {
+                com.jellio.tv.data.streams.StreamLookupLog.cacheHit()
+                return it
+            }
         }
         val request = sourcesInFlight.computeIfAbsent(itemId) {
             prefetchScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
@@ -1124,7 +1131,7 @@ class JellioRepository @Inject constructor(
     }
 
     private val streamInfoNamePattern = Regex(
-        "(^|[^a-z0-9])(2160p|1440p|1080[pi]|720p|576p|540p|480p|360p|240p|4k|uhd|ultra[ .-]?hd|qhd|2k|fhd|full[ .-]?hd|hd|sd|dvdrip|web-?dl|web-?rip|bluray|blu-ray|bdrip|brrip|remux|hdtv|hevc|[xh]\\.?265|[xh]\\.?264|avc|av1|vp9|hdr10?\\+?|dv|dovi|dolby|hlg|10\\s?bit|aac|e?-?ac-?3|ddp|dd\\+|dts(-?hd|-?x)?|truehd|atmos|flac|opus|mp3|l?pcm|[257]\\.[01]|stereo|mono|multi|dual([-.\\s]?audio)?|\\d+(\\.\\d+)?\\s*(gb|mb|gib|mib|mbps|kbps))([^a-z0-9]|$)",
+        "(^|[^a-z0-9])(web-?dl|web-?rip|bluray|blu-ray|bdrip|brrip|remux|hdtv|hevc|[xh]\\.?265|[xh]\\.?264|avc|av1|vp9|hdr10?\\+?|dovi|dolby\\s?vision|hlg|10\\s?bit|aac|e?-?ac-?3|ddp|dd\\+|dts(-?hd|-?x)?|truehd|atmos|flac|l?pcm|[257]\\.[01]|dual[-.\\s]?audio|multi[-.\\s]?audio|\\d+(\\.\\d+)?\\s*(gb|mb|gib|mib|mbps|kbps))([^a-z0-9]|$)",
         RegexOption.IGNORE_CASE,
     )
 
@@ -1139,15 +1146,19 @@ class JellioRepository @Inject constructor(
         return false
     }
 
+    private fun isRealStreamValue(value: String?): Boolean {
+        val clean = value?.trim()?.lowercase() ?: return false
+        return clean.isNotEmpty() && clean != "unknown" && clean != "und"
+    }
+
     private fun hasStreamInfo(source: MediaSourceDto): Boolean {
         if (com.jellio.tv.ui.detail.sourceQuality(source) != null) return true
-        if ((source.Size ?: 0L) > 0L || (source.Bitrate ?: 0L) > 0L) return true
+        if ((source.Size ?: 0L) >= 1024L * 1024L) return true
 
         val hasProbedStream = source.MediaStreams?.any { s ->
             when (s.Type) {
-                "Video" -> (s.Width ?: 0) > 0 || (s.Height ?: 0) > 0 || !s.Codec.isNullOrBlank() || (s.BitRate ?: 0L) > 0L || !s.VideoRange.isNullOrBlank() || !s.VideoRangeType.isNullOrBlank()
-                "Audio" -> !s.Codec.isNullOrBlank() || (s.Channels ?: 0) > 0 || !s.Language.isNullOrBlank() || (s.BitRate ?: 0L) > 0L
-                "Subtitle" -> true
+                "Video" -> (s.Width ?: 0) > 0 || (s.Height ?: 0) > 0 || (s.BitRate ?: 0L) > 0L
+                "Audio" -> isRealStreamValue(s.Codec) || (s.Channels ?: 0) > 0 || isRealStreamValue(s.Language)
                 else -> false
             }
         } == true

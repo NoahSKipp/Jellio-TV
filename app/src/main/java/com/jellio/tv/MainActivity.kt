@@ -712,7 +712,7 @@ private fun JellioTvApp(
                 } ?: pickerItem.ImageTags?.get("Primary")?.let {
                     appViewModel.rawImageUrl(session, pickerItem.Id, it, "Primary", 1920)
                 },
-                loadSources = { appViewModel.getMediaSources(session, pickerItem.Id) },
+                loadSources = { forceFresh -> appViewModel.getMediaSources(session, pickerItem.Id, forceFresh) },
                 rememberedSourceId = { appViewModel.rememberedMediaSourceId(pickerItem.Id) },
                 onSelect = { source ->
                     streamPickerItem = null

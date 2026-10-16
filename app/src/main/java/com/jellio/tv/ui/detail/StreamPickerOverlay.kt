@@ -244,7 +244,7 @@ private sealed interface SourcesState {
 fun StreamPickerOverlay(
     item: BaseItemDto,
     backdropUrl: String?,
-    loadSources: suspend () -> List<MediaSourceDto>,
+    loadSources: suspend (forceFresh: Boolean) -> List<MediaSourceDto>,
     rememberedSourceId: suspend () -> String?,
     onSelect: (MediaSourceDto) -> Unit,
     onDismiss: () -> Unit,
@@ -323,7 +323,7 @@ fun StreamPickerOverlay(
             // the Video transcode policy on, ones the server would have to
             // re-encode go after the rest, and Block leaves them out.
             val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
-            val loaded = loadSources()
+            val loaded = loadSources(reloadKey > 0)
             val kept = if (policy.blocking) loaded.filterNot { policy.needsReencode(it) } else loaded
             if (policy.blocking && loaded.isNotEmpty() && kept.isEmpty()) {
                 SourcesState.Error("Every stream for this title would need the server to re-encode the video, which is turned off on this server.")

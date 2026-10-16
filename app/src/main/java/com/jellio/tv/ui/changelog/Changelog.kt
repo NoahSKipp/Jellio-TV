@@ -96,6 +96,24 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.46.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Accurate Placeholder Filtering", "Unprobed stubs with default Unknown video ranges or sub-megabyte stub sizes are now cleanly recognized as empty and routed to the Digital Release Filter card."),
+            ChangelogFeature(Icons.Filled.Speed, "Instant Stream Picker Opening", "Opening the stream picker no longer blocks on a duplicate pre-check when no stream is remembered, and refreshing bypasses the local source cache."),
+        ),
+    ),
+    ChangelogRelease(
+        version = "0.46.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Always Show Stream Picker", "Removed automatic playback when only a single stream is returned so you can always inspect or refresh the available source first."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Overscan Calibration Modal", "Wrapped the overscan calibration screen in a full-screen dialog for reliable focus and display bounds."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.2",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.2",

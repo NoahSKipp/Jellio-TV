@@ -302,13 +302,13 @@ class DetailViewModel @Inject constructor(
     // If a stream choice is remembered, play directly. Otherwise show
     // the stream picker so the user can verify or pick the source.
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
-        val sources = getMediaSources(session, item.Id)
-        if (sources.isEmpty()) return PlayAction.ShowPicker(item)
-
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
-            if (remembered != null && sources.any { it.Id == remembered }) {
-                return PlayAction.Direct(item.Id, remembered)
+            if (remembered != null) {
+                val sources = getMediaSources(session, item.Id)
+                if (sources.any { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }) {
+                    return PlayAction.Direct(item.Id, remembered)
+                }
             }
         }
         return PlayAction.ShowPicker(item)
