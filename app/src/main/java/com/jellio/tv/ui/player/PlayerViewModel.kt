@@ -410,7 +410,7 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     null
                 }
-                val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId, forPlayer = true)
+                val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
                 // is still being prepared, not a blank screen.
@@ -491,7 +491,7 @@ class PlayerViewModel @Inject constructor(
                 val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 }?.roundToInt()
 
                 trickplaySession = session
-                trickplayInfo = repository.pickTrickplayInfo(item, target.mediaSource.Id)
+                trickplayInfo = null
                 trickplayMediaSourceId = target.mediaSource.Id
 
                 _uiState.value = PlayerUiState(
@@ -500,7 +500,7 @@ class PlayerViewModel @Inject constructor(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
-                    hasTrickplay = trickplayInfo != null,
+                    hasTrickplay = false,
                     resumePercent = resumePercent,
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
@@ -513,6 +513,8 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                     reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
                 )
+
+                loadTrickplayDuringPlayback(session, itemId, target.mediaSource.Id)
 
                 // Real port of screens/player.js's own real fire-and-
                 // forget getNextEpisode(item).then(...): resolved
@@ -1144,7 +1146,7 @@ class PlayerViewModel @Inject constructor(
         if (prewarmedPlayback?.itemId == nextId) return
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val nextItem = repository.getItemDetails(session.userId, nextId, forPlayer = true)
+                val nextItem = repository.getItemDetails(session.userId, nextId)
                 val audioPref = repository.getAudioLanguagePreference(session.userId)
                 val startTicks = nextItem.UserData?.PlaybackPositionTicks ?: 0L
                 var target = repository.resolvePlayback(session.userId, nextId, null, startTicks)
@@ -1159,6 +1161,18 @@ class PlayerViewModel @Inject constructor(
                     audioPreference = audioPref,
                 )
                 repository.prewarmStreamUrl(target.streamUrl)
+            }
+        }
+    }
+
+    private fun loadTrickplayDuringPlayback(session: Session, itemId: String, mediaSourceId: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val info = runCatching { repository.getTrickplayInfo(session.userId, itemId, mediaSourceId) }.getOrNull()
+            if (info != null && this@PlayerViewModel.itemId == itemId) {
+                trickplaySession = session
+                trickplayInfo = info
+                trickplayMediaSourceId = mediaSourceId
+                _uiState.value = _uiState.value.copy(hasTrickplay = true)
             }
         }
     }

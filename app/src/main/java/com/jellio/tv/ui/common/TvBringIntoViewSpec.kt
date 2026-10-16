@@ -7,25 +7,32 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 
 // Replaces Compose Foundation's heavy spring() physics animation with a
-// lightweight, crisp 200ms tween for TV D-pad focus scrolling.
-// On 4K Android TV devices (such as Google TV Streamer), spring physics
-// compute continuous sub-pixel oscillations across large viewports, causing
-// frame drops during rapid navigation.
+// lightweight, snappy 90ms tween for TV D-pad focus scrolling so scrolling
+// keeps direct pace with remote button presses and key repeats without lag.
 @OptIn(ExperimentalFoundationApi::class)
 internal object TvBringIntoViewSpec : BringIntoViewSpec {
     override val scrollAnimationSpec: AnimationSpec<Float> =
-        tween(durationMillis = 200, easing = FastOutSlowInEasing)
+        tween(durationMillis = 90, easing = FastOutSlowInEasing)
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        // Child is above the visible viewport: scroll up to bring it into view with margin
-        if (offset < 0f) {
-            return offset - 32f
+        // Child is taller/wider than the viewport: align to leading edge
+        if (size >= containerSize) {
+            return offset
         }
-        // Child is below the visible viewport: scroll down to bring it into view with margin
-        if (offset + size > containerSize) {
-            return (offset + size) - containerSize + 32f
+
+        // Buffer margin keeps the focused item from hugging the edge of the TV screen
+        // and ensures the next item is already in view ahead of navigation.
+        val margin = (containerSize * 0.12f).coerceIn(60f, 120f)
+
+        // Child is at or beyond the leading edge (top or left)
+        if (offset < margin) {
+            return offset - margin
         }
-        // Child is already fully inside the viewport
+        // Child is at or beyond the trailing edge (bottom or right)
+        if (offset + size > containerSize - margin) {
+            return (offset + size) - (containerSize - margin)
+        }
+        // Child is comfortably inside the viewport
         return 0f
     }
 }

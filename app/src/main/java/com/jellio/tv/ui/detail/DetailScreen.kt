@@ -355,6 +355,7 @@ fun DetailScreen(
                                 onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.Id, seasonId) },
                                 onEpisodeClick = onNavigateToDetail,
                                 onEpisodeOptions = { episode -> episodeMenuTarget = episode },
+                                onEpisodeFocused = { episodeId -> viewModel.preloadEpisode(episodeId) },
                             )
                         }
                     }
@@ -689,6 +690,7 @@ private fun SeasonsSection(
     onSelectSeason: (String) -> Unit,
     onEpisodeClick: (String) -> Unit,
     onEpisodeOptions: (BaseItemDto) -> Unit,
+    onEpisodeFocused: (String) -> Unit,
 ) {
     if (state.seasons.isEmpty()) return
     Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -727,6 +729,7 @@ private fun SeasonsSection(
                     imageUrl = imageUrl,
                     onClick = { onEpisodeClick(episode.Id) },
                     onOptionsClick = { onEpisodeOptions(episode) },
+                    onFocused = { onEpisodeFocused(episode.Id) },
                 )
             }
         }
@@ -745,6 +748,7 @@ private fun EpisodeCard(
     imageUrl: (String, String?, String, Int) -> String,
     onClick: () -> Unit,
     onOptionsClick: () -> Unit,
+    onFocused: () -> Unit = {},
 ) {
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
@@ -767,7 +771,9 @@ private fun EpisodeCard(
                 ),
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-            modifier = Modifier.width(cardWidth),
+            modifier = Modifier
+                .width(cardWidth)
+                .onFocusChanged { if (it.isFocused) onFocused() },
         ) {
             Column {
                 Box(modifier = Modifier.width(cardWidth).aspectRatio(16f / 9f)) {

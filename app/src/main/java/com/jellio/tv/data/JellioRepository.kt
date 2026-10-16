@@ -854,12 +854,17 @@ class JellioRepository @Inject constructor(
         }
 
     suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
-        cache.get("details:$itemId:$forPlayer", SHORT_CACHE_TTL_MS) {
-            fetchItemInfo(userId, itemId, if (forPlayer) PLAYER_DETAIL_FIELDS else DETAIL_FIELDS)
+        cache.get("details:$itemId", SHORT_CACHE_TTL_MS) {
+            fetchItemInfo(userId, itemId, DETAIL_FIELDS)
         }.also {
             previews[it.Id] = it
-            if (!forPlayer) preloaded[itemId] = System.currentTimeMillis() to it
+            preloaded[itemId] = System.currentTimeMillis() to it
         }
+
+    suspend fun getTrickplayInfo(userId: String, itemId: String, mediaSourceId: String?): TrickplayInfoDto? =
+        cache.get("trickplay:$itemId", CACHE_TTL_MS) {
+            fetchItemInfo(userId, itemId, "Trickplay")
+        }.let { pickTrickplayInfo(it, mediaSourceId) }
 
     // Full details fetched while the viewer rests on a card, so the title
     // page can open complete; fresh for a minute, the page still refreshes.
@@ -1124,31 +1129,48 @@ class JellioRepository @Inject constructor(
             .replace(Regex("[^a-z0-9]"), "")
             .trim()
 
+    private fun isReleaseName(name: String): Boolean {
+        if (name.isBlank()) return false
+        val lower = name.lowercase()
+        return Regex("\\b(1080p|720p|2160p|4k|uhd|fhd|hd|web-?dl|web-?rip|bluray|bdrip|remux|hdr10?\\+?|dv|dolby|x264|x265|h264|h265|hevc|av1|torrentio|debrid|realdebrid|alldebrid|premiumize)\\b|s\\d{1,2}e\\d{1,2}", RegexOption.IGNORE_CASE).containsMatchIn(lower)
+    }
+
     private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
         val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear")
-        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { normalizeTitle(it) }
-        // Not out yet: nothing without a file can be a real release.
+        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { normalizeTitle(it) }.filter { it.isNotEmpty() }
         val unreleased = item.PremiereDate?.let { date ->
             runCatching { java.time.OffsetDateTime.parse(date).toInstant().isAfter(java.time.Instant.now()) }.getOrNull()
         } == true
         return (item.MediaSources ?: emptyList()).filterNot { source ->
+            // If the source has a probed video stream, it is a real playable media source
+            if (source.MediaStreams?.any { it.Type == "Video" && (it.Width ?: 0) > 0 } == true) {
+                return@filterNot false
+            }
+
+            val rawName = source.Name.orEmpty().trim()
+            // If the release name carries standard release indicators, it is a real release
+            if (isReleaseName(rawName)) {
+                return@filterNot false
+            }
+
             val path = source.Path.orEmpty().trim()
-            val isStubPath = path.isEmpty() ||
+            val normName = normalizeTitle(rawName)
+
+            val isExplicitStub = path.isEmpty() ||
                 path == "/stub" ||
                 path.contains("/stub", ignoreCase = true) ||
-                path.startsWith("gelato", ignoreCase = true) ||
-                path.startsWith("stremio", ignoreCase = true) ||
-                path.endsWith(".strm", ignoreCase = true)
-            val hasNoRealSize = (source.Size ?: 0L) < 1024L * 1024L
-            val hasNoVideoStream = source.MediaStreams?.none { it.Type == "Video" } ?: true
-            if (!isStubPath && !hasNoRealSize) return@filterNot false
-            if (unreleased) return@filterNot true
-            val normName = normalizeTitle(source.Name.orEmpty())
-            if (normName.isEmpty()) return@filterNot true
-            if (titles.any { it.isNotEmpty() && (it == normName || it.contains(normName) || normName.contains(it)) }) {
+                path.startsWith("gelato://", ignoreCase = true) ||
+                path.startsWith("stremio://", ignoreCase = true)
+
+            // Unreleased titles: any stub or zero-byte placeholder without release indicators is fake
+            if (unreleased && (isExplicitStub || (source.Size ?: 0L) == 0L || normName.isEmpty() || normName in titles)) {
                 return@filterNot true
             }
-            isStubPath && (hasNoRealSize || hasNoVideoStream)
+
+            val isBareTitle = normName.isEmpty() || normName in titles
+            val hasNoRealFile = isExplicitStub || (source.Size ?: 0L) == 0L
+
+            isBareTitle && hasNoRealFile
         }
     }
 

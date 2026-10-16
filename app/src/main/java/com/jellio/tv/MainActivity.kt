@@ -106,6 +106,7 @@ class MainActivity : ComponentActivity() {
                 }
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.jellio.tv.ui.home.LocalGelatoPrefetch provides prefetchLambda,
+                    androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.TvBringIntoViewSpec,
                 ) {
                     val overscanPercent = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
                     val isCalibrating = com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating

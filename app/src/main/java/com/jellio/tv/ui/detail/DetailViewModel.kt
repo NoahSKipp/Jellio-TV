@@ -138,9 +138,11 @@ class DetailViewModel @Inject constructor(
                 if (item.Type == "Movie" || item.Type == "Episode") lookForStreams(session, item.Id)
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
-                    runCatching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
-                        ratingTargetId = series.Id
-                        _uiState.value = _uiState.value.copy(likes = series.UserData?.Likes)
+                    viewModelScope.launch {
+                        runCatching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
+                            ratingTargetId = series.Id
+                            _uiState.value = _uiState.value.copy(likes = series.UserData?.Likes)
+                        }
                     }
                 } else {
                     _uiState.value = _uiState.value.copy(likes = item.UserData?.Likes)
@@ -224,9 +226,14 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
             if (_uiState.value.selectedSeasonId == seasonId) {
+                repository.seedPreviews(episodes)
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
             }
         }
+    }
+
+    fun preloadEpisode(itemId: String) {
+        repository.preloadDetails(itemId)
     }
 
     // The one real item this screen's own Play button should hand off
