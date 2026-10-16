@@ -1116,18 +1116,39 @@ class JellioRepository @Inject constructor(
         }
     }
 
+    private fun normalizeTitle(s: String): String =
+        s.lowercase()
+            .replace(Regex("\\.(strm|mkv|mp4|avi)$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s*\\(\\d{4}\\)$"), "")
+            .replace(Regex("\\s+\\d{4}$"), "")
+            .replace(Regex("[^a-z0-9]"), "")
+            .trim()
+
     private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
-        val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle")
-        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { it.trim().lowercase() }
+        val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear")
+        val titles = listOfNotNull(item.Name, item.SeriesName, item.OriginalTitle).map { normalizeTitle(it) }
         // Not out yet: nothing without a file can be a real release.
         val unreleased = item.PremiereDate?.let { date ->
             runCatching { java.time.OffsetDateTime.parse(date).toInstant().isAfter(java.time.Instant.now()) }.getOrNull()
         } == true
         return (item.MediaSources ?: emptyList()).filterNot { source ->
-            val path = source.Path.orEmpty()
-            val noFile = path.isEmpty() || path == "/stub" || path.startsWith("gelato", ignoreCase = true) || path.startsWith("stremio", ignoreCase = true)
-            val name = source.Name.orEmpty().trim().lowercase()
-            noFile && (source.Size ?: 0L) == 0L && (unreleased || name.isEmpty() || name in titles)
+            val path = source.Path.orEmpty().trim()
+            val isStubPath = path.isEmpty() ||
+                path == "/stub" ||
+                path.contains("/stub", ignoreCase = true) ||
+                path.startsWith("gelato", ignoreCase = true) ||
+                path.startsWith("stremio", ignoreCase = true) ||
+                path.endsWith(".strm", ignoreCase = true)
+            val hasNoRealSize = (source.Size ?: 0L) < 1024L * 1024L
+            val hasNoVideoStream = source.MediaStreams?.none { it.Type == "Video" } ?: true
+            if (!isStubPath && !hasNoRealSize) return@filterNot false
+            if (unreleased) return@filterNot true
+            val normName = normalizeTitle(source.Name.orEmpty())
+            if (normName.isEmpty()) return@filterNot true
+            if (titles.any { it.isNotEmpty() && (it == normName || it.contains(normName) || normName.contains(it)) }) {
+                return@filterNot true
+            }
+            isStubPath && (hasNoRealSize || hasNoVideoStream)
         }
     }
 
