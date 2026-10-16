@@ -14,7 +14,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 fun formatRelativeTime(isoUtc: String?): String {
-    val then = isoUtc?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return ""
+    if (isoUtc.isNullOrBlank()) return ""
+    val then = runCatching { Instant.parse(isoUtc) }.getOrNull()
+        ?: runCatching { java.time.LocalDate.parse(isoUtc).atStartOfDay(java.time.ZoneOffset.UTC).toInstant() }.getOrNull()
+        ?: return ""
     val minutes = ChronoUnit.MINUTES.between(then, Instant.now())
     if (minutes < 1) return com.jellio.tv.ui.i18n.Strings.get("time_just_now")
     if (minutes < 60) return if (minutes == 1L) com.jellio.tv.ui.i18n.Strings.get("time_minute_ago") else com.jellio.tv.ui.i18n.Strings.format("time_minutes_ago", minutes)

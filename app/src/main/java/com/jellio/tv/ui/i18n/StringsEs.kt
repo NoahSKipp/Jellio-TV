@@ -204,6 +204,7 @@ internal object StringsEs {
         m["nav_shows"] = "Series"
         m["nav_switch_account"] = "Cambiar cuenta"
         m["nav_watchlist"] = "Lista de seguimiento"
+        m["notifications_clear_all"] = "Borrar todo"
         m["notifications_dismiss"] = "Descartar"
         m["notifications_nothing_new"] = "Nada nuevo."
         m["notifications_title"] = "Notificaciones"

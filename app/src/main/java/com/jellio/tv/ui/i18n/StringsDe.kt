@@ -204,6 +204,7 @@ internal object StringsDe {
         m["nav_shows"] = "Serien"
         m["nav_switch_account"] = "Konto wechseln"
         m["nav_watchlist"] = "Merkliste"
+        m["notifications_clear_all"] = "Alle löschen"
         m["notifications_dismiss"] = "Verwerfen"
         m["notifications_nothing_new"] = "Nichts Neues."
         m["notifications_title"] = "Benachrichtigungen"

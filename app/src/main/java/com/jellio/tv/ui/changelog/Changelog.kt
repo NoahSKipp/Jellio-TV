@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsRemote
@@ -106,6 +107,17 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "0.83.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.83.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.GraphicEq, "Live Updating Now Playing Bar", "Playback progress, timestamps, and completion percentage advance live second by second with smooth continuous animations."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Account-Safe Stream Handoff", "Stream handoff is restricted exclusively to your own user account, keeping other users' active streams safe from interruption."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Glassy Now Playing Pill & Display Toggle", "The floating Now Playing indicator is restyled in Jellio's dark glassy aesthetic, with a new toggle in Settings > Display to hide or show it."),
+            ChangelogFeature(Icons.Filled.Notifications, "Notification Timestamps & Deletion", "View relative reception timestamps on every alert, with one-click individual dismissal and a Clear All option."),
+        ),
+    ),
     ChangelogRelease(
         version = "0.82.0",
         title = "What's New in Jellio TV",

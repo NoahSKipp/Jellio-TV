@@ -381,6 +381,12 @@ interface JellyfinApi {
     @POST("Jellio/notifications/read")
     suspend fun markJellioNotificationsRead()
 
+    @DELETE("Jellio/notifications/{id}")
+    suspend fun deleteJellioNotification(@Path("id") id: String): retrofit2.Response<Unit>
+
+    @DELETE("Jellio/notifications")
+    suspend fun clearJellioNotifications(): retrofit2.Response<Unit>
+
     @GET("Jellio/anime/ids")
     suspend fun getAnimeIds(): com.jellio.tv.data.model.AnimeIdsDto
 

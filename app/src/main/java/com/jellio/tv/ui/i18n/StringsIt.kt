@@ -204,6 +204,7 @@ internal object StringsIt {
         m["nav_shows"] = "Serie"
         m["nav_switch_account"] = "Cambia account"
         m["nav_watchlist"] = "Lista di controllo"
+        m["notifications_clear_all"] = "Cancella tutto"
         m["notifications_dismiss"] = "Ignora"
         m["notifications_nothing_new"] = "Nessuna novità."
         m["notifications_title"] = "Notifiche"

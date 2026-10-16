@@ -2,6 +2,8 @@ package com.jellio.tv.ui.nowplaying
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
@@ -49,11 +52,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jellio.tv.ui.common.formatRelativeTime
 import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
 import com.jellio.tv.ui.groupwatch.InviteRow
 import com.jellio.tv.ui.notify.NotificationsViewModel
 import com.jellio.tv.ui.notify.messageFor
 import com.jellio.tv.ui.notify.subtitleFor
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -114,12 +120,19 @@ fun NowPlayingDrawer(
     initialTab: QuickHubTab = QuickHubTab.NOW_PLAYING,
     onOpenLiveTv: () -> Unit = {},
     onOpenGroupWatch: () -> Unit = {},
+    onRefreshNowPlaying: () -> Unit = {},
     notificationsViewModel: NotificationsViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onDismiss)
 
     LaunchedEffect(Unit) { notificationsViewModel.load() }
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(4000L)
+            onRefreshNowPlaying()
+        }
+    }
     val notifications by notificationsViewModel.items.collectAsState()
     val invites by groupWatchViewModel.invites.collectAsState()
 
@@ -434,7 +447,7 @@ fun NowPlayingDrawer(
                     } else {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(bottom = 24.dp),
+                            contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
                             // 1. Local Paused Media Card (if any)
@@ -512,9 +525,57 @@ fun NowPlayingDrawer(
                     } else {
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
-                            contentPadding = PaddingValues(bottom = 24.dp),
+                            contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
+                            // Clear all header
+                            if (notifList != null && notifList.isNotEmpty()) {
+                                item(key = "clear_all_header") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = "${notifList.size} ${if (notifList.size == 1) Strings.get("quick_hub_tab_notifications").trimEnd('s') else Strings.get("quick_hub_tab_notifications")}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = JellioTextSecondary,
+                                        )
+                                        Surface(
+                                            onClick = { notificationsViewModel.clearAll() },
+                                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                                            colors = ClickableSurfaceDefaults.colors(
+                                                containerColor = Color.White.copy(alpha = 0.08f),
+                                                focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                                contentColor = JellioTextSecondary,
+                                                focusedContentColor = Color.White,
+                                            ),
+                                            border = ClickableSurfaceDefaults.border(
+                                                border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))),
+                                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                            ),
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.DeleteSweep,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = Strings.get("notifications_clear_all"),
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                    fontSize = 11.sp,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Group watch invites
                             items(invites, key = { "invite_${it.Id}" }) { invite ->
                                 val isFirst = invites.firstOrNull() == invite
@@ -535,48 +596,41 @@ fun NowPlayingDrawer(
                                 items(notifList, key = { it.Id }) { n ->
                                     val isFirst = invites.isEmpty() && notifList.firstOrNull() == n
                                     val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
-                                    Surface(
-                                        onClick = {
-                                            if (n.Kind == "streamlink" || n.Kind == "streamlink_removed") {
-                                                onDismiss()
+                                    val isStreamLink = n.Kind == "streamlink" || n.Kind == "streamlink_removed"
+                                    val isParty = n.Kind == "party_scheduled" || n.Kind == "party_starting"
+                                    val hasAction = isStreamLink || isParty || itemId != null
+
+                                    val actionLabel = when {
+                                        isStreamLink -> Strings.get("now_playing_tune_in")
+                                        isParty -> Strings.get("gw_join")
+                                        else -> Strings.get("details_title")
+                                    }
+                                    val actionIcon = when {
+                                        isStreamLink -> Icons.Filled.LiveTv
+                                        isParty -> Icons.Filled.Tv
+                                        else -> Icons.Filled.Info
+                                    }
+
+                                    NotificationCard(
+                                        notification = n,
+                                        onOpen = {
+                                            onDismiss()
+                                            if (isStreamLink) {
                                                 onOpenLiveTv()
-                                            } else if (n.Kind == "party_scheduled" || n.Kind == "party_starting") {
-                                                onDismiss()
+                                            } else if (isParty) {
                                                 onOpenGroupWatch()
                                             } else if (itemId != null) {
-                                                onDismiss()
                                                 onNavigateToDetail(itemId)
                                             }
                                         },
-                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                                        colors = ClickableSurfaceDefaults.colors(
-                                            containerColor = Color.White.copy(alpha = if (n.Read) 0.04f else 0.1f),
-                                            contentColor = JellioText,
-                                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
-                                            focusedContentColor = JellioText,
-                                        ),
-                                        border = ClickableSurfaceDefaults.border(
-                                            border = Border.None,
-                                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
-                                        ),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .then(if (isFirst) Modifier.focusRequester(firstItemFocus) else Modifier),
-                                    ) {
-                                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                                            Text(
-                                                text = messageFor(n),
-                                                color = JellioText,
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = subtitleFor(n),
-                                                color = JellioTextSecondary,
-                                                style = MaterialTheme.typography.bodySmall,
-                                            )
-                                        }
-                                    }
+                                        onDismiss = {
+                                            notificationsViewModel.delete(n.Id)
+                                        },
+                                        hasAction = hasAction,
+                                        actionLabel = actionLabel,
+                                        actionIcon = actionIcon,
+                                        focusRequester = if (isFirst) firstItemFocus else null,
+                                    )
                                 }
                             }
                         }
@@ -807,11 +861,35 @@ private fun SessionCard(
             }
 
             // Progress Bar (if playback ticks exist)
-            val pos = session.PositionTicks ?: 0L
             val runTime = item.RunTimeTicks ?: 0L
+            val baseTicks = session.PositionTicks ?: 0L
+            var livePositionTicks by remember(session.Id, session.PositionTicks, session.IsPaused) {
+                mutableStateOf(baseTicks)
+            }
+
+            LaunchedEffect(session.Id, session.PositionTicks, session.IsPaused) {
+                if (!session.IsPaused && baseTicks > 0L) {
+                    val startUptime = android.os.SystemClock.uptimeMillis()
+                    while (isActive) {
+                        delay(1000L)
+                        val elapsedMs = android.os.SystemClock.uptimeMillis() - startUptime
+                        val newTicks = baseTicks + (elapsedMs * 10_000L)
+                        livePositionTicks = if (runTime > 0L) newTicks.coerceAtMost(runTime) else newTicks
+                    }
+                } else {
+                    livePositionTicks = baseTicks
+                }
+            }
+
+            val targetFraction = if (runTime > 0L) (livePositionTicks.toFloat() / runTime.toFloat()).coerceIn(0f, 1f) else 0f
+            val animatedFraction by animateFloatAsState(
+                targetValue = targetFraction,
+                animationSpec = tween(durationMillis = 950, easing = LinearEasing),
+                label = "progressBarFraction",
+            )
+
             if (runTime > 0L) {
                 Spacer(modifier = Modifier.height(10.dp))
-                val fraction = (pos.toFloat() / runTime.toFloat()).coerceIn(0f, 1f)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -821,7 +899,7 @@ private fun SessionCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(fraction)
+                            .fillMaxWidth(animatedFraction)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(2.dp))
                             .background(Color.White),
@@ -833,13 +911,13 @@ private fun SessionCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = formatTicks(pos),
+                        text = formatTicks(livePositionTicks),
                         style = MaterialTheme.typography.labelSmall,
                         color = JellioTextSecondary,
                         fontSize = 10.sp,
                     )
                     Text(
-                        text = "${(fraction * 100).toInt()}%",
+                        text = "${(targetFraction * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = JellioTextSecondary,
                         fontSize = 10.sp,
@@ -889,6 +967,104 @@ private fun SessionCard(
                         modifier = Modifier.weight(1f).then(
                             if (focusRequester != null && isOnlyAction) Modifier.focusRequester(focusRequester) else Modifier
                         ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationCard(
+    notification: com.jellio.tv.data.model.JellioNotificationDto,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+    hasAction: Boolean,
+    actionLabel: String,
+    actionIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    focusRequester: FocusRequester? = null,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = if (notification.Read) 0.04f else 0.08f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+            .padding(14.dp),
+    ) {
+        Column {
+            // Header Row: Subtitle/category on left, timestamp on right
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!notification.Read) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color.White),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = subtitleFor(notification),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = JellioTextSecondary,
+                        fontSize = 11.sp,
+                    )
+                }
+
+                val timeStr = remember(notification.CreatedUtc, notification.Date) {
+                    formatRelativeTime(notification.CreatedUtc ?: notification.Date)
+                }
+                if (timeStr.isNotEmpty()) {
+                    Text(
+                        text = timeStr,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = JellioTextSecondary.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Message text
+            Text(
+                text = messageFor(notification),
+                color = JellioText,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (hasAction) {
+                    DrawerActionButton(
+                        label = actionLabel,
+                        icon = actionIcon,
+                        primary = true,
+                        onClick = onOpen,
+                        modifier = Modifier.weight(1f).then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+                    )
+                    DrawerActionButton(
+                        label = Strings.get("notifications_dismiss"),
+                        icon = Icons.Filled.Close,
+                        primary = false,
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    DrawerActionButton(
+                        label = Strings.get("notifications_dismiss"),
+                        icon = Icons.Filled.Close,
+                        primary = true,
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                     )
                 }
             }

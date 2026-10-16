@@ -204,6 +204,7 @@ internal object StringsPl {
         m["nav_shows"] = "Seriale"
         m["nav_switch_account"] = "Zmień konto"
         m["nav_watchlist"] = "Do obejrzenia"
+        m["notifications_clear_all"] = "Wyczyść wszystko"
         m["notifications_dismiss"] = "Odrzuć"
         m["notifications_nothing_new"] = "Nic nowego."
         m["notifications_title"] = "Powiadomienia"

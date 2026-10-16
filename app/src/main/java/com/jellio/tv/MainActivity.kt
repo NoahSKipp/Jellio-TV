@@ -849,6 +849,9 @@ private fun JellioTvApp(
                         showNowPlayingDrawer = false
                         showGroupWatch = true
                     },
+                    onRefreshNowPlaying = {
+                        appViewModel.nowPlayingManager.refresh()
+                    },
                     rawImageUrl = memoizedRawImageUrl,
                     modifier = Modifier.fillMaxSize(),
                 )

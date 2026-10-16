@@ -204,6 +204,7 @@ internal object StringsPt {
         m["nav_shows"] = "Séries"
         m["nav_switch_account"] = "Trocar de conta"
         m["nav_watchlist"] = "Lista de interesses"
+        m["notifications_clear_all"] = "Limpar tudo"
         m["notifications_dismiss"] = "Descartar"
         m["notifications_nothing_new"] = "Nada de novo."
         m["notifications_title"] = "Notificações"

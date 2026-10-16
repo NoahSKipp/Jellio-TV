@@ -47,6 +47,21 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
             runCatching { api.markJellioNotificationsRead() }
         }
     }
+
+    fun delete(id: String) {
+        val current = _items.value ?: return
+        _items.value = current.filterNot { it.Id == id }
+        viewModelScope.launch {
+            runCatching { api.deleteJellioNotification(id) }
+        }
+    }
+
+    fun clearAll() {
+        _items.value = emptyList()
+        viewModelScope.launch {
+            runCatching { api.clearJellioNotifications() }
+        }
+    }
 }
 
 // The same lines components/notifications.js's messageFor/subtitleFor show.

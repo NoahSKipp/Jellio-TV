@@ -204,6 +204,7 @@ internal object StringsEn {
         m["nav_shows"] = "Shows"
         m["nav_switch_account"] = "Switch Account"
         m["nav_watchlist"] = "Watchlist"
+        m["notifications_clear_all"] = "Clear all"
         m["notifications_dismiss"] = "Dismiss"
         m["notifications_nothing_new"] = "Nothing new."
         m["notifications_title"] = "Notifications"
