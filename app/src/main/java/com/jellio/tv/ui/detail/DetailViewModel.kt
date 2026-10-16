@@ -298,13 +298,12 @@ class DetailViewModel @Inject constructor(
     suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
         runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
 
-    // forceChoice mirrors screens/detail.js's own Change Stream button:
-    // it only ever skips the remembered shortcut below, a title with
-    // one real source still has nothing to change to either way.
+    // forceChoice skips the remembered shortcut below.
+    // If a stream choice is remembered, play directly. Otherwise show
+    // the stream picker so the user can verify or pick the source.
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
         val sources = getMediaSources(session, item.Id)
         if (sources.isEmpty()) return PlayAction.ShowPicker(item)
-        if (sources.size == 1) return PlayAction.Direct(item.Id, sources.first().Id)
 
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)

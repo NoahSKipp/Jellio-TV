@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,13 +18,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -33,12 +37,13 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
@@ -61,6 +66,7 @@ fun OverscanCalibrationModal(
     val context = LocalContext.current
     var currentPercent by remember { mutableIntStateOf(DisplayPreferences.overscanPercent) }
     val initialFocus = remember { FocusRequester() }
+    var hasFocus by remember { mutableStateOf(false) }
 
     fun applyChange(newPercent: Int) {
         val clamped = newPercent.coerceIn(DisplayPreferences.MIN_PERCENT, DisplayPreferences.MAX_PERCENT)
@@ -69,24 +75,36 @@ fun OverscanCalibrationModal(
     }
 
     LaunchedEffect(Unit) {
-        initialFocus.requestFocus()
+        for (attempt in 0 until 30) {
+            withFrameNanos {}
+            if (hasFocus) break
+            runCatching { initialFocus.requestFocus() }
+        }
     }
 
-    BackHandler {
-        DisplayPreferences.setOverscan(context, currentPercent)
-        onDismiss()
-    }
-
-    val config = LocalConfiguration.current
-    val insetX = (config.screenWidthDp * (currentPercent / 100f) / 2f).dp
-    val insetY = (config.screenHeightDp * (currentPercent / 100f) / 2f).dp
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .focusProperties { onExit = { FocusRequester.Cancel } },
+    Dialog(
+        onDismissRequest = {
+            DisplayPreferences.setOverscan(context, currentPercent)
+            onDismiss()
+        },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+        ),
     ) {
+        BackHandler {
+            DisplayPreferences.setOverscan(context, currentPercent)
+            onDismiss()
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .focusProperties { onExit = { FocusRequester.Cancel } },
+        ) {
+            val insetX = maxWidth * (currentPercent / 100f) / 2f
+            val insetY = maxHeight * (currentPercent / 100f) / 2f
         // Outer reference bounds with 4-corner brackets
         Box(
             modifier = Modifier
@@ -217,7 +235,7 @@ fun OverscanCalibrationModal(
             ) {
                 Surface(
                     onClick = { applyChange(currentPercent - 1) },
-                    enabled = currentPercent > DisplayPreferences.MIN_PERCENT,
+                    enabled = true,
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = JellioBg,
@@ -230,7 +248,7 @@ fun OverscanCalibrationModal(
                     ),
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     modifier = Modifier.onKeyEvent {
-                        if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionLeft && currentPercent > DisplayPreferences.MIN_PERCENT) {
+                        if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionLeft) {
                             applyChange(currentPercent - 1)
                             true
                         } else false
@@ -244,7 +262,7 @@ fun OverscanCalibrationModal(
 
                 Surface(
                     onClick = { applyChange(currentPercent + 1) },
-                    enabled = currentPercent < DisplayPreferences.MAX_PERCENT,
+                    enabled = true,
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = JellioBg,
@@ -258,8 +276,9 @@ fun OverscanCalibrationModal(
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     modifier = Modifier
                         .focusRequester(initialFocus)
+                        .onFocusChanged { if (it.isFocused) hasFocus = true }
                         .onKeyEvent {
-                            if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionRight && currentPercent < DisplayPreferences.MAX_PERCENT) {
+                            if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionRight) {
                                 applyChange(currentPercent + 1)
                                 true
                             } else false
@@ -280,7 +299,10 @@ fun OverscanCalibrationModal(
             ) {
                 if (currentPercent > 0) {
                     Surface(
-                        onClick = { applyChange(0) },
+                        onClick = {
+                            applyChange(0)
+                            runCatching { initialFocus.requestFocus() }
+                        },
                         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.12f),
@@ -321,4 +343,5 @@ fun OverscanCalibrationModal(
             }
         }
     }
+}
 }
