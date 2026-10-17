@@ -238,6 +238,7 @@ class PlayerViewModel @Inject constructor(
     private val _failover = MutableStateFlow<FailoverNotice?>(null)
     val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()
     private val triedSourceIds = mutableListOf<String>()
+    private val transcodeRetriedSourceIds = mutableSetOf<String>()
     private var failoverLanguage: String? = null
     private var failingOver = false
     private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
@@ -265,7 +266,53 @@ class PlayerViewModel @Inject constructor(
         if (failingOver || syncPlay.group.value != null) return
         val id = itemId ?: return
         val source = currentSource ?: return
+        val sourceId = source.Id
         val state = _uiState.value
+        // Previously played Gelato streams carry cached MediaStreams on
+        // subsequent plays and switch from server remux to Static=true
+        // direct play. If ExoPlayer fails before the first frame on direct
+        // play, retry the same source via server remux/transcode first
+        // before marking it bad and failing over.
+        if (
+            reason == "error before the first frame" &&
+            state.directPlay &&
+            !VideoTranscodePolicy.blocking &&
+            sourceId != null &&
+            transcodeRetriedSourceIds.add(sourceId)
+        ) {
+            failingOver = true
+            android.util.Log.w("JellioPlayer", "direct play failed before first frame, retrying source $sourceId with server transcode")
+            _failover.value = FailoverNotice(
+                attempt = triedSourceIds.size + 1,
+                sourceLabel = sourceLabel(source),
+                slowTranscode = false,
+            )
+            viewModelScope.launch {
+                val target = runCatching {
+                    repository.resolvePlayback(
+                        userId = session.userId,
+                        itemId = id,
+                        mediaSourceId = sourceId,
+                        startTimeTicks = state.startPositionTicks,
+                        audioStreamIndex = state.selectedAudioStreamIndex,
+                        forceTranscode = true,
+                    )
+                }.getOrNull()
+                if (target != null) {
+                    val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, target.startPositionTicks)
+                    _uiState.value = state.copy(
+                        streamUrl = target.streamUrl,
+                        directPlay = false,
+                        subtitleTracks = subtitleTracks,
+                    )
+                    failingOver = false
+                    return@launch
+                }
+                failingOver = false
+                streamFailed(session, reason)
+            }
+            return
+        }
         failingOver = true
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
         viewModelScope.launch {
@@ -409,7 +456,11 @@ class PlayerViewModel @Inject constructor(
         loadedItemId = key
         if (!fromFailover) {
             triedSourceIds.clear()
+            transcodeRetriedSourceIds.clear()
             failoverLanguage = null
+            if (mediaSourceId != null) {
+                BadStreams.unmark(itemId, com.jellio.tv.data.model.MediaSourceDto(Id = mediaSourceId))
+            }
 
             failingOver = false
             _failover.value = null
@@ -631,7 +682,8 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             } catch (err: Exception) {
-                if (syncPlay.group.value == null) {
+                // A retry that the server can't even start moves on too.
+                if (fromFailover && syncPlay.group.value == null) {
                     if (currentSource == null) {
                         currentSource = com.jellio.tv.data.model.MediaSourceDto(Id = mediaSourceId ?: itemId)
                     }
