@@ -1177,8 +1177,38 @@ class JellioRepository @Inject constructor(
         if (sources.size == 1 && !hasStreamInfo(sources[0])) {
             return emptyList()
         }
-        return sources
+        val seenMultiLine = mutableMapOf<String, Int>()
+        val result = mutableListOf<MediaSourceDto>()
+        for (s in sources) {
+            val name = s.Name?.trim().orEmpty()
+            if (!name.contains("\n")) {
+                result.add(s)
+                continue
+            }
+            val existingIdx = seenMultiLine[name]
+            if (existingIdx != null) {
+                val existing = result[existingIdx]
+                val sHasProbed = s.MediaStreams?.any { it.Type == "Video" } == true
+                val exHasProbed = existing.MediaStreams?.any { it.Type == "Video" } == true
+                val merged = if (!sHasProbed && exHasProbed) {
+                    s.copy(
+                        MediaStreams = existing.MediaStreams,
+                        RunTimeTicks = s.RunTimeTicks ?: existing.RunTimeTicks,
+                        Size = s.Size ?: existing.Size,
+                        Container = s.Container ?: existing.Container,
+                    )
+                } else {
+                    s
+                }
+                result[existingIdx] = merged
+            } else {
+                seenMultiLine[name] = result.size
+                result.add(s)
+            }
+        }
+        return result
     }
+
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
@@ -1659,9 +1689,9 @@ class JellioRepository @Inject constructor(
 
     internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null): Boolean {
         if (mediaSource.SupportsDirectPlay != true) return false
-        if (mediaSource.Container.isNullOrBlank()) return false
-        val container = normalizeStreamContainer(mediaSource.Container)
+        val container = mediaSource.Container?.lowercase() ?: return false
         if (container !in DIRECT_PLAY_CONTAINERS) return false
+
         val streams = mediaSource.MediaStreams ?: emptyList()
         val video = streams.firstOrNull { it.Type == "Video" }
         val audioStreams = streams.filter { it.Type == "Audio" }

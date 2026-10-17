@@ -22,11 +22,14 @@ object BadStreams {
         purgeLegacyAndExpired(store, System.currentTimeMillis())
     }
 
-    // Key strictly by unique source.Id so one failing stream never poisons other
-    // streams on the same title.
+    // Key strictly by unique source.Id, and for multi-line scraper names
+    // (which contain the exact release filename and size), also key by
+    // release name so duplicate or stale sync rows of the same release fail together.
     internal fun keys(itemId: String, source: MediaSourceDto): List<String> = listOfNotNull(
         source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
+        source.Name?.takeIf { it.contains("\n") }?.trim()?.let { "$itemId|release:$it" },
     )
+
 
     private fun purgeLegacyAndExpired(store: SharedPreferences, now: Long) {
         val all = store.all
