@@ -96,6 +96,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.46.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.CheckCircle, "Accurate Stream Health Isolation", "Failed streams are now keyed strictly by their unique source ID rather than release descriptions, ensuring one failing stream never poisons other streams on the title, and purging legacy poisoned records."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Failover & Direct Play Stability", "Preserved the failover notice until playback genuinely starts moving, avoided premature seek requests before player preparation, and displayed transcode retry notices."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.6",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.6",
