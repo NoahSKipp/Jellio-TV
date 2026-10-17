@@ -282,6 +282,11 @@ class PlayerViewModel @Inject constructor(
         ) {
             failingOver = true
             android.util.Log.w("JellioPlayer", "direct play failed before first frame, retrying source $sourceId with server transcode")
+            _failover.value = FailoverNotice(
+                attempt = triedSourceIds.size + 1,
+                sourceLabel = sourceLabel(source),
+                slowTranscode = false,
+            )
             viewModelScope.launch {
                 val target = runCatching {
                     repository.resolvePlayback(

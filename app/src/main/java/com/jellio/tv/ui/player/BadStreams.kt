@@ -9,7 +9,7 @@ import com.jellio.tv.data.model.MediaSourceDto
 // automatic retries skip them. Same idea as the web's runtime/streamHealth.js.
 object BadStreams {
     private const val LIFETIME_MS = 48L * 60 * 60 * 1000
-    private const val SUBTITLE_CRASH_MIGRATION_KEY = "_v2_subtitle_fix_cleared"
+    private const val SUBTITLE_CRASH_MIGRATION_KEY = "_v3_desc_poison_cleared"
     private var prefs: SharedPreferences? = null
 
     fun init(context: Context) {
@@ -22,17 +22,11 @@ object BadStreams {
         purgeLegacyAndExpired(store, System.currentTimeMillis())
     }
 
-    // Never key by line 1 of source.Name: on Gelato/AIOStreams, line 1 is
-    // the shared addon/quality tier badge (e.g. "🚀 FHD" or "🚀 4K") shared
-    // across dozens of distinct streams. Lines 2+ hold the actual release
-    // filename and description.
-    internal fun keys(itemId: String, source: MediaSourceDto): List<String> {
-        val desc = source.Name?.lineSequence()?.drop(1)?.joinToString("\n")?.trim()?.takeIf { it.isNotEmpty() }
-        return listOfNotNull(
-            source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
-            desc?.let { "$itemId|desc:$it" },
-        )
-    }
+    // Key strictly by unique source.Id so one failing stream never poisons other
+    // streams on the same title.
+    internal fun keys(itemId: String, source: MediaSourceDto): List<String> = listOfNotNull(
+        source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
+    )
 
     private fun purgeLegacyAndExpired(store: SharedPreferences, now: Long) {
         val all = store.all
@@ -40,7 +34,7 @@ object BadStreams {
         val editor = store.edit()
         all.forEach { (key, value) ->
             if (key == SUBTITLE_CRASH_MIGRATION_KEY) return@forEach
-            if (key.contains("|name:") || (value as? Long ?: 0L) < now) {
+            if (key.contains("|name:") || key.contains("|desc:") || (value as? Long ?: 0L) < now) {
                 editor.remove(key)
                 dirty = true
             }
@@ -54,7 +48,7 @@ object BadStreams {
         val editor = store.edit()
         store.all.forEach { (key, value) ->
             if (key == SUBTITLE_CRASH_MIGRATION_KEY) return@forEach
-            if (key.contains("|name:") || (value as? Long ?: 0L) < now) editor.remove(key)
+            if (key.contains("|name:") || key.contains("|desc:") || (value as? Long ?: 0L) < now) editor.remove(key)
         }
         keys(itemId, source).forEach { editor.putLong(it, now + LIFETIME_MS) }
         editor.apply()

@@ -525,11 +525,6 @@ private fun PlayerSurface(
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
             setMediaSource(buildPlayerMediaSource(activeSideloadedTrack))
-            // A transcode already starts at startPositionTicks (the URL's
-            // StartTimeTicks); only a direct-play file needs the seek.
-            if (startPositionTicks > 0 && directPlay) {
-                seekTo(startPositionTicks / TICKS_PER_MS)
-            }
             // Keeps the device and its Wi-Fi awake while playing.
             setWakeMode(C.WAKE_MODE_NETWORK)
             playWhenReady = !showResumePrompt
@@ -568,7 +563,7 @@ private fun PlayerSurface(
             .collect { player.volume = it }
     }
 
-    var isPlaying by remember { mutableStateOf(true) }
+    var isPlaying by remember(player) { mutableStateOf(false) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember { mutableStateOf(false) }
     var endedAsPlaceholder by remember(streamUrl) { mutableStateOf(false) }
@@ -722,7 +717,7 @@ private fun PlayerSurface(
     var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
     var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
-    var seekedToResume by remember(player) { mutableStateOf(startPositionTicks > 0 && directPlay) }
+    var seekedToResume by remember(player) { mutableStateOf(false) }
     var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
@@ -869,7 +864,7 @@ private fun PlayerSurface(
                 // a resume prompt still waiting on the reader's own
                 // choice has a real duration already but has not
                 // started playing yet.
-                if (!hasReportedStart && isPlaying) {
+                if (!hasReportedStart && isPlaying && (realPositionMs() > 0 || player.currentPosition > 0)) {
                     hasReportedStart = true
                     onReportStart(realPositionMs() * TICKS_PER_MS)
                     onPlaybackStarted()

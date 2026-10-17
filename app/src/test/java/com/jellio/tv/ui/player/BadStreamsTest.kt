@@ -8,26 +8,21 @@ import org.junit.Test
 
 class BadStreamsTest {
     @Test
-    fun keysUseIdAndLines2PlusNeverLine1Header() {
+    fun keysUseUniqueSourceIdNeverSharedNames() {
         val streamA = MediaSourceDto(
             Id = "src-a",
             Name = "🚀 FHD\nShow.S01E01.1080p.WEB-DL-GroupA.mkv\n⚡ RealDebrid | 1.8 GB",
         )
         val streamB = MediaSourceDto(
             Id = "src-b",
-            Name = "🚀 FHD\nShow.S01E01.1080p.WEB-DL-GroupB.mkv\n⚡ RealDebrid | 2.1 GB",
+            Name = "🚀 FHD\nShow.S01E01.1080p.WEB-DL-GroupA.mkv\n⚡ RealDebrid | 1.8 GB",
         )
         val keysA = BadStreams.keys("ep-1", streamA)
         val keysB = BadStreams.keys("ep-1", streamB)
 
-        assertEquals(
-            listOf(
-                "ep-1|id:src-a",
-                "ep-1|desc:Show.S01E01.1080p.WEB-DL-GroupA.mkv\n⚡ RealDebrid | 1.8 GB",
-            ),
-            keysA,
-        )
-        assertTrue("Distinct streams sharing line 1 must not share any BadStreams keys", keysA.intersect(keysB.toSet()).isEmpty())
+        assertEquals(listOf("ep-1|id:src-a"), keysA)
+        assertEquals(listOf("ep-1|id:src-b"), keysB)
+        assertTrue("Distinct streams even with identical descriptions must not share BadStreams keys", keysA.intersect(keysB.toSet()).isEmpty())
     }
 
     @Test
