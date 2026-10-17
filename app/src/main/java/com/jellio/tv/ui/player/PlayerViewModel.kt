@@ -236,6 +236,7 @@ class PlayerViewModel @Inject constructor(
     private val _failover = MutableStateFlow<FailoverNotice?>(null)
     val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()
     private val triedSourceIds = mutableListOf<String>()
+    private val transcodeRetriedSourceIds = mutableSetOf<String>()
     private var failoverLanguage: String? = null
     private var failingOver = false
     private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
@@ -263,12 +264,53 @@ class PlayerViewModel @Inject constructor(
         if (failingOver || syncPlay.group.value != null) return
         val id = itemId ?: return
         val source = currentSource ?: return
+        val sourceId = source.Id
+        val state = _uiState.value
+        // Previously played Gelato streams carry cached MediaStreams on
+        // subsequent plays and switch from server remux to Static=true
+        // direct play. If ExoPlayer fails before the first frame on direct
+        // play, retry the same source via server remux/transcode first
+        // before marking it bad and failing over.
+        if (
+            reason == "error before the first frame" &&
+            state.directPlay &&
+            !VideoTranscodePolicy.blocking &&
+            sourceId != null &&
+            transcodeRetriedSourceIds.add(sourceId)
+        ) {
+            failingOver = true
+            android.util.Log.w("JellioPlayer", "direct play failed before first frame, retrying source $sourceId with server transcode")
+            viewModelScope.launch {
+                val target = runCatching {
+                    repository.resolvePlayback(
+                        userId = session.userId,
+                        itemId = id,
+                        mediaSourceId = sourceId,
+                        startTimeTicks = state.startPositionTicks,
+                        audioStreamIndex = state.selectedAudioStreamIndex,
+                        forceTranscode = true,
+                    )
+                }.getOrNull()
+                if (target != null) {
+                    val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, target.startPositionTicks)
+                    _uiState.value = state.copy(
+                        streamUrl = target.streamUrl,
+                        directPlay = false,
+                        subtitleTracks = subtitleTracks,
+                    )
+                    failingOver = false
+                    return@launch
+                }
+                failingOver = false
+                streamFailed(session, reason)
+            }
+            return
+        }
         failingOver = true
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
         viewModelScope.launch {
             BadStreams.mark(id, source)
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-            val state = _uiState.value
             val language = failoverLanguage
                 ?: state.audioTracks.firstOrNull { it.streamIndex == (state.selectedAudioStreamIndex ?: state.defaultAudioStreamIndex) }?.language
                 ?: source.MediaStreams.orEmpty().firstOrNull { it.Type == "Audio" }?.Language
@@ -354,6 +396,7 @@ class PlayerViewModel @Inject constructor(
     private var trickplaySession: Session? = null
     private var trickplayInfo: TrickplayInfoDto? = null
     private var trickplayMediaSourceId: String? = null
+    private var trickplayRequestedForSourceId: String? = null
     private var toastSeq = 0L
 
     fun showToast(message: String) {
@@ -396,6 +439,7 @@ class PlayerViewModel @Inject constructor(
         loadedItemId = key
         if (!fromFailover) {
             triedSourceIds.clear()
+            transcodeRetriedSourceIds.clear()
             failoverLanguage = null
             failingOver = false
             _failover.value = null
@@ -473,13 +517,10 @@ class PlayerViewModel @Inject constructor(
 
                 currentSource = target.mediaSource
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
-                // The server's own probe already says how long the stream
-                // is: a placeholder clip goes straight to the next one.
-                val probedMs = (target.mediaSource.RunTimeTicks ?: 0L) / 10_000
-                if (looksLikePlaceholder(probedMs, expectedRuntimeMs) && syncPlay.group.value == null) {
-                    streamFailed(session, "server reports a ${probedMs / 1000}s stream")
-                    return@launch
-                }
+                // Do not abort before playback starts based on cached
+                // target.mediaSource.RunTimeTicks: let ExoPlayer open the
+                // stream first and rely on actual playback duration once
+                // STATE_READY is reached.
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 subtitleSeriesId = if (isEpisode) item.SeriesId else null
                 val initialSubtitle = initialSubtitleIndex(
@@ -493,6 +534,7 @@ class PlayerViewModel @Inject constructor(
                 trickplaySession = session
                 trickplayInfo = null
                 trickplayMediaSourceId = target.mediaSource.Id
+                trickplayRequestedForSourceId = null
 
                 _uiState.value = PlayerUiState(
                     expectedRuntimeMs = expectedRuntimeMs,
@@ -513,8 +555,6 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                     reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
                 )
-
-                loadTrickplayDuringPlayback(session, itemId, target.mediaSource.Id)
 
                 // Real port of screens/player.js's own real fire-and-
                 // forget getNextEpisode(item).then(...): resolved
@@ -1117,7 +1157,13 @@ class PlayerViewModel @Inject constructor(
 
     fun reportStart(positionTicks: Long) {
         val id = itemId ?: return
-        viewModelScope.launch { repository.reportPlaybackStart(id, uiState.value.mediaSourceId, positionTicks) }
+        val sourceId = uiState.value.mediaSourceId
+        val session = trickplaySession
+        if (session != null && trickplayRequestedForSourceId != sourceId) {
+            trickplayRequestedForSourceId = sourceId
+            loadTrickplayDuringPlayback(session, id, sourceId)
+        }
+        viewModelScope.launch { repository.reportPlaybackStart(id, sourceId, positionTicks) }
     }
 
     fun reportProgress(positionTicks: Long, isPaused: Boolean) {

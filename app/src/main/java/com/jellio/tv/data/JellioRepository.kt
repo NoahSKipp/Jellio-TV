@@ -1486,6 +1486,7 @@ class JellioRepository @Inject constructor(
         startTimeTicks: Long,
         burnInSubtitleStreamIndex: Int? = null,
         audioStreamIndex: Int? = null,
+        forceTranscode: Boolean = false,
     ): PlaybackTarget {
         val response = api.getPlaybackInfo(
             itemId,
@@ -1517,9 +1518,10 @@ class JellioRepository @Inject constructor(
         // burned in subtitle already does: Static=true (a direct
         // playable file) serves every embedded track as is, no way to
         // tell the server which one to actually decode.
-        val forceTranscode = burnInSubtitleStreamIndex != null ||
+        val shouldTranscode = forceTranscode ||
+            burnInSubtitleStreamIndex != null ||
             (audioStreamIndex != null && audioStreamIndex != mediaSource.DefaultAudioStreamIndex)
-        val directPlay = !forceTranscode && canDirectPlay(mediaSource)
+        val directPlay = !shouldTranscode && canDirectPlay(mediaSource)
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
@@ -1647,7 +1649,7 @@ class JellioRepository @Inject constructor(
 
     private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
         if (mediaSource.SupportsDirectPlay != true) return false
-        val container = mediaSource.Container?.lowercase() ?: return false
+        val container = mediaSource.Container?.lowercase()?.split(",")?.firstOrNull()?.trim() ?: return false
         if (container !in DIRECT_PLAY_CONTAINERS) return false
         val streams = mediaSource.MediaStreams ?: emptyList()
         val video = streams.firstOrNull { it.Type == "Video" }

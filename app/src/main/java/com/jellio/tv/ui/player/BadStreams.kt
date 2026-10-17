@@ -12,21 +12,43 @@ object BadStreams {
     private var prefs: SharedPreferences? = null
 
     fun init(context: Context) {
-        prefs = context.applicationContext.getSharedPreferences("jellio_bad_streams", Context.MODE_PRIVATE)
+        val store = context.applicationContext.getSharedPreferences("jellio_bad_streams", Context.MODE_PRIVATE)
+        prefs = store
+        purgeLegacyAndExpired(store, System.currentTimeMillis())
     }
 
-    // A source's id can change when Gelato refreshes its rows; its name
-    // (the addon's release line) doesn't, so both are kept.
-    private fun keys(itemId: String, source: MediaSourceDto): List<String> = listOfNotNull(
-        source.Id?.let { "$itemId|id:$it" },
-        source.Name?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { "$itemId|name:$it" },
-    )
+    // Never key by line 1 of source.Name: on Gelato/AIOStreams, line 1 is
+    // the shared addon/quality tier badge (e.g. "🚀 FHD" or "🚀 4K") shared
+    // across dozens of distinct streams. Lines 2+ hold the actual release
+    // filename and description.
+    internal fun keys(itemId: String, source: MediaSourceDto): List<String> {
+        val desc = source.Name?.lineSequence()?.drop(1)?.joinToString("\n")?.trim()?.takeIf { it.isNotEmpty() }
+        return listOfNotNull(
+            source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
+            desc?.let { "$itemId|desc:$it" },
+        )
+    }
+
+    private fun purgeLegacyAndExpired(store: SharedPreferences, now: Long) {
+        val all = store.all
+        var dirty = false
+        val editor = store.edit()
+        all.forEach { (key, value) ->
+            if (key.contains("|name:") || (value as? Long ?: 0L) < now) {
+                editor.remove(key)
+                dirty = true
+            }
+        }
+        if (dirty) editor.apply()
+    }
 
     fun mark(itemId: String, source: MediaSourceDto) {
         val store = prefs ?: return
         val now = System.currentTimeMillis()
         val editor = store.edit()
-        store.all.forEach { (key, value) -> if ((value as? Long ?: 0L) < now) editor.remove(key) }
+        store.all.forEach { (key, value) ->
+            if (key.contains("|name:") || (value as? Long ?: 0L) < now) editor.remove(key)
+        }
         keys(itemId, source).forEach { editor.putLong(it, now + LIFETIME_MS) }
         editor.apply()
     }
@@ -34,12 +56,18 @@ object BadStreams {
     fun isBad(itemId: String, source: MediaSourceDto): Boolean {
         val store = prefs ?: return false
         val now = System.currentTimeMillis()
+        purgeLegacyAndExpired(store, now)
         return keys(itemId, source).any { store.getLong(it, 0L) > now }
     }
 }
 
 // A clip far shorter than the title it stands in for: AIOStreams' "download
-// failed" video and similar placeholders run about two minutes against a
-// runtime of an hour or more.
+// failed" video and similar placeholders run under three minutes against a
+// runtime of ten minutes or more. Capping actualMs at 180s ensures real
+// streams are never misclassified as placeholders when catalog metadata has
+// an inflated expected runtime.
+private const val MAX_PLACEHOLDER_MS = 3L * 60 * 1000
+
 fun looksLikePlaceholder(actualMs: Long, expectedMs: Long): Boolean =
-    actualMs > 0 && expectedMs >= 10 * 60 * 1000 && actualMs < expectedMs / 4
+    actualMs in 1..MAX_PLACEHOLDER_MS && expectedMs >= 10 * 60 * 1000 && actualMs < expectedMs / 4
+
