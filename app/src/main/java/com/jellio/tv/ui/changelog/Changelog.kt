@@ -96,6 +96,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.46.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.46.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Native Embedded Subtitle Playback", "Direct-play streams now use the container's native embedded subtitle tracks instead of sideloading all WebVTT tracks at startup, preventing Media3 MergingMediaSource crashes and stream failover loops on previously played episodes."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Probed Container Direct Play", "Normalized ffprobe container strings (matroska and mov) and cleared falsely flagged bad streams so previously played episodes direct-play cleanly."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.5",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.5",

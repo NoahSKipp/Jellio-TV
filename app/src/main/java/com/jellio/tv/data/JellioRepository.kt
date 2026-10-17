@@ -1518,16 +1518,25 @@ class JellioRepository @Inject constructor(
         // burned in subtitle already does: Static=true (a direct
         // playable file) serves every embedded track as is, no way to
         // tell the server which one to actually decode.
+        val targetAudioStream = if (audioStreamIndex != null) {
+            mediaSource.MediaStreams?.firstOrNull { it.Type == "Audio" && it.Index == audioStreamIndex }
+        } else {
+            null
+        }
+        val audioNeedsTranscode = if (audioStreamIndex != null && audioStreamIndex != mediaSource.DefaultAudioStreamIndex) {
+            targetAudioStream == null || !canDirectPlayAudio(targetAudioStream.Codec)
+        } else {
+            false
+        }
         val shouldTranscode = forceTranscode ||
             burnInSubtitleStreamIndex != null ||
-            (audioStreamIndex != null && audioStreamIndex != mediaSource.DefaultAudioStreamIndex)
-        val directPlay = !shouldTranscode && canDirectPlay(mediaSource)
+            audioNeedsTranscode
+        val directPlay = !shouldTranscode && canDirectPlay(mediaSource, audioStreamIndex)
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
-        val rawContainer = mediaSource.Container ?: "mp4"
-        val parsedContainer = rawContainer.split(",").firstOrNull()?.trim() ?: "mp4"
+        val parsedContainer = normalizeStreamContainer(mediaSource.Container)
         val container = if (directPlay) parsedContainer else "mp4"
 
         val streamUrl = buildString {
@@ -1629,13 +1638,14 @@ class JellioRepository @Inject constructor(
         return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
     }
 
-    private fun canDirectPlayAudio(codec: String?): Boolean {
+    internal fun canDirectPlayAudio(codec: String?): Boolean {
         val c = codec?.lowercase() ?: return false
-        if (c in setOf("aac", "mp3", "opus", "vorbis", "flac")) return true
+        if (c in setOf("aac", "mp3", "opus", "vorbis", "flac", "pcm", "pcm_s16le", "pcm_s24le", "alac")) return true
+        if (com.jellio.tv.ui.player.PlayerPrefs.audioPassthrough && c in DIRECT_PLAY_AUDIO_CODECS) return true
         val mimeType = when (c) {
             "ac3" -> "audio/ac3"
             "eac3" -> "audio/eac3"
-            else -> return false // DTS, TrueHD, etc. have no native software decoder in Android/Media3
+            else -> return false // DTS, TrueHD, etc. have no native software decoder in Android/Media3 without passthrough
         }
         return try {
             val list = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
@@ -1647,13 +1657,20 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    private fun canDirectPlay(mediaSource: MediaSourceDto): Boolean {
+    internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null): Boolean {
         if (mediaSource.SupportsDirectPlay != true) return false
-        val container = mediaSource.Container?.lowercase()?.split(",")?.firstOrNull()?.trim() ?: return false
+        if (mediaSource.Container.isNullOrBlank()) return false
+        val container = normalizeStreamContainer(mediaSource.Container)
         if (container !in DIRECT_PLAY_CONTAINERS) return false
         val streams = mediaSource.MediaStreams ?: emptyList()
         val video = streams.firstOrNull { it.Type == "Video" }
-        val audio = streams.firstOrNull { it.Type == "Audio" }
+        val audioStreams = streams.filter { it.Type == "Audio" }
+        val targetAudioIndex = audioStreamIndex ?: mediaSource.DefaultAudioStreamIndex
+        val audio = if (targetAudioIndex != null) {
+            audioStreams.firstOrNull { it.Index == targetAudioIndex } ?: audioStreams.firstOrNull()
+        } else {
+            audioStreams.firstOrNull()
+        }
         if (video != null && video.Codec?.lowercase() !in DIRECT_PLAY_VIDEO_CODECS) return false
         if (audio != null && !canDirectPlayAudio(audio.Codec)) return false
         return true
@@ -1689,5 +1706,14 @@ class JellioRepository @Inject constructor(
         val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=85"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
         return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
+    }
+}
+
+internal fun normalizeStreamContainer(rawContainer: String?): String {
+    val first = rawContainer?.lowercase()?.split(",")?.firstOrNull()?.trim().orEmpty()
+    return when (first) {
+        "", "mov" -> "mp4"
+        "matroska" -> "mkv"
+        else -> first
     }
 }

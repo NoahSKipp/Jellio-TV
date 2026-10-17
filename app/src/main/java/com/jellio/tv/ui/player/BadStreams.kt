@@ -9,11 +9,16 @@ import com.jellio.tv.data.model.MediaSourceDto
 // automatic retries skip them. Same idea as the web's runtime/streamHealth.js.
 object BadStreams {
     private const val LIFETIME_MS = 48L * 60 * 60 * 1000
+    private const val SUBTITLE_CRASH_MIGRATION_KEY = "_v2_subtitle_fix_cleared"
     private var prefs: SharedPreferences? = null
 
     fun init(context: Context) {
         val store = context.applicationContext.getSharedPreferences("jellio_bad_streams", Context.MODE_PRIVATE)
         prefs = store
+        if (!store.getBoolean(SUBTITLE_CRASH_MIGRATION_KEY, false)) {
+            store.edit().clear().putBoolean(SUBTITLE_CRASH_MIGRATION_KEY, true).apply()
+            return
+        }
         purgeLegacyAndExpired(store, System.currentTimeMillis())
     }
 
@@ -34,6 +39,7 @@ object BadStreams {
         var dirty = false
         val editor = store.edit()
         all.forEach { (key, value) ->
+            if (key == SUBTITLE_CRASH_MIGRATION_KEY) return@forEach
             if (key.contains("|name:") || (value as? Long ?: 0L) < now) {
                 editor.remove(key)
                 dirty = true
@@ -47,9 +53,17 @@ object BadStreams {
         val now = System.currentTimeMillis()
         val editor = store.edit()
         store.all.forEach { (key, value) ->
+            if (key == SUBTITLE_CRASH_MIGRATION_KEY) return@forEach
             if (key.contains("|name:") || (value as? Long ?: 0L) < now) editor.remove(key)
         }
         keys(itemId, source).forEach { editor.putLong(it, now + LIFETIME_MS) }
+        editor.apply()
+    }
+
+    fun unmark(itemId: String, source: MediaSourceDto) {
+        val store = prefs ?: return
+        val editor = store.edit()
+        keys(itemId, source).forEach { editor.remove(it) }
         editor.apply()
     }
 

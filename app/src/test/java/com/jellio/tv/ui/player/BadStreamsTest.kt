@@ -47,4 +47,13 @@ class BadStreamsTest {
         // Short expected runtime (< 10m) is never flagged
         assertFalse(looksLikePlaceholder(60_000L, 5L * 60 * 1000))
     }
+
+    @Test
+    fun normalizeStreamContainerMapsProbedContainerStrings() {
+        assertEquals("mkv", com.jellio.tv.data.normalizeStreamContainer("matroska,webm"))
+        assertEquals("mkv", com.jellio.tv.data.normalizeStreamContainer("mkv"))
+        assertEquals("mp4", com.jellio.tv.data.normalizeStreamContainer("mov,mp4,m4a,3gp,3g2,mj2"))
+        assertEquals("mp4", com.jellio.tv.data.normalizeStreamContainer("mp4"))
+        assertEquals("mp4", com.jellio.tv.data.normalizeStreamContainer(null))
+    }
 }

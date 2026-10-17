@@ -36,6 +36,8 @@ data class SubtitleTrackUiState(
     val isTextBased: Boolean,
     val url: String?,
     val language: String? = null,
+    val isExternal: Boolean = false,
+    val embeddedTextOrdinal: Int = -1,
 )
 
 // Real port of screens/player.js's own buildResumePrompt()/
@@ -426,6 +428,15 @@ class PlayerViewModel @Inject constructor(
     )
 
     private var prewarmedPlayback: PrewarmedPlayback? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
+
+    fun onScreenDisposed() {
+        loadJob?.cancel()
+        loadJob = null
+        loadedItemId = null
+        failingOver = false
+        _failover.value = null
+    }
 
     fun retry(session: Session) {
         val id = itemId ?: return
@@ -435,7 +446,7 @@ class PlayerViewModel @Inject constructor(
 
     fun load(session: Session, itemId: String, mediaSourceId: String?, fromFailover: Boolean = false) {
         val key = itemId + "|" + mediaSourceId
-        if (loadedItemId == key) return
+        if (!fromFailover && loadedItemId == key) return
         loadedItemId = key
         if (!fromFailover) {
             triedSourceIds.clear()
@@ -443,10 +454,13 @@ class PlayerViewModel @Inject constructor(
             failoverLanguage = null
             failingOver = false
             _failover.value = null
+            hasCreditedRealWatch = false
+            lastReportedDurationSeconds = 0.0
         }
         this.itemId = itemId
         this.mediaSourceIdParam = mediaSourceId
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
             try {
                 val prewarmed = if (mediaSourceId == null && !fromFailover && prewarmedPlayback?.itemId == itemId) {
@@ -529,7 +543,7 @@ class PlayerViewModel @Inject constructor(
                     repository.getSubtitleLanguagePreference(session.userId),
                 )
                 val audioTracks = buildAudioTracks(target.mediaSource)
-                val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 }?.roundToInt()
+                val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 && !fromFailover }?.roundToInt()
 
                 trickplaySession = session
                 trickplayInfo = null
@@ -789,20 +803,31 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun buildSubtitleTracks(itemId: String, mediaSource: MediaSourceDto, offsetTicks: Long = 0): List<SubtitleTrackUiState> {
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
+        var embeddedTextIndex = 0
         return mediaSource.MediaStreams
             ?.filter { it.Type == "Subtitle" }
-            // Block: an image subtitle would make the server re-encode the video.
-            ?.filter { it.IsTextSubtitleStream == true || !VideoTranscodePolicy.blocking }
             ?.mapNotNull { stream ->
-                val index = stream.Index ?: return@mapNotNull null
+                val isExternal = stream.DeliveryMethod == "External"
                 val isText = stream.IsTextSubtitleStream == true
+                val currentEmbeddedTextOrdinal = if (!isExternal && isText) embeddedTextIndex++ else -1
+                // Block: an image subtitle would make the server re-encode the video.
+                if (!isText && VideoTranscodePolicy.blocking) return@mapNotNull null
+                val index = stream.Index ?: return@mapNotNull null
                 val label = stream.DisplayTitle ?: stream.Language ?: "Subtitle"
                 val url = if (isText) {
                     runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
                 } else {
                     null
                 }
-                SubtitleTrackUiState(index, if (isText) label else label + imageSubtitleSuffix(), isText, url, stream.Language)
+                SubtitleTrackUiState(
+                    streamIndex = index,
+                    label = if (isText) label else label + imageSubtitleSuffix(),
+                    isTextBased = isText,
+                    url = url,
+                    language = stream.Language,
+                    isExternal = isExternal,
+                    embeddedTextOrdinal = currentEmbeddedTextOrdinal,
+                )
             }
             ?: emptyList()
     }
@@ -941,8 +966,8 @@ class PlayerViewModel @Inject constructor(
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
         // Direct play carries every audio track already: the player swaps
         // to it in place (PlayerScreen's selectAudioTrack effect), no
-        // reload, no restart.
-        if (_uiState.value.directPlay) {
+        // reload, no restart, unless the picked track needs transcoding.
+        if (_uiState.value.directPlay && currentSource?.let { repository.canDirectPlay(it, streamIndex) } != false) {
             _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
             showToast("Audio: $label")
             return
@@ -1157,6 +1182,7 @@ class PlayerViewModel @Inject constructor(
 
     fun reportStart(positionTicks: Long) {
         val id = itemId ?: return
+        currentSource?.let { BadStreams.unmark(id, it) }
         val sourceId = uiState.value.mediaSourceId
         val session = trickplaySession
         if (session != null && trickplayRequestedForSourceId != sourceId) {

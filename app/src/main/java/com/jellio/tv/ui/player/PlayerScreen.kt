@@ -235,7 +235,10 @@ fun PlayerScreen(
     val failover by viewModel.failover.collectAsState()
     DisposableEffect(Unit) {
         PlayerPresence.active = true
-        onDispose { PlayerPresence.active = false }
+        onDispose {
+            PlayerPresence.active = false
+            viewModel.onScreenDisposed()
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
@@ -446,31 +449,12 @@ private fun PlayerSurface(
     val inGroupAtOpen = remember { syncPlay.group.value != null }
     val showResumePrompt = resumePercent != null && !resumePromptDismissed && !inGroupAtOpen
 
-    // Every real text based subtitle track declared as a real
-    // MediaItem.SubtitleConfiguration from this very first prepare()
-    // call, not added later: Media3 requires a full setMediaSource
-    // reload to attach one mid-playback, which wipes the buffer, so
-    // toggling between them afterward is real track *selection*
-    // (below), never a second real prepare().
-    val player = remember(streamUrl) {
-        val subtitleConfigs = subtitleTracks.filter { it.isTextBased && it.url != null }.map { track ->
-            MediaItem.SubtitleConfiguration.Builder(Uri.parse(track.url))
-                .setMimeType(MimeTypes.TEXT_VTT)
-                .setId(SIDELOADED_SUBTITLE_PREFIX + track.streamIndex)
-                .setLabel(track.label)
-                .setLanguage(track.language)
-                .build()
-        }
-        val mediaItem = MediaItem.Builder()
-            .setUri(streamUrl)
-            .setSubtitleConfigurations(subtitleConfigs)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setSubtitle(subtitle).build())
-            .build()
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-            .build()
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+    val activeSideloadedTrack = subtitleTracks.firstOrNull {
+        it.streamIndex == selectedSubtitleIndex && it.isTextBased && it.url != null && (!directPlay || it.isExternal)
+    }
+
+    val httpDataSourceFactory = remember(session.accessToken) {
+        DefaultHttpDataSource.Factory()
             .setUserAgent("Jellio-TV/$APP_VERSION")
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15000)
@@ -481,6 +465,41 @@ private fun PlayerSurface(
                     put("Authorization", buildEmbyAuthorizationHeader("AndroidTV", APP_VERSION, session.accessToken))
                 }
             )
+    }
+
+    @OptIn(UnstableApi::class)
+    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
+        val mediaItem = MediaItem.Builder()
+            .setUri(streamUrl)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setSubtitle(subtitle).build())
+            .build()
+        val videoSource = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+            .createMediaSource(mediaItem)
+        val subUrl = sideloadedTrack?.url ?: return videoSource
+        val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(subUrl))
+            .setMimeType(MimeTypes.TEXT_VTT)
+            .setId(SIDELOADED_SUBTITLE_PREFIX + sideloadedTrack.streamIndex)
+            .setLabel(sideloadedTrack.label)
+            .setLanguage(sideloadedTrack.language)
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        val subtitleSource = androidx.media3.exoplayer.source.SingleSampleMediaSource.Factory(httpDataSourceFactory)
+            .setTreatLoadErrorsAsEndOfStream(true)
+            .createMediaSource(subtitleConfig, C.TIME_UNSET)
+        return androidx.media3.exoplayer.source.MergingMediaSource(videoSource, subtitleSource)
+    }
+
+    // Direct play uses the container's native embedded subtitle tracks with
+    // zero extra HTTP requests. Only external subtitles or transcoded streams
+    // sideload the single selected WebVTT track via SingleSampleMediaSource
+    // with treatLoadErrorsAsEndOfStream = true so a subtitle failure never
+    // aborts video playback.
+    val player = remember(streamUrl) {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)
 
@@ -505,7 +524,7 @@ private fun PlayerSurface(
             .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
-            setMediaItem(mediaItem)
+            setMediaSource(buildPlayerMediaSource(activeSideloadedTrack))
             // A transcode already starts at startPositionTicks (the URL's
             // StartTimeTicks); only a direct-play file needs the seek.
             if (startPositionTicks > 0 && directPlay) {
@@ -559,6 +578,7 @@ private fun PlayerSurface(
     val selectedSubtitleLanguage = subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.language
     // The player's listener lives as long as the player; these keep it
     // reading the current choices, not the ones from when it was made.
+    val currentSubtitleTracks by androidx.compose.runtime.rememberUpdatedState(subtitleTracks)
     val currentSubtitleIndex by androidx.compose.runtime.rememberUpdatedState(selectedSubtitleIndex)
     val currentSubtitleLanguage by androidx.compose.runtime.rememberUpdatedState(selectedSubtitleLanguage)
     val currentAudioIndex by androidx.compose.runtime.rememberUpdatedState(selectedAudioStreamIndex)
@@ -702,7 +722,8 @@ private fun PlayerSurface(
     var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
     var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
-    var seekedToResume by remember(player) { mutableStateOf(false) }
+    var seekedToResume by remember(player) { mutableStateOf(startPositionTicks > 0 && directPlay) }
+    var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
     var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
@@ -763,7 +784,7 @@ private fun PlayerSurface(
                 }
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                val found = applySubtitleSelection(player, currentSubtitleIndex, currentSubtitleLanguage)
+                val found = applySubtitleSelection(player, currentSubtitleTracks, currentSubtitleIndex, currentSubtitleLanguage)
                 // Picked, the stream has its tracks, and none of them is it:
                 // say so instead of quietly showing nothing.
                 if (currentSubtitleIndex != null && !found && !subtitleMissingReported &&
@@ -796,19 +817,25 @@ private fun PlayerSurface(
         player.addAnalyticsListener(loadErrors)
         onDispose {
             player.removeListener(listener)
-            onReportStopped((streamOffsetMs + player.currentPosition) * TICKS_PER_MS)
+            if (hasReportedStart) {
+                onReportStopped((streamOffsetMs + player.currentPosition) * TICKS_PER_MS)
+            }
             player.release()
         }
     }
 
-    // Off, or a specific real text track: a plain real track selection
-    // override, no reload, since every text track was already declared
-    // on the MediaItem above before prepare() ever ran.
-    // Applied again once the tracks are known (onTracksChanged): right
-    // after prepare() there are none yet, and the choice used to be lost.
-    LaunchedEffect(player, selectedSubtitleIndex) {
+    LaunchedEffect(player, activeSideloadedTrack?.streamIndex) {
+        if (activeSideloadedTrack?.streamIndex != loadedSideloadedSubtitleIndex) {
+            loadedSideloadedSubtitleIndex = activeSideloadedTrack?.streamIndex
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            player.setMediaSource(buildPlayerMediaSource(activeSideloadedTrack), pos)
+            player.prepare()
+        }
+    }
+
+    LaunchedEffect(player, subtitleTracks, selectedSubtitleIndex) {
         subtitleMissingReported = false
-        applySubtitleSelection(player, selectedSubtitleIndex, selectedSubtitleLanguage)
+        applySubtitleSelection(player, subtitleTracks, selectedSubtitleIndex, selectedSubtitleLanguage)
     }
 
     LaunchedEffect(player, selectedAudioStreamIndex, directPlay) {
@@ -2432,7 +2459,12 @@ private fun selectAudioTrack(
 // counts from 0, so English SDH could pick the German track before it.
 // Failing that, a text track in the same language. Returns whether the
 // chosen track was found (true when subtitles are off).
-private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?, language: String?): Boolean {
+private fun applySubtitleSelection(
+    player: Player,
+    subtitleTracks: List<SubtitleTrackUiState>,
+    selectedSubtitleIndex: Int?,
+    language: String?,
+): Boolean {
     val params = player.trackSelectionParameters.buildUpon()
     params.clearOverridesOfType(C.TRACK_TYPE_TEXT)
     var found = selectedSubtitleIndex == null
@@ -2441,20 +2473,36 @@ private fun applySubtitleSelection(player: Player, selectedSubtitleIndex: Int?, 
     } else {
         params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
         val targetId = SIDELOADED_SUBTITLE_PREFIX + selectedSubtitleIndex
-        fun matches(id: String?) = id != null && (id == targetId || id.endsWith(":$targetId"))
+        fun matchesSideloaded(id: String?) = id != null && (id == targetId || id.endsWith(":$targetId"))
+        fun isSideloaded(id: String?) = id != null && (id.startsWith(SIDELOADED_SUBTITLE_PREFIX) || id.contains(":$SIDELOADED_SUBTITLE_PREFIX"))
+        val imageSubtitleMimeTypes = setOf(MimeTypes.APPLICATION_PGS, MimeTypes.APPLICATION_VOBSUB, MimeTypes.APPLICATION_DVBSUBS)
         val textGroups = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
         var choice: Pair<androidx.media3.common.Tracks.Group, Int>? = null
         for (group in textGroups) {
-            val i = (0 until group.length).firstOrNull { matches(group.getTrackFormat(it).id) } ?: continue
+            val i = (0 until group.length).firstOrNull { matchesSideloaded(group.getTrackFormat(it).id) } ?: continue
             choice = group to i
             break
         }
-        val wanted = normalizeLanguage(language)
-        if (choice == null && wanted != null) {
+        val targetTrack = subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }
+        val wanted = normalizeLanguage(language ?: targetTrack?.language)
+        if (choice == null) {
+            val embeddedTextCandidates = mutableListOf<Pair<androidx.media3.common.Tracks.Group, Int>>()
             for (group in textGroups) {
-                val i = (0 until group.length).firstOrNull { normalizeLanguage(group.getTrackFormat(it).language) == wanted } ?: continue
-                choice = group to i
-                break
+                for (i in 0 until group.length) {
+                    val format = group.getTrackFormat(i)
+                    if (!isSideloaded(format.id) && format.sampleMimeType !in imageSubtitleMimeTypes) {
+                        embeddedTextCandidates.add(group to i)
+                    }
+                }
+            }
+            fun languageOf(pair: Pair<androidx.media3.common.Tracks.Group, Int>) =
+                normalizeLanguage(pair.first.getTrackFormat(pair.second).language)
+            val ordinal = targetTrack?.embeddedTextOrdinal ?: -1
+            val byPosition = if (ordinal in embeddedTextCandidates.indices) embeddedTextCandidates[ordinal] else null
+            choice = when {
+                byPosition != null && (wanted == null || languageOf(byPosition) == null || languageOf(byPosition) == wanted) -> byPosition
+                wanted != null -> embeddedTextCandidates.firstOrNull { languageOf(it) == wanted } ?: byPosition
+                else -> byPosition
             }
         }
         if (choice != null) {
