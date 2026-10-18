@@ -12,9 +12,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
+private const val SERVICE_ROW_TIMEOUT_MS = 15_000L
 private const val SERVICE_ROW_LIMIT = 24
 private const val TOP_GENRES_LIMIT = 10
 private const val MIN_GENRE_COUNT = 3
@@ -77,19 +80,18 @@ class ServiceViewModel @Inject constructor(
                 var heroItem: BaseItemDto? = null
                 var heroRating = -1.0
 
-                matching.forEach { collection ->
+                // Every collection is fetched at once (they used to go one
+                // after another) and each row goes up as soon as it answers.
+                val fetches = matching.map { collection ->
                     val kind = repository.collectionKind(collection)
-                    val items = try {
-                        repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT)
-                    } catch (err: Exception) {
-                        emptyList()
-                    }
+                    Triple(collection, kind, async { runCatching { repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT) }.getOrDefault(emptyList()) })
+                }
+                fetches.forEach { (collection, kind, deferred) ->
+                    val items = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { deferred.await() }.orEmpty()
                     if (items.isEmpty()) return@forEach
                     rows.add(ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items, collectionId = collection.Id))
-                    // Real screens/service.js's own pickHeroItem(): whichever
-                    // real item across every matched collection carries a
-                    // real backdrop and rates highest, not always row
-                    // zero's own first card.
+                    // The best rated item with a backdrop across every
+                    // collection leads the page (screens/service.js's pickHeroItem()).
                     items.forEach { item ->
                         if (item.BackdropImageTags.isNullOrEmpty()) return@forEach
                         val rating = item.CommunityRating ?: 0.0
@@ -98,15 +100,21 @@ class ServiceViewModel @Inject constructor(
                             heroRating = rating
                         }
                     }
+                    _uiState.value = ServiceUiState(
+                        isLoading = false,
+                        serviceName = serviceName,
+                        heroItem = heroItem,
+                        rows = rows.toList(),
+                        topGenres = topGenres(rows),
+                    )
                 }
 
                 _uiState.value = ServiceUiState(
                     isLoading = false,
                     serviceName = serviceName,
                     heroItem = heroItem,
-                    rows = rows,
+                    rows = rows.toList(),
                     topGenres = topGenres(rows),
-                    canDeleteItems = repository.canDeleteItems(session.userId),
                 )
             } catch (err: Exception) {
                 _uiState.value = ServiceUiState(isLoading = false, error = err.message ?: "Could not load $serviceName", serviceName = serviceName)

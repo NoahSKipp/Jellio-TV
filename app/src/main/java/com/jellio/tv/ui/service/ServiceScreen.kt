@@ -76,8 +76,9 @@ fun ServiceScreen(
     val contentFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(serviceName) { viewModel.load(session, serviceName) }
-    LaunchedEffect(uiState.rows) {
-        if (uiState.rows.isNotEmpty()) contentFocusRequester.requestFocus()
+    // Once, when the first row arrives: rows keep arriving after that.
+    LaunchedEffect(uiState.rows.isNotEmpty()) {
+        if (uiState.rows.isNotEmpty()) runCatching { contentFocusRequester.requestFocus() }
     }
     val openItemOptions = rememberCardOptionsHost(
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
