@@ -82,7 +82,10 @@ data class HomeUiState(
 )
 
 private const val COMING_SOON_LIMIT = 12
-private const val CATALOG_ROW_LIMIT = 24
+// Fetched deeper than shown: titles already in an earlier row are dropped,
+// which used to leave catalog and genre rows with only a few cards.
+private const val CATALOG_ROW_LIMIT = 60
+private const val ROW_DISPLAY_LIMIT = 24
 // Real screens/home.js's own ROW_LIST_LIMIT: components/rowListModal.js's
 // own real "browse everything" fetchAll, a catalog or genre row's own
 // full real depth rather than the row's own small ROW_LIMIT.
@@ -95,7 +98,7 @@ private const val MIN_CATALOG_ITEMS = 3
 private const val MAX_ANIME_CATALOG_ROWS = 0
 
 private const val GENRE_ROWS = 4
-private const val GENRE_ROW_LIMIT = 24
+private const val GENRE_ROW_LIMIT = 60
 
 private data class SeasonalSpec(
     val title: String,
@@ -668,7 +671,7 @@ class HomeViewModel @Inject constructor(
     // One catalog row once its items arrive: titles a row already on
     // screen shows are left out, in the order rows arrive.
     private fun catalogSection(userId: String, entry: CatalogRowEntry, exclude: MutableSet<String>): HomeSection? {
-        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }.take(ROW_DISPLAY_LIMIT)
         deduped.forEach { item ->
             exclude.add(item.Id)
             exclude.add(titleKey(item))
@@ -708,7 +711,7 @@ class HomeViewModel @Inject constructor(
     // comment documents (recommendation rows first pick, then catalog,
     // genre rows last).
     private fun genreSection(userId: String, entry: GenreRowEntry, exclude: MutableSet<String>): HomeSection? {
-        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }
+        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }.take(ROW_DISPLAY_LIMIT)
         deduped.forEach { item ->
             exclude.add(item.Id)
             exclude.add(titleKey(item))
