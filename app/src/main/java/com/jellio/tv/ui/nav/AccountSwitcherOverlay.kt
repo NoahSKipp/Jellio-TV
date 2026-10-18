@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.nav
 
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -96,6 +97,7 @@ fun AccountSwitcherOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),

@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.nav
 
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -61,6 +62,7 @@ fun LibraryPickerOverlay(
         Column(
             modifier = Modifier
                 .width(360.dp)
+                .dismissOnBack(onDismiss)
                 .clip(RoundedCornerShape(16.dp))
                 .background(JellioBgElevated)
                 .border(1.dp, JellioBorder, RoundedCornerShape(16.dp))

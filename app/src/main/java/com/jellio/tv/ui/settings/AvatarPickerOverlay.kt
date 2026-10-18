@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.settings
 
+import com.jellio.tv.ui.common.dismissOnBack
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -128,6 +129,7 @@ fun AvatarPickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .focusGroup().focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),

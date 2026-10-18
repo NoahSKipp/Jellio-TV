@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -101,6 +102,7 @@ fun RowListModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .background(JellioBg)
             .focusProperties { onExit = { FocusRequester.Cancel } },
     ) {

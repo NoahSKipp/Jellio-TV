@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.library
 
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -114,6 +115,7 @@ fun LibraryFilterFieldOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .focusGroup().focusProperties { onExit = { FocusRequester.Cancel } },
     ) {
         Box(

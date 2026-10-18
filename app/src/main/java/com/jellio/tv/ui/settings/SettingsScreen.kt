@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.settings
 
+import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.tv.material3.Icon
@@ -534,6 +535,7 @@ private fun LanguagePickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.5f))
             .clickable(
