@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +51,7 @@ import java.util.Locale
 data class ShowcaseInfo(val item: BaseItemDto, val series: BaseItemDto?)
 
 private const val TICKS_PER_MINUTE = 10_000_000L * 60L
+private const val SHOWCASE_SETTLE_MS = 180L
 private val TmdbDark = Color(0xFF0D253F)
 private val TmdbGreen = Color(0xFF90CEA1)
 private val TmdbBlue = Color(0xFF01B4E4)
@@ -296,4 +300,42 @@ private fun TmdbBadge() {
             .background(Brush.horizontalGradient(listOf(TmdbGreen, TmdbBlue)), RoundedCornerShape(3.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp),
     )
+}
+
+// The showcase follows focus once it settles, so moving quickly along a row
+// doesn't start a backdrop load for every card passed.
+@Composable
+fun ShowcaseHost(
+    highlighted: androidx.compose.runtime.State<BaseItemDto?>,
+    fallback: BaseItemDto?,
+    loadInfo: suspend (BaseItemDto) -> ShowcaseInfo,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    modifier: Modifier = Modifier,
+) {
+    val active = highlighted.value ?: fallback
+    var shownItem by remember { mutableStateOf<BaseItemDto?>(null) }
+    var showcaseInfo by remember { mutableStateOf<ShowcaseInfo?>(null) }
+    LaunchedEffect(active?.Id) {
+        val target = active ?: return@LaunchedEffect
+        if (shownItem != null) kotlinx.coroutines.delay(SHOWCASE_SETTLE_MS)
+        shownItem = target
+        showcaseInfo = ShowcaseInfo(target, null)
+        showcaseInfo = loadInfo(target)
+    }
+    HomeItemShowcase(item = shownItem, info = showcaseInfo, imageUrl = imageUrl, modifier = modifier)
+}
+
+// What the showcase needs beyond a row item: its overview when the row came
+// without one, and an episode's show (logo, backdrop, airing status). Most
+// cards need nothing; otherwise one small cached request.
+suspend fun loadShowcaseInfo(repository: com.jellio.tv.data.JellioRepository, userId: String, item: BaseItemDto): ShowcaseInfo {
+    val isEpisode = item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
+    val seriesId = item.SeriesId?.takeIf { isEpisode }
+    val ids = buildList {
+        if (item.Overview.isNullOrBlank()) add(item.Id)
+        seriesId?.let(::add)
+    }
+    if (ids.isEmpty()) return ShowcaseInfo(item, null)
+    val fetched = runCatching { repository.getShowcaseItems(userId, ids) }.getOrDefault(emptyMap())
+    return ShowcaseInfo(fetched[item.Id] ?: item, seriesId?.let { fetched[it] })
 }

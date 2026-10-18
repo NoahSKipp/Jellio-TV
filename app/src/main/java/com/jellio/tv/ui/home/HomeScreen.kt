@@ -73,7 +73,6 @@ import kotlinx.coroutines.launch
 // on it.
 private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
-private const val SHOWCASE_SETTLE_MS = 180L
 
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
 // real rows, fetched from the real Jellio-Plugin backend rather than
@@ -376,29 +375,6 @@ fun HomeScreen(
             )
         }
     }
-}
-
-// The showcase follows focus once it settles, so moving quickly along a row
-// doesn't start a backdrop load for every card passed.
-@Composable
-private fun ShowcaseHost(
-    highlighted: androidx.compose.runtime.State<BaseItemDto?>,
-    fallback: BaseItemDto?,
-    loadInfo: suspend (BaseItemDto) -> ShowcaseInfo,
-    imageUrl: (BaseItemDto, String, Int) -> String,
-    modifier: Modifier = Modifier,
-) {
-    val active = highlighted.value ?: fallback
-    var shownItem by remember { mutableStateOf<BaseItemDto?>(null) }
-    var showcaseInfo by remember { mutableStateOf<ShowcaseInfo?>(null) }
-    LaunchedEffect(active?.Id) {
-        val target = active ?: return@LaunchedEffect
-        if (shownItem != null) kotlinx.coroutines.delay(SHOWCASE_SETTLE_MS)
-        shownItem = target
-        showcaseInfo = ShowcaseInfo(target, null)
-        showcaseInfo = loadInfo(target)
-    }
-    HomeItemShowcase(item = shownItem, info = showcaseInfo, imageUrl = imageUrl, modifier = modifier)
 }
 
 // Real port of components/homeCustomizer.js's own

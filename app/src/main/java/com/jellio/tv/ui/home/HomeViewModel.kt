@@ -475,20 +475,8 @@ class HomeViewModel @Inject constructor(
     // an optimistic-free round trip to the real server, then patched
     // back into whichever real row(s) actually hold this item, same
     // real reasoning updateItem() below documents.
-    // What Home's showcase needs beyond the row item: its overview when the
-    // row came without one, and an episode's show (logo, backdrop, airing
-    // status). Nothing to fetch for most cards; otherwise one small request.
-    suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo {
-        val isEpisode = item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
-        val seriesId = item.SeriesId?.takeIf { isEpisode }
-        val ids = buildList {
-            if (item.Overview.isNullOrBlank()) add(item.Id)
-            seriesId?.let(::add)
-        }
-        if (ids.isEmpty()) return ShowcaseInfo(item, null)
-        val fetched = runCatching { repository.getShowcaseItems(session.userId, ids) }.getOrDefault(emptyMap())
-        return ShowcaseInfo(fetched[item.Id] ?: item, seriesId?.let { fetched[it] })
-    }
+    suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo =
+        loadShowcaseInfo(repository, session.userId, item)
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {

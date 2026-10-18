@@ -379,6 +379,9 @@ class LibraryViewModel @Inject constructor(
             return@coroutineScope
         }
 
+        // The top row is only AniList's Trending catalog; any other catalog
+        // already has its own row below.
+        if (!coverflowIsTrending) coverflowSource = emptyList()
         val badge = if (coverflowIsTrending) "Trending on AniList" else null
         val canDelete = canDeleteDeferred.await()
         _uiState.value = LibraryUiState(
@@ -397,6 +400,9 @@ class LibraryViewModel @Inject constructor(
         )
         rowSnapshotStore.saveLibrarySnapshot(session.userId, libraryId, snapshot)
     }
+
+    suspend fun showcaseInfo(session: Session, item: BaseItemDto): com.jellio.tv.ui.home.ShowcaseInfo =
+        com.jellio.tv.ui.home.loadShowcaseInfo(repository, session.userId, item)
 
     // Real port of components/cardOptionsMenu.js's own Watchlist/Mark
     // Watched/Remove from Library options, same real handlers
