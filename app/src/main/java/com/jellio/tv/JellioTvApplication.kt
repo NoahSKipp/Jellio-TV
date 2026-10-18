@@ -12,6 +12,9 @@ import coil3.gif.GifDecoder
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
+import coil3.bitmapFactoryMaxParallelism
+import coil3.request.allowHardware
+import coil3.request.crossfade
 import coil3.util.DebugLogger
 import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
@@ -57,8 +60,8 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val sessionManager = entryPoint.sessionManager()
 
         val imageDispatcher = okhttp3.Dispatcher().apply {
-            maxRequests = 128
-            maxRequestsPerHost = 32
+            maxRequests = 32
+            maxRequestsPerHost = 16
         }
 
         val imageOkHttpClient = OkHttpClient.Builder()
@@ -122,9 +125,21 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                 }
                 add(SvgDecoder.Factory())
             }
+            // Memory cache, crossfade, precision, bitmap and decoder settings
+            // follow NuvioTV's NuvioApplication (GPL-3.0): a bigger share of
+            // RAM on roomier boxes, no global crossfade, inexact sizing and
+            // at most four decodes at once keep low end boxes scrolling.
             .memoryCache {
+                val activityManager = getSystemService(android.app.ActivityManager::class.java)
+                val memoryInfo = android.app.ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
+                val totalRamMb = memoryInfo.totalMem / (1024 * 1024)
+                val cachePercent = when {
+                    totalRamMb in 1..2048 -> 0.15
+                    totalRamMb in 2049..3072 -> 0.20
+                    else -> 0.25
+                }
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.25)
+                    .maxSizePercent(context, cachePercent)
                     .build()
             }
             .diskCache {
@@ -133,6 +148,10 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(250L * 1024 * 1024)
                     .build()
             }
+            .crossfade(false)
+            .precision(coil3.size.Precision.INEXACT)
+            .allowHardware(false)
+            .bitmapFactoryMaxParallelism(4)
             .apply { if (BuildConfig.DEBUG) logger(DebugLogger()) }
             .build()
     }
