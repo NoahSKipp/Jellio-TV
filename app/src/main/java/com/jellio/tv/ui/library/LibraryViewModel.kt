@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -39,6 +40,9 @@ private const val ROW_LIST_LIMIT = 500
 // A themed row needs this many matching titles to show.
 private const val MIN_THEMED_ITEMS = 6
 private const val ANIME_THEME_POOL = 150
+// How long one row's request may hold up the page before it is skipped.
+private const val ROW_TIMEOUT_MS = 15_000L
+private const val THEMED_TIMEOUT_MS = 8_000L
 
 private fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 
@@ -195,33 +199,17 @@ class LibraryViewModel @Inject constructor(
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = defaultSort[0], sortOrder = defaultSort[1])
             }.getOrDefault(emptyList())
         }
-        val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
         // discoverGenres is a real data dependency for the per-genre
         // fetch below, same real reason it stays its own real await
         // before that one fires, unlike the three above.
-        val genres = runCatching { repository.discoverGenres(session.userId, library.Id, itemType, GENRE_ROWS) }.getOrDefault(emptyList())
-        val genreItemsDeferred = genres.map { genre ->
-            genre to async {
-                runCatching { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIMIT) }.getOrDefault(emptyList())
-            }
+        val genresDeferred = async {
+            runCatching { repository.discoverGenres(session.userId, library.Id, itemType, GENRE_ROWS) }.getOrDefault(emptyList())
         }
+        val progressive = _uiState.value.isLoading
 
-        val excludeIds = excludeIdsDeferred.await()
+        val excludeIds = withTimeoutOrNull(ROW_TIMEOUT_MS) { excludeIdsDeferred.await() }.orEmpty()
         animeIds = excludeIds
-        // The time of day row; too few matches and the random picks stand in
-        // as plain Featured, so a themed name never sits over unrelated titles.
-        val themed = themedDeferred.await().filterNot { isAnime(it) }.take(ROW_LIMIT)
-        val useThemed = themed.size >= MIN_THEMED_ITEMS
-        val coverflowItems = if (useThemed) themed else coverflowItemsDeferred.await().filterNot { isAnime(it) }
-        val featuredTitle = if (useThemed) theme.title else null
-        val mainItems = mainItemsDeferred.await().filterNot { isAnime(it) }
-
-        // Real port of screens/library.js's own buildRow(...,
-        // fetchAll) calls for the main row and each genre row: neither
-        // one re-applies the anime exclude set inside its own fetchAll
-        // closure there either (only the initial row fetch above does),
-        // same real (if perhaps unintended) behaviour kept here rather
-        // than "fixed" beyond what that file actually does.
+        val mainItems = withTimeoutOrNull(ROW_TIMEOUT_MS) { mainItemsDeferred.await() }.orEmpty().filterNot { isAnime(it) }
         val mainRow = HomeSection(
             sortLabel(LIBRARY_SORT_OPTIONS.first().value),
             mainItems,
@@ -236,9 +224,36 @@ class LibraryViewModel @Inject constructor(
                 ).filterNot { isAnime(it) }
             },
         )
+        // Nothing on screen yet: rows go up as they arrive instead of all at
+        // the end, and any one request that hangs is skipped.
+        fun publish(coverflow: List<BaseItemDto>, badge: String?, sections: List<HomeSection>) {
+            if (!progressive) return
+            _uiState.value = LibraryUiState(
+                isLoading = false,
+                title = library.Name ?: "Library",
+                coverflowItems = coverflow,
+                coverflowBadge = badge,
+                mainRow = mainRow,
+                sections = sections,
+            )
+        }
+        publish(emptyList(), null, emptyList())
+
+        val themed = withTimeoutOrNull(THEMED_TIMEOUT_MS) { themedDeferred.await() }.orEmpty().filterNot { isAnime(it) }.take(ROW_LIMIT)
+        val useThemed = themed.size >= MIN_THEMED_ITEMS
+        val coverflowItems = if (useThemed) themed else withTimeoutOrNull(THEMED_TIMEOUT_MS) { coverflowItemsDeferred.await() }.orEmpty().filterNot { isAnime(it) }
+        val featuredTitle = if (useThemed) theme.title else null
+        publish(coverflowItems, featuredTitle, emptyList())
+
+        val genres = withTimeoutOrNull(ROW_TIMEOUT_MS) { genresDeferred.await() }.orEmpty()
+        val genreItemsDeferred = genres.map { genre ->
+            genre to async {
+                runCatching { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIMIT) }.getOrDefault(emptyList())
+            }
+        }
         val sections = mutableListOf<HomeSection>()
         genreItemsDeferred.forEach { (genre, deferred) ->
-            val items = deferred.await().filterNot { isAnime(it) }
+            val items = withTimeoutOrNull(ROW_TIMEOUT_MS) { deferred.await() }.orEmpty().filterNot { isAnime(it) }
             if (items.isNotEmpty()) {
                 sections.add(
                     HomeSection(
@@ -247,16 +262,11 @@ class LibraryViewModel @Inject constructor(
                         fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
                     ),
                 )
+                publish(coverflowItems, featuredTitle, sections.toList())
             }
         }
 
-        // Real feedback pointed at Harbor's own Shows tab, a mood-led
-        // line above its carousel that changes with the reader's own
-        // time of day: only the Shows library carries one, Movies has
-        // no equivalent real reference screenshot behind it.
-
-        val allGenres = allGenresDeferred.await().ifEmpty { genres }
-        val canDelete = canDeleteDeferred.await()
+        val allGenres = withTimeoutOrNull(ROW_TIMEOUT_MS) { allGenresDeferred.await() }.orEmpty().ifEmpty { genres }
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = library.Name ?: "Library",
@@ -266,7 +276,6 @@ class LibraryViewModel @Inject constructor(
             // Every genre the library has, not just the few with rows.
             genreOptions = allGenres,
             sections = sections,
-            canDeleteItems = canDelete,
         )
         val snapshot = LibrarySnapshot(
             title = library.Name ?: "Library",
@@ -336,13 +345,12 @@ class LibraryViewModel @Inject constructor(
     // showing nothing is the honest outcome when no catalog is
     // configured, not a copy of the Shows page.
     private suspend fun loadAnime(session: Session, libraryId: String) = coroutineScope {
-        val canDeleteDeferred = async { repository.canDeleteItems(session.userId) }
         val collections = runCatching { repository.getCollections(session.userId) }
             .getOrDefault(emptyList())
             .filter { repository.isAnimeCollection(it) }
 
         if (collections.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE, canDeleteItems = canDeleteDeferred.await())
+            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
             return@coroutineScope
         }
 
@@ -367,56 +375,43 @@ class LibraryViewModel @Inject constructor(
         // every real anime catalog's own item fetch fires together
         // instead of the second catalog waiting on the first one's own
         // response.
-        val itemLists = picked.map { collection ->
+        val progressive = _uiState.value.isLoading
+        val fetches = picked.map { collection ->
             collection to async { runCatching { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIMIT) }.getOrDefault(emptyList()) }
-        }.map { (collection, deferred) -> collection to deferred.await() }
-
-        // Real feedback: the coverflow used to feature whichever
-        // catalog actually had the most real items behind it, no real
-        // tie to whatever "Trending on AniList" badge happened to
-        // land on a row further down. The real Trending catalog, when
-        // this server actually has one, gets the coverflow now
-        // exclusively, and is skipped as its own row below once it
-        // becomes the hero instead (real feedback's own "two
-        // carousels" complaint), same real COVERFLOW_MIN_ITEMS floor
-        // components/libraryCoverflow.js's own MIN_SLIDES already
-        // enforces so a coverflow never mounts with nothing behind it.
-        var coverflowSource = emptyList<BaseItemDto>()
-        var coverflowIsTrending = false
-        var trendingId: String? = null
-        itemLists.forEach { (collection, items) ->
-            val name = collection.Name ?: ""
-            if (TRENDING_ANIME_NAME.containsMatchIn(name) && items.size >= COVERFLOW_MIN_ITEMS) {
-                trendingId = collection.Id
-                coverflowSource = items
-                coverflowIsTrending = true
-            } else if (!coverflowIsTrending && items.size > coverflowSource.size) {
-                coverflowSource = items
-            }
         }
 
-        // Real port of that file's own buildRow(collectionName, items,
-        // null, fetchAll) call for each anime catalog row: real
-        // getCollectionItems(collectionId, collectionType,
-        // ROW_LIST_LIMIT), collectionType fixed to "tvshows" the same
-        // way the initial per-catalog fetch above already is.
-        val sections = itemLists.mapNotNull { (collection, items) ->
-            if (collection.Id == trendingId || items.isEmpty()) {
-                null
+        // Rows go up one by one in catalog order as each answers, AniList
+        // Trending first as its own row; a catalog that hangs is skipped.
+        var coverflowSource = emptyList<BaseItemDto>()
+        val itemLists = mutableListOf<Pair<BaseItemDto, List<BaseItemDto>>>()
+        val sections = mutableListOf<HomeSection>()
+        fetches.forEach { (collection, deferred) ->
+            val items = withTimeoutOrNull(ROW_TIMEOUT_MS) { deferred.await() }.orEmpty()
+            itemLists += collection to items
+            if (items.isEmpty()) return@forEach
+            if (coverflowSource.isEmpty() && TRENDING_ANIME_NAME.containsMatchIn(collection.Name ?: "") && items.size >= COVERFLOW_MIN_ITEMS) {
+                coverflowSource = items
             } else {
-                HomeSection(
+                sections += HomeSection(
                     collection.Name ?: "",
                     items,
                     fetchAll = { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIST_LIMIT) },
                 )
             }
+            if (progressive) {
+                _uiState.value = LibraryUiState(
+                    isLoading = false,
+                    title = "Anime",
+                    coverflowItems = coverflowSource,
+                    coverflowBadge = if (coverflowSource.isNotEmpty()) "Trending on AniList" else null,
+                    sections = sections.toList(),
+                )
+            }
         }
 
-        // The time of day row, from this library's anime in the theme's
-        // genres plus everything the catalog rows hold, best matches first.
-        val ids = animeIdsDeferred.await()
-        // Already in one of the theme's genres (the server matched it).
-        val genreMatched = themedPoolDeferred.await().filter { it.Id.replace("-", "").lowercase() in ids }
+        val ids = withTimeoutOrNull(ROW_TIMEOUT_MS) { animeIdsDeferred.await() }.orEmpty()
+        val genreMatched = withTimeoutOrNull(THEMED_TIMEOUT_MS) { themedPoolDeferred.await() }.orEmpty()
+            .filter { it.Id.replace("-", "").lowercase() in ids }
         val genreMatchedIds = genreMatched.map { it.Id }.toSet()
         val pool = (genreMatched + itemLists.flatMap { it.second }).distinctBy { it.Id }
             .shuffled(kotlin.random.Random(Calendar.getInstance().get(Calendar.DAY_OF_YEAR)))
@@ -425,25 +420,20 @@ class LibraryViewModel @Inject constructor(
             .sortedByDescending { it.second }
             .map { it.first }
             .take(ROW_LIMIT)
-        val sectionsWithTheme = if (themed.size >= MIN_THEMED_ITEMS) listOf(HomeSection(theme.title, themed)) + sections else sections
+        val sectionsWithTheme = if (themed.size >= MIN_THEMED_ITEMS) listOf(HomeSection(theme.title, themed)) + sections else sections.toList()
 
-        if (sectionsWithTheme.isEmpty() && !coverflowIsTrending) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE, canDeleteItems = canDeleteDeferred.await())
+        if (sectionsWithTheme.isEmpty() && coverflowSource.isEmpty()) {
+            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
             return@coroutineScope
         }
 
-        // The top row is only AniList's Trending catalog; any other catalog
-        // already has its own row below.
-        if (!coverflowIsTrending) coverflowSource = emptyList()
-        val badge = if (coverflowIsTrending) "Trending on AniList" else null
-        val canDelete = canDeleteDeferred.await()
+        val badge = if (coverflowSource.isNotEmpty()) "Trending on AniList" else null
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = "Anime",
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
             sections = sectionsWithTheme,
-            canDeleteItems = canDelete,
         )
         val snapshot = LibrarySnapshot(
             title = "Anime",
