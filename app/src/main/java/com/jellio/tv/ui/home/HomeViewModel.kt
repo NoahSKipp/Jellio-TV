@@ -220,11 +220,6 @@ class HomeViewModel @Inject constructor(
                     // load, reported live as "loading takes forever".
                     val continueWatchingDeferred = async { runCatching { repository.getContinueWatching(session.userId) }.getOrDefault(emptyList()) }
                     val upNextDeferred = async { runCatching { repository.getNextUp(session.userId) }.getOrDefault(emptyList()) }
-                    // Real web hero (runtime/api.js's own getHeroCandidates())
-                    // never draws from Continue Watching at all, only a
-                    // random real Movie/Series: fetched independently rather
-                    // than reusing whatever led the rows above.
-                    val heroCandidatesDeferred = async { runCatching { repository.getHeroCandidates(session.userId) }.getOrDefault(emptyList()) }
                     val comingSoonDeferred = async { runCatching { repository.getCalendarEntries().take(COMING_SOON_LIMIT) }.getOrDefault(emptyList()) }
                     val collectionsDeferred = async { runCatching { repository.getCollections(session.userId) }.getOrDefault(emptyList()) }
                     val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
@@ -243,7 +238,8 @@ class HomeViewModel @Inject constructor(
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through exclude below) every discovery row.
                     animeIds = animeIdsDeferred.await()
-                    val heroCandidates = heroCandidatesDeferred.await().filterNot { isAnime(it) }
+                    // Home has no banner carousel any more, its showcase follows focus.
+                    val heroCandidates = emptyList<BaseItemDto>()
                     val user = userDeferred.await()
                     val customization = customizationDeferred.await()
                     // First open: the banner, Continue Watching and Up Next
@@ -479,6 +475,18 @@ class HomeViewModel @Inject constructor(
     // an optimistic-free round trip to the real server, then patched
     // back into whichever real row(s) actually hold this item, same
     // real reasoning updateItem() below documents.
+    // Full details for the showcase above the rows (row items carry no
+    // overview), plus the show for an episode: its logo, backdrop and
+    // whether it is still airing. Cached, and the title page reuses them.
+    suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo {
+        val details = runCatching { repository.getItemDetails(session.userId, item.Id) }.getOrNull() ?: item
+        val seriesId = (details.SeriesId ?: item.SeriesId)?.takeIf {
+            item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
+        }
+        val series = seriesId?.let { id -> runCatching { repository.getItemDetails(session.userId, id) }.getOrNull() }
+        return ShowcaseInfo(details, series)
+    }
+
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
             val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch

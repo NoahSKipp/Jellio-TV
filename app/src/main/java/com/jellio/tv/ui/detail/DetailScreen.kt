@@ -719,18 +719,20 @@ private fun SeasonsSection(
                 }
             }
         }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(state.selectedSeasonEpisodes, key = { it.Id }) { episode ->
-                EpisodeCard(
-                    episode = episode,
-                    imageUrl = imageUrl,
-                    onClick = { onEpisodeClick(episode.Id) },
-                    onOptionsClick = { onEpisodeOptions(episode) },
-                    onFocused = { onEpisodeFocused(episode.Id) },
-                )
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(state.selectedSeasonEpisodes, key = { it.Id }) { episode ->
+                    EpisodeCard(
+                        episode = episode,
+                        imageUrl = imageUrl,
+                        onClick = { onEpisodeClick(episode.Id) },
+                        onOptionsClick = { onEpisodeOptions(episode) },
+                        onFocused = { onEpisodeFocused(episode.Id) },
+                    )
+                }
             }
         }
     }
@@ -813,45 +815,47 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = "Cast", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val avatarWidth = 140.dp.scaled()
-        LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(cast, key = { it.Id }) { person ->
-                Surface(
-                    onClick = { onPersonClick(person.Id) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = Color.Transparent,
-                        focusedContainerColor = Color.White.copy(alpha = 0.25f),
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.dp, Color.White),
-                            shape = RoundedCornerShape(12.dp),
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(cast, key = { it.Id }) { person ->
+                    Surface(
+                        onClick = { onPersonClick(person.Id) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.Transparent,
+                            focusedContainerColor = Color.White.copy(alpha = 0.25f),
                         ),
-                    ),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-                    modifier = Modifier.width(avatarWidth),
-                ) {
-                    Column {
-                        Box(modifier = Modifier.width(avatarWidth).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
-                            val tag = person.PrimaryImageTag
-                            if (tag != null) {
-                                AsyncImage(
-                                    model = imageUrl(person.Id, tag, "Primary", 300),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, Color.White),
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                        modifier = Modifier.width(avatarWidth),
+                    ) {
+                        Column {
+                            Box(modifier = Modifier.width(avatarWidth).aspectRatio(1f).clip(CircleShape).background(JellioBgElevated)) {
+                                val tag = person.PrimaryImageTag
+                                if (tag != null) {
+                                    AsyncImage(
+                                        model = imageUrl(person.Id, tag, "Primary", 300),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
                             }
-                        }
-                        Text(
-                            text = person.Name.orEmpty(),
-                            color = JellioText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                        person.Role?.let {
-                            Text(text = it, color = JellioTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                text = person.Name.orEmpty(),
+                                color = JellioText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                            person.Role?.let {
+                                Text(text = it, color = JellioTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
@@ -865,38 +869,40 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = "Trailers", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val trailerCardWidth = 280.dp.scaled()
-        LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(trailers) { trailer ->
-                val url = trailer.Url ?: return@items
-                Surface(
-                    onClick = { onOpen(url) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = JellioBgElevated,
-                        contentColor = JellioText,
-                        focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                        focusedContentColor = JellioText,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.5.dp, Color.White),
-                            shape = RoundedCornerShape(12.dp),
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(trailers) { trailer ->
+                    val url = trailer.Url ?: return@items
+                    Surface(
+                        onClick = { onOpen(url) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = JellioBgElevated,
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.28f),
+                            focusedContentColor = JellioText,
                         ),
-                    ),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-                    modifier = Modifier.width(trailerCardWidth),
-                ) {
-                    Column {
-                        Box(modifier = Modifier.width(trailerCardWidth).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
-                            Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.5.dp, Color.White),
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                        modifier = Modifier.width(trailerCardWidth),
+                    ) {
+                        Column {
+                            Box(modifier = Modifier.width(trailerCardWidth).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
+                                Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
+                            }
+                            Text(
+                                text = trailer.Name ?: "Trailer",
+                                color = JellioText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(12.dp),
+                            )
                         }
-                        Text(
-                            text = trailer.Name ?: "Trailer",
-                            color = JellioText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(12.dp),
-                        )
                     }
                 }
             }

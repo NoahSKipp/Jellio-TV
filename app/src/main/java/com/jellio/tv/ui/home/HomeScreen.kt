@@ -73,6 +73,8 @@ import kotlinx.coroutines.launch
 // on it.
 private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
+private const val SHOWCASE_SETTLE_MS = 180L
+
 // Mirrors screens/home.js's own buildHomeSections(): a real hero over
 // real rows, fetched from the real Jellio-Plugin backend rather than
 // placeholder content.
@@ -209,11 +211,21 @@ fun HomeScreen(
                 val density = LocalDensity.current
                 val rowsViewportHeight = screenHeight * 0.54f
                 val topFixtureHeight = screenHeight - rowsViewportHeight
-                val activeHighlighted = highlightedItem ?: uiState.heroItems.firstOrNull() ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+                val activeHighlighted = highlightedItem ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+                // The showcase follows focus once it settles, so moving quickly
+                // along a row doesn't start a backdrop load for every card passed.
+                var shownItem by remember { mutableStateOf<BaseItemDto?>(null) }
+                var showcaseInfo by remember { mutableStateOf<ShowcaseInfo?>(null) }
+                LaunchedEffect(activeHighlighted?.Id) {
+                    val target = activeHighlighted ?: return@LaunchedEffect
+                    if (shownItem != null) kotlinx.coroutines.delay(SHOWCASE_SETTLE_MS)
+                    shownItem = target
+                    showcaseInfo = viewModel.showcaseInfo(session, target)
+                }
 
-                // Permanent fixture in the top portion of the screen (Nuvio-style background showcase)
                 HomeItemShowcase(
-                    item = activeHighlighted,
+                    item = shownItem,
+                    info = showcaseInfo,
                     imageUrl = imageUrl,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -223,7 +235,7 @@ fun HomeScreen(
 
                 // Scrollable rows in the bottom viewport
                 val verticalRowBringIntoViewSpec = remember(density) {
-                    val topInsetPx = with(density) { 48.dp.toPx() }
+                    val topInsetPx = with(density) { RowHeaderHeight.toPx() }
                     com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx) {
                         listState.canScrollBackward
                     }
@@ -269,39 +281,29 @@ fun HomeScreen(
                                         val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
                                         val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
                                         val onCardFocus = remember { { item: BaseItemDto -> highlightedItem = item } }
-                                        if (row.landscape) {
-                                            val onShatterFinished = remember(row, session) {
-                                                { item: BaseItemDto ->
-                                                    val isShowRemoval = removingTarget?.second == true
-                                                    removingTarget = null
-                                                    if (isShowRemoval) {
-                                                        viewModel.hideShowFromRow(item)
-                                                    } else {
-                                                        viewModel.removeFromRow(session, item)
-                                                    }
+                                        val onShatterFinished = remember(row, session) {
+                                            { item: BaseItemDto ->
+                                                val isShowRemoval = removingTarget?.second == true
+                                                removingTarget = null
+                                                if (isShowRemoval) {
+                                                    viewModel.hideShowFromRow(item)
+                                                } else {
+                                                    viewModel.removeFromRow(session, item)
                                                 }
                                             }
-                                            LandscapeRow(
-                                                section = row.section,
-                                                rawImageUrl = rawImageUrl,
-                                                onItemClick = onItemClick,
-                                                onTitleClick = onRowTitle,
-                                                onItemOptions = onRowOptions,
-                                                removingItemId = removingTarget?.first,
-                                                onShatterFinished = onShatterFinished,
-                                                onItemFocus = onCardFocus,
-                                            )
-                                        } else {
-                                            PosterRow(
-                                                section = row.section,
-                                                imageUrl = imageUrl,
-                                                onItemClick = onItemClick,
-                                                onItemOptions = onRowOptions,
-                                                onTitleClick = onRowTitle,
-                                                userImageUrl = userImageUrl,
-                                                onItemFocus = onCardFocus,
-                                            )
                                         }
+                                        PosterRow(
+                                            section = row.section,
+                                            imageUrl = imageUrl,
+                                            onItemClick = onItemClick,
+                                            onItemOptions = onRowOptions,
+                                            onTitleClick = onRowTitle,
+                                            userImageUrl = userImageUrl,
+                                            onItemFocus = onCardFocus,
+                                            progress = row.landscape,
+                                            removingItemId = if (row.landscape) removingTarget?.first else null,
+                                            onShatterFinished = onShatterFinished,
+                                        )
                                     }
                                     is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
                                     is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)

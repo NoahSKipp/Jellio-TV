@@ -116,8 +116,10 @@ fun PersonScreen(
                                     color = JellioText,
                                     modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
                                 )
-                                LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    items(uiState.filmography, key = { it.Id }) { work -> FilmographyCard(work, imageUrl, onClick = { onItemClick(work.Id) }) }
+                                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+                                    LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        items(uiState.filmography, key = { it.Id }) { work -> FilmographyCard(work, imageUrl, onClick = { onItemClick(work.Id) }) }
+                                    }
                                 }
                             }
                         }

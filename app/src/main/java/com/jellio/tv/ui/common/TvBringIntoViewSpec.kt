@@ -5,6 +5,11 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 // Replaces Compose Foundation's heavy spring() physics animation with a
 // lightweight, snappy 90ms tween for TV D-pad focus scrolling so scrolling
@@ -37,36 +42,28 @@ internal object TvBringIntoViewSpec : BringIntoViewSpec {
     }
 }
 
-// Dedicated BringIntoViewSpec for horizontal LazyRows on TV.
-// Maintains a leading margin on the left while anchoring the focused card
-// around the left 35-40% of the screen by providing a generous trailing margin (~52%).
-// This ensures upcoming cards continuously stream in from the right edge as the user
-// navigates right, all the way to the final "View All" expand button.
+// Horizontal rows: the focused card stays at the row's start edge, so the
+// cards after it keep sliding in from the right. Near the end the row can't
+// scroll any further and focus moves along to the last item (View All).
 @OptIn(ExperimentalFoundationApi::class)
-internal object TvHorizontalBringIntoViewSpec : BringIntoViewSpec {
+internal class TvHorizontalBringIntoViewSpec(private val leadingPx: Float) : BringIntoViewSpec {
     override val scrollAnimationSpec: AnimationSpec<Float> =
-        tween(durationMillis = 180, easing = FastOutSlowInEasing)
+        tween(durationMillis = 200, easing = FastOutSlowInEasing)
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        if (size >= containerSize) return offset
-
-        val leadingMargin = (containerSize * 0.05f).coerceAtLeast(60f)
-        val trailingMargin = containerSize * 0.52f
-
-        if (offset < leadingMargin) {
-            return offset - leadingMargin
-        }
-        if (offset + size > containerSize - trailingMargin) {
-            return (offset + size) - (containerSize - trailingMargin)
-        }
-        return 0f
+        val target = if (containerSize - leadingPx < size) containerSize - size else leadingPx
+        return offset - target
     }
 }
 
-// Dedicated BringIntoViewSpec for vertical LazyColumn hosting horizontal media rows.
-// Keeps the active/focused row pinned neatly at the top of the rows viewport,
-// offsetting by the row title height so the row heading sits right below the
-// fixed top showcase and cards remain fully visible without getting pushed down.
+@Composable
+internal fun rememberTvHorizontalBringIntoViewSpec(leading: Dp = 48.dp): BringIntoViewSpec {
+    val density = LocalDensity.current
+    return remember(density, leading) { TvHorizontalBringIntoViewSpec(with(density) { leading.toPx() }) }
+}
+
+// Vertical list of rows under Home's showcase: the focused card always lands
+// topInsetPx below the top of the list, which leaves room for its row title.
 @OptIn(ExperimentalFoundationApi::class)
 internal class TvVerticalRowBringIntoViewSpec(
     private val topInsetPx: Float = 0f,

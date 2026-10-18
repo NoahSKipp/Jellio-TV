@@ -114,7 +114,9 @@ class MainActivity : ComponentActivity() {
                     val insetX = if (isCalibrating) 0.dp else (config.screenWidthDp * (overscanPercent / 100f) / 2f).dp
                     val insetY = if (isCalibrating) 0.dp else (config.screenHeightDp * (overscanPercent / 100f) / 2f).dp
                     Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+                        // One dark ground behind every screen and the sidebar alike.
                         Surface(
+                            colors = androidx.tv.material3.SurfaceDefaults.colors(containerColor = JellioBg),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(androidx.compose.ui.graphics.Color.Black)

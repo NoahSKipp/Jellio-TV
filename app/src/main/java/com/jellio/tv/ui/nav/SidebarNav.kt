@@ -189,7 +189,9 @@ fun SidebarNav(
             // overlays once expanded, absent while collapsed and
             // sitting flush against real reserved layout space instead.
             .shadow(elevation = if (shadowAlpha > 0f) 24.dp else 0.dp, shape = RoundedCornerShape(0.dp))
-            .background(JellioBg)
+            // See-through while collapsed so it shares the screen's own
+            // background; solid once it opens over the content.
+            .background(JellioBg.copy(alpha = (shadowAlpha * 2f).coerceIn(0f, 1f)))
             .padding(vertical = 20.dp, horizontal = 10.dp)
             // Real port of .jellio-sidebar's own :focus-within: Compose's
             // own FocusState.hasFocus already means exactly that (this

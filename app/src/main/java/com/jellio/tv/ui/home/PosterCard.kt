@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -60,169 +62,142 @@ import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.delay
 import java.util.Locale
 
-// Real gap found live right after prefetch-on-focus shipped: D-pad
-// scrolling through a long row focused, and so fired a prefetch for,
-// every card passed over on the way to the one a reader actually
-// stopped on: wasted round trips against their own addon/debrid/TMDb
-// rate limits for titles nobody was ever about to open. Mirrors
-// components/card.js's own PREFETCH_DEBOUNCE_MS: only fires once focus
-// actually lingers past this, not on every transient landing.
-// Only a card the viewer stays on: moving along a row never prefetches.
+// Only a card the viewer stays on prefetches its streams, never every card
+// passed over on the way along a row (mirrors components/card.js).
 private const val PREFETCH_DEBOUNCE_MS = 600L
 
-// Sized to 126.dp x 189.dp standard portrait cards, expanding to 336.dp
-// (16:9 banner) when focused.
+// How long a card has to stay focused before it widens into its banner.
+private const val EXPAND_DELAY_MS = 2500L
+private const val EXPAND_ANIMATION_MS = 220
+private const val TICKS_PER_MINUTE = 10_000_000L * 60L
+
 internal val PosterWidth = 126.dp
 
-// Ordered fallback list of candidate image URLs for a poster card, matching
-// Jellio Web components/card.js cardImageCandidates(): tries tagged Primary,
-// untagged Primary (bypassing stale tags or transient first-hit remote fetch
-// timeouts), Series Primary, Parent Thumb, Parent Primary, Album Primary,
-// Thumb, Backdrop, and Parent Backdrop.
+private fun imageFor(
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    id: String,
+    tag: String?,
+    type: String,
+    maxWidth: Int,
+): String {
+    val synthetic = BaseItemDto(
+        Id = id,
+        ImageTags = if (!tag.isNullOrEmpty() && type != "Backdrop") mapOf(type to tag) else emptyMap(),
+        BackdropImageTags = if (!tag.isNullOrEmpty() && type == "Backdrop") listOf(tag) else emptyList(),
+    )
+    return imageUrl(synthetic, type, maxWidth)
+}
+
+private class CandidateList(
+    private val imageUrl: (BaseItemDto, String, Int) -> String,
+    private val maxWidth: Int,
+) {
+    val urls = LinkedHashSet<String>()
+
+    fun tagged(id: String?, tag: String?, type: String) {
+        if (id.isNullOrBlank() || tag.isNullOrBlank()) return
+        imageFor(imageUrl, id, tag, type, maxWidth).takeIf { it.isNotBlank() }?.let(urls::add)
+    }
+
+    fun untagged(id: String?, type: String) {
+        if (id.isNullOrBlank()) return
+        imageFor(imageUrl, id, null, type, maxWidth).takeIf { it.isNotBlank() }?.let(urls::add)
+    }
+
+    fun both(id: String?, tag: String?, type: String) {
+        tagged(id, tag, type)
+        untagged(id, type)
+    }
+}
+
+private fun BaseItemDto.isEpisodeLike(): Boolean =
+    Type.equals("Episode", ignoreCase = true) || Type.equals("Season", ignoreCase = true)
+
+// Poster art for a 2:3 card (mirrors components/card.js cardImageCandidates).
+// seriesFirst puts the show's poster ahead of an episode's own 16:9 still.
 internal fun posterImageCandidates(
     item: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
     maxWidth: Int = 400,
+    seriesFirst: Boolean = false,
 ): List<String> {
-    val urls = LinkedHashSet<String>()
-    fun buildUrl(targetId: String, tag: String?, type: String): String {
-        val synthetic = BaseItemDto(
-            Id = targetId,
-            ImageTags = if (!tag.isNullOrEmpty() && type != "Backdrop") mapOf(type to tag) else emptyMap(),
-            BackdropImageTags = if (!tag.isNullOrEmpty() && type == "Backdrop") listOf(tag) else emptyList(),
-        )
-        return imageUrl(synthetic, type, maxWidth)
-    }
-    fun push(targetId: String?, tag: String?, type: String = "Primary", includeUntagged: Boolean = true) {
-        if (targetId.isNullOrBlank()) return
-        if (!tag.isNullOrBlank()) {
-            val tagged = buildUrl(targetId, tag, type)
-            if (tagged.isNotBlank()) urls.add(tagged)
-        }
-        if (includeUntagged) {
-            val untagged = buildUrl(targetId, null, type)
-            if (untagged.isNotBlank()) urls.add(untagged)
-        }
-    }
-
-    val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
-    push(item.Id, primaryTag, "Primary", includeUntagged = true)
-
+    val list = CandidateList(imageUrl, maxWidth)
     val seriesPrimaryTag = item.SeriesPrimaryImageTag ?: item.ImageTags?.get("SeriesPrimary")
-    push(item.SeriesId, seriesPrimaryTag, "Primary", includeUntagged = true)
-
-    push(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb", includeUntagged = true)
-
-    val parentPrimaryId = item.ParentPrimaryImageItemId ?: item.ParentId
-    push(parentPrimaryId, item.ParentPrimaryImageTag, "Primary", includeUntagged = true)
-
-    push(item.AlbumId, item.AlbumPrimaryImageTag, "Primary", includeUntagged = true)
-
-    val thumbTag = item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
-    if (!thumbTag.isNullOrBlank()) {
-        push(item.Id, thumbTag, "Thumb", includeUntagged = true)
-    }
-
-    val backdropTag = item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop")
-    if (!backdropTag.isNullOrBlank()) {
-        push(item.Id, backdropTag, "Backdrop", includeUntagged = true)
-    }
-
-    val parentBackdropTag = item.ParentBackdropImageTags?.firstOrNull()
-    if (!item.ParentBackdropItemId.isNullOrBlank() && !parentBackdropTag.isNullOrBlank()) {
-        push(item.ParentBackdropItemId, parentBackdropTag, "Backdrop", includeUntagged = true)
-    }
-
-    push(item.Id, null, "Thumb", includeUntagged = true)
-    push(item.Id, null, "Backdrop", includeUntagged = true)
-
-    return urls.toList()
+    if (seriesFirst && item.isEpisodeLike()) list.both(item.SeriesId, seriesPrimaryTag, "Primary")
+    list.both(item.Id, item.ImageTags?.get("Primary") ?: item.PrimaryImageTag, "Primary")
+    list.both(item.SeriesId, seriesPrimaryTag, "Primary")
+    list.tagged(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb")
+    list.both(item.ParentPrimaryImageItemId ?: item.ParentId, item.ParentPrimaryImageTag, "Primary")
+    list.both(item.AlbumId, item.AlbumPrimaryImageTag, "Primary")
+    list.tagged(item.Id, item.ImageTags?.get("Thumb") ?: item.ThumbImageTag, "Thumb")
+    list.tagged(item.Id, item.BackdropImageTags?.firstOrNull(), "Backdrop")
+    list.tagged(item.ParentBackdropItemId, item.ParentBackdropImageTags?.firstOrNull(), "Backdrop")
+    list.untagged(item.Id, "Thumb")
+    list.untagged(item.Id, "Backdrop")
+    return list.urls.toList()
 }
 
-// Ordered candidate image URLs for the 16:9 backdrop view of an expanded poster card.
+// Wide art for the banner card and the Home showcase. An episode carries no
+// backdrop of its own, so its show's comes first unless episodeStill asks for
+// the episode's own picture (Continue Watching, Up Next).
 internal fun posterBackdropCandidates(
     item: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
     maxWidth: Int = 800,
+    episodeStill: Boolean = false,
+    series: BaseItemDto? = null,
 ): List<String> {
-    val urls = LinkedHashSet<String>()
-    fun buildUrl(targetId: String, tag: String?, type: String): String {
-        val synthetic = BaseItemDto(
-            Id = targetId,
-            BackdropImageTags = if (!tag.isNullOrEmpty() && type == "Backdrop") listOf(tag) else emptyList(),
-            ImageTags = if (!tag.isNullOrEmpty() && type != "Backdrop") mapOf(type to tag) else emptyMap(),
-        )
-        return imageUrl(synthetic, type, maxWidth)
-    }
-    fun push(targetId: String?, tag: String?, type: String = "Backdrop") {
-        if (targetId.isNullOrBlank()) return
-        if (!tag.isNullOrBlank()) {
-            val tagged = buildUrl(targetId, tag, type)
-            if (tagged.isNotBlank()) urls.add(tagged)
-        }
-        val untagged = buildUrl(targetId, null, type)
-        if (untagged.isNotBlank()) urls.add(untagged)
-    }
-
-    val backdropTag = item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop")
-    push(item.Id, backdropTag, "Backdrop")
-
-    val parentBackdropTag = item.ParentBackdropImageTags?.firstOrNull()
-    if (!item.ParentBackdropItemId.isNullOrBlank()) {
-        push(item.ParentBackdropItemId, parentBackdropTag, "Backdrop")
-    }
-    if (!item.SeriesId.isNullOrBlank()) {
-        push(item.SeriesId, null, "Backdrop")
-    }
-
-    val thumbTag = item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
-    push(item.Id, thumbTag, "Thumb")
-    val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
-    push(item.Id, primaryTag, "Primary")
-
-    return urls.toList()
+    val list = CandidateList(imageUrl, maxWidth)
+    val ownPrimary = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
+    if (episodeStill && item.isEpisodeLike()) list.tagged(item.Id, ownPrimary, "Primary")
+    list.tagged(item.Id, item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop"), "Backdrop")
+    if (series != null) list.tagged(series.Id, series.BackdropImageTags?.firstOrNull(), "Backdrop")
+    list.tagged(item.ParentBackdropItemId, item.ParentBackdropImageTags?.firstOrNull(), "Backdrop")
+    list.untagged(item.SeriesId, "Backdrop")
+    list.tagged(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb")
+    list.tagged(item.Id, item.ImageTags?.get("Thumb") ?: item.ThumbImageTag, "Thumb")
+    if (item.isEpisodeLike()) list.tagged(item.Id, ownPrimary, "Primary")
+    list.untagged(item.Id, "Backdrop")
+    list.tagged(item.Id, ownPrimary, "Primary")
+    return list.urls.toList()
 }
 
-// Ordered candidate image URLs for the clear logo of an item.
+// Clear logo: the item's own, else its show's.
 internal fun posterLogoCandidates(
     item: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
     maxWidth: Int = 400,
+    series: BaseItemDto? = null,
 ): List<String> {
-    val urls = LinkedHashSet<String>()
-    fun buildUrl(targetId: String, tag: String?, type: String): String {
-        val synthetic = BaseItemDto(
-            Id = targetId,
-            ImageTags = if (!tag.isNullOrEmpty()) mapOf(type to tag) else emptyMap(),
-        )
-        return imageUrl(synthetic, type, maxWidth)
-    }
-    fun push(targetId: String?, tag: String?, type: String = "Logo") {
-        if (targetId.isNullOrBlank()) return
-        if (!tag.isNullOrBlank()) {
-            val tagged = buildUrl(targetId, tag, type)
-            if (tagged.isNotBlank()) urls.add(tagged)
-        }
-        val untagged = buildUrl(targetId, null, type)
-        if (untagged.isNotBlank()) urls.add(untagged)
-    }
-
-    val logoTag = item.ImageTags?.get("Logo")
-    push(item.Id, logoTag, "Logo")
-
-    if (!item.ParentLogoItemId.isNullOrBlank()) {
-        push(item.ParentLogoItemId, item.ParentLogoImageTag, "Logo")
-    }
-    if (!item.SeriesId.isNullOrBlank()) {
-        push(item.SeriesId, null, "Logo")
-    }
-
-    return urls.toList()
+    val list = CandidateList(imageUrl, maxWidth)
+    list.tagged(item.Id, item.ImageTags?.get("Logo"), "Logo")
+    if (series != null) list.tagged(series.Id, series.ImageTags?.get("Logo"), "Logo")
+    list.tagged(item.ParentLogoItemId, item.ParentLogoImageTag, "Logo")
+    list.untagged(item.SeriesId, "Logo")
+    if (!item.isEpisodeLike()) list.untagged(item.Id, "Logo")
+    return list.urls.toList()
 }
 
-// Compact portrait poster card (126.dp x 189.dp) that expands into a 16:9 banner card
-// (336.dp wide) after a lingering focus delay, displaying the backdrop image and ClearLogo
-// with a clean white focus ring. Moving away collapses the card back down immediately.
+internal fun episodeLabel(item: BaseItemDto): String {
+    if (!item.Type.equals("Episode", ignoreCase = true)) return ""
+    val season = item.ParentIndexNumber ?: return ""
+    val episode = item.IndexNumber ?: return ""
+    return "S$season E$episode"
+}
+
+private fun remainingLabel(item: BaseItemDto): String {
+    val runTicks = item.RunTimeTicks ?: return ""
+    val posTicks = item.UserData?.PlaybackPositionTicks ?: return ""
+    if (runTicks <= 0 || posTicks <= 0 || posTicks >= runTicks) return ""
+    val minutes = Math.round((runTicks - posTicks).toDouble() / TICKS_PER_MINUTE)
+    return if (minutes > 0) "${minutes}m left" else ""
+}
+
+// A 2:3 poster that widens into a 16:9 banner (backdrop plus logo) once it has
+// been focused for EXPAND_DELAY_MS, and narrows again as soon as focus leaves.
+// progress is the Continue Watching / Up Next look: the show's poster, then
+// the episode's own still when widened, with the time left and a progress bar.
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PosterCard(
     item: BaseItemDto,
@@ -233,30 +208,32 @@ fun PosterCard(
     userImageUrl: ((String, String?) -> String)? = null,
     canExpand: Boolean = true,
     onFocus: ((BaseItemDto) -> Unit)? = null,
+    progress: Boolean = false,
+    isRemoving: Boolean = false,
+    onShatterFinished: () -> Unit = {},
 ) {
     val baseWidth = PosterWidth.scaled()
     val baseHeight = (PosterWidth * 1.5f).scaled()
-    val expandedWidth = (baseHeight * (16f / 9f))
+    val expandedWidth = baseHeight * (16f / 9f)
     val prefetch = LocalGelatoPrefetch.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
     var isExpanded by remember { mutableStateOf(false) }
+    val bringIntoView = remember { BringIntoViewRequester() }
 
     LaunchedEffect(isFocused, canExpand) {
-        if (!isFocused || !canExpand) {
-            isExpanded = false
-            return@LaunchedEffect
-        }
         isExpanded = false
-        delay(450L)
-        if (isFocused && canExpand) {
-            isExpanded = true
-        }
+        if (!isFocused || !canExpand) return@LaunchedEffect
+        delay(EXPAND_DELAY_MS)
+        isExpanded = true
+        // A card near the end of a row grows past the right edge; once it
+        // has finished widening, scroll the row so all of it shows.
+        delay(EXPAND_ANIMATION_MS + 40L)
+        runCatching { bringIntoView.bringIntoView() }
     }
 
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
-            onFocus?.invoke(item)
             delay(PREFETCH_DEBOUNCE_MS)
             if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) {
                 prefetch(item)
@@ -273,211 +250,223 @@ fun PosterCard(
         }
     }
 
-    val targetWidth = if (isExpanded) expandedWidth else baseWidth
     val animatedWidth by animateDpAsState(
-        targetValue = targetWidth,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        targetValue = if (isExpanded) expandedWidth else baseWidth,
+        animationSpec = tween(durationMillis = EXPAND_ANIMATION_MS, easing = FastOutSlowInEasing),
         label = "posterCardWidth",
     )
 
-    val candidates = remember(item, imageUrl) { posterImageCandidates(item, imageUrl, 400) }
+    val candidates = remember(item, imageUrl, progress) { posterImageCandidates(item, imageUrl, 400, seriesFirst = progress) }
     var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeUrl = candidates.getOrNull(candidateIndex)
 
-    val backdropCandidates = remember(item, imageUrl) { posterBackdropCandidates(item, imageUrl, 800) }
+    val backdropCandidates = remember(item, imageUrl, progress) { posterBackdropCandidates(item, imageUrl, 800, episodeStill = progress) }
     var backdropIndex by remember(item.Id, backdropCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
 
     val logoCandidates = remember(item, imageUrl) { posterLogoCandidates(item, imageUrl, 300) }
     var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeLogoUrl = logoCandidates.getOrNull(logoIndex)
-    var logoLoadFailed by remember(item.Id) { mutableStateOf(false) }
 
-    Box(modifier = modifier.width(animatedWidth)) {
-        Surface(
-            onClick = onClick,
-            onLongClick = onOptionsClick,
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = JellioBgElevated,
-                contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                focusedContentColor = JellioText,
-            ),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(2.dp, Color.White),
-                    shape = RoundedCornerShape(12.dp),
-                )
-            ),
-            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
-            modifier = Modifier
-                .width(animatedWidth)
-                .height(baseHeight)
-                .onFocusChanged { state ->
-                    isFocused = state.isFocused
-                    if (state.isFocused) {
-                        onFocus?.invoke(item)
-                    }
-                },
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (isExpanded) {
-                    if (activeBackdropUrl != null) {
-                        AsyncImage(
-                            model = activeBackdropUrl,
-                            contentDescription = item.Name,
-                            contentScale = ContentScale.Crop,
-                            onError = {
-                                if (backdropIndex < backdropCandidates.size - 1) {
-                                    backdropIndex += 1
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+    val episode = episodeLabel(item)
+    val remaining = if (progress) remainingLabel(item) else ""
+    val percentage = item.UserData?.PlayedPercentage?.takeIf { it > 0 && item.UserData?.Played != true }
 
-                    // Bottom gradient overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.65f)
-                            .align(Alignment.BottomStart)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.85f),
-                                    )
-                                )
-                            )
+    if (isRemoving) {
+        Box(modifier = modifier.width(baseWidth).height(baseHeight)) {
+            val shatterUrl = activeUrl ?: candidates.firstOrNull()
+            if (shatterUrl != null) {
+                CardShatterOverlay(imageUrl = shatterUrl, cardWidth = baseWidth, cardHeight = baseHeight, onFinished = onShatterFinished)
+            } else {
+                LaunchedEffect(item.Id) { onShatterFinished() }
+            }
+        }
+        return
+    }
+
+    Surface(
+        onClick = onClick,
+        onLongClick = onOptionsClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = JellioBgElevated,
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(12.dp),
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
+        modifier = modifier
+            .bringIntoViewRequester(bringIntoView)
+            .width(animatedWidth)
+            .height(baseHeight)
+            .onFocusChanged { state ->
+                if (state.isFocused && !isFocused) onFocus?.invoke(item)
+                isFocused = state.isFocused
+            },
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isExpanded) {
+                if (activeBackdropUrl != null) {
+                    AsyncImage(
+                        model = activeBackdropUrl,
+                        contentDescription = item.Name,
+                        contentScale = ContentScale.Crop,
+                        onError = { if (backdropIndex < backdropCandidates.size) backdropIndex += 1 },
+                        modifier = Modifier.fillMaxSize(),
                     )
-
-                    // Clearlogo or Title overlay at bottom-left
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 12.dp, bottom = 10.dp, end = 12.dp)
-                            .fillMaxWidth(0.70f)
-                    ) {
-                        if (!activeLogoUrl.isNullOrBlank() && !logoLoadFailed) {
-                            AsyncImage(
-                                model = activeLogoUrl,
-                                contentDescription = item.Name,
-                                onError = {
-                                    if (logoIndex + 1 < logoCandidates.size) {
-                                        logoIndex += 1
-                                    } else {
-                                        logoLoadFailed = true
-                                    }
-                                },
-                                contentScale = ContentScale.Fit,
-                                alignment = Alignment.BottomStart,
-                                modifier = Modifier
-                                    .height(36.dp.scaled())
-                                    .fillMaxWidth(),
-                            )
-                        } else {
-                            Text(
-                                text = item.Name ?: item.SeriesName ?: "",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                } else {
-                    if (activeUrl != null) {
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.7f)
+                        .align(Alignment.BottomStart)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)))),
+                )
+                if (remaining.isNotEmpty()) {
+                    CardChip(text = remaining, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, end = 12.dp, bottom = if (percentage != null) 12.dp else 10.dp)
+                        .fillMaxWidth(0.75f),
+                ) {
+                    if (activeLogoUrl != null) {
                         AsyncImage(
-                            model = activeUrl,
-                            contentDescription = item.Name,
-                            contentScale = ContentScale.Crop,
-                            onError = {
-                                if (candidateIndex < candidates.size - 1) {
-                                    candidateIndex += 1
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize(),
+                            model = activeLogoUrl,
+                            contentDescription = item.SeriesName ?: item.Name,
+                            onError = { logoIndex += 1 },
+                            contentScale = ContentScale.Fit,
+                            alignment = Alignment.BottomStart,
+                            modifier = Modifier.height(40.dp.scaled()).fillMaxWidth(),
                         )
                     } else {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(JellioBgElevated)
-                                .padding(12.dp),
-                        ) {
-                            Text(
-                                text = item.Name ?: item.SeriesName ?: "",
-                                color = JellioText.copy(alpha = 0.75f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 4,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            )
-                        }
+                        Text(
+                            text = if (item.isEpisodeLike()) item.SeriesName ?: item.Name.orEmpty() else item.Name.orEmpty(),
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    val watchers = item.Watchers
-                    if (!watchers.isNullOrEmpty()) {
-                        WatchersBadge(
-                            watchers = watchers,
-                            userImageUrl = userImageUrl,
+                    if (progress && episode.isNotEmpty()) {
+                        Text(
+                            text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            } else {
+                if (activeUrl != null) {
+                    AsyncImage(
+                        model = activeUrl,
+                        contentDescription = item.Name,
+                        contentScale = ContentScale.Crop,
+                        onError = { if (candidateIndex < candidates.size) candidateIndex += 1 },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(JellioBgElevated)
+                            .padding(12.dp),
+                    ) {
+                        Text(
+                            text = item.SeriesName ?: item.Name.orEmpty(),
+                            color = JellioText.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
+                }
+                val watchers = item.Watchers
+                if (!watchers.isNullOrEmpty()) {
+                    WatchersBadge(
+                        watchers = watchers,
+                        userImageUrl = userImageUrl,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                    )
+                }
+                if (!progress) {
+                    item.CommunityRating?.let { rating ->
+                        CardChip(
+                            text = String.format(Locale.US, "%.1f", rating),
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
+                                .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
                                 .padding(6.dp),
                         )
                     }
-                    item.CommunityRating?.let { rating ->
-                        Text(
-                            text = String.format(Locale.US, "%.1f ★", rating),
-                            color = JellioText,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier
-                                .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
-                                .padding(6.dp)
-                                .background(JellioBg.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                    val userData = item.UserData
-                    if (userData?.Played == true) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = JellioBg,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .size(20.dp)
-                                .background(JellioSecondary, CircleShape)
-                                .padding(3.dp),
-                        )
-                    } else {
-                        val percentage = userData?.PlayedPercentage
-                        if (percentage != null && percentage > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .background(Color.White.copy(alpha = 0.25f)),
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(minOf(100.0, percentage).toFloat() / 100f)
-                                        .height(4.dp)
-                                        .background(JellioSecondary),
-                                )
-                            }
-                        }
-                    }
+                }
+                if (progress && episode.isNotEmpty()) {
+                    CardChip(
+                        text = episode,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 6.dp, bottom = if (percentage != null) 10.dp else 6.dp),
+                    )
+                }
+                if (item.UserData?.Played == true) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = JellioBg,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .size(20.dp)
+                            .background(JellioSecondary, CircleShape)
+                            .padding(3.dp),
+                    )
+                }
+            }
+            if (percentage != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .background(Color.White.copy(alpha = 0.25f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(minOf(100.0, percentage).toFloat() / 100f)
+                            .height(4.dp)
+                            .background(JellioSecondary),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CardChip(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        color = JellioText,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }
 
 // Real port of components/cardOptionsMenu.js's own real content

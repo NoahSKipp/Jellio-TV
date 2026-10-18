@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -38,7 +40,7 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import com.jellio.tv.ui.common.TvHorizontalBringIntoViewSpec
+import com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec
 
 // Mirrors components/row.js: a title (the real library/Continue
 // Watching name, not an invented category) over a horizontally
@@ -53,17 +55,22 @@ fun PosterRow(
     onTitleClick: (() -> Unit)? = null,
     userImageUrl: ((String, String?) -> String)? = null,
     onItemFocus: ((BaseItemDto) -> Unit)? = null,
+    // Continue Watching / Up Next look, and the card mid removal (see
+    // HomeScreen's removingTarget).
+    progress: Boolean = false,
+    removingItemId: String? = null,
+    onShatterFinished: (BaseItemDto) -> Unit = {},
 ) {
     val rowItems = remember(section.items) { section.items.take(20) }
     if (rowItems.isEmpty()) return
-    Column(modifier = modifier.padding(vertical = 12.dp)) {
+    Column(modifier = modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
-        CompositionLocalProvider(LocalBringIntoViewSpec provides TvHorizontalBringIntoViewSpec) {
+        CompositionLocalProvider(LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 state = rememberTvRowState(),
                 contentPadding = PaddingValues(horizontal = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.rowEntry(firstCard),
             ) {
                 // Real feedback live: a focusable heading blocked ordinary
@@ -86,6 +93,9 @@ fun PosterRow(
                             userImageUrl = userImageUrl,
                             canExpand = true,
                             onFocus = onItemFocus,
+                            progress = progress,
+                            isRemoving = removingItemId == item.Id,
+                            onShatterFinished = { onShatterFinished(item) },
                         )
                     }
                 }
@@ -111,18 +121,28 @@ fun RowTitle(text: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
+            fontSize = RowTitleFontSize,
+            fontWeight = FontWeight.SemiBold,
+            color = JellioText,
+            maxLines = 1,
             modifier = Modifier.padding(start = 48.dp),
         )
         Box(
             modifier = Modifier
-                .padding(start = 48.dp, top = 8.dp, bottom = 20.dp)
-                .width(38.dp)
+                .padding(start = 48.dp, top = 6.dp, bottom = 12.dp)
+                .width(32.dp)
                 .height(3.dp)
                 .background(JellioSecondary, RoundedCornerShape(999.dp)),
         )
     }
 }
+
+// Space above a focused row's cards on Home (row top padding, title line,
+// accent bar): Home keeps the focused cards this far below the showcase so
+// the title stays visible.
+internal val RowTopPadding = 8.dp
+internal val RowTitleFontSize = 20.sp
+internal val RowHeaderHeight = 60.dp
 
 // Real port of components/rowListModal.js's own makeRowTitleClickable():
 // the same "view all" action this used to hang off the row's own

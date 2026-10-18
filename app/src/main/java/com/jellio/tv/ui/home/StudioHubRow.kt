@@ -48,18 +48,20 @@ fun StudioHubRow(
     onServiceClick: (String) -> Unit,
 ) {
     if (services.isEmpty()) return
-    Column {
+    Column(modifier = Modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
         RowTitle(text = "Studio Hubs")
         val firstTile = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
-        LazyRow(
-            state = rememberTvRowState(),
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.rowEntry(firstTile),
-        ) {
-            items(services, key = { it }) { service ->
-                RowEntryTarget(if (service == services.first()) firstTile else null) {
-                    StudioHubTile(name = service, logoUrl = logoUrl(service), onClick = { onServiceClick(service) })
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            LazyRow(
+                state = rememberTvRowState(),
+                contentPadding = PaddingValues(horizontal = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.rowEntry(firstTile),
+            ) {
+                items(services, key = { it }) { service ->
+                    RowEntryTarget(if (service == services.first()) firstTile else null) {
+                        StudioHubTile(name = service, logoUrl = logoUrl(service), onClick = { onServiceClick(service) })
+                    }
                 }
             }
         }
