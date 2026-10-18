@@ -96,6 +96,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.50.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.50.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Libraries Look Like Home", "Movies, Shows and Anime now have the same big backdrop and details at the top as Home, following whatever you're on, with the rows scrolling below. The old carousels are gone."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Featured Rows", "What the carousels used to show is now the first row: Featured picks in Movies, a time of day pick in Shows and Trending on AniList in Anime."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.49.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.49.0",
