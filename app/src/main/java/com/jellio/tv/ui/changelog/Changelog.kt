@@ -101,6 +101,9 @@ val CHANGELOG_RELEASES = listOf(
         subtitle = "Version 0.52.2",
         features = listOf(
             ChangelogFeature(Icons.Filled.Info, "Search Crash Fixed", "Typing a search letter by letter no longer closes the app while results are coming in."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Libraries and Studio Hubs", "Shows, Anime and Studio Hubs show their first rows straight away and fill in the rest as it arrives, instead of waiting for everything. A slow request no longer holds up the whole page."),
+            ChangelogFeature(Icons.Filled.Tv, "Fuller Rows", "Rows on Home that skip titles already shown above now dig deeper, so they're no longer left with just a few cards. Search posters also load faster."),
+            ChangelogFeature(Icons.Filled.Settings, "Language Settings Stick", "Choosing a default audio or subtitle language now stays shown right away instead of jumping back to the old one."),
         ),
     ),
     ChangelogRelease(
