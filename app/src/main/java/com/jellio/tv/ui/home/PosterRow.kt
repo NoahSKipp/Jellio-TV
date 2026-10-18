@@ -61,7 +61,7 @@ fun PosterRow(
     removingItemId: String? = null,
     onShatterFinished: (BaseItemDto) -> Unit = {},
 ) {
-    val rowItems = remember(section.items) { section.items.take(20) }
+    val rowItems = remember(section.items) { section.items.distinctBy { it.Id }.take(20) }
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
         RowTitle(text = section.title)

@@ -59,6 +59,17 @@ private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
+
+// One card per title: Gelato can hand back the same film under more than one
+// id, which filled a genre row with copies of one title.
+internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
+    val seen = HashSet<String>()
+    return items.filter { item ->
+        val newId = seen.add("i:" + item.Id)
+        val newTitle = seen.add("t:" + com.jellio.tv.data.recommend.titleKey(item))
+        newId && newTitle
+    }
+}
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
@@ -721,8 +732,9 @@ class JellioRepository @Inject constructor(
 
     // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
-        runCatching { api.getCachedGenreItems(genre, itemType, parentId, limit).Items }.getOrNull()
-            ?: api.getItems(
+        distinctTitles(
+            runCatching { api.getCachedGenreItems(genre, itemType, parentId, limit).Items }.getOrNull()
+                ?: api.getItems(
             userId = userId,
             parentId = parentId,
             includeItemTypes = itemType,
@@ -732,7 +744,8 @@ class JellioRepository @Inject constructor(
             sortBy = "CommunityRating",
             sortOrder = "Descending",
             fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
-        ).Items
+        ).Items,
+        )
 
     suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto> =
         api.getCommunityUsers()
