@@ -96,6 +96,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.50.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.50.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Card Menu Fixed", "Holding select on a card now opens a proper menu on top of everything, ready to use with the remote, instead of a stretched menu you couldn't select anything in. Letting go of the button no longer picks the first option by accident."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.50.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.50.0",
