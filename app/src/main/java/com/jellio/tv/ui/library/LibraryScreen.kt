@@ -87,7 +87,6 @@ fun LibraryScreen(
         val openItemOptions = rememberCardOptionsHost(
             onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
             onToggleWatched = { viewModel.toggleWatched(session, it) },
-            onItemChanged = { viewModel.replaceItem(it) },
         )
 
         LaunchedEffect(Unit) { viewModel.load(session, library) }

@@ -527,8 +527,6 @@ fun CardOptionsMenu(
     onRemoveShowFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
-    onClearResume: (() -> Unit)? = null,
-    onHideFromUpNext: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val isWatchlisted = item.UserData?.IsFavorite == true
@@ -553,10 +551,6 @@ fun CardOptionsMenu(
             else -> {
                 onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", it)) }
                 onToggleWatched?.let { add(MenuAction(if (isPlayed) "Mark as unwatched" else "Mark as watched", it)) }
-                val resumable = !isPlayed && (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L
-                if (resumable) onClearResume?.let { add(MenuAction("Remove from Continue Watching", it, danger = true)) }
-                val isShow = item.Type == "Series" || item.Type == "Episode"
-                if (isShow) onHideFromUpNext?.let { add(MenuAction("Remove from Up Next", it, danger = true)) }
             }
         }
     }

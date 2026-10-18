@@ -342,8 +342,6 @@ fun HomeScreen(
                 onRemoveShowFromRow = if (upNext && item.SeriesId != null) { { removingTarget = item.Id to true } } else null,
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
-                onClearResume = { viewModel.removeFromContinueWatching(session, item) },
-                onHideFromUpNext = { viewModel.hideFromUpNext(item) },
                 onDismiss = { cardMenuTarget = null },
             )
         }

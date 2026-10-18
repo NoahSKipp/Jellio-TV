@@ -485,8 +485,6 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun replaceItem(item: BaseItemDto) = updateItem(item.Id) { item }
-
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
         _uiState.value = state.copy(

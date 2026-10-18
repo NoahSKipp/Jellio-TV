@@ -575,25 +575,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Hides a show from Up Next from any card: a series card or one of its episodes.
-    fun hideFromUpNext(item: BaseItemDto) {
-        val seriesId = if (item.Type == "Series") item.Id else item.SeriesId ?: return
-        viewModelScope.launch {
-            runCatching { repository.hideSeriesFromNextUp(seriesId) }.onSuccess {
-                val state = _uiState.value
-                _uiState.value = state.copy(
-                    rows = state.rows.map { row ->
-                        if (row is PosterHomeRow && row.section.key == "up-next") {
-                            row.copy(section = row.section.copy(items = row.section.items.filterNot { it.SeriesId == seriesId }))
-                        } else {
-                            row
-                        }
-                    },
-                )
-            }
-        }
-    }
-
     private fun removeItemFromRows(itemId: String) {
         val state = _uiState.value
         val updatedRows = state.rows.map { row ->
