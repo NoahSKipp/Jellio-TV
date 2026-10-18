@@ -96,6 +96,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.47.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.47.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Permanent Showcase & Backdrop Art", "Home features a permanent top showcase displaying the highlighted selection's backdrop art with smooth horizontal and vertical gradients, clear logo, metadata, ongoing status, and overview synopsis."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Compact Cards & Focus Expansion", "Compact poster cards display more items per row and smoothly expand into a 16:9 banner with backdrop art, title logo, and high-contrast white focus ring when lingered on."),
+            ChangelogFeature(Icons.Filled.Speed, "Smooth Row Streaming", "Horizontal rows stream upcoming items continuously across the screen up to 20 items, while dedicated TV scrolling keeps focused rows neatly aligned below the fixed showcase."),
+            ChangelogFeature(Icons.Filled.Tune, "Dark Sidebar Navigation", "Sidebar navigation seamlessly blends into the dark screen background with refined elevation shadows and clean borders."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.46.9",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.46.9",
