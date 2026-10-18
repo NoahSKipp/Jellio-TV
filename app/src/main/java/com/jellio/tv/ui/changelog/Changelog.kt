@@ -96,6 +96,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.52.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.52.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "One Press of Back", "Menus and pop-ups like the profile switcher, card menu, library picker and filters now close with a single press of Back."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Remove from Continue Watching and Up Next", "Hold select on any card to take it off Continue Watching or Up Next. Removing something from Continue Watching no longer marks it as watched, it just forgets where you stopped. Remove from Library is no longer offered on the TV."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.51.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.51.0",
