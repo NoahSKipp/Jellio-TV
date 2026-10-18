@@ -122,14 +122,7 @@ fun HomeScreen(
     // only ever answer a real drift a frame after it already rendered.
     // Blocking the real scroll from ever reaching this list in the
     // first place, while this item holds real focus, closes that last
-    // real frame instead.
-    var heroHasFocus by remember { mutableStateOf(false) }
-    val blockScrollWhileHeroFocused = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
-                if (heroHasFocus) available else Offset.Zero
-        }
-    }
+    var highlightedItem by remember { mutableStateOf<BaseItemDto?>(null) }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
@@ -212,168 +205,18 @@ fun HomeScreen(
                 }
 
                 CompositionLocalProvider(LocalBringIntoViewSpec provides TvBringIntoViewSpec) {
+                    val activeHighlighted = highlightedItem ?: uiState.heroItems.firstOrNull() ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .nestedScroll(blockScrollWhileHeroFocused)
                             .focusRestorer(),
                     ) {
                     item {
-                        // Real bug found live: pressing Up back to this
-                        // real hero only ever scrolled this list the
-                        // minimum real distance Compose's own default
-                        // "bring the newly focused child into view"
-                        // logic needed to make that child's own bounds
-                        // visible, not necessarily this list's own real
-                        // top, so the hero's own top edge (its own real
-                        // title/logo row) stayed clipped behind
-                        // whatever content padding sits above it.
-                        // Forced back to a real hard scrollToItem(0) the
-                        // moment focus lands anywhere inside this real
-                        // item instead, same real fix a plain
-                        // BringIntoView request cannot give on its own.
-                        //
-                        // Real bug found live, round two: View Details
-                        // sits near this hero's own real bottom edge
-                        // (HeroSection's own Column is bottom-aligned),
-                        // so the moment it actually receives focus,
-                        // Compose's own default per-child bring-into-view
-                        // request fires for that button's own real
-                        // (smaller, lower) bounds too, racing the
-                        // animateScrollToItem(0) call below since both
-                        // target the same real scroll container. A
-                        // plain, un-animated scrollToItem(0) resolves in
-                        // one real frame instead of over an animation's
-                        // own real duration, closing the window the
-                        // default request used to win in and leaving
-                        // this list scrolled to this item's own real
-                        // top rather than wherever View Details happens
-                        // to sit.
-                        //
-                        // Real bug found live, round three: this fired on
-                        // every real focus change anywhere inside the
-                        // hero, not just the one real transition into it
-                        // (moving between the arrows and View Details
-                        // still reports hasFocus = true throughout, but
-                        // this lambda still runs again each time). Each
-                        // real call launched its own real coroutine
-                        // against the same listState, and Compose's own
-                        // scroll mutex cancels whichever real call was
-                        // already in flight the moment a newer one
-                        // starts, so a quick real run of them back to
-                        // back visibly interrupted each other mid-scroll
-                        // instead of any one ever finishing clean,
-                        // reading as "moves up and down a tiny bit" and
-                        // never actually settling at this item's own
-                        // real top.
-                        //
-                        // Real bug found live, round four: guarding this
-                        // to only the one false-to-true transition (this
-                        // fix's own previous real shape) stopped the
-                        // race, but Compose's own default per-child
-                        // bring-into-view request still fires
-                        // independently on every later real focus move
-                        // between the arrows/View Details, uncorrected
-                        // now that this callback no longer answers back a
-                        // second time, so the list still drifted off
-                        // this item's own real top after the first
-                        // correct real landing, just slower. Cancelling
-                        // whichever real job this callback's own last
-                        // call started, every real time it runs rather
-                        // than only the first, is the actual fix: only
-                        // ever one real scrollToItem(0) in flight, always
-                        // the newest, so this never again races its own
-                        // previous real call the way the unguarded round
-                        // three version did, but still answers back every
-                        // single real time the default logic tries to
-                        // nudge this list away from this item's own top.
-                        // Real bug found live, round five: cancelling
-                        // our own previous real call before relaunching
-                        // stopped US from racing ourselves, but Compose's
-                        // own default per-child bring-into-view request
-                        // is dispatched by the focus system directly,
-                        // not through this callback at all, so this had
-                        // no real handle to cancel that one with. A
-                        // delay before our own scrollToItem(0) let it
-                        // settle first and win, but real feedback live
-                        // still caught this as "jumps up and down a tiny
-                        // bit": the default request still visibly moved
-                        // this list for the delay's own real duration
-                        // before our own correction snapped it back, a
-                        // real visible artifact even though it did
-                        // eventually converge correctly.
-                        //
-                        // Real bug found live, round six: suppressing
-                        // that default request outright instead, via
-                        // NoOpBringIntoViewSpec (its own header covers
-                        // why), so this is the only real thing that ever
-                        // scrolls this list while focus lives anywhere
-                        // inside this item. Only fires once, on the real
-                        // false-to-true transition into the hero group:
-                        // nothing else can nudge this list out from
-                        // under it anymore, so there's nothing later to
-                        // re-answer.
-                        // Real ui/library/LibraryScreen.kt's own header
-                        // on this exact round: a single scrollToItem(0)
-                        // call here only sometimes won against whatever
-                        // it's racing (confirmed live on that file's own
-                        // coverflow, via a real screen recording -
-                        // "occasionally correct but usually not"), a
-                        // real per-item header sitting above that
-                        // stage making the miss visible there in a way
-                        // this hero (nothing sits above it) never would
-                        // show on its own. Reasserting it a few real
-                        // times over the next 250ms rather than
-                        // trusting the first call alone closes that
-                        // same race here too.
-                        //
-                        // Real bug found live, round eight, on a real
-                        // screen recording: a real guessed delay before
-                        // a second reassertion (first 250ms, then 220ms)
-                        // lost anyway, every real time, to a later real
-                        // default scroll landing at a real different
-                        // moment each time (confirmed live: once right
-                        // after this rail's own sidebar finished
-                        // collapsing, once past 500ms with no sidebar
-                        // involved at all) - not a fixed real delay at
-                        // all, so no real guessed delay ever answers it
-                        // for good. Watching this list's own real scroll
-                        // position directly instead, for as long as
-                        // focus actually lives anywhere inside this
-                        // item, and correcting the real instant it ever
-                        // actually drifts off item 0, answers every real
-                        // one of them regardless of timing - reactive to
-                        // a real state change rather than a blind real
-                        // guess at when one might happen. Kept as a real
-                        // fallback alongside the block above: heroHasFocus
-                        // now lives one real scope up (the nestedScroll
-                        // connection above needs it too), this item's own
-                        // onFocusChanged below is the one real place that
-                        // still sets it.
-                        LaunchedEffect(heroHasFocus) {
-                            if (heroHasFocus) {
-                                snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-                                    .collect { (index, offset) ->
-                                        if (index != 0 || offset != 0) listState.scrollToItem(0)
-                                    }
-                            }
-                        }
-                        Box(
-                            modifier = Modifier.onFocusChanged { state ->
-                                heroHasFocus = state.hasFocus
-                            },
-                        ) {
-                            CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
-                                HeroSection(
-                                    items = uiState.heroItems,
-                                    imageUrl = imageUrl,
-                                    onPlay = onPlay,
-                                    onToggleWatchlist = { item -> viewModel.toggleWatchlist(session, item) },
-                                    onViewDetails = onItemClick,
-                                )
-                            }
-                        }
+                        HomeItemShowcase(
+                            item = activeHighlighted,
+                            imageUrl = imageUrl,
+                        )
                     }
                     // Real screens/home.js's own jellio-home-greeting: real
                     // feedback found "Welcome back" read as a placeholder
@@ -420,6 +263,7 @@ fun HomeScreen(
                                 is PosterHomeRow -> {
                                     val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
                                     val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
+                                    val onCardFocus = remember { { item: BaseItemDto -> highlightedItem = item } }
                                     if (row.landscape) {
                                         val onShatterFinished = remember(row, session) {
                                             { item: BaseItemDto ->
@@ -440,6 +284,7 @@ fun HomeScreen(
                                             onItemOptions = onRowOptions,
                                             removingItemId = removingTarget?.first,
                                             onShatterFinished = onShatterFinished,
+                                            onItemFocus = onCardFocus,
                                         )
                                     } else {
                                         PosterRow(
@@ -449,6 +294,7 @@ fun HomeScreen(
                                             onItemOptions = onRowOptions,
                                             onTitleClick = onRowTitle,
                                             userImageUrl = userImageUrl,
+                                            onItemFocus = onCardFocus,
                                         )
                                     }
                                 }

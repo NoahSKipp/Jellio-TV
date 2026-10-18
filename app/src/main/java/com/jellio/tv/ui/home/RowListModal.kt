@@ -145,6 +145,7 @@ fun RowListModal(
                                 onDismiss()
                                 onItemClick(item)
                             },
+                            canExpand = false,
                             modifier = Modifier.gridColumnFocus(
                                 controller = focusController,
                                 index = index,

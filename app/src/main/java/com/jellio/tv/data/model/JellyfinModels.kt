@@ -184,6 +184,8 @@ data class BaseItemDto(
     val Overview: String? = null,
     val OfficialRating: String? = null,
     val CommunityRating: Double? = null,
+    val Status: String? = null,
+    val EndDate: String? = null,
     val Genres: List<String>? = null,
     val People: List<PersonDto>? = null,
     val RemoteTrailers: List<TrailerDto>? = null,

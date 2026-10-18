@@ -36,6 +36,9 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import com.jellio.tv.ui.common.TvHorizontalBringIntoViewSpec
 
 // Mirrors components/row.js: a title (the real library/Continue
 // Watching name, not an invented category) over a horizontally
@@ -49,42 +52,47 @@ fun PosterRow(
     onItemOptions: ((BaseItemDto) -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
     userImageUrl: ((String, String?) -> String)? = null,
+    onItemFocus: ((BaseItemDto) -> Unit)? = null,
 ) {
-    val rowItems = remember(section.items) { section.items.take(10) }
+    val rowItems = remember(section.items) { section.items.take(20) }
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
-        LazyRow(
-            state = rememberTvRowState(),
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.rowEntry(firstCard),
-        ) {
-            // Real feedback live: a focusable heading blocked ordinary
-            // Left/Right between cards in the same row, the nearest
-            // focusable candidate above a row's own first card being
-            // the title itself rather than nothing. Real feedback also
-            // asked for the header back to plain, unfocusable text. A
-            // real button at the row's own start, same shape and
-            // height a real card here has, replaces it instead of
-            // dropping "view all" entirely.
-            items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
-                val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
-                val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
-                RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
-                    PosterCard(
-                        item = item,
-                        imageUrl = imageUrl,
-                        onClick = onCardClick,
-                        onOptionsClick = onCardOptions,
-                        userImageUrl = userImageUrl,
-                    )
+        CompositionLocalProvider(LocalBringIntoViewSpec provides TvHorizontalBringIntoViewSpec) {
+            LazyRow(
+                state = rememberTvRowState(),
+                contentPadding = PaddingValues(horizontal = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.rowEntry(firstCard),
+            ) {
+                // Real feedback live: a focusable heading blocked ordinary
+                // Left/Right between cards in the same row, the nearest
+                // focusable candidate above a row's own first card being
+                // the title itself rather than nothing. Real feedback also
+                // asked for the header back to plain, unfocusable text. A
+                // real button at the row's own start, same shape and
+                // height a real card here has, replaces it instead of
+                // dropping "view all" entirely.
+                items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
+                    val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
+                    val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
+                    RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
+                        PosterCard(
+                            item = item,
+                            imageUrl = imageUrl,
+                            onClick = onCardClick,
+                            onOptionsClick = onCardOptions,
+                            userImageUrl = userImageUrl,
+                            canExpand = true,
+                            onFocus = onItemFocus,
+                        )
+                    }
                 }
-            }
-            if (onTitleClick != null && section.items.size > 10) {
-                item {
-                    RowExpandButton(onClick = onTitleClick, height = PosterWidth.scaled() * 1.5f)
+                if (onTitleClick != null && (section.items.size > 20 || section.fetchAll != null)) {
+                    item {
+                        RowExpandButton(onClick = onTitleClick, height = (PosterWidth * 1.5f).scaled())
+                    }
                 }
             }
         }

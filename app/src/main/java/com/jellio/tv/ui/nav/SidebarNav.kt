@@ -52,6 +52,7 @@ import androidx.tv.material3.SelectableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -188,12 +189,7 @@ fun SidebarNav(
             // overlays once expanded, absent while collapsed and
             // sitting flush against real reserved layout space instead.
             .shadow(elevation = if (shadowAlpha > 0f) 24.dp else 0.dp, shape = RoundedCornerShape(0.dp))
-            .background(JellioBgElevated)
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(0.dp),
-            )
+            .background(JellioBg)
             .padding(vertical = 20.dp, horizontal = 10.dp)
             // Real port of .jellio-sidebar's own :focus-within: Compose's
             // own FocusState.hasFocus already means exactly that (this

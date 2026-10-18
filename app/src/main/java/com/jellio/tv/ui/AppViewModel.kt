@@ -86,16 +86,32 @@ class AppViewModel @Inject constructor(
     // tag). Falls back to the Primary image rather than requesting a
     // Backdrop type that was never going to exist server side.
     fun imageUrl(session: Session, item: BaseItemDto, imageType: String, maxWidth: Int): String {
-        val backdropTag = item.BackdropImageTags?.firstOrNull()
+        if (imageType == "Logo") {
+            val logoTag = item.ImageTags?.get("Logo") ?: item.ParentLogoImageTag
+            val targetId = if (item.ImageTags?.containsKey("Logo") == true) {
+                item.Id
+            } else if (!item.ParentLogoItemId.isNullOrBlank()) {
+                item.ParentLogoItemId!!
+            } else if (!item.SeriesId.isNullOrBlank()) {
+                item.SeriesId!!
+            } else {
+                item.Id
+            }
+            return repository.imageUrl(session.serverAddress, targetId, logoTag, "Logo", maxWidth, session.accessToken)
+        }
+        val backdropTag = item.BackdropImageTags?.firstOrNull() ?: item.ParentBackdropImageTags?.firstOrNull()
         val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
         val resolvedType = if (imageType == "Backdrop" && backdropTag == null && primaryTag != null) "Primary" else imageType
         val tag = when (resolvedType) {
             "Backdrop" -> backdropTag
             "Primary" -> primaryTag
-            "Thumb" -> item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
+            "Thumb" -> item.ImageTags?.get("Thumb") ?: item.ThumbImageTag ?: item.ParentThumbImageTag
             else -> item.ImageTags?.get(resolvedType)
         }
-        return repository.imageUrl(session.serverAddress, item.Id, tag, resolvedType, maxWidth, session.accessToken)
+        val targetId = if (resolvedType == "Backdrop" && item.BackdropImageTags.isNullOrEmpty() && !item.ParentBackdropItemId.isNullOrBlank()) {
+            item.ParentBackdropItemId!!
+        } else item.Id
+        return repository.imageUrl(session.serverAddress, targetId, tag, resolvedType, maxWidth, session.accessToken)
     }
 
     // The general form imageUrl() above builds on top of: an arbitrary

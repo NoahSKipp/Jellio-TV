@@ -20,9 +20,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import com.jellio.tv.ui.common.TvHorizontalBringIntoViewSpec
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,40 +74,44 @@ fun LandscapeRow(
     // merely hidden, until its own overlay's setTimeout removes it.
     removingItemId: String? = null,
     onShatterFinished: (BaseItemDto) -> Unit = {},
+    onItemFocus: ((BaseItemDto) -> Unit)? = null,
 ) {
-    val rowItems = remember(section.items) { section.items.take(10) }
+    val rowItems = remember(section.items) { section.items.take(20) }
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(vertical = 12.dp)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
-        LazyRow(
-            state = rememberTvRowState(),
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.rowEntry(firstCard),
-        ) {
-            // Same real reasoning PosterRow's own header carries: a
-            // focusable heading blocked ordinary Left/Right onto this
-            // row's own first card, and real feedback asked for it back
-            // to plain text. RowExpandButton at the row's own start
-            // instead, sized to this row's own real 16:9 card height.
-            items(rowItems, key = { it.Id }, contentType = { "landscape_card" }) { item ->
-                val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
-                val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
-                RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
-                    LandscapeCard(
-                        item = item,
-                        imageUrl = rawImageUrl,
-                        onClick = onCardClick,
-                        onOptionsClick = onCardOptions,
-                        isRemoving = removingItemId == item.Id,
-                        onShatterFinished = { onShatterFinished(item) },
-                    )
+        CompositionLocalProvider(LocalBringIntoViewSpec provides TvHorizontalBringIntoViewSpec) {
+            LazyRow(
+                state = rememberTvRowState(),
+                contentPadding = PaddingValues(horizontal = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.rowEntry(firstCard),
+            ) {
+                // Same real reasoning PosterRow's own header carries: a
+                // focusable heading blocked ordinary Left/Right onto this
+                // row's own first card, and real feedback asked for it back
+                // to plain text. RowExpandButton at the row's own start
+                // instead, sized to this row's own real 16:9 card height.
+                items(rowItems, key = { it.Id }, contentType = { "landscape_card" }) { item ->
+                    val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
+                    val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
+                    RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
+                        LandscapeCard(
+                            item = item,
+                            imageUrl = rawImageUrl,
+                            onClick = onCardClick,
+                            onOptionsClick = onCardOptions,
+                            isRemoving = removingItemId == item.Id,
+                            onShatterFinished = { onShatterFinished(item) },
+                            onFocus = onItemFocus,
+                        )
+                    }
                 }
-            }
-            if (onTitleClick != null && section.items.size > 10) {
-                item {
-                    RowExpandButton(onClick = onTitleClick, height = LandscapeCardWidth.scaled() * 9f / 16f)
+                if (onTitleClick != null && (section.items.size > 20 || section.fetchAll != null)) {
+                    item {
+                        RowExpandButton(onClick = onTitleClick, height = LandscapeCardWidth.scaled() * 9f / 16f)
+                    }
                 }
             }
         }
@@ -190,6 +198,7 @@ fun LandscapeCard(
     onOptionsClick: (() -> Unit)? = null,
     isRemoving: Boolean = false,
     onShatterFinished: () -> Unit = {},
+    onFocus: ((BaseItemDto) -> Unit)? = null,
 ) {
     val isEpisode = item.Type == "Episode" && !item.SeriesName.isNullOrEmpty()
     val hasSeason = item.ParentIndexNumber != null
@@ -233,7 +242,9 @@ fun LandscapeCard(
             )
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-        modifier = Modifier.width(landscapeCardWidth),
+        modifier = Modifier
+            .width(landscapeCardWidth)
+            .onFocusChanged { state -> if (state.isFocused) onFocus?.invoke(item) },
     ) {
         Box(modifier = Modifier.width(landscapeCardWidth).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))) {
             if (activeUrl != null) {

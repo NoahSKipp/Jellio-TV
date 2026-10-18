@@ -162,6 +162,7 @@ fun SearchScreen(
                                 imageUrl = imageUrl,
                                 onClick = { onItemClick(item) },
                                 onOptionsClick = { openItemOptions(item) },
+                                canExpand = false,
                                 modifier = Modifier.gridColumnFocus(
                                     controller = focusController,
                                     index = index,

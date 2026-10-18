@@ -36,3 +36,30 @@ internal object TvBringIntoViewSpec : BringIntoViewSpec {
         return 0f
     }
 }
+
+// Dedicated BringIntoViewSpec for horizontal LazyRows on TV.
+// Maintains a leading margin on the left while anchoring the focused card
+// around the left 35-40% of the screen by providing a generous trailing margin (~52%).
+// This ensures upcoming cards continuously stream in from the right edge as the user
+// navigates right, all the way to the final "View All" expand button.
+@OptIn(ExperimentalFoundationApi::class)
+internal object TvHorizontalBringIntoViewSpec : BringIntoViewSpec {
+    override val scrollAnimationSpec: AnimationSpec<Float> =
+        tween(durationMillis = 180, easing = FastOutSlowInEasing)
+
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        if (size >= containerSize) return offset
+
+        val leadingMargin = (containerSize * 0.05f).coerceAtLeast(60f)
+        val trailingMargin = containerSize * 0.52f
+
+        if (offset < leadingMargin) {
+            return offset - leadingMargin
+        }
+        if (offset + size > containerSize - trailingMargin) {
+            return (offset + size) - (containerSize - trailingMargin)
+        }
+        return 0f
+    }
+}
+

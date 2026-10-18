@@ -19,6 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,17 +63,16 @@ import java.util.Locale
 // Real gap found live right after prefetch-on-focus shipped: D-pad
 // scrolling through a long row focused, and so fired a prefetch for,
 // every card passed over on the way to the one a reader actually
-// stopped on - wasted round trips against their own addon/debrid/TMDb
+// stopped on: wasted round trips against their own addon/debrid/TMDb
 // rate limits for titles nobody was ever about to open. Mirrors
 // components/card.js's own PREFETCH_DEBOUNCE_MS: only fires once focus
 // actually lingers past this, not on every transient landing.
 // Only a card the viewer stays on: moving along a row never prefetches.
 private const val PREFETCH_DEBOUNCE_MS = 600L
 
-// Visible to RowExpandButton (PosterRow.kt), same package: its own
-// button height matches a real poster's own aspect-ratio height,
-// nothing to duplicate the 170.dp itself for.
-internal val PosterWidth = 170.dp
+// Sized to 126.dp x 189.dp standard portrait cards, expanding to 336.dp
+// (16:9 banner) when focused.
+internal val PosterWidth = 126.dp
 
 // Ordered fallback list of candidate image URLs for a poster card, matching
 // Jellio Web components/card.js cardImageCandidates(): tries tagged Primary,
@@ -135,26 +139,90 @@ internal fun posterImageCandidates(
     return urls.toList()
 }
 
-// Mirrors components/card.js's own poster shape: a 2:3 poster, no
-// text underneath (the real title only shows up in the row's own
-// heading and, later, a focused card's own detail panel), the same
-// real reasoning card.js's own header gives for keeping a grid dense.
-//
-// onOptionsClick mirrors components/card.js's own buildCardActions():
-// real Watchlist/Mark Watched actions reachable without leaving the
-// grid, hover/focus-revealed there. Reached through a long D-pad
-// press on the card itself now, not a second focusable button sharing
-// its own bounds: real feedback live found that second Surface was
-// exactly what blocked ordinary Left/Right between cards in the same
-// row, the nearest focusable candidate in either direction being the
-// current card's own options button rather than its neighbour. The
-// menu itself (CardOptionsMenu below) is the caller's own job to
-// render at its own screen root, same real reason DetailScreen's own
-// EpisodeOptionsMenu is not owned by EpisodeCard either: a real
-// full-screen overlay rendered from inside a LazyRow item would only
-// ever fill that row's own bounds, not the real screen. null (the
-// default) wires no long press at all, same real card shape this had
-// before options existed.
+// Ordered candidate image URLs for the 16:9 backdrop view of an expanded poster card.
+internal fun posterBackdropCandidates(
+    item: BaseItemDto,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    maxWidth: Int = 800,
+): List<String> {
+    val urls = LinkedHashSet<String>()
+    fun buildUrl(targetId: String, tag: String?, type: String): String {
+        val synthetic = BaseItemDto(
+            Id = targetId,
+            BackdropImageTags = if (!tag.isNullOrEmpty() && type == "Backdrop") listOf(tag) else emptyList(),
+            ImageTags = if (!tag.isNullOrEmpty() && type != "Backdrop") mapOf(type to tag) else emptyMap(),
+        )
+        return imageUrl(synthetic, type, maxWidth)
+    }
+    fun push(targetId: String?, tag: String?, type: String = "Backdrop") {
+        if (targetId.isNullOrBlank()) return
+        if (!tag.isNullOrBlank()) {
+            val tagged = buildUrl(targetId, tag, type)
+            if (tagged.isNotBlank()) urls.add(tagged)
+        }
+        val untagged = buildUrl(targetId, null, type)
+        if (untagged.isNotBlank()) urls.add(untagged)
+    }
+
+    val backdropTag = item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop")
+    push(item.Id, backdropTag, "Backdrop")
+
+    val parentBackdropTag = item.ParentBackdropImageTags?.firstOrNull()
+    if (!item.ParentBackdropItemId.isNullOrBlank()) {
+        push(item.ParentBackdropItemId, parentBackdropTag, "Backdrop")
+    }
+    if (!item.SeriesId.isNullOrBlank()) {
+        push(item.SeriesId, null, "Backdrop")
+    }
+
+    val thumbTag = item.ImageTags?.get("Thumb") ?: item.ThumbImageTag
+    push(item.Id, thumbTag, "Thumb")
+    val primaryTag = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
+    push(item.Id, primaryTag, "Primary")
+
+    return urls.toList()
+}
+
+// Ordered candidate image URLs for the clear logo of an item.
+internal fun posterLogoCandidates(
+    item: BaseItemDto,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    maxWidth: Int = 400,
+): List<String> {
+    val urls = LinkedHashSet<String>()
+    fun buildUrl(targetId: String, tag: String?, type: String): String {
+        val synthetic = BaseItemDto(
+            Id = targetId,
+            ImageTags = if (!tag.isNullOrEmpty()) mapOf(type to tag) else emptyMap(),
+        )
+        return imageUrl(synthetic, type, maxWidth)
+    }
+    fun push(targetId: String?, tag: String?, type: String = "Logo") {
+        if (targetId.isNullOrBlank()) return
+        if (!tag.isNullOrBlank()) {
+            val tagged = buildUrl(targetId, tag, type)
+            if (tagged.isNotBlank()) urls.add(tagged)
+        }
+        val untagged = buildUrl(targetId, null, type)
+        if (untagged.isNotBlank()) urls.add(untagged)
+    }
+
+    val logoTag = item.ImageTags?.get("Logo")
+    push(item.Id, logoTag, "Logo")
+
+    if (!item.ParentLogoItemId.isNullOrBlank()) {
+        push(item.ParentLogoItemId, item.ParentLogoImageTag, "Logo")
+    }
+    if (!item.SeriesId.isNullOrBlank()) {
+        push(item.SeriesId, null, "Logo")
+    }
+
+    return urls.toList()
+}
+
+// Compact portrait poster card (126.dp x 189.dp) that expands into a 16:9 banner card
+// (336.dp wide) after a lingering focus delay, displaying the backdrop image and ClearLogo
+// with a clean white focus ring. Moving away collapses the card back down immediately.
 @Composable
 fun PosterCard(
     item: BaseItemDto,
@@ -163,23 +231,35 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     onOptionsClick: (() -> Unit)? = null,
     userImageUrl: ((String, String?) -> String)? = null,
+    canExpand: Boolean = true,
+    onFocus: ((BaseItemDto) -> Unit)? = null,
 ) {
-    // Real reference dp values, scaled to the actual TV this composed
-    // on: PosterWidth.scaled()'s own header (ui/theme/TvScale.kt)
-    // explains why a fixed dp size alone was not real enough coverage.
-    val posterWidth = PosterWidth.scaled()
+    val baseWidth = PosterWidth.scaled()
+    val baseHeight = (PosterWidth * 1.5f).scaled()
+    val expandedWidth = (baseHeight * (16f / 9f))
     val prefetch = LocalGelatoPrefetch.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
-    val candidates = remember(item, imageUrl) { posterImageCandidates(item, imageUrl, 400) }
-    var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val activeUrl = candidates.getOrNull(candidateIndex)
+    var isExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isFocused, canExpand) {
+        if (!isFocused || !canExpand) {
+            isExpanded = false
+            return@LaunchedEffect
+        }
+        isExpanded = false
+        delay(450L)
+        if (isFocused && canExpand) {
+            isExpanded = true
+        }
+    }
+
     LaunchedEffect(isFocused, item.Id) {
         if (isFocused) {
+            onFocus?.invoke(item)
             delay(PREFETCH_DEBOUNCE_MS)
             if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) {
                 prefetch(item)
-                // The title page's backdrop, into the disk cache only.
                 if (!item.BackdropImageTags.isNullOrEmpty()) {
                     coil3.SingletonImageLoader.get(context).enqueue(
                         coil3.request.ImageRequest.Builder(context)
@@ -192,7 +272,28 @@ fun PosterCard(
             }
         }
     }
-    Box(modifier = modifier.width(posterWidth)) {
+
+    val targetWidth = if (isExpanded) expandedWidth else baseWidth
+    val animatedWidth by animateDpAsState(
+        targetValue = targetWidth,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "posterCardWidth",
+    )
+
+    val candidates = remember(item, imageUrl) { posterImageCandidates(item, imageUrl, 400) }
+    var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeUrl = candidates.getOrNull(candidateIndex)
+
+    val backdropCandidates = remember(item, imageUrl) { posterBackdropCandidates(item, imageUrl, 800) }
+    var backdropIndex by remember(item.Id, backdropCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
+
+    val logoCandidates = remember(item, imageUrl) { posterLogoCandidates(item, imageUrl, 300) }
+    var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeLogoUrl = logoCandidates.getOrNull(logoIndex)
+    var logoLoadFailed by remember(item.Id) { mutableStateOf(false) }
+
+    Box(modifier = modifier.width(animatedWidth)) {
         Surface(
             onClick = onClick,
             onLongClick = onOptionsClick,
@@ -205,109 +306,167 @@ fun PosterCard(
             ),
             border = ClickableSurfaceDefaults.border(
                 focusedBorder = Border(
-                    border = BorderStroke(2.5.dp, Color.White),
+                    border = BorderStroke(2.dp, Color.White),
                     shape = RoundedCornerShape(12.dp),
                 )
             ),
-            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-            modifier = Modifier.width(posterWidth)
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),
+            modifier = Modifier
+                .width(animatedWidth)
+                .height(baseHeight)
                 .onFocusChanged { state -> isFocused = state.isFocused },
         ) {
-            Box(modifier = Modifier.width(posterWidth).aspectRatio(2f / 3f)) {
-                if (activeUrl != null) {
-                    AsyncImage(
-                        model = activeUrl,
-                        contentDescription = item.Name,
-                        contentScale = ContentScale.Crop,
-                        onError = {
-                            if (candidateIndex < candidates.size) {
-                                candidateIndex += 1
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
-                    )
-                } else {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(JellioBgElevated)
-                            .padding(12.dp),
-                    ) {
-                        Text(
-                            text = item.Name ?: item.SeriesName ?: "",
-                            color = JellioText.copy(alpha = 0.75f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (isExpanded) {
+                    if (activeBackdropUrl != null) {
+                        AsyncImage(
+                            model = activeBackdropUrl,
+                            contentDescription = item.Name,
+                            contentScale = ContentScale.Crop,
+                            onError = {
+                                if (backdropIndex < backdropCandidates.size - 1) {
+                                    backdropIndex += 1
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
-                }
-                val watchers = item.Watchers
-                if (!watchers.isNullOrEmpty()) {
-                    WatchersBadge(
-                        watchers = watchers,
-                        userImageUrl = userImageUrl,
+
+                    // Bottom gradient overlay
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp),
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.65f)
+                            .align(Alignment.BottomStart)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.85f),
+                                    )
+                                )
+                            )
                     )
-                }
-                // Real port of js/libraryBrowse.js's own rating span
-                // (item.CommunityRating.toFixed(1)), css/library-browse.css's
-                // own .jellio-card-rating: top corner rather than that
-                // file's own bottom-right, the watched checkmark/progress
-                // bar below already own the bottom of this card.
-                item.CommunityRating?.let { rating ->
-                    Text(
-                        text = String.format(Locale.US, "%.1f ★", rating),
-                        color = JellioText,
-                        style = MaterialTheme.typography.labelSmall,
+
+                    // Clearlogo or Title overlay at bottom-left
+                    Box(
                         modifier = Modifier
-                            .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
-                            .padding(6.dp)
-                            .background(JellioBg.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-                // Real port of components/card.js's own paintCardState():
-                // a watched checkmark badge wins outright over a progress
-                // bar, the same real Played-before-PlayedPercentage order
-                // that function's own branching uses. Bottom corner
-                // rather than top: the options button below now owns
-                // the top corner, same real reason EpisodeCard's own
-                // played check moved there first.
-                val userData = item.UserData
-                if (userData?.Played == true) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = JellioBg,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .size(20.dp)
-                            .background(JellioSecondary, CircleShape)
-                            .padding(3.dp),
-                    )
+                            .align(Alignment.BottomStart)
+                            .padding(start = 12.dp, bottom = 10.dp, end = 12.dp)
+                            .fillMaxWidth(0.70f)
+                    ) {
+                        if (!activeLogoUrl.isNullOrBlank() && !logoLoadFailed) {
+                            AsyncImage(
+                                model = activeLogoUrl,
+                                contentDescription = item.Name,
+                                onError = {
+                                    if (logoIndex + 1 < logoCandidates.size) {
+                                        logoIndex += 1
+                                    } else {
+                                        logoLoadFailed = true
+                                    }
+                                },
+                                contentScale = ContentScale.Fit,
+                                alignment = Alignment.BottomStart,
+                                modifier = Modifier
+                                    .height(36.dp.scaled())
+                                    .fillMaxWidth(),
+                            )
+                        } else {
+                            Text(
+                                text = item.Name ?: item.SeriesName ?: "",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 } else {
-                    val percentage = userData?.PlayedPercentage
-                    if (percentage != null && percentage > 0) {
+                    if (activeUrl != null) {
+                        AsyncImage(
+                            model = activeUrl,
+                            contentDescription = item.Name,
+                            contentScale = ContentScale.Crop,
+                            onError = {
+                                if (candidateIndex < candidates.size - 1) {
+                                    candidateIndex += 1
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .background(Color.White.copy(alpha = 0.25f)),
+                                .fillMaxSize()
+                                .background(JellioBgElevated)
+                                .padding(12.dp),
                         ) {
+                            Text(
+                                text = item.Name ?: item.SeriesName ?: "",
+                                color = JellioText.copy(alpha = 0.75f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
+                    }
+                    val watchers = item.Watchers
+                    if (!watchers.isNullOrEmpty()) {
+                        WatchersBadge(
+                            watchers = watchers,
+                            userImageUrl = userImageUrl,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp),
+                        )
+                    }
+                    item.CommunityRating?.let { rating ->
+                        Text(
+                            text = String.format(Locale.US, "%.1f ★", rating),
+                            color = JellioText,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
+                                .padding(6.dp)
+                                .background(JellioBg.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    val userData = item.UserData
+                    if (userData?.Played == true) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = JellioBg,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .size(20.dp)
+                                .background(JellioSecondary, CircleShape)
+                                .padding(3.dp),
+                        )
+                    } else {
+                        val percentage = userData?.PlayedPercentage
+                        if (percentage != null && percentage > 0) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(minOf(100.0, percentage).toFloat() / 100f)
+                                    .align(Alignment.BottomStart)
+                                    .fillMaxWidth()
                                     .height(4.dp)
-                                    .background(JellioSecondary),
-                            )
+                                    .background(Color.White.copy(alpha = 0.25f)),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(minOf(100.0, percentage).toFloat() / 100f)
+                                        .height(4.dp)
+                                        .background(JellioSecondary),
+                                )
+                            }
                         }
                     }
                 }
