@@ -20,6 +20,7 @@ import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -82,6 +83,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
@@ -145,6 +147,9 @@ import kotlinx.coroutines.isActive
 private const val SEEK_STEP_MS = 10_000L
 private const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
 private const val CONTROLS_HIDE_DELAY_MS = 4_000L
+// Paused this long with nothing open, the controls give way to the
+// "You're watching" screen (NuvioTV does the same).
+private const val PAUSE_OVERLAY_DELAY_MS = 5_000L
 // Real port of screens/player.js's own showPlayerToast() 4000ms
 // setTimeout.
 private const val TOAST_DURATION_MS = 4_000L
@@ -1026,6 +1031,19 @@ private fun PlayerSurface(
         }
     }
 
+    val pausedByViewer = pauseInfo != null && hasReportedStart && !playWhenReadyState && !showResumePrompt && !isEnded
+    val menuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel || showReactMenu
+    var pauseOverlayVisible by remember { mutableStateOf(false) }
+    // The key that took the pause screen away, so its key up only does that.
+    var pauseOverlayDismissKey by remember { mutableStateOf<Key?>(null) }
+    LaunchedEffect(pausedByViewer, menuOpen, interaction) {
+        pauseOverlayVisible = false
+        if (!pausedByViewer || menuOpen) return@LaunchedEffect
+        delay(PAUSE_OVERLAY_DELAY_MS)
+        pauseOverlayVisible = true
+        controlsVisible = false
+    }
+
     // Real port of screens/player.js's own mouseleave handler clearing
     // scrubPreview: controls hiding is this remote's own closest real
     // equivalent to a mouse actually leaving the seek bar.
@@ -1056,12 +1074,22 @@ private fun PlayerSurface(
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
-            .onPreviewKeyEvent {
+            .onPreviewKeyEvent { event ->
+                if (pauseOverlayVisible && event.type == KeyEventType.KeyDown) pauseOverlayDismissKey = event.key
                 interaction++
                 false
             }
             .onKeyEvent { event ->
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                if (pauseOverlayDismissKey == event.key) {
+                    pauseOverlayDismissKey = null
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.MediaPlayPause, Key.MediaPlay -> togglePlay()
+                        Key.Back -> Unit
+                        else -> controlsVisible = true
+                    }
+                    return@onKeyEvent true
+                }
                 // The Up Next card and the end screen own the remote while
                 // shown: arrows move between their buttons instead of seeking.
                 if (showEndScreen || upNextCardVisible) {
@@ -1206,8 +1234,7 @@ private fun PlayerSurface(
             modifier = Modifier.fillMaxSize(),
         )
 
-        val showPauseOverlay = pauseInfo != null && hasReportedStart && !playWhenReadyState && !showResumePrompt && !isEnded
-        if (showPauseOverlay) {
+        if (pauseOverlayVisible && pausedByViewer) {
             PauseOverlay(info = pauseInfo!!)
         }
 
@@ -1273,7 +1300,7 @@ private fun PlayerSurface(
             }
         }
 
-        val anyMenuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel || showReactMenu
+        val anyMenuOpen = menuOpen
         if (controlsVisible) {
             PlayerControls(
                 title = title,
@@ -1541,12 +1568,6 @@ private fun PlayerControls(
     onOpenReactMenu: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize().focusProperties { canFocus = enabled }) {
-        Column(modifier = Modifier.align(Alignment.TopStart).padding(top = 40.dp, start = 48.dp)) {
-            Text(text = title, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
-            if (subtitle.isNotEmpty()) {
-                Text(text = subtitle, color = JellioTextSecondary)
-            }
-        }
 
         val playPauseFocusRequester = remember { FocusRequester() }
         LaunchedEffect(enabled) {
@@ -1578,6 +1599,25 @@ private fun PlayerControls(
                 Brush.verticalGradient(listOf(Color.Transparent, JellioBg)),
             ).padding(horizontal = 48.dp, vertical = 32.dp),
         ) {
+            // What's playing sits with the seek bar, as in NuvioTV.
+            Text(
+                text = title,
+                color = JellioText,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    text = subtitle,
+                    color = JellioText.copy(alpha = 0.85f),
+                    fontSize = 17.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
             // Real port of screens/player.js's own scrubPreview: this
             // Android TV remote has no real mousemove to hover the bar
             // with, so the preview tracks the seek's own real landing
@@ -1896,6 +1936,8 @@ private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifi
     com.jellio.tv.ui.common.TitleLoadingArt(info.backdropUrl, info.logoUrl, info.title, modifier)
 }
 
+// Shown after a few seconds paused, in place of the controls. Layout follows
+// NuvioTV's PauseOverlay: everything bottom left, the time top right.
 @Composable
 private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -1909,43 +1951,87 @@ private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) 
         }
         Box(
             modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.9f))),
+                Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.92f))),
             ),
         )
+        PauseClock(modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 48.dp))
         Column(
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 48.dp, end = 96.dp).widthIn(max = 640.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 48.dp, end = 96.dp, bottom = 72.dp)
+                .widthIn(max = 720.dp),
         ) {
-            Text(text = "You're watching", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
-            Text(
-                text = info.title,
-                color = JellioText,
-                style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                info.rating?.let { Text(text = it, color = JellioTextSecondary) }
-                info.year?.let { Text(text = it, color = JellioTextSecondary) }
-                info.officialRating?.let { Text(text = it, color = JellioTextSecondary) }
+            Text(text = "You're watching", color = JellioTextSecondary, fontSize = 17.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            var logoFailed by remember(info.logoUrl) { mutableStateOf(false) }
+            if (info.logoUrl != null && !logoFailed) {
+                AsyncImage(
+                    model = info.logoUrl,
+                    contentDescription = info.title,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.BottomStart,
+                    onError = { logoFailed = true },
+                    modifier = Modifier.height(88.dp).widthIn(max = 420.dp),
+                )
+            } else {
+                Text(
+                    text = info.title,
+                    color = JellioText,
+                    fontSize = 38.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            val details = listOfNotNull(info.year, info.episodeCode?.takeIf { info.isEpisode }, info.officialRating, info.rating)
+            if (details.isNotEmpty()) {
+                Text(
+                    text = details.joinToString("  •  "),
+                    color = JellioTextSecondary,
+                    fontSize = 17.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
             }
             if (info.isEpisode) {
-                info.episodeCode?.let {
-                    Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
-                }
                 info.episodeTitle?.takeIf { it.isNotEmpty() }?.let {
-                    Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = it,
+                        color = JellioText,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                 }
             }
             info.overview?.takeIf { it.isNotEmpty() }?.let {
                 Text(
                     text = it,
                     color = JellioTextSecondary,
+                    fontSize = 17.sp,
+                    lineHeight = 24.sp,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 14.dp),
                 )
             }
         }
     }
+}
+
+@Composable
+private fun PauseClock(modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val formatter = remember(context) { android.text.format.DateFormat.getTimeFormat(context) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay((60_000L - now % 60_000L).coerceAtLeast(1_000L))
+        }
+    }
+    Text(text = formatter.format(java.util.Date(now)), color = JellioText, fontSize = 30.sp, modifier = modifier)
 }
 
 // Real port of screens/player.js's own buildUpNextOverlay(): a real

@@ -749,7 +749,7 @@ class PlayerViewModel @Inject constructor(
             year = item.ProductionYear?.toString(),
             officialRating = item.OfficialRating,
             isEpisode = isEpisode,
-            episodeCode = if (isEpisode && hasEpisodeCode) "S${item.ParentIndexNumber}E${item.IndexNumber}" else null,
+            episodeCode = if (isEpisode && hasEpisodeCode) "S${item.ParentIndexNumber} E${item.IndexNumber}" else null,
             episodeTitle = if (isEpisode) item.Name else null,
             overview = item.Overview,
         )
@@ -1149,7 +1149,7 @@ class PlayerViewModel @Inject constructor(
             itemId = episode.Id,
             title = episode.Name.orEmpty(),
             thumbnailUrl = thumbnailUrl,
-            episodeCode = if (hasCode) "S${episode.ParentIndexNumber}E${episode.IndexNumber}" else null,
+            episodeCode = if (hasCode) "S${episode.ParentIndexNumber} E${episode.IndexNumber}" else null,
             rating = episode.CommunityRating?.let { "%.1f".format(it) },
             overview = episode.Overview,
         )
