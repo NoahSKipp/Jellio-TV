@@ -96,6 +96,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.48.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.48.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "A Better Home Showcase", "The top of Home now shows the title you're on with its backdrop, logo, details and description. Episodes use their show's artwork and logo, ratings carry a TMDB badge, and shows still airing get an Ongoing badge."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Posters That Grow", "Continue Watching and Up Next now use the same slim posters as every other row. Rest on a card for a moment and it widens into a banner, showing the episode's own picture, how much is left and your progress."),
+            ChangelogFeature(Icons.Filled.Speed, "Rows That Scroll Ahead", "The card you're on stays at the left of its row, so what's coming next slides in from the right, all the way to View All. This works on Home, in every library, on title pages and on cast pages."),
+            ChangelogFeature(Icons.Filled.Palette, "One Dark Background", "Every screen and the sidebar now share the same dark background, and Home opens faster because it no longer loads the old banner carousel."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.47.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.47.0",
