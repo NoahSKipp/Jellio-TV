@@ -39,6 +39,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -522,119 +531,80 @@ fun CardOptionsMenu(
     onDeleteItem: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
     val isWatchlisted = item.UserData?.IsFavorite == true
     val isPlayed = item.UserData?.Played == true
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
+    val actions = buildList {
+        when {
+            continueWatching -> {
+                onGoToDetails?.let { add(MenuAction("Go to details", it)) }
+                onPlayManually?.let { add(MenuAction("Play manually", it)) }
+                onStartOver?.let { add(MenuAction("Start from beginning", it)) }
+                onRemoveFromRow?.let { add(MenuAction("Remove from Continue Watching", it, danger = true)) }
+            }
+            upNext -> {
+                onGoToDetails?.let { add(MenuAction("Go to details", it)) }
+                // Jellyfin can't hide one episode from Next Up; marking it
+                // played is what drops it off the row.
+                onRemoveFromRow?.let { add(MenuAction("Remove from Up Next", it, danger = true)) }
+                // Hides the whole show server side, so its next episode
+                // doesn't take its place.
+                onRemoveShowFromRow?.let { add(MenuAction("Remove Show from Up Next", it, danger = true)) }
+            }
+            else -> {
+                onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", it)) }
+                onToggleWatched?.let { add(MenuAction(if (isPlayed) "Mark as unwatched" else "Mark as watched", it)) }
+                if (canDelete && onDeleteItem != null) add(MenuAction("Remove from Library", onDeleteItem, danger = true))
+            }
+        }
+    }
+    CardDialog(onDismiss = onDismiss) { firstFocus ->
         Column(
             modifier = Modifier
-                .widthIn(min = 260.dp)
+                .widthIn(min = 320.dp, max = 460.dp)
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(vertical = 12.dp),
         ) {
             Text(
-                text = item.Name.orEmpty(),
+                text = item.SeriesName?.takeIf { continueWatching || upNext } ?: item.Name.orEmpty(),
                 color = JellioText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
             )
-            when {
-                continueWatching -> {
-                    onGoToDetails?.let { CardOptionsMenuRow(label = "Go to details", onClick = { it(); onDismiss() }) }
-                    onPlayManually?.let { CardOptionsMenuRow(label = "Play manually", onClick = { it(); onDismiss() }) }
-                    onStartOver?.let { CardOptionsMenuRow(label = "Start from beginning", onClick = { it(); onDismiss() }) }
-                    onRemoveFromRow?.let { CardOptionsMenuRow(label = "Remove from Continue Watching", onClick = { it(); onDismiss() }, danger = true) }
-                }
-                upNext -> {
-                    onGoToDetails?.let { CardOptionsMenuRow(label = "Go to details", onClick = { it(); onDismiss() }) }
-                    // Real gap components/cardOptionsMenu.js's own
-                    // toggleWatched() header documents: Jellyfin has no
-                    // endpoint that just hides one title from NextUp on
-                    // its own, marking the episode played is the only
-                    // real call that also drops it off this row.
-                    onRemoveFromRow?.let { CardOptionsMenuRow(label = "Remove from Up Next", onClick = { it(); onDismiss() }, danger = true) }
-                    // Real port of components/cardOptionsMenu.js's own
-                    // "Remove Show from Up Next": the row entry above
-                    // only ever marks this one episode played, which
-                    // just advances the same series to its own next
-                    // episode on the row's very next fetch, not
-                    // actually leaving it. This hides the whole series
-                    // server side instead (Controllers/
-                    // NextUpHiddenController.cs), a real series stays
-                    // gone across a reload rather than resurfacing
-                    // under its next episode.
-                    onRemoveShowFromRow?.let { CardOptionsMenuRow(label = "Remove Show from Up Next", onClick = { it(); onDismiss() }, danger = true) }
-                }
-                else -> {
-                    if (onToggleWatchlist != null) {
-                        CardOptionsMenuRow(label = if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", onClick = { onToggleWatchlist(); onDismiss() })
-                    }
-                    if (onToggleWatched != null) {
-                        CardOptionsMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
-                    }
-                    // Real gate components/cardOptionsMenu.js's own
-                    // header documents: canDelete is decided by the
-                    // caller from the signed in user's own real
-                    // Policy.IsAdministrator/EnableContentDeletion,
-                    // fetched once for the whole screen rather than
-                    // per card. Real Remove from Library confirmation
-                    // itself is the caller's own job too
-                    // (RemoveFromLibraryConfirm below), same real two
-                    // step flow that file's own window.confirm() gate
-                    // gives before ever calling deleteItem().
-                    if (canDelete && onDeleteItem != null) {
-                        CardOptionsMenuRow(label = "Remove from Library", onClick = { onDeleteItem(); onDismiss() }, danger = true)
-                    }
-                }
+            actions.forEachIndexed { index, action ->
+                CardOptionsMenuRow(
+                    label = action.label,
+                    danger = action.danger,
+                    onClick = {
+                        action.onClick()
+                        onDismiss()
+                    },
+                    modifier = if (index == 0) Modifier.focusRequester(firstFocus) else Modifier,
+                )
             }
         }
     }
 }
 
-// Real port of components/cardOptionsMenu.js's own window.confirm()
-// gate before deleteItem() ever fires: this app has no real
-// blocking confirm dialog to lean on, same shape as CardOptionsMenu
-// itself above (a scrim behind a rounded JellioBgElevated surface)
-// rather than a platform Dialog window, the same real reason that
-// composable's own header gives for rendering at the caller's own
-// screen root instead of a separate window a D-pad has to refocus
-// into.
+private data class MenuAction(val label: String, val onClick: () -> Unit, val danger: Boolean = false)
+
+// Asked before Remove from Library deletes anything.
 @Composable
 fun RemoveFromLibraryConfirm(
     item: BaseItemDto,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    BackHandler(onBack = onCancel)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onCancel,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
+    CardDialog(onDismiss = onCancel) { firstFocus ->
         Column(
             modifier = Modifier
-                .widthIn(min = 320.dp, max = 420.dp)
+                .widthIn(min = 360.dp, max = 460.dp)
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(24.dp),
         ) {
-            Text(text = "Remove from Library", color = JellioText)
+            Text(text = "Remove from Library", color = JellioText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 text = "Remove \"${item.Name.orEmpty()}\" from your library? This cannot be undone.",
                 color = JellioText,
@@ -644,14 +614,18 @@ fun RemoveFromLibraryConfirm(
                 Surface(
                     onClick = onCancel,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White, focusedContentColor = JellioBg),
+                    modifier = Modifier.focusRequester(firstFocus),
                 ) {
                     Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onConfirm,
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioDanger, contentColor = JellioText),
+                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioDanger.copy(alpha = 0.85f), contentColor = JellioText, focusedContainerColor = JellioDanger, focusedContentColor = JellioText),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+                    ),
                     modifier = Modifier.padding(start = 12.dp),
                 ) {
                     Text(text = "Remove", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
@@ -661,15 +635,69 @@ fun RemoveFromLibraryConfirm(
     }
 }
 
+// A menu in its own window: always on top of the screen (it used to be laid
+// out inside whatever screen opened it, stretched or underneath), holding
+// focus until it closes. The key up that ends the long press which opened it
+// is swallowed, so it can't pick the first option by itself.
 @Composable
-private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, danger: Boolean = false) {
+private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequester) -> Unit) {
+    val firstFocus = remember { FocusRequester() }
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        repeat(10) {
+            if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(50)
+        }
+    }
+    LaunchedEffect(Unit) {
+        delay(700)
+        armed = true
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .onPreviewKeyEvent { event ->
+                    val select = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
+                    if (!armed && select) {
+                        if (event.type == KeyEventType.KeyUp) armed = true
+                        true
+                    } else {
+                        if (event.type == KeyEventType.KeyDown) armed = true
+                        false
+                    }
+                }
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = onDismiss,
+                ),
+        ) {
+            content(firstFocus)
+        }
+    }
+}
+
+@Composable
+private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
     Surface(
         onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = if (danger) JellioDanger else JellioText),
-        modifier = Modifier.fillMaxWidth(),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = if (danger) JellioDanger else JellioText,
+            focusedContainerColor = Color.White,
+            focusedContentColor = if (danger) Color(0xFFC62840) else JellioBg,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp),
     ) {
-        Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))
+        Text(text = label, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
     }
 }
 
