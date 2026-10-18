@@ -96,6 +96,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.52.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.52.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Tidier Card Menus", "Remove from Continue Watching and Remove from Up Next are back to only showing on the Continue Watching and Up Next rows. Other cards just offer Watchlist and Watched."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.52.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.52.0",
