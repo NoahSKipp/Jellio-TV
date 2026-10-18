@@ -600,3 +600,6 @@ data class FeedEntryDto(
     val BadgeDescription: String? = null,
     val BadgeRarity: String? = null,
 )
+
+@com.squareup.moshi.JsonClass(generateAdapter = true)
+data class UserDataUpdate(val PlaybackPositionTicks: Long)

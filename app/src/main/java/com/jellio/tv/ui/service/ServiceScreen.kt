@@ -80,10 +80,8 @@ fun ServiceScreen(
         if (uiState.rows.isNotEmpty()) contentFocusRequester.requestFocus()
     }
     val openItemOptions = rememberCardOptionsHost(
-        canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
         onToggleWatched = { viewModel.toggleWatched(session, it) },
-        onDeleteItem = { viewModel.deleteItem(it) },
     )
 
     Box(modifier = modifier.fillMaxSize()) {

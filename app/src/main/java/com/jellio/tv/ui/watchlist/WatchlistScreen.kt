@@ -38,10 +38,8 @@ fun WatchlistScreen(
 
     LaunchedEffect(session.userId) { viewModel.load(session) }
     val openItemOptions = rememberCardOptionsHost(
-        canDeleteItems = uiState.canDeleteItems,
         onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
         onToggleWatched = { viewModel.toggleWatched(session, it) },
-        onDeleteItem = { viewModel.deleteItem(it) },
     )
 
     Box(modifier = modifier.fillMaxSize()) {

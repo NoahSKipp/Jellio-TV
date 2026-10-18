@@ -520,7 +520,6 @@ fun CardOptionsMenu(
     item: BaseItemDto,
     continueWatching: Boolean = false,
     upNext: Boolean = false,
-    canDelete: Boolean = false,
     onGoToDetails: (() -> Unit)? = null,
     onPlayManually: (() -> Unit)? = null,
     onStartOver: (() -> Unit)? = null,
@@ -528,7 +527,8 @@ fun CardOptionsMenu(
     onRemoveShowFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
-    onDeleteItem: (() -> Unit)? = null,
+    onClearResume: (() -> Unit)? = null,
+    onHideFromUpNext: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val isWatchlisted = item.UserData?.IsFavorite == true
@@ -553,7 +553,10 @@ fun CardOptionsMenu(
             else -> {
                 onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", it)) }
                 onToggleWatched?.let { add(MenuAction(if (isPlayed) "Mark as unwatched" else "Mark as watched", it)) }
-                if (canDelete && onDeleteItem != null) add(MenuAction("Remove from Library", onDeleteItem, danger = true))
+                val resumable = !isPlayed && (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L
+                if (resumable) onClearResume?.let { add(MenuAction("Remove from Continue Watching", it, danger = true)) }
+                val isShow = item.Type == "Series" || item.Type == "Episode"
+                if (isShow) onHideFromUpNext?.let { add(MenuAction("Remove from Up Next", it, danger = true)) }
             }
         }
     }
@@ -590,51 +593,6 @@ fun CardOptionsMenu(
 
 private data class MenuAction(val label: String, val onClick: () -> Unit, val danger: Boolean = false)
 
-// Asked before Remove from Library deletes anything.
-@Composable
-fun RemoveFromLibraryConfirm(
-    item: BaseItemDto,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    CardDialog(onDismiss = onCancel) { firstFocus ->
-        Column(
-            modifier = Modifier
-                .widthIn(min = 360.dp, max = 460.dp)
-                .background(JellioBgElevated, RoundedCornerShape(16.dp))
-                .padding(24.dp),
-        ) {
-            Text(text = "Remove from Library", color = JellioText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "Remove \"${item.Name.orEmpty()}\" from your library? This cannot be undone.",
-                color = JellioText,
-                modifier = Modifier.padding(top = 12.dp, bottom = 20.dp),
-            )
-            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    onClick = onCancel,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White, focusedContentColor = JellioBg),
-                    modifier = Modifier.focusRequester(firstFocus),
-                ) {
-                    Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
-                }
-                Surface(
-                    onClick = onConfirm,
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = JellioDanger.copy(alpha = 0.85f), contentColor = JellioText, focusedContainerColor = JellioDanger, focusedContentColor = JellioText),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
-                    ),
-                    modifier = Modifier.padding(start = 12.dp),
-                ) {
-                    Text(text = "Remove", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
-                }
-            }
-        }
-    }
-}
-
 // A menu in its own window: always on top of the screen (it used to be laid
 // out inside whatever screen opened it, stretched or underneath), holding
 // focus until it closes. The key up that ends the long press which opened it
@@ -663,6 +621,11 @@ private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequest
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.55f))
                 .onPreviewKeyEvent { event ->
+                    // First Back closes it (left alone, the first press only moves focus).
+                    if (event.key == Key.Back) {
+                        if (event.type == KeyEventType.KeyUp) onDismiss()
+                        return@onPreviewKeyEvent true
+                    }
                     val select = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                     if (!armed && select) {
                         if (event.type == KeyEventType.KeyUp) armed = true

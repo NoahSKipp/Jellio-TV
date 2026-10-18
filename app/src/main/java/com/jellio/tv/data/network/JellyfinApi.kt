@@ -222,6 +222,15 @@ interface JellyfinApi {
     @DELETE("Users/{userId}/PlayedItems/{itemId}")
     suspend fun markUnplayed(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
+    // Sets only the given user data fields; used to clear a resume position
+    // without marking the title watched.
+    @POST("UserItems/{itemId}/UserData")
+    suspend fun updateUserData(
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String,
+        @Body body: com.jellio.tv.data.model.UserDataUpdate,
+    ): UserItemDataDto
+
     @POST("Users/{userId}/Items/{itemId}/Rating")
     suspend fun setRating(
         @Path("userId") userId: String,

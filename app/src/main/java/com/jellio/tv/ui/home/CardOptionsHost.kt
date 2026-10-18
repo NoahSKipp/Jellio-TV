@@ -5,49 +5,60 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.session.SessionManager
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-// Every real grid outside Home (Library, Watchlist, Search, Service)
-// only ever needs CardOptionsMenu's own plain "every other card"
-// branch (Watchlist/Mark Watched/Remove from Library), never the
-// Continue Watching/Up Next ones HomeScreen's own inline wiring still
-// owns directly: this is that plain branch's own state and both real
-// overlays (the menu itself, RemoveFromLibraryConfirm) in one place,
-// so a screen that only needs it wires three callbacks instead of
-// duplicating HomeScreen's own cardMenuTarget/pendingDeleteItem pair
-// and both composable calls by hand. Called once, unconditionally, at
-// a screen's own root, same real reason HomeScreen renders its own
-// overlays at that screen's own root rather than inside a row/item.
+// The card menu for every screen but Home (libraries, Watchlist, Search,
+// Studio Hubs): Watchlist and Watched through the screen's own handlers,
+// and taking a title off Continue Watching or Up Next here. onItemChanged
+// hands back the title with its new state so the screen can redraw it.
+// Call it once at the screen's root.
 @Composable
 fun rememberCardOptionsHost(
-    canDeleteItems: Boolean,
     onToggleWatchlist: (BaseItemDto) -> Unit,
     onToggleWatched: (BaseItemDto) -> Unit,
-    onDeleteItem: (BaseItemDto) -> Unit,
+    onItemChanged: (BaseItemDto) -> Unit = {},
+    actions: CardActionsViewModel = hiltViewModel(),
 ): (BaseItemDto) -> Unit {
     var menuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
-    var pendingDelete by remember { mutableStateOf<BaseItemDto?>(null) }
 
     menuTarget?.let { item ->
         CardOptionsMenu(
             item = item,
-            canDelete = canDeleteItems,
             onToggleWatchlist = { onToggleWatchlist(item) },
             onToggleWatched = { onToggleWatched(item) },
-            onDeleteItem = { pendingDelete = item },
+            onClearResume = { actions.clearResume(item, onItemChanged) },
+            onHideFromUpNext = { actions.hideFromUpNext(item) },
             onDismiss = { menuTarget = null },
-        )
-    }
-    pendingDelete?.let { item ->
-        RemoveFromLibraryConfirm(
-            item = item,
-            onConfirm = {
-                pendingDelete = null
-                onDeleteItem(item)
-            },
-            onCancel = { pendingDelete = null },
         )
     }
 
     return { item -> menuTarget = item }
+}
+
+@HiltViewModel
+class CardActionsViewModel @Inject constructor(
+    private val repository: JellioRepository,
+    private val sessionManager: SessionManager,
+) : ViewModel() {
+    fun clearResume(item: BaseItemDto, onChanged: (BaseItemDto) -> Unit) {
+        viewModelScope.launch {
+            val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
+            runCatching { repository.clearResumePosition(userId, item.Id) }
+                .onSuccess { onChanged(item.copy(UserData = it)) }
+        }
+    }
+
+    fun hideFromUpNext(item: BaseItemDto) {
+        val seriesId = if (item.Type == "Series") item.Id else item.SeriesId ?: return
+        viewModelScope.launch { runCatching { repository.hideSeriesFromNextUp(seriesId) } }
+    }
 }

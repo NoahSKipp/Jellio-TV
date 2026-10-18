@@ -1300,6 +1300,19 @@ class JellioRepository @Inject constructor(
         return result
     }
 
+    // Takes a title off Continue Watching without marking it watched. Servers
+    // without the user data endpoint get watched then unwatched, which also
+    // resets the position.
+    suspend fun clearResumePosition(userId: String, itemId: String): UserItemDataDto {
+        val result = runCatching { api.updateUserData(itemId, userId, com.jellio.tv.data.model.UserDataUpdate(0L)) }
+            .getOrElse {
+                api.markPlayed(userId, itemId)
+                api.markUnplayed(userId, itemId)
+            }
+        cache.clear()
+        return result
+    }
+
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 

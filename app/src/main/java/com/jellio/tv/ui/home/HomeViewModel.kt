@@ -554,6 +554,46 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // Off Continue Watching without marking it watched: only its resume
+    // position is cleared, so elsewhere it just loses its progress bar.
+    fun removeFromContinueWatching(session: Session, item: BaseItemDto) {
+        viewModelScope.launch {
+            val updated = runCatching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull() ?: return@launch
+            val state = _uiState.value
+            _uiState.value = state.copy(
+                rows = state.rows.map { row ->
+                    when {
+                        row !is PosterHomeRow -> row
+                        row.section.key == "continue-watching" ->
+                            row.copy(section = row.section.copy(items = row.section.items.filterNot { it.Id == item.Id }))
+                        row.section.items.any { it.Id == item.Id } ->
+                            row.copy(section = row.section.copy(items = row.section.items.map { if (it.Id == item.Id) it.copy(UserData = updated) else it }))
+                        else -> row
+                    }
+                },
+            )
+        }
+    }
+
+    // Hides a show from Up Next from any card: a series card or one of its episodes.
+    fun hideFromUpNext(item: BaseItemDto) {
+        val seriesId = if (item.Type == "Series") item.Id else item.SeriesId ?: return
+        viewModelScope.launch {
+            runCatching { repository.hideSeriesFromNextUp(seriesId) }.onSuccess {
+                val state = _uiState.value
+                _uiState.value = state.copy(
+                    rows = state.rows.map { row ->
+                        if (row is PosterHomeRow && row.section.key == "up-next") {
+                            row.copy(section = row.section.copy(items = row.section.items.filterNot { it.SeriesId == seriesId }))
+                        } else {
+                            row
+                        }
+                    },
+                )
+            }
+        }
+    }
+
     private fun removeItemFromRows(itemId: String) {
         val state = _uiState.value
         val updatedRows = state.rows.map { row ->

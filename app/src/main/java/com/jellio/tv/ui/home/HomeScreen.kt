@@ -147,11 +147,6 @@ fun HomeScreen(
             if (session.accessToken.isNotEmpty()) "$withTag&ApiKey=${session.accessToken}&api_key=${session.accessToken}" else withTag
         }
     }
-    // Real port of components/cardOptionsMenu.js's own window.confirm()
-    // step before deleteItem() ever fires: the card options menu itself
-    // only ever sets this, RemoveFromLibraryConfirm below owns the
-    // actual real deletion call.
-    var pendingDeleteItem by remember { mutableStateOf<BaseItemDto?>(null) }
     // Real components/homeCustomizer.js's own header: editMode lives
     // only in this real local closure, reset to off on every fresh
     // visit to this screen the same way that file's own real editMode
@@ -276,10 +271,10 @@ fun HomeScreen(
                                             { item: BaseItemDto ->
                                                 val isShowRemoval = removingTarget?.second == true
                                                 removingTarget = null
-                                                if (isShowRemoval) {
-                                                    viewModel.hideShowFromRow(item)
-                                                } else {
-                                                    viewModel.removeFromRow(session, item)
+                                                when {
+                                                    isShowRemoval -> viewModel.hideShowFromRow(item)
+                                                    row.section.key == "continue-watching" -> viewModel.removeFromContinueWatching(session, item)
+                                                    else -> viewModel.removeFromRow(session, item)
                                                 }
                                             }
                                         }
@@ -347,20 +342,9 @@ fun HomeScreen(
                 onRemoveShowFromRow = if (upNext && item.SeriesId != null) { { removingTarget = item.Id to true } } else null,
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
-                canDelete = !continueWatching && !upNext && uiState.canDeleteItems,
-                onDeleteItem = { pendingDeleteItem = item },
+                onClearResume = { viewModel.removeFromContinueWatching(session, item) },
+                onHideFromUpNext = { viewModel.hideFromUpNext(item) },
                 onDismiss = { cardMenuTarget = null },
-            )
-        }
-
-        pendingDeleteItem?.let { item ->
-            RemoveFromLibraryConfirm(
-                item = item,
-                onConfirm = {
-                    pendingDeleteItem = null
-                    viewModel.deleteItem(item)
-                },
-                onCancel = { pendingDeleteItem = null },
             )
         }
 

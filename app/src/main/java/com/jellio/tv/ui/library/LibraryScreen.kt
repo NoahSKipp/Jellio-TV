@@ -85,10 +85,9 @@ fun LibraryScreen(
         val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
         val onCardFocus = remember { { item: BaseItemDto -> highlightedItem.value = item } }
         val openItemOptions = rememberCardOptionsHost(
-            canDeleteItems = uiState.canDeleteItems,
             onToggleWatchlist = { viewModel.toggleWatchlist(session, it) },
             onToggleWatched = { viewModel.toggleWatched(session, it) },
-            onDeleteItem = { viewModel.deleteItem(it) },
+            onItemChanged = { viewModel.replaceItem(it) },
         )
 
         LaunchedEffect(Unit) { viewModel.load(session, library) }
