@@ -96,10 +96,11 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
-        version = "0.50.1",
+        version = "0.51.0",
         title = "What's New in Jellio TV",
-        subtitle = "Version 0.50.1",
+        subtitle = "Version 0.51.0",
         features = listOf(
+            ChangelogFeature(Icons.Filled.Bedtime, "Rows for the Time of Day", "Movies, Shows and Anime now open on a row picked for the time of day, with a different take each day: easy family movies in the morning, thrillers in the evening, after-dark horror late at night. Anime gets its own, like slice of life with breakfast, battle shōnen in the afternoon and isekai after midnight."),
             ChangelogFeature(Icons.Filled.AutoAwesome, "Card Menu Fixed", "Holding select on a card now opens a proper menu on top of everything, ready to use with the remote, instead of a stretched menu you couldn't select anything in. Letting go of the button no longer picks the first option by accident."),
         ),
     ),
