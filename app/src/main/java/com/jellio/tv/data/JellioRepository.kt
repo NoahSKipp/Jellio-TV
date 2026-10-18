@@ -1481,6 +1481,11 @@ class JellioRepository @Inject constructor(
     suspend fun getUser(userId: String): UserDto =
         cache.get("user:$userId", CACHE_TTL_MS) { api.getUser(userId) }
 
+    suspend fun getUserFresh(userId: String): UserDto {
+        cache.invalidate("user:$userId")
+        return getUser(userId)
+    }
+
     // Mirrors runtime/api.js's own updateLanguagePreferences() exactly:
     // starts from the signed in user's own current Configuration and
     // only overwrites the two real fields screens/settings.js's own

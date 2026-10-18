@@ -161,27 +161,35 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setAudioLanguage(session: Session, code: String?) {
-        val previous = _audioLanguage.value
         _audioLanguage.value = code
-        saveLanguagePreferences(session, code, _subtitleLanguage.value) { _audioLanguage.value = previous }
+        saveLanguagePreferences(session, code, _subtitleLanguage.value)
     }
 
     fun setSubtitleLanguage(session: Session, code: String?) {
-        val previous = _subtitleLanguage.value
         _subtitleLanguage.value = code
-        saveLanguagePreferences(session, _audioLanguage.value, code) { _subtitleLanguage.value = previous }
+        saveLanguagePreferences(session, _audioLanguage.value, code)
     }
 
-    private fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?, onFailure: () -> Unit) {
+    // A save that reports an error may still have been stored (the screen
+    // used to flip back to the old choice while the server kept the new
+    // one), so the server's own answer decides what is shown.
+    private fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
         viewModelScope.launch {
             _languageStatus.value = "Saving…"
-            try {
-                repository.updateLanguagePreferences(session.userId, audio, subtitle)
+            val saved = runCatching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
+                .onFailure { android.util.Log.w("JellioSettings", "language save reported an error", it) }
+                .isSuccess
+            if (saved) {
                 _languageStatus.value = "Saved, takes effect the next time you start playback."
-            } catch (err: Exception) {
-                onFailure()
-                _languageStatus.value = "Could not save language preferences."
+                return@launch
             }
+            val stored = runCatching { repository.getUserFresh(session.userId).Configuration }.getOrNull()
+            if (stored != null) {
+                _audioLanguage.value = matchLanguageOption(stored.AudioLanguagePreference)?.code
+                _subtitleLanguage.value = matchLanguageOption(stored.SubtitleLanguagePreference)?.code
+            }
+            val matches = stored != null && _audioLanguage.value == audio && _subtitleLanguage.value == subtitle
+            _languageStatus.value = if (matches) "Saved, takes effect the next time you start playback." else "Could not save language preferences."
         }
     }
 
