@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.changelog
 
+import com.jellio.tv.ui.common.dismissOnBack
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -1465,7 +1466,6 @@ fun ChangelogPopup(
     release: ChangelogRelease = CURRENT_CHANGELOG,
     allReleases: List<ChangelogRelease> = CHANGELOG_RELEASES,
 ) {
-    BackHandler(onBack = onDismiss)
     val buttonFocusRequester = remember { FocusRequester() }
     var showPreviousVersions by remember { mutableStateOf(false) }
     var expandedPreviousVersion by remember { mutableStateOf<String?>(null) }
@@ -1477,9 +1477,16 @@ fun ChangelogPopup(
         }
     }
 
+    // Its own window: the screen behind claims focus while it loads, which
+    // used to pull focus off Continue and behind this popup.
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
     Box(
         modifier = modifier
             .fillMaxSize()
+            .dismissOnBack(onDismiss)
             .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.8f)),
         contentAlignment = Alignment.Center,
@@ -1732,5 +1739,6 @@ fun ChangelogPopup(
                 }
             }
         }
+    }
     }
 }
