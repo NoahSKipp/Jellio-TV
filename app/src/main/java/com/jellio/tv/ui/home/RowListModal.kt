@@ -125,7 +125,8 @@ fun RowListModal(
                 val scaledPosterWidth = PosterWidth.scaled()
                 val spacing = 16.dp
                 val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
-                val totalCount = displayedItems.size
+                val shownItems = displayedItems
+                val totalCount = shownItems.size
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Fixed(columnCount),
@@ -137,8 +138,8 @@ fun RowListModal(
                         .focusRequester(listFocusRequester)
                         .focusRestorer(firstCard),
                 ) {
-                    items(totalCount, key = { "${displayedItems[it].Id}-$it" }, contentType = { "poster_card" }) { index ->
-                        val item = displayedItems[index]
+                    items(totalCount, key = { "${shownItems[it].Id}-$it" }, contentType = { "poster_card" }) { index ->
+                        val item = shownItems[index]
                         RegisterGridFocusItem(focusController, index)
                         PosterCard(
                             item = item,

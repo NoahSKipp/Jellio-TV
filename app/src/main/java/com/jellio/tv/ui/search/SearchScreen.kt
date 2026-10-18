@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -143,7 +144,11 @@ fun SearchScreen(
                     val scaledPosterWidth = PosterWidth.scaled()
                     val spacing = 16.dp
                     val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
-                    val totalCount = uiState.results.size
+                    // One snapshot for the whole grid: reading uiState inside the
+                    // key lambda saw the next query's empty results while the grid
+                    // still had the old count, and crashed.
+                    val results = remember(uiState.results) { uiState.results.distinctBy { it.Id } }
+                    val totalCount = results.size
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Fixed(columnCount),
@@ -152,8 +157,8 @@ fun SearchScreen(
                         contentPadding = PaddingValues(bottom = 48.dp),
                         modifier = Modifier.fillMaxSize().focusRestorer(focusController.requesterFor(0)),
                     ) {
-                        items(totalCount, key = { uiState.results[it].Id }, contentType = { "poster_card" }) { index ->
-                            val item = uiState.results[index]
+                        items(totalCount, key = { results[it].Id }, contentType = { "poster_card" }) { index ->
+                            val item = results[index]
                             RegisterGridFocusItem(focusController, index)
                             PosterCard(
                                 item = item,
