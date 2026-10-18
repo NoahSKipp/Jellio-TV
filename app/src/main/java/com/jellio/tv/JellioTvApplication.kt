@@ -60,8 +60,11 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val sessionManager = entryPoint.sessionManager()
 
         val imageDispatcher = okhttp3.Dispatcher().apply {
-            maxRequests = 32
-            maxRequestsPerHost = 16
+            // Posters come from the Jellyfin server, which fetches each from
+            // TMDB the first time: more at once than NuvioTV (images from a
+            // CDN) keeps search results from filling in slowly.
+            maxRequests = 64
+            maxRequestsPerHost = 32
         }
 
         val imageOkHttpClient = OkHttpClient.Builder()
