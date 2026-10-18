@@ -80,9 +80,9 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (uiState.mode) {
-            // Left blank rather than flashing the manual form for the
-            // one frame before the real server/profile check resolves.
-            LoginMode.CHECKING -> Unit
+            // A spinner rather than the form while the server is checked
+            // (trying https and http can take a few seconds).
+            LoginMode.CHECKING -> com.jellio.tv.ui.common.ScreenSpinner()
             LoginMode.SERVER_ENTRY -> ServerAddressForm(
                 uiState = uiState,
                 onContinue = { server -> viewModel.submitServerAddress(server) },
@@ -140,7 +140,7 @@ private fun ServerAddressForm(
         JellioTextField(
             value = serverAddress,
             onValueChange = { serverAddress = it },
-            label = "Server address (https://...)",
+            label = "Server address (e.g. jellyfin.example.com)",
             modifier = Modifier.fillMaxWidth(),
         )
         uiState.error?.let { error ->
@@ -288,7 +288,7 @@ private fun ManualLoginForm(
         JellioTextField(
             value = serverAddress,
             onValueChange = { serverAddress = it },
-            label = "Server address (https://...)",
+            label = "Server address (e.g. jellyfin.example.com)",
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(modifier = Modifier.height(16.dp))

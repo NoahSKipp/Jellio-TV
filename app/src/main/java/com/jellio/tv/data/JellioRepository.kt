@@ -242,16 +242,35 @@ class JellioRepository @Inject constructor(
     // first run.
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
 
-    suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
-        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        if (normalized.isEmpty()) {
-            return LoginResult.Failure("Enter your server address")
+    // An address typed without http:// or https:// is tried both ways (the
+    // likelier one first) and the first that answers as a Jellyfin server
+    // wins; the failure names every address tried.
+    suspend fun resolveServerAddress(input: String): Result<String> {
+        val trimmed = input.trim().trimEnd('/')
+        if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Enter your server address"))
+        val hasScheme = trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)
+        val first = com.jellio.tv.di.normalizeServerAddress(trimmed)
+        val candidates = if (hasScheme) {
+            listOf(first)
+        } else if (first.startsWith("https://")) {
+            listOf(first, "http://" + first.removePrefix("https://"))
+        } else {
+            listOf(first, "https://" + first.removePrefix("http://"))
         }
-        sessionManager.saveServerAddress(normalized)
+        for (candidate in candidates) {
+            sessionManager.saveServerAddress(candidate)
+            if (runCatching { api.getPublicSystemInfo() }.isSuccess) return Result.success(candidate)
+        }
+        sessionManager.saveServerAddress(first)
+        val tried = candidates.joinToString(" and ")
+        return Result.failure(java.io.IOException("Couldn't reach a Jellyfin server. Tried $tried."))
+    }
+
+    suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
+        val normalized = resolveServerAddress(serverAddress).getOrElse {
+            return LoginResult.Failure(it.message ?: "Could not reach that server")
+        }
         return try {
-            // Confirms the address is a real reachable Jellyfin server
-            // before ever sending real credentials to it.
-            api.getPublicSystemInfo()
             // NetworkModule.kt's own auth interceptor attaches this
             // request's own real Authorization header itself now (device
             // metadata, no session token to fold in yet at this point).

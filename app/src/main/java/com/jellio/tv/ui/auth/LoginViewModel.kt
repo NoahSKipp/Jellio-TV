@@ -142,12 +142,18 @@ class LoginViewModel @Inject constructor(
     // exact same real PROFILE_PICKER/MANUAL decision backToProfiles()
     // makes on a device that already knew its server.
     fun submitServerAddress(serverAddress: String) {
-        val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        if (normalized.isEmpty()) {
+        if (serverAddress.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "Enter your server address")
             return
         }
-        loadProfiles(normalized)
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(mode = LoginMode.CHECKING, error = null)
+            repository.resolveServerAddress(serverAddress)
+                .onSuccess { loadProfiles(it) }
+                .onFailure {
+                    _uiState.value = LoginUiState(mode = LoginMode.SERVER_ENTRY, serverAddress = serverAddress, error = it.message)
+                }
+        }
     }
 
     fun quickSignIn(userId: String) {
