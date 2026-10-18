@@ -312,14 +312,26 @@ class JellioRepository @Inject constructor(
             ?: return LoginResult.Failure("No remembered sign-in for this profile")
         sessionManager.saveServerAddress(normalized)
         return try {
-            val user = api.getUserWithToken(entry.accessToken, userId)
+            val authorization = com.jellio.tv.data.network.buildEmbyAuthorizationHeader(
+                sessionManager.getCachedDeviceId(),
+                com.jellio.tv.data.network.APP_VERSION,
+                entry.accessToken,
+            )
+            val user = api.getUserWithToken(entry.accessToken, userId, authorization)
             clearCache()
             sessionManager.saveSession(normalized, entry.accessToken, user.Id, user.Name)
             rememberUser(normalized, user.Id, entry.accessToken, user.Name, user.PrimaryImageTag)
             LoginResult.Success
+        } catch (err: retrofit2.HttpException) {
+            // Only a token the server actually rejects is forgotten.
+            if (err.code() == 401 || err.code() == 403) {
+                rememberedUsersStore.forgetUser(normalized, userId)
+                LoginResult.Failure("That saved sign-in no longer works. Sign in again.")
+            } else {
+                LoginResult.Failure("Could not switch to that profile right now.")
+            }
         } catch (err: Exception) {
-            rememberedUsersStore.forgetUser(normalized, userId)
-            LoginResult.Failure("That saved sign-in no longer works. Sign in again.")
+            LoginResult.Failure("Could not reach the server. Try again.")
         }
     }
 

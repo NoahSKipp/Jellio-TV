@@ -112,10 +112,14 @@ object NetworkModule {
     @AuthInterceptor
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
+            val original = chain.request()
+            // A request carrying its own credentials (checking a saved
+            // profile's token) keeps them.
+            if (original.header("Authorization") != null) return@Interceptor chain.proceed(original)
             val token = sessionManager.getCachedAccessToken()
             val deviceId = sessionManager.getCachedDeviceId()
             val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
-            val request = chain.request().newBuilder().addHeader("Authorization", header).build()
+            val request = original.newBuilder().header("Authorization", header).build()
             chain.proceed(request)
         }
 

@@ -83,6 +83,7 @@ class AccountSwitcherViewModel @Inject constructor(
     fun selectPublicUser(session: Session, user: UserDto, onNeedsPassword: () -> Unit) {
         val hasPassword = user.HasPassword != false && user.HasConfiguredPassword != false
         if (hasPassword) {
+            user.Name?.takeIf { it.isNotBlank() }?.let(com.jellio.tv.ui.auth.LoginHandoff::put)
             onNeedsPassword()
             return
         }

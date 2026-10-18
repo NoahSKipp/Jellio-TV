@@ -54,11 +54,10 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    private var started = false
-
+    // Runs every time the login screen opens: this view model outlives a
+    // sign in, and keeping the old state reopened the form with the
+    // previous account's name in it.
     fun start() {
-        if (started) return
-        started = true
         loadProfiles(_uiState.value.serverAddress)
     }
 
@@ -114,7 +113,17 @@ class LoginViewModel @Inject constructor(
             val rememberedIds = liveRemembered.map { it.userId }.toSet()
             val publicOnly = publicUsers.filter { it.Id !in rememberedIds }
 
-            _uiState.value = if (liveRemembered.isEmpty() && publicOnly.isEmpty()) {
+            val handoff = LoginHandoff.take()
+            _uiState.value = if (handoff != null) {
+                LoginUiState(
+                    mode = LoginMode.MANUAL,
+                    serverAddress = serverAddress,
+                    remembered = liveRemembered,
+                    publicOnly = publicOnly,
+                    manualPrefillUsername = handoff,
+                    canReturnToProfiles = liveRemembered.isNotEmpty() || publicOnly.isNotEmpty(),
+                )
+            } else if (liveRemembered.isEmpty() && publicOnly.isEmpty()) {
                 LoginUiState(mode = LoginMode.MANUAL, serverAddress = serverAddress)
             } else {
                 LoginUiState(
@@ -282,4 +291,16 @@ class LoginViewModel @Inject constructor(
             }
         }
     }
+}
+
+// The account a switch is heading to when it needs a password: the login
+// screen opens straight on the form with that name filled in.
+object LoginHandoff {
+    @Volatile private var username: String? = null
+
+    fun put(name: String) {
+        username = name
+    }
+
+    fun take(): String? = username.also { username = null }
 }

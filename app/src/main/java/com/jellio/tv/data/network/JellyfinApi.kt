@@ -33,6 +33,7 @@ import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -82,6 +83,9 @@ interface JellyfinApi {
     suspend fun getUserWithToken(
         @Query("ApiKey") token: String,
         @Path("userId") userId: String,
+        // Built from the saved token: otherwise the signed in user's own
+        // header wins over ApiKey and the check runs as the wrong user.
+        @Header("Authorization") authorization: String,
     ): UserDto
 
     // Real endpoint, POST /Users/{id}/Configuration (UserController.cs's
