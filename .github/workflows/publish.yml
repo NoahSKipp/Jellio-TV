@@ -25,10 +25,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Debug-signed until a real release keystore exists (no signing
-      # secrets configured yet): still a real, directly installable
-      # sideload APK, same real build type Nuvio's own README points
-      # people at for building from source.
+      # A release build (not debuggable, so ART fully optimises it and the
+      # Compose baseline profiles apply), signed with the same key as before.
       - name: Restore signing key
         run: |
           if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
@@ -38,8 +36,8 @@ jobs:
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
 
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug
+      - name: Assemble release APK
+        run: ./gradlew :app:assembleRelease
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
@@ -50,7 +48,7 @@ jobs:
           mkdir -p dist
           TAG="${{ github.event.release.tag_name }}"
           if [ -z "$TAG" ]; then TAG=$(gh release view --json tagName -q .tagName); fi
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/jellio-tv-${TAG}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/jellio-tv-${TAG}.apk"
           cd dist
           for file in ./*; do
             md5sum "${file#./}" >> "${file%.*}.md5"

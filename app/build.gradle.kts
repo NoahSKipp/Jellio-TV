@@ -50,9 +50,10 @@ android {
         debug {
             signingConfigs.findByName("sideload")?.let { signingConfig = it }
         }
+        // The published build. Same key as debug builds so it installs over them.
         release {
             isMinifyEnabled = false
-            signingConfigs.findByName("sideload")?.let { signingConfig = it }
+            signingConfig = signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
         }
     }
 
