@@ -96,6 +96,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.48.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.48.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Much Smoother Scrolling", "Jellio TV now ships as an optimised build instead of a debug one, images load at the size they're shown, and moving between cards no longer redraws the whole Home screen. The seasonal scene also pauses while a row scrolls."),
+            ChangelogFeature(Icons.Filled.Tv, "Instant Descriptions and Banners", "Descriptions on Home appear straight away, and a card's banner and logo load while you rest on it, so they're ready the moment it widens."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Fixes", "Genre rows no longer repeat the same title over and over, and library banners no longer show under the sidebar."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.48.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.48.0",
