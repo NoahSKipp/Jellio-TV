@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.ShowsEditorial
+import com.jellio.tv.data.model.animeTimeOfDay
+import com.jellio.tv.data.model.moviesTimeOfDay
+import com.jellio.tv.data.model.score
+import com.jellio.tv.data.model.showsTimeOfDay
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.showsEditorial
 import com.jellio.tv.data.cache.LibrarySnapshot
@@ -32,6 +36,11 @@ private const val COVERFLOW_MIN_ITEMS = 3
 // independently redeclared constant, kept the same way here rather
 // than reusing HomeViewModel's or ServiceViewModel's own private copy.
 private const val ROW_LIST_LIMIT = 500
+// A themed row needs this many matching titles to show.
+private const val MIN_THEMED_ITEMS = 6
+private const val ANIME_THEME_POOL = 150
+
+private fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 
 // Only a real anime catalog collection whose own name actually says
 // "trending" earns the coverflow below: JellioRepository's own
@@ -166,6 +175,20 @@ class LibraryViewModel @Inject constructor(
         val coverflowItemsDeferred = async {
             runCatching { repository.getHeroCandidates(session.userId, limit = 8, parentId = library.Id) }.getOrDefault(emptyList())
         }
+        val theme = if (library.CollectionType == "movies") moviesTimeOfDay(currentHour()) else showsTimeOfDay(currentHour())
+        val themedDeferred = async {
+            runCatching {
+                repository.getLibraryItems(
+                    session.userId,
+                    library.Id,
+                    limit = ROW_LIMIT * 2,
+                    includeItemTypes = itemType,
+                    sortBy = "Random",
+                    sortOrder = "Ascending",
+                    genre = theme.genres.joinToString("|"),
+                )
+            }.getOrDefault(emptyList())
+        }
         val defaultSort = LIBRARY_SORT_OPTIONS.first().value.split(":")
         val mainItemsDeferred = async {
             runCatching {
@@ -185,7 +208,12 @@ class LibraryViewModel @Inject constructor(
 
         val excludeIds = excludeIdsDeferred.await()
         animeIds = excludeIds
-        val coverflowItems = coverflowItemsDeferred.await().filterNot { isAnime(it) }
+        // The time of day row; too few matches and the random picks stand in
+        // as plain Featured, so a themed name never sits over unrelated titles.
+        val themed = themedDeferred.await().filterNot { isAnime(it) }.take(ROW_LIMIT)
+        val useThemed = themed.size >= MIN_THEMED_ITEMS
+        val coverflowItems = if (useThemed) themed else coverflowItemsDeferred.await().filterNot { isAnime(it) }
+        val featuredTitle = if (useThemed) theme.title else null
         val mainItems = mainItemsDeferred.await().filterNot { isAnime(it) }
 
         // Real port of screens/library.js's own buildRow(...,
@@ -226,11 +254,6 @@ class LibraryViewModel @Inject constructor(
         // line above its carousel that changes with the reader's own
         // time of day: only the Shows library carries one, Movies has
         // no equivalent real reference screenshot behind it.
-        val editorial = if (library.CollectionType == "tvshows") {
-            showsEditorial(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
-        } else {
-            null
-        }
 
         val allGenres = allGenresDeferred.await().ifEmpty { genres }
         val canDelete = canDeleteDeferred.await()
@@ -238,7 +261,7 @@ class LibraryViewModel @Inject constructor(
             isLoading = false,
             title = library.Name ?: "Library",
             coverflowItems = coverflowItems,
-            editorial = editorial,
+            coverflowBadge = featuredTitle,
             mainRow = mainRow,
             // Every genre the library has, not just the few with rows.
             genreOptions = allGenres,
@@ -248,7 +271,7 @@ class LibraryViewModel @Inject constructor(
         val snapshot = LibrarySnapshot(
             title = library.Name ?: "Library",
             coverflowItems = coverflowItems,
-            coverflowBadge = null,
+            coverflowBadge = featuredTitle,
             mainRowTitle = mainRow?.title,
             mainRowItems = mainRow?.items ?: emptyList(),
             sections = sections.map { it.toCachedRowDto() },
@@ -324,6 +347,21 @@ class LibraryViewModel @Inject constructor(
         }
 
         val picked = collections.take(MAX_ANIME_ROWS)
+        val theme = animeTimeOfDay(currentHour())
+        val animeIdsDeferred = async { repository.getAnimeIds() }
+        val themedPoolDeferred = async {
+            runCatching {
+                repository.getLibraryItems(
+                    session.userId,
+                    libraryId,
+                    limit = ANIME_THEME_POOL,
+                    includeItemTypes = "Series",
+                    sortBy = "Random",
+                    sortOrder = "Ascending",
+                    genre = theme.genres.joinToString("|"),
+                )
+            }.getOrDefault(emptyList())
+        }
         // Real perf bug found live, same real fix renderAnime()'s own
         // Promise.allSettled(animeCollections.map(...)) already uses:
         // every real anime catalog's own item fetch fires together
@@ -374,7 +412,22 @@ class LibraryViewModel @Inject constructor(
             }
         }
 
-        if (sections.isEmpty() && !coverflowIsTrending) {
+        // The time of day row, from this library's anime in the theme's
+        // genres plus everything the catalog rows hold, best matches first.
+        val ids = animeIdsDeferred.await()
+        // Already in one of the theme's genres (the server matched it).
+        val genreMatched = themedPoolDeferred.await().filter { it.Id.replace("-", "").lowercase() in ids }
+        val genreMatchedIds = genreMatched.map { it.Id }.toSet()
+        val pool = (genreMatched + itemLists.flatMap { it.second }).distinctBy { it.Id }
+            .shuffled(kotlin.random.Random(Calendar.getInstance().get(Calendar.DAY_OF_YEAR)))
+        val themed = pool.map { it to theme.score(it) + if (it.Id in genreMatchedIds) 1 else 0 }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .map { it.first }
+            .take(ROW_LIMIT)
+        val sectionsWithTheme = if (themed.size >= MIN_THEMED_ITEMS) listOf(HomeSection(theme.title, themed)) + sections else sections
+
+        if (sectionsWithTheme.isEmpty() && !coverflowIsTrending) {
             _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE, canDeleteItems = canDeleteDeferred.await())
             return@coroutineScope
         }
@@ -389,14 +442,14 @@ class LibraryViewModel @Inject constructor(
             title = "Anime",
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
-            sections = sections,
+            sections = sectionsWithTheme,
             canDeleteItems = canDelete,
         )
         val snapshot = LibrarySnapshot(
             title = "Anime",
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
-            sections = sections.map { it.toCachedRowDto() },
+            sections = sectionsWithTheme.map { it.toCachedRowDto() },
         )
         rowSnapshotStore.saveLibrarySnapshot(session.userId, libraryId, snapshot)
     }

@@ -88,3 +88,92 @@ fun showsEditorial(hour: Int): ShowsEditorial {
         description = copy.subtitle,
     )
 }
+
+// A themed row for the time of day: its title, the genres that fill it
+// and, for anime, words to look for in a title or overview (isekai is a
+// tag, not a genre, so "another world" and friends find it instead).
+@androidx.compose.runtime.Immutable
+data class TimeOfDayRow(val title: String, val genres: List<String>, val keywords: List<String> = emptyList())
+
+private fun rotate(variants: Map<String, List<TimeOfDayRow>>, hour: Int): TimeOfDayRow {
+    val bucket = dayBucket(hour)
+    val list = variants.getValue(bucket)
+    return list[(dayOfYear() + BUCKET_INDEX.getValue(bucket) * 3) % list.size]
+}
+
+private val MOVIE_VARIANTS = mapOf(
+    "morning" to listOf(
+        TimeOfDayRow("Easy morning movies", listOf("Family", "Animation", "Comedy")),
+        TimeOfDayRow("Feel-good features", listOf("Comedy", "Romance", "Family")),
+        TimeOfDayRow("Documentaries with your coffee", listOf("Documentary", "History")),
+        TimeOfDayRow("Sunny side up", listOf("Comedy", "Music", "Animation")),
+    ),
+    "afternoon" to listOf(
+        TimeOfDayRow("Afternoon blockbusters", listOf("Action", "Adventure")),
+        TimeOfDayRow("Comfort classics", listOf("Comedy", "Drama", "Romance")),
+        TimeOfDayRow("Quests and adventures", listOf("Adventure", "Fantasy", "Family")),
+        TimeOfDayRow("Matinee westerns and wars", listOf("Western", "War", "History")),
+    ),
+    "evening" to listOf(
+        TimeOfDayRow("Tonight's feature", listOf("Drama", "Thriller", "Action")),
+        TimeOfDayRow("Date night", listOf("Romance", "Comedy")),
+        TimeOfDayRow("Edge of your seat", listOf("Thriller", "Crime", "Mystery")),
+        TimeOfDayRow("Epic sci-fi and fantasy", listOf("Science Fiction", "Fantasy")),
+    ),
+    "night" to listOf(
+        TimeOfDayRow("After-dark horror", listOf("Horror", "Thriller")),
+        TimeOfDayRow("Crime after midnight", listOf("Crime", "Mystery", "Thriller")),
+        TimeOfDayRow("Strange late-night picks", listOf("Science Fiction", "Mystery", "Fantasy")),
+        TimeOfDayRow("Midnight mysteries", listOf("Mystery", "Thriller", "Horror")),
+    ),
+)
+
+private val ANIME_VARIANTS = mapOf(
+    "morning" to listOf(
+        TimeOfDayRow("Slice-of-life sunrise", listOf("Slice of Life", "Comedy"), listOf("school", "café", "cafe", "everyday")),
+        TimeOfDayRow("School-day openers", listOf("Slice of Life", "Comedy", "Romance"), listOf("high school", "classmate", "club")),
+        TimeOfDayRow("Morning training arcs", listOf("Sports", "Action"), listOf("tournament", "training", "team", "championship")),
+        TimeOfDayRow("Cozy and wholesome", listOf("Slice of Life", "Family", "Kids"), listOf("cooking", "food", "family", "countryside")),
+    ),
+    "afternoon" to listOf(
+        TimeOfDayRow("After-school adventures", listOf("Adventure", "Comedy", "Action & Adventure"), listOf("journey", "adventure", "friends")),
+        TimeOfDayRow("Battle shōnen break", listOf("Action", "Adventure", "Action & Adventure"), listOf("hero", "power", "battle", "strongest")),
+        TimeOfDayRow("Club room picks", listOf("Sports", "Music", "Slice of Life"), listOf("club", "band", "idol", "team")),
+        TimeOfDayRow("Gag anime for the break", listOf("Comedy"), listOf("comedy", "gag", "hilarious")),
+    ),
+    "evening" to listOf(
+        TimeOfDayRow("Tonight's big arcs", listOf("Action", "Drama", "Fantasy", "Sci-Fi & Fantasy"), listOf("war", "destiny", "kingdom")),
+        TimeOfDayRow("Pilots, to your units", listOf("Mecha", "Sci-Fi", "Sci-Fi & Fantasy"), listOf("mecha", "robot", "pilot", "giant")),
+        TimeOfDayRow("Romance after dark", listOf("Romance", "Drama"), listOf("love", "confess", "relationship")),
+        TimeOfDayRow("Swords and sorcery", listOf("Fantasy", "Adventure", "Sci-Fi & Fantasy"), listOf("magic", "sword", "demon lord", "dragon")),
+    ),
+    "night" to listOf(
+        TimeOfDayRow("Isekai: diving into another world", listOf("Fantasy", "Sci-Fi & Fantasy"), listOf("isekai", "another world", "reincarnat", "transported", "summoned", "different world")),
+        TimeOfDayRow("Supernatural after midnight", listOf("Supernatural", "Horror", "Mystery"), listOf("ghost", "spirit", "curse", "yokai", "demon")),
+        TimeOfDayRow("Psychological late-night picks", listOf("Psychological", "Thriller", "Mystery"), listOf("mind", "death game", "detective", "survival")),
+        TimeOfDayRow("Neon and cyberpunk", listOf("Sci-Fi", "Mecha", "Sci-Fi & Fantasy"), listOf("cyber", "future", "dystopia", "android", "virtual")),
+    ),
+)
+
+private val SHOW_GENRES = mapOf(
+    "morning" to listOf("Comedy", "Family", "Animation", "Documentary"),
+    "afternoon" to listOf("Comedy", "Reality", "Action & Adventure", "Animation"),
+    "evening" to listOf("Drama", "Crime", "Mystery", "Sci-Fi & Fantasy", "War & Politics"),
+    "night" to listOf("Mystery", "Crime", "Sci-Fi & Fantasy", "Drama"),
+)
+
+fun moviesTimeOfDay(hour: Int): TimeOfDayRow = rotate(MOVIE_VARIANTS, hour)
+
+fun animeTimeOfDay(hour: Int): TimeOfDayRow = rotate(ANIME_VARIANTS, hour)
+
+// Shows keep their own copy (showsEditorial above); this is what fills it.
+fun showsTimeOfDay(hour: Int): TimeOfDayRow =
+    TimeOfDayRow(showsEditorial(hour).tagline, SHOW_GENRES.getValue(dayBucket(hour)))
+
+// How well an anime matches a row: a keyword hit counts double a genre hit.
+fun TimeOfDayRow.score(item: BaseItemDto): Int {
+    val genreHits = item.Genres.orEmpty().count { genre -> genres.any { it.equals(genre, ignoreCase = true) } }
+    val text = ((item.Name ?: "") + " " + (item.Overview ?: "")).lowercase()
+    val keywordHits = keywords.count { text.contains(it.lowercase()) }
+    return genreHits + keywordHits * 2
+}
