@@ -125,7 +125,9 @@ fun HomeScreen(
     // only ever answer a real drift a frame after it already rendered.
     // Blocking the real scroll from ever reaching this list in the
     // first place, while this item holds real focus, closes that last
-    var highlightedItem by remember { mutableStateOf<BaseItemDto?>(null) }
+    // Read only inside ShowcaseHost: a focus move then recomposes the
+    // showcase alone, not this whole screen.
+    val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
@@ -211,21 +213,11 @@ fun HomeScreen(
                 val density = LocalDensity.current
                 val rowsViewportHeight = screenHeight * 0.54f
                 val topFixtureHeight = screenHeight - rowsViewportHeight
-                val activeHighlighted = highlightedItem ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
-                // The showcase follows focus once it settles, so moving quickly
-                // along a row doesn't start a backdrop load for every card passed.
-                var shownItem by remember { mutableStateOf<BaseItemDto?>(null) }
-                var showcaseInfo by remember { mutableStateOf<ShowcaseInfo?>(null) }
-                LaunchedEffect(activeHighlighted?.Id) {
-                    val target = activeHighlighted ?: return@LaunchedEffect
-                    if (shownItem != null) kotlinx.coroutines.delay(SHOWCASE_SETTLE_MS)
-                    shownItem = target
-                    showcaseInfo = viewModel.showcaseInfo(session, target)
-                }
-
-                HomeItemShowcase(
-                    item = shownItem,
-                    info = showcaseInfo,
+                val firstRowItem = uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+                ShowcaseHost(
+                    highlighted = highlightedItem,
+                    fallback = firstRowItem,
+                    loadInfo = { item -> viewModel.showcaseInfo(session, item) },
                     imageUrl = imageUrl,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -280,7 +272,7 @@ fun HomeScreen(
                                     is PosterHomeRow -> {
                                         val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
                                         val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
-                                        val onCardFocus = remember { { item: BaseItemDto -> highlightedItem = item } }
+                                        val onCardFocus = remember { { item: BaseItemDto -> highlightedItem.value = item } }
                                         val onShatterFinished = remember(row, session) {
                                             { item: BaseItemDto ->
                                                 val isShowRemoval = removingTarget?.second == true
@@ -384,6 +376,29 @@ fun HomeScreen(
             )
         }
     }
+}
+
+// The showcase follows focus once it settles, so moving quickly along a row
+// doesn't start a backdrop load for every card passed.
+@Composable
+private fun ShowcaseHost(
+    highlighted: androidx.compose.runtime.State<BaseItemDto?>,
+    fallback: BaseItemDto?,
+    loadInfo: suspend (BaseItemDto) -> ShowcaseInfo,
+    imageUrl: (BaseItemDto, String, Int) -> String,
+    modifier: Modifier = Modifier,
+) {
+    val active = highlighted.value ?: fallback
+    var shownItem by remember { mutableStateOf<BaseItemDto?>(null) }
+    var showcaseInfo by remember { mutableStateOf<ShowcaseInfo?>(null) }
+    LaunchedEffect(active?.Id) {
+        val target = active ?: return@LaunchedEffect
+        if (shownItem != null) kotlinx.coroutines.delay(SHOWCASE_SETTLE_MS)
+        shownItem = target
+        showcaseInfo = ShowcaseInfo(target, null)
+        showcaseInfo = loadInfo(target)
+    }
+    HomeItemShowcase(item = shownItem, info = showcaseInfo, imageUrl = imageUrl, modifier = modifier)
 }
 
 // Real port of components/homeCustomizer.js's own

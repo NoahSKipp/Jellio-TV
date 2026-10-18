@@ -23,11 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -129,30 +130,40 @@ private fun ShowcaseBackdrop(
     var index by remember(candidates) { mutableIntStateOf(0) }
     val url = candidates.getOrNull(index) ?: return
     val context = LocalContext.current
-    val request = remember(url) { ImageRequest.Builder(context).data(url).crossfade(300).build() }
-    Box(
-        modifier = modifier.drawWithContent {
-            drawContent()
-            drawRect(
-                Brush.horizontalGradient(
-                    0f to JellioBg,
-                    0.18f to JellioBg.copy(alpha = 0.9f),
-                    0.42f to JellioBg.copy(alpha = 0.55f),
-                    0.68f to JellioBg.copy(alpha = 0.15f),
-                    1f to Color.Transparent,
-                    endX = size.width * 0.7f,
-                ),
+    BoxWithConstraints(
+        modifier = modifier.drawWithCache {
+            val sideFade = Brush.horizontalGradient(
+                0f to JellioBg,
+                0.18f to JellioBg.copy(alpha = 0.9f),
+                0.42f to JellioBg.copy(alpha = 0.55f),
+                0.68f to JellioBg.copy(alpha = 0.15f),
+                1f to Color.Transparent,
+                endX = size.width * 0.7f,
             )
-            drawRect(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.55f to Color.Transparent,
-                    0.8f to JellioBg.copy(alpha = 0.7f),
-                    1f to JellioBg,
-                ),
+            val bottomFade = Brush.verticalGradient(
+                0f to Color.Transparent,
+                0.55f to Color.Transparent,
+                0.8f to JellioBg.copy(alpha = 0.7f),
+                1f to JellioBg,
             )
+            onDrawWithContent {
+                drawContent()
+                drawRect(sideFade)
+                drawRect(bottomFade)
+            }
         },
     ) {
+        val density = LocalDensity.current
+        val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
+        val heightPx = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
+        val request = remember(url, widthPx, heightPx) {
+            ImageRequest.Builder(context)
+                .data(url)
+                .memoryCacheKey("${url}_${widthPx}x$heightPx")
+                .size(widthPx, heightPx)
+                .crossfade(250)
+                .build()
+        }
         AsyncImage(
             model = request,
             contentDescription = null,
@@ -174,10 +185,14 @@ private fun ShowcaseLogo(
     val candidates = remember(item.Id, series?.Id) { posterLogoCandidates(item, imageUrl, 600, series = series) }
     var index by remember(candidates) { mutableIntStateOf(0) }
     val url = candidates.getOrNull(index)
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val logoWidthPx = with(density) { 340.dp.scaled().roundToPx() }.coerceAtLeast(1)
+    val logoHeightPx = with(density) { 72.dp.scaled().roundToPx() }.coerceAtLeast(1)
     Box(contentAlignment = Alignment.BottomStart, modifier = Modifier.height(72.dp.scaled())) {
         if (url != null) {
             AsyncImage(
-                model = url,
+                model = remember(url, logoWidthPx, logoHeightPx) { sizedImageRequest(context, url, logoWidthPx, logoHeightPx) },
                 contentDescription = title,
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.BottomStart,

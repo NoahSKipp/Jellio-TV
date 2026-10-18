@@ -52,6 +52,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import coil3.request.crossfade
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -232,22 +233,41 @@ fun PosterCard(
         runCatching { bringIntoView.bringIntoView() }
     }
 
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val baseWidthPx = with(density) { baseWidth.roundToPx() }.coerceAtLeast(1)
+    val baseHeightPx = with(density) { baseHeight.roundToPx() }.coerceAtLeast(1)
+    val expandedWidthPx = with(density) { expandedWidth.roundToPx() }.coerceAtLeast(1)
+    val logoHeightPx = with(density) { 40.dp.scaled().roundToPx() }.coerceAtLeast(1)
+
+    val candidates = remember(item, imageUrl, progress) { posterImageCandidates(item, imageUrl, 400, seriesFirst = progress) }
+    var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeUrl = candidates.getOrNull(candidateIndex)
+
+    // Banner art is only worked out for the focused card, not every card in view.
+    val wantsBanner = isFocused && canExpand
+    val backdropCandidates = remember(item, imageUrl, progress, wantsBanner) {
+        if (wantsBanner) posterBackdropCandidates(item, imageUrl, 800, episodeStill = progress) else emptyList()
+    }
+    var backdropIndex by remember(item.Id, backdropCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
+
+    val logoCandidates = remember(item, imageUrl, wantsBanner) {
+        if (wantsBanner) posterLogoCandidates(item, imageUrl, 300) else emptyList()
+    }
+    var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val activeLogoUrl = logoCandidates.getOrNull(logoIndex)
+
+    // Resting on a card warms its banner and logo with the exact requests the
+    // widened card makes, so they are in memory by the time it widens.
     LaunchedEffect(isFocused, item.Id) {
-        if (isFocused) {
-            delay(PREFETCH_DEBOUNCE_MS)
-            if (!com.jellio.tv.ui.perf.ScrollActivity.scrolling) {
-                prefetch(item)
-                if (!item.BackdropImageTags.isNullOrEmpty()) {
-                    coil3.SingletonImageLoader.get(context).enqueue(
-                        coil3.request.ImageRequest.Builder(context)
-                            .data(imageUrl(item, "Backdrop", 1920))
-                            .memoryCachePolicy(coil3.request.CachePolicy.DISABLED)
-                            .size(640, 360)
-                            .build(),
-                    )
-                }
-            }
-        }
+        if (!isFocused) return@LaunchedEffect
+        delay(PREFETCH_DEBOUNCE_MS)
+        if (com.jellio.tv.ui.perf.ScrollActivity.busy) return@LaunchedEffect
+        prefetch(item)
+        if (!canExpand) return@LaunchedEffect
+        val loader = coil3.SingletonImageLoader.get(context)
+        backdropCandidates.firstOrNull()?.let { loader.enqueue(sizedImageRequest(context, it, expandedWidthPx, baseHeightPx)) }
+        logoCandidates.firstOrNull()?.let { loader.enqueue(sizedImageRequest(context, it, expandedWidthPx, logoHeightPx)) }
     }
 
     val animatedWidth by animateDpAsState(
@@ -255,18 +275,6 @@ fun PosterCard(
         animationSpec = tween(durationMillis = EXPAND_ANIMATION_MS, easing = FastOutSlowInEasing),
         label = "posterCardWidth",
     )
-
-    val candidates = remember(item, imageUrl, progress) { posterImageCandidates(item, imageUrl, 400, seriesFirst = progress) }
-    var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val activeUrl = candidates.getOrNull(candidateIndex)
-
-    val backdropCandidates = remember(item, imageUrl, progress) { posterBackdropCandidates(item, imageUrl, 800, episodeStill = progress) }
-    var backdropIndex by remember(item.Id, backdropCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
-
-    val logoCandidates = remember(item, imageUrl) { posterLogoCandidates(item, imageUrl, 300) }
-    var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val activeLogoUrl = logoCandidates.getOrNull(logoIndex)
 
     val episode = episodeLabel(item)
     val remaining = if (progress) remainingLabel(item) else ""
@@ -314,7 +322,7 @@ fun PosterCard(
             if (isExpanded) {
                 if (activeBackdropUrl != null) {
                     AsyncImage(
-                        model = activeBackdropUrl,
+                        model = remember(activeBackdropUrl) { sizedImageRequest(context, activeBackdropUrl, expandedWidthPx, baseHeightPx) },
                         contentDescription = item.Name,
                         contentScale = ContentScale.Crop,
                         onError = { if (backdropIndex < backdropCandidates.size) backdropIndex += 1 },
@@ -340,7 +348,7 @@ fun PosterCard(
                 ) {
                     if (activeLogoUrl != null) {
                         AsyncImage(
-                            model = activeLogoUrl,
+                            model = remember(activeLogoUrl) { sizedImageRequest(context, activeLogoUrl, expandedWidthPx, logoHeightPx) },
                             contentDescription = item.SeriesName ?: item.Name,
                             onError = { logoIndex += 1 },
                             contentScale = ContentScale.Fit,
@@ -370,7 +378,7 @@ fun PosterCard(
             } else {
                 if (activeUrl != null) {
                     AsyncImage(
-                        model = activeUrl,
+                        model = remember(activeUrl) { sizedImageRequest(context, activeUrl, baseWidthPx, baseHeightPx, crossfade = true) },
                         contentDescription = item.Name,
                         contentScale = ContentScale.Crop,
                         onError = { if (candidateIndex < candidates.size) candidateIndex += 1 },
@@ -454,6 +462,23 @@ fun PosterCard(
         }
     }
 }
+
+// Card art at the card's own pixel size, keyed by that size so a prefetch and
+// the card read the same memory cache entry (same approach as NuvioTV's
+// ContentCard, GPL-3.0).
+internal fun sizedImageRequest(
+    context: android.content.Context,
+    url: String,
+    widthPx: Int,
+    heightPx: Int,
+    crossfade: Boolean = false,
+): coil3.request.ImageRequest =
+    coil3.request.ImageRequest.Builder(context)
+        .data(url)
+        .memoryCacheKey("${url}_${widthPx}x$heightPx")
+        .size(widthPx, heightPx)
+        .apply { if (crossfade) crossfade(150) }
+        .build()
 
 @Composable
 private fun CardChip(text: String, modifier: Modifier = Modifier) {

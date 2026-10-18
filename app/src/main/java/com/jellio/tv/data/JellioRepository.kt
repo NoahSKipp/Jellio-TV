@@ -70,7 +70,8 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
         newId && newTitle
     }
 }
-private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
+// Overview so Home's showcase can describe a title without asking again.
+private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags,Overview"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
 // real metadata a plain row/grid fetch never asks for. Trickplay only for
@@ -78,6 +79,8 @@ private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags"
 // Gelato title made opening its page far slower than on web.
 internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
+private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks,PremiereDate,CommunityRating,BackdropImageTags," +
+    "ParentBackdropItemId,ParentBackdropImageTags"
 internal const val PLAYER_DETAIL_FIELDS = "$DETAIL_FIELDS,Trickplay"
 
 // Two distinct real patterns, same distinction navShared.js's own
@@ -592,7 +595,7 @@ class JellioRepository @Inject constructor(
             // screens/service.js's own pickHeroItem() needs it to judge
             // which real item across a matched collection is even
             // eligible to lead that page's own hero.
-            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres,BackdropImageTags",
+            fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres,BackdropImageTags,Overview",
         ).Items
 
     // Real runtime/api.js's own getResumeItems(): RunTimeTicks
@@ -746,6 +749,22 @@ class JellioRepository @Inject constructor(
             fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
         ).Items,
         )
+
+    // Showcase details for titles whose row entry came without them (older
+    // cached rows, episodes needing their show): one request for the item and
+    // its show together, kept for half an hour.
+    private val showcaseCache = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
+
+    suspend fun getShowcaseItems(userId: String, ids: List<String>): Map<String, BaseItemDto> {
+        val now = System.currentTimeMillis()
+        val fresh = ids.mapNotNull { id -> showcaseCache[id]?.takeIf { now - it.first < PRELOAD_TTL_MS }?.second }.associateBy { it.Id }
+        val missing = ids.filter { it !in fresh }.distinct()
+        if (missing.isEmpty()) return fresh
+        val fetched = api.getItemsByIds(userId, missing.joinToString(","), SHOWCASE_FIELDS).Items
+        if (showcaseCache.size > 400) showcaseCache.clear()
+        fetched.forEach { showcaseCache[it.Id] = now to it }
+        return fresh + fetched.associateBy { it.Id }
+    }
 
     suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto> =
         api.getCommunityUsers()

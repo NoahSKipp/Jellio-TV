@@ -475,16 +475,19 @@ class HomeViewModel @Inject constructor(
     // an optimistic-free round trip to the real server, then patched
     // back into whichever real row(s) actually hold this item, same
     // real reasoning updateItem() below documents.
-    // Full details for the showcase above the rows (row items carry no
-    // overview), plus the show for an episode: its logo, backdrop and
-    // whether it is still airing. Cached, and the title page reuses them.
+    // What Home's showcase needs beyond the row item: its overview when the
+    // row came without one, and an episode's show (logo, backdrop, airing
+    // status). Nothing to fetch for most cards; otherwise one small request.
     suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo {
-        val details = runCatching { repository.getItemDetails(session.userId, item.Id) }.getOrNull() ?: item
-        val seriesId = (details.SeriesId ?: item.SeriesId)?.takeIf {
-            item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
+        val isEpisode = item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
+        val seriesId = item.SeriesId?.takeIf { isEpisode }
+        val ids = buildList {
+            if (item.Overview.isNullOrBlank()) add(item.Id)
+            seriesId?.let(::add)
         }
-        val series = seriesId?.let { id -> runCatching { repository.getItemDetails(session.userId, id) }.getOrNull() }
-        return ShowcaseInfo(details, series)
+        if (ids.isEmpty()) return ShowcaseInfo(item, null)
+        val fetched = runCatching { repository.getShowcaseItems(session.userId, ids) }.getOrDefault(emptyMap())
+        return ShowcaseInfo(fetched[item.Id] ?: item, seriesId?.let { fetched[it] })
     }
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
