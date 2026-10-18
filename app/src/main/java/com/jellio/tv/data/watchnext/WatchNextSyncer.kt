@@ -75,8 +75,6 @@ class WatchNextSyncer @Inject constructor(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) put(android.media.tv.TvContract.WatchNextPrograms.COLUMN_CONTENT_ID, itemId)
         }
 
-    private fun deepLinkUri(itemId: String): Uri = appLink("https://jellio.tv/play?id=$itemId")
-
     private fun detailLinkUri(itemId: String): Uri = appLink("https://jellio.tv/item?id=$itemId")
 
     private fun appLink(url: String): Uri {
@@ -177,7 +175,7 @@ class WatchNextSyncer @Inject constructor(
             .setPosterArtAspectRatio(
                 if (art.landscape) TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9 else TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER,
             )
-            .setIntentUri(deepLinkUri(item.Id))
+            .setIntentUri(detailLinkUri(item.Id))
             .setInternalProviderId(item.Id)
             .setDurationMillis(runtimeMs)
             .setLastPlaybackPositionMillis(positionMs)
@@ -311,7 +309,7 @@ class WatchNextSyncer @Inject constructor(
     // get a row per list. Continue Watching and Next Up play straight
     // away; Watchlist and Recently Added open the title page.
 
-    private class ChannelSpec(val key: String, val name: String, val plays: Boolean)
+    private class ChannelSpec(val key: String, val name: String)
 
     private val channelPrefs by lazy { context.getSharedPreferences("jellio_channels", Context.MODE_PRIVATE) }
 
@@ -328,7 +326,7 @@ class WatchNextSyncer @Inject constructor(
                 val id = channelId(spec) ?: return@runCatching
                 context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
                 picks.take(CHANNEL_SIZE).forEachIndexed { index, item ->
-                    val program = toPreviewProgram(session, id, item, plays = false, weight = CHANNEL_SIZE - index, overview = null) ?: return@forEachIndexed
+                    val program = toPreviewProgram(session, id, item, weight = CHANNEL_SIZE - index, overview = null) ?: return@forEachIndexed
                     context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
                 }
             }.onFailure { Log.w(TAG, "top picks channel failed", it) }
@@ -378,7 +376,6 @@ class WatchNextSyncer @Inject constructor(
         session: Session,
         channelId: Long,
         item: BaseItemDto,
-        plays: Boolean,
         weight: Int,
         overview: String?,
     ): androidx.tvprovider.media.tv.PreviewProgram? {
@@ -397,7 +394,7 @@ class WatchNextSyncer @Inject constructor(
             .setPosterArtAspectRatio(
                 if (art.landscape) TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9 else TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER,
             )
-            .setIntentUri(if (plays) deepLinkUri(item.Id) else detailLinkUri(item.Id))
+            .setIntentUri(detailLinkUri(item.Id))
             .setInternalProviderId(item.Id)
             .setWeight(weight)
         (overview ?: item.Overview)?.takeIf { it.isNotBlank() }?.let { builder.setDescription(it) }
@@ -437,7 +434,7 @@ class WatchNextSyncer @Inject constructor(
             context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
             items.forEachIndexed { index, item ->
                 val overview = overviews[item.Id] ?: item.SeriesId?.let { overviews[it] }
-                val program = toPreviewProgram(session, id, item, spec.plays, items.size - index, overview) ?: return@forEachIndexed
+                val program = toPreviewProgram(session, id, item, items.size - index, overview) ?: return@forEachIndexed
                 context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
                 shown += item.Id
             }
@@ -486,10 +483,10 @@ class WatchNextSyncer @Inject constructor(
         const val MAX_ROWS = 5
         const val CHANNEL_SIZE = 15
         private val CHANNELS = listOf(
-            ChannelSpec("continue", "Continue Watching", plays = true),
-            ChannelSpec("nextup", "Next Up", plays = true),
-            ChannelSpec("watchlist", "Watchlist", plays = false),
-            ChannelSpec("picks", "Top Picks for You", plays = false),
+            ChannelSpec("continue", "Continue Watching"),
+            ChannelSpec("nextup", "Next Up"),
+            ChannelSpec("watchlist", "Watchlist"),
+            ChannelSpec("picks", "Top Picks for You"),
         )
     }
 }

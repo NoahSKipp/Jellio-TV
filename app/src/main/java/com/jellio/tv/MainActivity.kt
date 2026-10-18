@@ -149,10 +149,10 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
         if (uri.host != "jellio.tv") return
-        // A channel's title opens its page; Watch Next and play links play it.
+        // Launcher entries open the title's page. /play links from older
+        // syncs, still on the home screen, do the same instead of playing.
         when (uri.path) {
-            "/play" -> uri.getQueryParameter("id")?.let { deepLinkItemId.value = it }
-            "/item" -> uri.getQueryParameter("id")?.let { deepLinkItemId.value = "detail:$it" }
+            "/play", "/item" -> uri.getQueryParameter("id")?.let { deepLinkItemId.value = "detail:$it" }
         }
     }
 }
