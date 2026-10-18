@@ -96,10 +96,13 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
-        version = "0.48.2",
+        version = "0.49.0",
         title = "What's New in Jellio TV",
-        subtitle = "Version 0.48.2",
+        subtitle = "Version 0.49.0",
         features = listOf(
+            ChangelogFeature(Icons.Filled.Group, "A New Feed", "The activity feed is built for the TV now: a list grouped by day next to a big spotlight of whatever you're on, with its artwork, who watched it and when. Filters show how many entries each type has."),
+            ChangelogFeature(Icons.Filled.Settings, "Easier Account Switching", "Switching to a saved account sticks now instead of asking to sign in again, and switching to an account with a password opens the sign in form with that account's name already filled in."),
+            ChangelogFeature(Icons.Filled.Info, "Simpler Server Address", "Type your server address without http:// or https://. Jellio tries both, and if neither answers it tells you exactly which addresses it tried."),
             ChangelogFeature(Icons.Filled.Tv, "Launcher Opens the Title", "Picking something from Jellio's rows on the Google TV home now opens its episode or movie page right away, instead of a long wait before playback started on its own."),
             ChangelogFeature(Icons.Filled.PlayCircle, "Cleaner Player Info", "The show and episode now sit just above the seek bar instead of the top corner. The \"You're watching\" screen appears after a few seconds paused, in place of the controls rather than on top of them, and any button brings the controls back."),
         ),
