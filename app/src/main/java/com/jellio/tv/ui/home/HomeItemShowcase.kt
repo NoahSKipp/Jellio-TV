@@ -52,12 +52,9 @@ fun HomeItemShowcase(
     imageUrl: (BaseItemDto, String, Int) -> String,
     modifier: Modifier = Modifier,
 ) {
-    val showcaseHeight = 360.dp.scaled()
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(showcaseHeight)
             .background(JellioBg),
     ) {
         if (item != null) {
@@ -83,7 +80,7 @@ fun HomeItemShowcase(
                                 startX = 0f,
                                 endX = horizontalFadeEndX,
                             )
-                            val bottomFadeStartY = size.height * 0.55f
+                            val bottomFadeStartY = size.height * 0.45f
                             val verticalGradient = Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.0f to Color.Transparent,
@@ -122,10 +119,10 @@ fun HomeItemShowcase(
             // Info column on the left
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth(0.55f)
-                    .padding(start = 48.dp, bottom = 20.dp, end = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth(0.54f)
+                    .padding(start = 48.dp, top = 20.dp, end = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // ClearLogo with fallback to bold Title
                 val logoCandidates = remember(item.Id) { posterLogoCandidates(item, imageUrl, 500) }
@@ -140,8 +137,8 @@ fun HomeItemShowcase(
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.CenterStart,
                         modifier = Modifier
-                            .height(85.dp.scaled())
-                            .widthIn(min = 80.dp.scaled(), max = 240.dp.scaled()),
+                            .height(70.dp.scaled())
+                            .widthIn(min = 80.dp.scaled(), max = 220.dp.scaled()),
                     )
                 } else {
                     Text(
@@ -155,12 +152,11 @@ fun HomeItemShowcase(
                 }
 
                 // Metadata row: Type • Genre • Runtime • Year • [IMDb] 8.0
-                val isSeries = item.Type.equals("Series", ignoreCase = true) || !item.SeriesName.isNullOrBlank()
-                val isOngoing = isSeries && (
+                val isSeries = item.Type.equals("Series", ignoreCase = true)
+                val isOngoing = (isSeries && item.Status?.equals("Ended", ignoreCase = true) != true && item.EndDate == null) ||
                     item.Status?.equals("Continuing", ignoreCase = true) == true ||
-                    item.Status?.equals("Ongoing", ignoreCase = true) == true ||
-                    (item.Status?.equals("Ended", ignoreCase = true) != true && item.EndDate == null)
-                )
+                    item.Status?.equals("Ongoing", ignoreCase = true) == true
+
 
                 val metadataParts = remember(item, isSeries, isOngoing) {
                     buildList {

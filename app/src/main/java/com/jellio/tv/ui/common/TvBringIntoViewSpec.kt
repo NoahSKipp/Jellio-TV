@@ -63,3 +63,23 @@ internal object TvHorizontalBringIntoViewSpec : BringIntoViewSpec {
     }
 }
 
+// Dedicated BringIntoViewSpec for vertical LazyColumn hosting horizontal media rows.
+// Keeps the active/focused row pinned neatly at the top of the rows viewport,
+// offsetting by the row title height so the row heading sits right below the
+// fixed top showcase and cards remain fully visible without getting pushed down.
+@OptIn(ExperimentalFoundationApi::class)
+internal class TvVerticalRowBringIntoViewSpec(
+    private val topInsetPx: Float = 0f,
+    private val canScrollBackward: () -> Boolean = { true },
+) : BringIntoViewSpec {
+    override val scrollAnimationSpec: AnimationSpec<Float> =
+        tween(durationMillis = 180, easing = FastOutSlowInEasing)
+
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val distance = offset - topInsetPx
+        if (distance < 0f && !canScrollBackward()) return 0f
+        return distance
+    }
+}
+
+

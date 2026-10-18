@@ -314,7 +314,12 @@ fun PosterCard(
             modifier = Modifier
                 .width(animatedWidth)
                 .height(baseHeight)
-                .onFocusChanged { state -> isFocused = state.isFocused },
+                .onFocusChanged { state ->
+                    isFocused = state.isFocused
+                    if (state.isFocused) {
+                        onFocus?.invoke(item)
+                    }
+                },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (isExpanded) {

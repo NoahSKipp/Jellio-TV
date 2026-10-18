@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,8 +45,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -204,110 +205,124 @@ fun HomeScreen(
                     ord to visible
                 }
 
-                CompositionLocalProvider(LocalBringIntoViewSpec provides TvBringIntoViewSpec) {
-                    val activeHighlighted = highlightedItem ?: uiState.heroItems.firstOrNull() ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                val density = LocalDensity.current
+                val rowsViewportHeight = screenHeight * 0.54f
+                val topFixtureHeight = screenHeight - rowsViewportHeight
+                val activeHighlighted = highlightedItem ?: uiState.heroItems.firstOrNull() ?: uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+
+                // Permanent fixture in the top portion of the screen (Nuvio-style background showcase)
+                HomeItemShowcase(
+                    item = activeHighlighted,
+                    imageUrl = imageUrl,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth()
+                        .height(topFixtureHeight + 36.dp),
+                )
+
+                // Scrollable rows in the bottom viewport
+                val verticalRowBringIntoViewSpec = remember(density) {
+                    val topInsetPx = with(density) { 48.dp.toPx() }
+                    com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx) {
+                        listState.canScrollBackward
+                    }
+                }
+
+                CompositionLocalProvider(LocalBringIntoViewSpec provides verticalRowBringIntoViewSpec) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier
-                            .fillMaxSize()
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .height(rowsViewportHeight)
                             .focusRestorer(),
                     ) {
-                    item {
-                        HomeItemShowcase(
-                            item = activeHighlighted,
-                            imageUrl = imageUrl,
-                        )
-                    }
-                    // Real screens/home.js's own jellio-home-greeting: real
-                    // feedback found "Welcome back" read as a placeholder
-                    // the moment it was ever anything else, a real
-                    // time-of-day/name greeting instead.
-                    if (uiState.greeting.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = uiState.greeting,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(
-                                    start = 48.dp,
-                                    top = 24.dp,
-                                    bottom = 8.dp,
-                                ),
-                            )
-                        }
-                    }
-                    item {
-                        HomeCustomizeBar(
-                            editMode = editMode,
-                            onToggleEdit = { editMode = !editMode },
-                            onReset = { viewModel.resetCustomization() },
-                            modifier = Modifier.padding(start = 48.dp, top = if (uiState.greeting.isEmpty()) 16.dp else 0.dp, bottom = 8.dp),
-                        )
-                    }
-                    items(visibleRows, key = { it.key }, contentType = { it::class.java.name }) { row ->
-                        val hidden = uiState.customization.hidden.contains(row.key)
-                        val index = order.indexOf(row.key)
-                        val onMoveUp = remember(row.key) { { viewModel.moveRow(row.key, -1) } }
-                        val onMoveDown = remember(row.key) { { viewModel.moveRow(row.key, 1) } }
-                        val onToggleHidden = remember(row.key) { { viewModel.toggleRowHidden(row.key) } }
-                        HomeRowEditor(
-                            editMode = editMode,
-                            displayName = row.displayName,
-                            hidden = hidden,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < order.size - 1,
-                            onMoveUp = onMoveUp,
-                            onMoveDown = onMoveDown,
-                            onToggleHidden = onToggleHidden,
-                        ) {
-                            when (row) {
-                                is PosterHomeRow -> {
-                                    val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
-                                    val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
-                                    val onCardFocus = remember { { item: BaseItemDto -> highlightedItem = item } }
-                                    if (row.landscape) {
-                                        val onShatterFinished = remember(row, session) {
-                                            { item: BaseItemDto ->
-                                                val isShowRemoval = removingTarget?.second == true
-                                                removingTarget = null
-                                                if (isShowRemoval) {
-                                                    viewModel.hideShowFromRow(item)
-                                                } else {
-                                                    viewModel.removeFromRow(session, item)
-                                                }
-                                            }
-                                        }
-                                        LandscapeRow(
-                                            section = row.section,
-                                            rawImageUrl = rawImageUrl,
-                                            onItemClick = onItemClick,
-                                            onTitleClick = onRowTitle,
-                                            onItemOptions = onRowOptions,
-                                            removingItemId = removingTarget?.first,
-                                            onShatterFinished = onShatterFinished,
-                                            onItemFocus = onCardFocus,
-                                        )
-                                    } else {
-                                        PosterRow(
-                                            section = row.section,
-                                            imageUrl = imageUrl,
-                                            onItemClick = onItemClick,
-                                            onItemOptions = onRowOptions,
-                                            onTitleClick = onRowTitle,
-                                            userImageUrl = userImageUrl,
-                                            onItemFocus = onCardFocus,
-                                        )
-                                    }
-                                }
-                                is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
-                                is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
+                        if (editMode) {
+                            item(key = "customize_bar_top") {
+                                HomeCustomizeBar(
+                                    editMode = true,
+                                    onToggleEdit = { editMode = !editMode },
+                                    onReset = { viewModel.resetCustomization() },
+                                    modifier = Modifier.padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
+                                )
                             }
                         }
+                        items(visibleRows, key = { it.key }, contentType = { it::class.java.name }) { row ->
+                            val hidden = uiState.customization.hidden.contains(row.key)
+                            val index = order.indexOf(row.key)
+                            val onMoveUp = remember(row.key) { { viewModel.moveRow(row.key, -1) } }
+                            val onMoveDown = remember(row.key) { { viewModel.moveRow(row.key, 1) } }
+                            val onToggleHidden = remember(row.key) { { viewModel.toggleRowHidden(row.key) } }
+                            HomeRowEditor(
+                                editMode = editMode,
+                                displayName = row.displayName,
+                                hidden = hidden,
+                                canMoveUp = index > 0,
+                                canMoveDown = index < order.size - 1,
+                                onMoveUp = onMoveUp,
+                                onMoveDown = onMoveDown,
+                                onToggleHidden = onToggleHidden,
+                            ) {
+                                when (row) {
+                                    is PosterHomeRow -> {
+                                        val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
+                                        val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
+                                        val onCardFocus = remember { { item: BaseItemDto -> highlightedItem = item } }
+                                        if (row.landscape) {
+                                            val onShatterFinished = remember(row, session) {
+                                                { item: BaseItemDto ->
+                                                    val isShowRemoval = removingTarget?.second == true
+                                                    removingTarget = null
+                                                    if (isShowRemoval) {
+                                                        viewModel.hideShowFromRow(item)
+                                                    } else {
+                                                        viewModel.removeFromRow(session, item)
+                                                    }
+                                                }
+                                            }
+                                            LandscapeRow(
+                                                section = row.section,
+                                                rawImageUrl = rawImageUrl,
+                                                onItemClick = onItemClick,
+                                                onTitleClick = onRowTitle,
+                                                onItemOptions = onRowOptions,
+                                                removingItemId = removingTarget?.first,
+                                                onShatterFinished = onShatterFinished,
+                                                onItemFocus = onCardFocus,
+                                            )
+                                        } else {
+                                            PosterRow(
+                                                section = row.section,
+                                                imageUrl = imageUrl,
+                                                onItemClick = onItemClick,
+                                                onItemOptions = onRowOptions,
+                                                onTitleClick = onRowTitle,
+                                                userImageUrl = userImageUrl,
+                                                onItemFocus = onCardFocus,
+                                            )
+                                        }
+                                    }
+                                    is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
+                                    is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
+                                }
+                            }
+                        }
+                        if (!editMode) {
+                            item(key = "customize_bar_bottom") {
+                                HomeCustomizeBar(
+                                    editMode = false,
+                                    onToggleEdit = { editMode = true },
+                                    onReset = { viewModel.resetCustomization() },
+                                    modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 32.dp),
+                                )
+                            }
+                        }
+                        // Rows still loading below the ones already shown.
+                        if (uiState.loadingMore) {
+                            item(key = "skeleton") { SkeletonRow() }
+                        }
                     }
-                    // Rows still loading below the ones already shown.
-                    if (uiState.loadingMore) {
-                        item(key = "skeleton") { SkeletonRow() }
-                    }
-                }
                 }
             }
         }
