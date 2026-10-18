@@ -66,9 +66,11 @@ fun PosterRow(
     Column(modifier = modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
+        val rowState = rememberTvRowState()
+        ReportRowScrolling(rowState)
         CompositionLocalProvider(LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
-                state = rememberTvRowState(),
+                state = rowState,
                 contentPadding = PaddingValues(horizontal = 48.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.rowEntry(firstCard),
@@ -184,3 +186,20 @@ fun RowExpandButton(onClick: () -> Unit, height: Dp, modifier: Modifier = Modifi
 }
 
 private val RowExpandButtonWidth = 120.dp
+
+@Composable
+internal fun ReportRowScrolling(state: androidx.compose.foundation.lazy.LazyListState) {
+    androidx.compose.runtime.LaunchedEffect(state) {
+        var counted = false
+        try {
+            androidx.compose.runtime.snapshotFlow { state.isScrollInProgress }.collect { scrolling ->
+                if (scrolling != counted) {
+                    com.jellio.tv.ui.perf.ScrollActivity.rowsScrolling += if (scrolling) 1 else -1
+                    counted = scrolling
+                }
+            }
+        } finally {
+            if (counted) com.jellio.tv.ui.perf.ScrollActivity.rowsScrolling -= 1
+        }
+    }
+}

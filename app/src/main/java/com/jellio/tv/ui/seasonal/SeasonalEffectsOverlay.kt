@@ -120,7 +120,7 @@ private fun rememberClock(): MutableLongState {
             withFrameNanos { now ->
                 val delta = now - previous
                 previous = now
-                if (ScrollActivity.scrolling) return@withFrameNanos
+                if (ScrollActivity.busy) return@withFrameNanos
                 t += delta
                 if (t - last >= stepNanos) {
                     last = t

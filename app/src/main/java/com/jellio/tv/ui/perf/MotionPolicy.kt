@@ -5,6 +5,7 @@ import android.content.Context
 import android.provider.Settings
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
@@ -18,6 +19,11 @@ enum class MotionLevel { FULL, REDUCED, STILL, OFF }
 // meanwhile, so the scroll gets the whole frame budget.
 object ScrollActivity {
     var scrolling by mutableStateOf(false)
+
+    // Rows scrolling sideways right now; every right press moves a row.
+    var rowsScrolling by mutableIntStateOf(0)
+
+    val busy: Boolean get() = scrolling || rowsScrolling > 0
 }
 
 // What the device looks like, worked out once at start: low-RAM devices,
