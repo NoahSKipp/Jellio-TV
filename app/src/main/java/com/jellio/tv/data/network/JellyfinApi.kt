@@ -504,11 +504,9 @@ interface JellyfinApi {
     suspend fun reportRealDuration(@Body body: ReportDurationRequest)
 }
 
-// This app's own real client version, sent on every request's own
-// Authorization header below; NetworkModule.kt's own auth interceptor
-// needs the exact same value login already sent, one shared constant
-// rather than two copies that could quietly drift apart.
-const val APP_VERSION = "0.1.0"
+// Sent on every request's Authorization header, so Jellyfin's device list
+// shows the installed release.
+val APP_VERSION: String = com.jellio.tv.BuildConfig.VERSION_NAME
 
 // Real Jellyfin auth convention every client sends, confirmed against
 // the same real shape jellyfin-apiclient-javascript's own boot line
