@@ -51,6 +51,22 @@ data class LibrarySnapshot(
     val savedAt: Long = System.currentTimeMillis(),
 )
 
+@JsonClass(generateAdapter = true)
+data class CachedServiceRowDto(
+    val title: String,
+    val kind: String,
+    val items: List<BaseItemDto> = emptyList(),
+    val collectionId: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class ServiceSnapshot(
+    val heroItem: BaseItemDto? = null,
+    val rows: List<CachedServiceRowDto> = emptyList(),
+    val topGenres: List<String> = emptyList(),
+    val savedAt: Long = System.currentTimeMillis(),
+)
+
 fun HomeRow.toCachedRowDto(): CachedRowDto = when (this) {
     is PosterHomeRow -> CachedRowDto(
         key = key,
@@ -94,7 +110,7 @@ fun CachedRowDto.toHomeSection(): HomeSection = HomeSection(
 )
 
 // Disk-backed snapshot store for instant cold start rendering of
-// Home screen rows and Library (Movies, Series, Anime) screens.
+// Home screen rows, Library (Movies, Series, Anime) screens and Studio Hubs.
 @Singleton
 class RowSnapshotStore @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -106,6 +122,7 @@ class RowSnapshotStore @Inject constructor(
 
     private val homeAdapter by lazy { moshi.adapter(HomeSnapshot::class.java) }
     private val libraryAdapter by lazy { moshi.adapter(LibrarySnapshot::class.java) }
+    private val serviceAdapter by lazy { moshi.adapter(ServiceSnapshot::class.java) }
 
     suspend fun loadHomeSnapshot(userId: String): HomeSnapshot? = withContext(Dispatchers.IO) {
         val file = File(cacheDir, "home_${sanitizeKey(userId)}.json")
@@ -139,6 +156,17 @@ class RowSnapshotStore @Inject constructor(
             val json = libraryAdapter.toJson(snapshot)
             file.writeText(json)
         }
+    }
+
+    suspend fun loadServiceSnapshot(userId: String, serviceName: String): ServiceSnapshot? = withContext(Dispatchers.IO) {
+        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}.json")
+        if (!file.exists()) return@withContext null
+        runCatching { serviceAdapter.fromJson(file.readText()) }.getOrNull()
+    }
+
+    suspend fun saveServiceSnapshot(userId: String, serviceName: String, snapshot: ServiceSnapshot) = withContext(Dispatchers.IO) {
+        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}.json")
+        runCatching { file.writeText(serviceAdapter.toJson(snapshot)) }
     }
 
     private fun sanitizeKey(key: String): String = key.replace(Regex("[^a-zA-Z0-9_-]"), "_")

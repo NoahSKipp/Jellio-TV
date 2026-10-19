@@ -3,6 +3,9 @@ package com.jellio.tv.ui.service
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.cache.CachedServiceRowDto
+import com.jellio.tv.data.cache.RowSnapshotStore
+import com.jellio.tv.data.cache.ServiceSnapshot
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.groupByService
@@ -60,6 +63,7 @@ data class ServiceUiState(
 @HiltViewModel
 class ServiceViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ServiceUiState())
@@ -71,7 +75,21 @@ class ServiceViewModel @Inject constructor(
         if (loadedService == serviceName) return
         loadedService = serviceName
         viewModelScope.launch {
-            _uiState.value = ServiceUiState(isLoading = true, serviceName = serviceName)
+            // The last visit's rows show at once; the refresh replaces them
+            // in one go when it's done so nothing moves while browsing.
+            val cached = runCatching { rowSnapshotStore.loadServiceSnapshot(session.userId, serviceName) }.getOrNull()
+                ?.takeIf { it.rows.isNotEmpty() }
+            _uiState.value = if (cached != null) {
+                ServiceUiState(
+                    isLoading = false,
+                    serviceName = serviceName,
+                    heroItem = cached.heroItem,
+                    rows = cached.rows.map { ServiceRow(it.title, it.kind, it.items, it.collectionId) },
+                    topGenres = cached.topGenres,
+                )
+            } else {
+                ServiceUiState(isLoading = true, serviceName = serviceName)
+            }
             try {
                 val collections = repository.getCollections(session.userId)
                 val matching = groupByService(collections)[serviceName].orEmpty()
@@ -100,6 +118,7 @@ class ServiceViewModel @Inject constructor(
                             heroRating = rating
                         }
                     }
+                    if (cached != null) return@forEach
                     _uiState.value = ServiceUiState(
                         isLoading = false,
                         serviceName = serviceName,
@@ -116,7 +135,19 @@ class ServiceViewModel @Inject constructor(
                     rows = rows.toList(),
                     topGenres = topGenres(rows),
                 )
+                if (rows.isNotEmpty()) {
+                    rowSnapshotStore.saveServiceSnapshot(
+                        session.userId,
+                        serviceName,
+                        ServiceSnapshot(
+                            heroItem = heroItem,
+                            rows = rows.map { CachedServiceRowDto(it.title, it.kind, it.items, it.collectionId) },
+                            topGenres = topGenres(rows),
+                        ),
+                    )
+                }
             } catch (err: Exception) {
+                if (cached != null) return@launch
                 _uiState.value = ServiceUiState(isLoading = false, error = err.message ?: "Could not load $serviceName", serviceName = serviceName)
             }
         }
