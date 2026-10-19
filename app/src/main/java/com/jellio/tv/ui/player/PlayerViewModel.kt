@@ -622,7 +622,12 @@ class PlayerViewModel @Inject constructor(
                 // segment key actually came back, same real truthy
                 // check that file's own .then() callback runs.
                 viewModelScope.launch {
-                    val segments = repository.getIntroSkipperSegments(itemId)
+                    // Credits starting in the first half are bad data; they
+                    // would show Skip Credits and Up Next right at the start.
+                    val segments = repository.getIntroSkipperSegments(itemId)?.let { found ->
+                        val credits = found.Credits
+                        if (credits != null && expectedRuntimeMs > 0 && credits.Start * 1000 < expectedRuntimeMs / 2) found.copy(Credits = null) else found
+                    }
                     if (segments != null && (segments.Introduction != null || segments.Credits != null)) {
                         _uiState.value = _uiState.value.copy(skipSegments = segments)
                     }
