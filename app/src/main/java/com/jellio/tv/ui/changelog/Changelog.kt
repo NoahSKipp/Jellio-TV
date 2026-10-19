@@ -97,6 +97,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.52.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.52.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Instant Studio Hubs", "Studio Hubs open straight away with what they showed last time and refresh in the background, like Home and your libraries already do."),
+            ChangelogFeature(Icons.Filled.Tv, "Quicker Home Refresh", "Recommendation and genre rows reuse what they already loaded for half an hour, so Home refreshes faster and asks your server for less."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.52.4",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.52.4",
