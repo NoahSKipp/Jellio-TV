@@ -103,6 +103,7 @@ val CHANGELOG_RELEASES = listOf(
         features = listOf(
             ChangelogFeature(Icons.Filled.Settings, "Tidier Settings", "Category names no longer wrap onto a second line, and the test tools for screen overlays, image loading and the Google TV row are gone."),
             ChangelogFeature(Icons.Filled.Tv, "Easier Settings Navigation", "Press OK on a category to jump into its settings, and Back to return to the category list. Back from the list leaves Settings."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Studio Hubs", "Studio Hubs, catalog rows on Home and the Anime library load much faster, and each hub row shows up as soon as it's ready instead of waiting for the rows above it."),
         ),
     ),
     ChangelogRelease(
