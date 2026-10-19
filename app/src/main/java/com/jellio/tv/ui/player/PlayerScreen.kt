@@ -598,8 +598,10 @@ private fun PlayerSurface(
         onDispose { hostView.keepScreenOn = false }
     }
     var exoError by remember { mutableStateOf<PlaybackProblem?>(null) }
-    var positionMs by remember { mutableLongStateOf(0L) }
+    var positionMs by remember { mutableLongStateOf(startPositionTicks / TICKS_PER_MS) }
     var durationMs by remember { mutableLongStateOf(0L) }
+    // The title's known runtime until the stream reports its own.
+    val shownDurationMs = if (durationMs > 0) durationMs else expectedRuntimeMs
 
     // Where in the title the stream's own time zero is: 0 for direct play,
     // the start position for a transcode that began encoding there.
@@ -1178,7 +1180,7 @@ private fun PlayerSurface(
                         // where to, rather than bringing the whole overlay up.
                         val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
                         val base = seekFlash?.target ?: positionMs
-                        val newPos = seekTarget(base, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, durationMs)
+                        val newPos = seekTarget(base, if (forward) SEEK_STEP_MS else -SEEK_STEP_MS, shownDurationMs)
                         userSeek(newPos)
                         val total = (seekFlash?.totalMs ?: 0L) + if (forward) SEEK_STEP_MS else -SEEK_STEP_MS
                         seekFlash = SeekFlash(newPos, total, System.nanoTime())
@@ -1270,7 +1272,7 @@ private fun PlayerSurface(
                 val seconds = flash.totalMs / 1000
                 Text(
                     text = (if (seconds >= 0) "+${seconds}s" else "${seconds}s") + "  ·  " + formatMs(flash.target) +
-                        if (durationMs > 0) " / " + formatMs(durationMs) else "",
+                        if (shownDurationMs > 0) " / " + formatMs(shownDurationMs) else "",
                     color = JellioText,
                     style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
                 )
@@ -1310,7 +1312,7 @@ private fun PlayerSurface(
                 isPlaying = isPlaying,
                 enabled = !anyMenuOpen,
                 positionMs = positionMs,
-                durationMs = durationMs,
+                durationMs = shownDurationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 hasAudioTracks = true,
                 hasSourceOptions = sourceOptions.size > 1,
@@ -1321,7 +1323,7 @@ private fun PlayerSurface(
                 sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
                 onPlayPause = { togglePlay() },
                 onSkip = { deltaMs ->
-                    userSeek(seekTarget(positionMs, deltaMs, durationMs))
+                    userSeek(seekTarget(positionMs, deltaMs, shownDurationMs))
                 },
                 onScrub = { target ->
                     scrubPositionMs = target
