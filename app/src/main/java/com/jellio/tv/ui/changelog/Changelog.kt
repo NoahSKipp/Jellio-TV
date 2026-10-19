@@ -102,6 +102,7 @@ val CHANGELOG_RELEASES = listOf(
         subtitle = "Version 0.52.4",
         features = listOf(
             ChangelogFeature(Icons.Filled.Speed, "Faster Episode Start", "Episodes you resume now start right where you left off, instead of loading from the beginning first and then jumping ahead. Playback also gets going a little sooner."),
+            ChangelogFeature(Icons.Filled.Info, "Runtime Shown Right Away", "The player shows the episode's full length and where it starts as soon as it opens, instead of 0:00 / 0:00 until the video has loaded."),
         ),
     ),
     ChangelogRelease(
