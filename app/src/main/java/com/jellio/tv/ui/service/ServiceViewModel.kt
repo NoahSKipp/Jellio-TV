@@ -15,7 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -104,39 +104,41 @@ class ServiceViewModel @Inject constructor(
                 val collections = repository.getCollections(session.userId)
                 val matching = groupByService(collections)[serviceName].orEmpty()
 
-                val rows = mutableListOf<ServiceRow>()
+                // Slots keep the collections' order while each row goes up as
+                // soon as its own answer arrives, not after the ones above it.
+                val slots = arrayOfNulls<ServiceRow>(matching.size)
                 var heroItem: BaseItemDto? = null
                 var heroRating = -1.0
 
-                // Every collection is fetched at once (they used to go one
-                // after another) and each row goes up as soon as it answers.
-                val fetches = matching.map { collection ->
-                    val kind = repository.collectionKind(collection)
-                    Triple(collection, kind, async { runCatching { repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT) }.getOrDefault(emptyList()) })
-                }
-                fetches.forEach { (collection, kind, deferred) ->
-                    val items = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { deferred.await() }.orEmpty()
-                    if (items.isEmpty()) return@forEach
-                    rows.add(ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items, collectionId = collection.Id))
-                    // The best rated item with a backdrop across every
-                    // collection leads the page (screens/service.js's pickHeroItem()).
-                    items.forEach { item ->
-                        if (item.BackdropImageTags.isNullOrEmpty()) return@forEach
-                        val rating = item.CommunityRating ?: 0.0
-                        if (heroItem == null || rating > heroRating) {
-                            heroItem = item
-                            heroRating = rating
+                matching.mapIndexed { index, collection ->
+                    launch {
+                        val kind = repository.collectionKind(collection)
+                        val items = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) {
+                            runCatching { repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT) }.getOrDefault(emptyList())
+                        }.orEmpty()
+                        if (items.isEmpty()) return@launch
+                        slots[index] = ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items, collectionId = collection.Id)
+                        // The best rated item with a backdrop across every
+                        // collection leads the page (screens/service.js's pickHeroItem()).
+                        items.forEach { item ->
+                            if (item.BackdropImageTags.isNullOrEmpty()) return@forEach
+                            val rating = item.CommunityRating ?: 0.0
+                            if (heroItem == null || rating > heroRating) {
+                                heroItem = item
+                                heroRating = rating
+                            }
                         }
+                        if (cached != null) return@launch
+                        _uiState.value = ServiceUiState(
+                            isLoading = false,
+                            serviceName = serviceName,
+                            heroItem = heroItem,
+                            rows = arrange(slots.filterNotNull()),
+                            topGenres = topGenres(slots.filterNotNull()),
+                        )
                     }
-                    if (cached != null) return@forEach
-                    _uiState.value = ServiceUiState(
-                        isLoading = false,
-                        serviceName = serviceName,
-                        heroItem = heroItem,
-                        rows = arrange(rows),
-                        topGenres = topGenres(rows),
-                    )
-                }
+                }.joinAll()
+                val rows = slots.filterNotNull()
 
                 val genres = topGenres(rows)
                 val finalRows = arrange(rows) + genreRows(rows, genres, serviceName)
