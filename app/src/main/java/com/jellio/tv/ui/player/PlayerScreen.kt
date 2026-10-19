@@ -204,8 +204,7 @@ private object EpisodeSleepTimer {
 // from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
 // Credits segment starts the outro, so showing the card there reads as
 // timed to the episode rather than to an arbitrary count of seconds
-// left; the fixed-seconds rule is only the fallback for a title Intro
-// Skipper has no Credits segment for at all.
+// left. Without a Credits segment the card never shows.
 private fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSeconds: Double, durationSeconds: Double): Boolean {
     if (durationSeconds <= 0) return false
     val credits = segments?.Credits
