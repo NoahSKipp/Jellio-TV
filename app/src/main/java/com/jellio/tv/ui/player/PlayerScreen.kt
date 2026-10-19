@@ -528,7 +528,10 @@ private fun PlayerSurface(
             .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
             .setAudioAttributes(audioAttributes, true)
             .build().apply {
-            setMediaSource(buildPlayerMediaSource(activeSideloadedTrack))
+            // Direct play opens at the resume point instead of buffering
+            // from 0:00 and seeking once the duration is known.
+            val resumeMs = if (directPlay && startPositionTicks > 0) startPositionTicks / TICKS_PER_MS else 0L
+            setMediaSource(buildPlayerMediaSource(activeSideloadedTrack), resumeMs)
             // Keeps the device and its Wi-Fi awake while playing.
             setWakeMode(C.WAKE_MODE_NETWORK)
             playWhenReady = !showResumePrompt
@@ -721,7 +724,7 @@ private fun PlayerSurface(
     var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
     var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
-    var seekedToResume by remember(player) { mutableStateOf(false) }
+    var seekedToResume by remember(player) { mutableStateOf(directPlay && startPositionTicks > 0) }
     var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
