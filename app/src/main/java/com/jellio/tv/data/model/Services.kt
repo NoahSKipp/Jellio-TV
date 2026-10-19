@@ -43,6 +43,27 @@ fun logoSlug(name: String): String =
 fun logoUrl(serverAddress: String, name: String): String =
     "$serverAddress/Jellio/frontend/img/services/${logoSlug(name)}.svg"
 
+// Each service's brand colour, for the tint behind its hub.
+private val SERVICE_COLORS = mapOf(
+    "Netflix" to 0xFFE50914,
+    "HBO Max" to 0xFF5822B4,
+    "Max" to 0xFF002BE7,
+    "Disney+" to 0xFF113CCF,
+    "Prime Video" to 0xFF00A8E1,
+    "Apple TV+" to 0xFF8E8E93,
+    "Hulu" to 0xFF1CE783,
+    "Paramount+" to 0xFF0064FF,
+    "Peacock" to 0xFFFFB800,
+    "Crunchyroll" to 0xFFF47521,
+    "AMC+" to 0xFFF5C400,
+    "Starz" to 0xFF6E6E73,
+    "Shudder" to 0xFFC8102E,
+    "Discovery+" to 0xFF2175D9,
+    "Sky Go" to 0xFF0072C9,
+)
+
+fun serviceColor(name: String): Long? = SERVICE_COLORS[name]
+
 fun groupByService(items: List<BaseItemDto>): Map<String, List<BaseItemDto>> {
     val groups = linkedMapOf<String, MutableList<BaseItemDto>>()
     items.forEach { item ->

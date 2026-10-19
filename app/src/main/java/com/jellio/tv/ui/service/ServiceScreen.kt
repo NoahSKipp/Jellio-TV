@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,6 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +47,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.serviceColor
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec
@@ -66,6 +76,7 @@ private const val ALL_FILTER = "all"
 fun ServiceScreen(
     session: Session,
     serviceName: String,
+    logoUrl: String?,
     imageUrl: (BaseItemDto, String, Int) -> String,
     onItemClick: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
@@ -133,6 +144,20 @@ fun ServiceScreen(
                         .height(screenHeight - rowsViewportHeight + 36.dp),
                 )
 
+                // The service's colour washes in from the top, over the backdrop.
+                serviceColor(serviceName)?.let { brand ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color(brand).copy(alpha = 0.24f),
+                                    0.7f to Color.Transparent,
+                                ),
+                            ),
+                    )
+                }
+
                 val rowsSpec = remember(density) {
                     TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }) { listState.canScrollBackward }
                 }
@@ -149,6 +174,7 @@ fun ServiceScreen(
                         item(key = "header") {
                             ServiceHeader(
                                 name = uiState.serviceName,
+                                logoUrl = logoUrl,
                                 genres = uiState.topGenres,
                                 selected = filter,
                                 onSelect = { filter = it },
@@ -200,7 +226,7 @@ private fun filteredItems(row: ServiceRow, filter: String): List<BaseItemDto> {
 
 // The hub's name with the All/Movies/Shows/genre chips beside it.
 @Composable
-private fun ServiceHeader(name: String, genres: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun ServiceHeader(name: String, logoUrl: String?, genres: List<String>, selected: String, onSelect: (String) -> Unit) {
     val chips = buildList {
         add(ALL_FILTER to "All")
         add("movies" to "Movies")
@@ -211,7 +237,20 @@ private fun ServiceHeader(name: String, genres: List<String>, selected: String, 
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(start = 48.dp, top = 4.dp, bottom = 8.dp),
     ) {
-        Text(text = name, color = JellioText, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        var logoFailed by remember(logoUrl) { mutableStateOf(logoUrl == null) }
+        if (logoFailed) {
+            Text(text = name, color = JellioText, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        } else {
+            AsyncImage(
+                model = logoUrl,
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                colorFilter = ColorFilter.tint(Color.White, BlendMode.SrcIn),
+                onState = { if (it is AsyncImagePainter.State.Error) logoFailed = true },
+                modifier = Modifier.height(30.dp).width(110.dp),
+            )
+        }
         LazyRow(
             contentPadding = PaddingValues(start = 24.dp, end = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),

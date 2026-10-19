@@ -549,6 +549,7 @@ private fun JellioTvApp(
             is JellioRoute.Service -> ServiceScreen(
                 session = session,
                 serviceName = current.name,
+                logoUrl = appViewModel.serviceLogoUrl(session, current.name),
                 imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 modifier = Modifier.fillMaxSize(),
