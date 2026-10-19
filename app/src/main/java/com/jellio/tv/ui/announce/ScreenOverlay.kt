@@ -67,23 +67,6 @@ class ScreenOverlayViewModel @Inject constructor(
     private var after = -1L
     private val queue = ArrayDeque<ScreenOverlay>()
 
-    // Settings' test button: what the server answers right now, and a
-    // sample overlay drawn locally, to tell a delivery problem from a
-    // drawing one.
-    private val _diagnostic = MutableStateFlow<String?>(null)
-    val diagnostic: StateFlow<String?> = _diagnostic.asStateFlow()
-
-    fun runTest(scope: kotlinx.coroutines.CoroutineScope) {
-        scope.launch {
-            _diagnostic.value = "Checking..."
-            _diagnostic.value = runCatching { repository.getPendingOverlays(0) }.fold(
-                onSuccess = { "Server answered: latest #${it.Latest}, ${it.Overlays.size} pending for you. This TV last saw #$after." },
-                onFailure = { "Server check failed: ${it.javaClass.simpleName}: ${it.message}" },
-            )
-            queue.addLast(ScreenOverlay("Test overlay", null, 0.9f, 4, -System.currentTimeMillis()))
-        }
-    }
-
     suspend fun runWhileStarted() {
         while (coroutineContext.isActive) {
             val pending = runCatching { repository.getPendingOverlays(after) }.getOrNull()

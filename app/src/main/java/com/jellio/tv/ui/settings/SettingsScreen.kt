@@ -414,17 +414,6 @@ fun SettingsScreen(
                         onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
                     )
                 }
-
-                SettingsSection(title = "Screen overlays", icon = Icons.Filled.Campaign) {
-                    val overlayViewModel: com.jellio.tv.ui.announce.ScreenOverlayViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                    val diagnostic by overlayViewModel.diagnostic.collectAsState()
-                    val testScope = androidx.compose.runtime.rememberCoroutineScope()
-                    SettingsPickerRow(
-                        label = "Test screen overlay",
-                        value = diagnostic ?: "Shows a sample overlay and checks the server",
-                        onClick = { overlayViewModel.runTest(testScope) },
-                    )
-                }
                 }
                 SettingsCategory.ABOUT -> {
                 SettingsSection(title = "About", icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
@@ -436,18 +425,7 @@ fun SettingsScreen(
                             onClick = onShowChangelog,
                         )
                         UpdateCheckRow(viewModel = appUpdateViewModel)
-                        ImageCheckRow(session = session)
                     }
-                }
-
-                val watchNext by viewModel.watchNextStatus.collectAsState()
-                SettingsSection(title = "Google TV home", icon = Icons.Filled.Tv, description = "Titles you are watching, in the Continue Watching row of the Google TV home.") {
-                    SettingsActionRow(
-                        label = "Sync Continue Watching now",
-                        icon = Icons.Filled.Sync,
-                        description = watchNextSummary(watchNext),
-                        onClick = { viewModel.syncWatchNext() },
-                    )
                 }
                 }
             }
@@ -810,14 +788,6 @@ private fun SettingsSection(
     }
 }
 
-private fun watchNextSummary(status: com.jellio.tv.data.watchnext.WatchNextStatus?): String {
-    if (status == null) return "Not synced yet in this session."
-    val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(status.at))
-    status.error?.let { return "Last sync at $time failed: $it" }
-    val hidden = if (status.hiddenByViewer > 0) ", ${status.hiddenByViewer} removed on the home screen" else ""
-    return "Last sync at $time: ${status.published} of ${status.candidates} titles published, ${status.onLauncher} in the row$hidden."
-}
-
 @Composable
 private fun SettingsDivider() {
     Box(Modifier.padding(horizontal = 20.dp).fillMaxWidth().height(1.dp).background(CardBorder))
@@ -980,68 +950,6 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     )
                 }
             }
-        }
-    }
-}
-
-// Loads the signed-in user's avatar through the same image loader every
-// poster uses, bypassing both caches, and reports exactly what came back.
-@Composable
-private fun ImageCheckRow(session: Session) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var result by remember { mutableStateOf<String?>(null) }
-    val base = normalizeServerAddress(session.serverAddress)
-
-    Column(modifier = Modifier.padding(top = 12.dp)) {
-        Surface(
-            onClick = {
-                result = "Testing..."
-                scope.launch {
-                    val url = "$base/Users/${session.userId}/Images/Primary?maxWidth=96&api_key=${session.accessToken}"
-                    val started = System.currentTimeMillis()
-                    val request = ImageRequest.Builder(context)
-                        .data(url)
-                        .memoryCachePolicy(CachePolicy.DISABLED)
-                        .diskCachePolicy(CachePolicy.DISABLED)
-                        .build()
-                    val outcome = SingletonImageLoader.get(context).execute(request)
-                    val took = System.currentTimeMillis() - started
-                    result = when (outcome) {
-                        is SuccessResult -> "Images load fine (${outcome.image.width}x${outcome.image.height}, ${took} ms)."
-                        is ErrorResult -> {
-                            val error = outcome.throwable
-                            val detail = error.message
-                                ?.replace(session.accessToken, "…")
-                                ?.take(160) ?: "no message"
-                            if (error is HttpException && error.response.code == 404) {
-                                "Server reached in ${took} ms (no avatar set, which is fine)."
-                            } else {
-                                "Failed after ${took} ms: ${error::class.simpleName}: $detail"
-                            }
-                        }
-                    }
-                }
-            },
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = JellioBgElevated,
-                contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.28f),
-                focusedContentColor = JellioText,
-            ),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(2.dp, Color.White),
-                    shape = RoundedCornerShape(999.dp),
-                )
-            ),
-        ) {
-            Text(text = "Test image loading", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-        }
-        result?.let {
-            Text(text = "Image host: $base", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
-            Text(text = it, color = JellioText, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
