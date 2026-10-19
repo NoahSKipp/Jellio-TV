@@ -97,6 +97,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.53.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.53.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Info, "Correct Version in Jellyfin", "Jellyfin's Devices and Dashboard now show the Jellio TV version you actually have installed, instead of 0.1.0."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.53.2",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.53.2",
