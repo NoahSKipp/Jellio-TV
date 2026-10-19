@@ -159,6 +159,9 @@ class ServiceViewModel @Inject constructor(
     suspend fun fetchAllForRow(session: Session, row: ServiceRow): List<BaseItemDto> =
         repository.getCollectionItems(session.userId, row.collectionId, row.kind, ROW_LIST_LIMIT)
 
+    suspend fun showcaseInfo(session: Session, item: BaseItemDto): com.jellio.tv.ui.home.ShowcaseInfo =
+        com.jellio.tv.ui.home.loadShowcaseInfo(repository, session.userId, item)
+
     private fun topGenres(rows: List<ServiceRow>): List<String> {
         val counts = linkedMapOf<String, Int>()
         rows.forEach { row ->
