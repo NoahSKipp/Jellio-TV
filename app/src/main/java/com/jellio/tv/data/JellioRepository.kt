@@ -617,12 +617,14 @@ class JellioRepository @Inject constructor(
         }.awaitAll().flatten().mapTo(mutableSetOf()) { it.Id }
     }
 
+    // Not recursive, like the web client: a collection's titles are its
+    // direct children, and a recursive walk of a large one is much slower.
     suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24): List<BaseItemDto> =
         api.getItems(
             userId = userId,
             parentId = collectionId,
             includeItemTypes = if (kind == "movies") "Movie" else "Series",
-            recursive = true,
+            recursive = false,
             limit = limit,
             sortBy = "SortName",
             // BackdropImageTags is not part of the default field set:
