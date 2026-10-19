@@ -97,6 +97,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.53.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.53.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Info, "Skip Prompts at the Right Time", "Bad credits timestamps could show Skip Credits and Up Next right as an episode started. Credits now only count in the second half of an episode."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.53.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.53.1",
