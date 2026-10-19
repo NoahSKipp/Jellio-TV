@@ -61,6 +61,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -159,7 +164,13 @@ fun SettingsScreen(
     // focused one's settings on the right.
     var category by remember { mutableStateOf(SettingsCategory.ACCOUNT) }
     LaunchedEffect(category) { scrollState.scrollTo(0) }
-    val firstCategory = remember { FocusRequester() }
+    // OK on a category moves into its settings; Back from the settings
+    // returns to the category they belong to, and only Back from the
+    // categories leaves the screen.
+    val categoryFocus = remember { SettingsCategory.entries.associateWith { FocusRequester() } }
+    val firstCategory = categoryFocus.getValue(SettingsCategory.ACCOUNT)
+    val contentFocus = remember { FocusRequester() }
+    var contentHasFocus by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
         Column(modifier = Modifier.width(280.dp)) {
             Text(text = "Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
@@ -167,13 +178,14 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.focusRestorer(firstCategory),
             ) {
-                SettingsCategory.entries.forEachIndexed { index, entry ->
+                SettingsCategory.entries.forEach { entry ->
                     SettingsCategoryItem(
                         label = entry.label,
                         icon = entry.icon,
                         selected = entry == category,
                         onFocus = { category = entry },
-                        modifier = if (index == 0) Modifier.focusRequester(firstCategory) else Modifier,
+                        onClick = { runCatching { contentFocus.requestFocus() } },
+                        modifier = Modifier.focusRequester(categoryFocus.getValue(entry)),
                     )
                 }
             }
@@ -183,6 +195,14 @@ fun SettingsScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxSize()
+                .onFocusChanged { contentHasFocus = it.hasFocus }
+                .onPreviewKeyEvent { event ->
+                    if (event.key != Key.Back || !contentHasFocus) return@onPreviewKeyEvent false
+                    if (event.type == KeyEventType.KeyUp) runCatching { categoryFocus.getValue(category).requestFocus() }
+                    true
+                }
+                .focusRequester(contentFocus)
+                .focusRestorer()
                 .verticalScroll(scrollState),
         ) {
           Column(modifier = Modifier.widthIn(max = 820.dp)) {
@@ -710,9 +730,9 @@ private fun SleepTimerSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun SettingsCategoryItem(label: String, icon: ImageVector, selected: Boolean, onFocus: () -> Unit, modifier: Modifier = Modifier) {
+private fun SettingsCategoryItem(label: String, icon: ImageVector, selected: Boolean, onFocus: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        onClick = onFocus,
+        onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent,
