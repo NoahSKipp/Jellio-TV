@@ -156,6 +156,9 @@ private const val CACHE_TTL_MS = 60_000L
 // watchlist toggle reads correctly again well within the time it
 // takes to navigate back and look.
 private const val SHORT_CACHE_TTL_MS = 8_000L
+// Same as the web row cache's genres/people class: a title's genre and
+// cast neighbours barely change, so Home refreshes reuse them.
+private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
 
 private class TtlCache {
     private data class Entry(val value: Any?, val expiresAt: Long)
@@ -766,6 +769,9 @@ class JellioRepository @Inject constructor(
 
     // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
+        cachedUnlessEmpty("genre:$userId:$parentId:$itemType:$genre:$limit") { fetchGenreItems(userId, parentId, itemType, genre, limit) }
+
+    private suspend fun fetchGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int): List<BaseItemDto> =
         distinctTitles(
             runCatching { api.getCachedGenreItems(genre, itemType, parentId, limit).Items }.getOrNull()
                 ?: api.getItems(
@@ -1045,7 +1051,14 @@ class JellioRepository @Inject constructor(
     // scoring the whole library client side to fill one row. Mirrors
     // runtime/api.js's own getRecommendationCandidates() exactly,
     // including its own real Genres=a|b OR-join convention.
-    suspend fun getRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> {
+    suspend fun getRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> =
+        cachedUnlessEmpty("reccand:$userId:${seed.Id}:$limit") { fetchRecommendationCandidates(userId, seed, limit) }
+
+    // An empty answer is usually a failed request, so it isn't kept.
+    private suspend fun <T> cachedUnlessEmpty(key: String, fetch: suspend () -> List<T>): List<T> =
+        cache.get(key, RECOMMENDATION_CACHE_TTL_MS, fetch).also { if (it.isEmpty()) cache.invalidate(key) }
+
+    private suspend fun fetchRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> {
         val genres = seed.Genres.orEmpty()
         val people = seed.People.orEmpty().filter { it.Id.isNotEmpty() && (it.Type == "Actor" || it.Type == "Director") }.take(5)
         if (genres.isEmpty() && people.isEmpty()) return emptyList()
