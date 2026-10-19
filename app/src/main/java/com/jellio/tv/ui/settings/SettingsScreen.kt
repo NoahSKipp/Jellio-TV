@@ -161,7 +161,7 @@ fun SettingsScreen(
     LaunchedEffect(category) { scrollState.scrollTo(0) }
     val firstCategory = remember { FocusRequester() }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
-        Column(modifier = Modifier.width(260.dp)) {
+        Column(modifier = Modifier.width(280.dp)) {
             Text(text = "Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -734,7 +734,7 @@ private fun SettingsCategoryItem(label: String, icon: ImageVector, selected: Boo
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
         ) {
             Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(text = label, style = MaterialTheme.typography.titleMedium)
+            Text(text = label, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
         }
     }
 }
