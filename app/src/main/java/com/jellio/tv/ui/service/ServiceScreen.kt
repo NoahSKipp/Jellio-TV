@@ -217,6 +217,10 @@ fun ServiceScreen(
 // either the All chip or a chip whose own kind already matched.
 private fun filteredItems(row: ServiceRow, filter: String): List<BaseItemDto> {
     val isGenreFilter = filter.startsWith("genre:")
+    if (row.kind == MIXED_KIND && (filter == "movies" || filter == "tvshows")) {
+        val type = if (filter == "movies") "Movie" else "Series"
+        return row.items.filter { it.Type.equals(type, ignoreCase = true) }
+    }
     val typeMatch = filter == ALL_FILTER || isGenreFilter || row.kind == filter
     if (!typeMatch) return emptyList()
     if (!isGenreFilter) return row.items

@@ -24,6 +24,12 @@ private const val SERVICE_ROW_TIMEOUT_MS = 15_000L
 private const val SERVICE_ROW_LIMIT = 24
 private const val TOP_GENRES_LIMIT = 10
 private const val MIN_GENRE_COUNT = 3
+private const val GENRE_ROW_COUNT = 4
+private const val GENRE_ROW_MIN_ITEMS = 8
+// A row sharing this much of its titles with one above it is dropped.
+private const val DUPLICATE_ROW_OVERLAP = 0.8
+private val TOP_ROW = Regex("top ?10|trending|popular", RegexOption.IGNORE_CASE)
+private val NEW_ROW = Regex("\\bnew\\b|latest|recent|just added", RegexOption.IGNORE_CASE)
 
 // Real screens/service.js's own ROW_LIST_LIMIT: components/
 // rowListModal.js's own "browse everything" cap, that file's own
@@ -42,6 +48,10 @@ private const val ROW_LIST_LIMIT = 500
 // browse this row's full real catalog past whatever SERVICE_ROW_LIMIT
 // already trimmed it to.
 data class ServiceRow(val title: String, val kind: String, val items: List<BaseItemDto>, val collectionId: String)
+
+// Genre rows built from the hub's own titles hold movies and shows alike
+// and have no collection behind them.
+const val MIXED_KIND = "mixed"
 
 data class ServiceUiState(
     val isLoading: Boolean = true,
@@ -123,17 +133,19 @@ class ServiceViewModel @Inject constructor(
                         isLoading = false,
                         serviceName = serviceName,
                         heroItem = heroItem,
-                        rows = rows.toList(),
+                        rows = arrange(rows),
                         topGenres = topGenres(rows),
                     )
                 }
 
+                val genres = topGenres(rows)
+                val finalRows = arrange(rows) + genreRows(rows, genres, serviceName)
                 _uiState.value = ServiceUiState(
                     isLoading = false,
                     serviceName = serviceName,
                     heroItem = heroItem,
-                    rows = rows.toList(),
-                    topGenres = topGenres(rows),
+                    rows = finalRows,
+                    topGenres = genres,
                 )
                 if (rows.isNotEmpty()) {
                     rowSnapshotStore.saveServiceSnapshot(
@@ -141,8 +153,8 @@ class ServiceViewModel @Inject constructor(
                         serviceName,
                         ServiceSnapshot(
                             heroItem = heroItem,
-                            rows = rows.map { CachedServiceRowDto(it.title, it.kind, it.items, it.collectionId) },
-                            topGenres = topGenres(rows),
+                            rows = finalRows.map { CachedServiceRowDto(it.title, it.kind, it.items, it.collectionId) },
+                            topGenres = genres,
                         ),
                     )
                 }
@@ -157,7 +169,43 @@ class ServiceViewModel @Inject constructor(
     // fetchAll callback: this row's own full real collection, past
     // whatever SERVICE_ROW_LIMIT already trimmed the row itself to.
     suspend fun fetchAllForRow(session: Session, row: ServiceRow): List<BaseItemDto> =
-        repository.getCollectionItems(session.userId, row.collectionId, row.kind, ROW_LIST_LIMIT)
+        if (row.collectionId.isEmpty()) row.items
+        else repository.getCollectionItems(session.userId, row.collectionId, row.kind, ROW_LIST_LIMIT)
+
+    // Top 10 and trending catalogs first, then what's new, then the rest,
+    // without rows that mostly repeat one above them.
+    private fun arrange(rows: List<ServiceRow>): List<ServiceRow> {
+        val ordered = rows.sortedBy { row ->
+            when {
+                TOP_ROW.containsMatchIn(row.title) -> 0
+                NEW_ROW.containsMatchIn(row.title) -> 1
+                else -> 2
+            }
+        }
+        val kept = mutableListOf<ServiceRow>()
+        ordered.forEach { row ->
+            val ids = row.items.map { it.Id }.toSet()
+            val duplicate = kept.any { earlier ->
+                val shared = earlier.items.count { it.Id in ids }
+                ids.isNotEmpty() && shared >= ids.size * DUPLICATE_ROW_OVERLAP
+            }
+            if (!duplicate) kept.add(row)
+        }
+        return kept
+    }
+
+    // "Comedy on Netflix" and the like, from the hub's own titles, best rated first.
+    private fun genreRows(rows: List<ServiceRow>, genres: List<String>, serviceName: String): List<ServiceRow> {
+        val titles = rows.flatMap { it.items }.distinctBy { it.Id }
+        return genres.take(GENRE_ROW_COUNT).mapNotNull { genre ->
+            val items = titles
+                .filter { it.Genres?.contains(genre) == true }
+                .sortedByDescending { it.CommunityRating ?: 0.0 }
+                .take(SERVICE_ROW_LIMIT)
+            if (items.size < GENRE_ROW_MIN_ITEMS) null
+            else ServiceRow(title = "$genre on $serviceName", kind = MIXED_KIND, items = items, collectionId = "")
+        }
+    }
 
     suspend fun showcaseInfo(session: Session, item: BaseItemDto): com.jellio.tv.ui.home.ShowcaseInfo =
         com.jellio.tv.ui.home.loadShowcaseInfo(repository, session.userId, item)
