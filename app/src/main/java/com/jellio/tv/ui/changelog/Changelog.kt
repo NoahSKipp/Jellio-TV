@@ -97,6 +97,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.53.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.53.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Settings, "Tidier Settings", "Category names no longer wrap onto a second line, and the test tools for screen overlays, image loading and the Google TV row are gone."),
+            ChangelogFeature(Icons.Filled.Tv, "Easier Settings Navigation", "Press OK on a category to jump into its settings, and Back to return to the category list. Back from the list leaves Settings."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.53.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.53.0",
