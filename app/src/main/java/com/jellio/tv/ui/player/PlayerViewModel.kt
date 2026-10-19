@@ -478,6 +478,9 @@ class PlayerViewModel @Inject constructor(
                 } else {
                     null
                 }
+                // Warms the cached user and transcode policy while the item loads.
+                launch { runCatching { repository.getUser(session.userId) } }
+                launch { runCatching { repository.loadVideoTranscodePolicy() } }
                 val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
