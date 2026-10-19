@@ -97,6 +97,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.53.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.53.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Studio Hubs Redesigned", "Studio Hubs now look like Home: the title you're on fills the top of the screen with its backdrop and details, tinted in the service's colour, with the service's logo by the filters."),
+            ChangelogFeature(Icons.Filled.Speed, "Better Rows in Studio Hubs", "Top 10 and trending rows come first, then what's new, then rows for the hub's biggest genres. Rows that mostly repeat another one are left out."),
+            ChangelogFeature(Icons.Filled.Info, "More Studio Hub Logos", "AMC+, Shudder, Discovery+ and Sky Go now show their logos instead of their name. Needs Jellio 1.85.0 on your server."),
+            ChangelogFeature(Icons.Filled.Settings, "Anime Stays in Anime", "Anime is now recognised much more reliably, so it no longer turns up in Home, Movies and Series. Needs Jellio 1.85.0 and the latest Gelato on your server."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.52.5",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.52.5",
