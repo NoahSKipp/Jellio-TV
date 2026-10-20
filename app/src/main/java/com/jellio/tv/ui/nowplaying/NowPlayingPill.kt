@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.nowplaying
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -11,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,7 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +43,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,27 +53,48 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.nowplaying.NowPlayingManager
+import com.jellio.tv.data.session.Session
+import com.jellio.tv.di.normalizeServerAddress
 import com.jellio.tv.ui.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 private val GreenDot = Color(0xFF22C55E)
 
 @Composable
 fun NowPlayingPill(
     activeCount: Int,
-    topSession: NowPlayingSessionDto?,
+    topSession: NowPlayingSessionDto? = null,
     localPaused: NowPlayingManager.LocalPausedMedia?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    sessions: List<NowPlayingSessionDto> = emptyList(),
+    session: Session? = null,
 ) {
     val isVisible = activeCount > 0 || localPaused != null
     var isFocused by remember { mutableStateOf(false) }
+
+    var currentIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(sessions.size) {
+        if (sessions.size <= 1) {
+            currentIndex = 0
+        } else {
+            currentIndex = currentIndex % sessions.size
+            while (isActive) {
+                delay(4500L)
+                currentIndex = (currentIndex + 1) % sessions.size
+            }
+        }
+    }
+    val displayedSession = if (sessions.isNotEmpty()) sessions[currentIndex % sessions.size] else topSession
 
     AnimatedVisibility(
         visible = isVisible,
@@ -128,14 +155,6 @@ fun NowPlayingPill(
                         activeCount == 1 -> Strings.get("now_playing_active_stream")
                         else -> Strings.format("now_playing_active_streams", activeCount)
                     }
-                    val subtitle = when {
-                        localPaused != null && activeCount == 0 -> localPaused.title
-                        topSession?.Item?.Name != null -> {
-                            val user = topSession.UserName ?: Strings.get("tv_someone")
-                            "$user · ${topSession.Item.Name}"
-                        }
-                        else -> null
-                    }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -155,16 +174,83 @@ fun NowPlayingPill(
                         }
                     }
 
-                    if (subtitle != null) {
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = JellioTextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 11.sp,
-                            modifier = Modifier.width(170.dp.scaled()),
-                        )
+                    val targetKey = if (localPaused != null && activeCount == 0) {
+                        "local:${localPaused.itemId}"
+                    } else {
+                        displayedSession?.Id ?: displayedSession?.UserId ?: "local"
+                    }
+
+                    AnimatedContent(
+                        targetState = targetKey,
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 })
+                                .togetherWith(fadeOut(tween(180)) + slideOutVertically(tween(180)) { -it / 2 })
+                        },
+                        label = "now_playing_pill_subtitle",
+                    ) { _ ->
+                        val activeSess = displayedSession
+                        val subtitle = when {
+                            localPaused != null && activeCount == 0 -> localPaused.title
+                            activeSess?.Item?.Name != null -> {
+                                val user = activeSess.UserName ?: Strings.get("tv_someone")
+                                "$user · ${activeSess.Item.Name}"
+                            }
+                            else -> null
+                        }
+
+                        if (subtitle != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 2.dp),
+                            ) {
+                                if (!(localPaused != null && activeCount == 0) && activeSess != null) {
+                                    val userName = activeSess.UserName ?: Strings.get("tv_someone")
+                                    val initial = userName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                                    val avatarUrl = if (session != null && !activeSess.UserId.isNullOrBlank()) {
+                                        val cleanServer = normalizeServerAddress(session.serverAddress)
+                                        "$cleanServer/Users/${activeSess.UserId}/Images/Primary?maxWidth=64&ApiKey=${session.accessToken}&api_key=${session.accessToken}"
+                                    } else null
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White.copy(alpha = 0.16f)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = initial,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 8.sp,
+                                            ),
+                                            color = Color.White,
+                                        )
+                                        if (avatarUrl != null) {
+                                            AsyncImage(
+                                                model = avatarUrl,
+                                                contentDescription = userName,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape),
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+
+                                Text(
+                                    text = subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = JellioTextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.width(170.dp.scaled()),
+                                )
+                            }
+                        }
                     }
                 }
             }

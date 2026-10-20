@@ -172,8 +172,14 @@ fun SettingsScreen(
     var showRecordKeyDialog by remember { mutableStateOf(false) }
     val currentActivity = androidx.compose.ui.platform.LocalContext.current as? com.jellio.tv.MainActivity
     androidx.compose.runtime.DisposableEffect(showRecordKeyDialog) {
-        if (showRecordKeyDialog) currentActivity?.isRecordingShortcut = true
-        onDispose { currentActivity?.isRecordingShortcut = false }
+        if (!showRecordKeyDialog) {
+            currentActivity?.isRecordingShortcut = false
+            currentActivity?.onShortcutKeyRecorded = null
+        }
+        onDispose {
+            currentActivity?.isRecordingShortcut = false
+            currentActivity?.onShortcutKeyRecorded = null
+        }
     }
     val changeAvatarFocusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
@@ -1245,6 +1251,48 @@ private fun RecordRemoteButtonDialog(
 
     val listeningFocusRequester = remember { FocusRequester() }
     val actionFocusRequester = remember { FocusRequester() }
+    val currentActivity = LocalContext.current as? com.jellio.tv.MainActivity
+
+    androidx.compose.runtime.DisposableEffect(recordedCode) {
+        if (recordedCode == null) {
+            val openedAtMs = android.os.SystemClock.uptimeMillis()
+            currentActivity?.isRecordingShortcut = true
+            currentActivity?.onShortcutKeyRecorded = { code, event ->
+                if (android.os.SystemClock.uptimeMillis() - openedAtMs < 220L) {
+                    true
+                } else if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    if (code == android.view.KeyEvent.KEYCODE_BACK) {
+                        onDismiss()
+                        true
+                    } else {
+                        val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
+                        val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
+                        recordedCode = code
+                        recordedLabel = name
+                        isRestricted = restricted
+                        if (
+                            code == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                            code == android.view.KeyEvent.KEYCODE_ENTER ||
+                            code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER ||
+                            code == android.view.KeyEvent.KEYCODE_BACK
+                        ) {
+                            selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
+                        }
+                        true
+                    }
+                } else {
+                    true
+                }
+            }
+        } else {
+            currentActivity?.isRecordingShortcut = false
+            currentActivity?.onShortcutKeyRecorded = null
+        }
+        onDispose {
+            currentActivity?.isRecordingShortcut = false
+            currentActivity?.onShortcutKeyRecorded = null
+        }
+    }
 
     LaunchedEffect(recordedCode) {
         if (recordedCode == null) {
@@ -1268,8 +1316,6 @@ private fun RecordRemoteButtonDialog(
             .then(
                 if (recordedCode == null) {
                     Modifier
-                        .focusRequester(listeningFocusRequester)
-                        .focusable()
                         .onPreviewKeyEvent { keyEvent ->
                             if (keyEvent.nativeKeyEvent.action == android.view.KeyEvent.ACTION_DOWN) {
                                 val code = keyEvent.nativeKeyEvent.keyCode
@@ -1282,13 +1328,20 @@ private fun RecordRemoteButtonDialog(
                                 recordedCode = code
                                 recordedLabel = name
                                 isRestricted = restricted
-                                if (code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_BACK) {
+                                if (
+                                    code == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                                    code == android.view.KeyEvent.KEYCODE_ENTER ||
+                                    code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER ||
+                                    code == android.view.KeyEvent.KEYCODE_BACK
+                                ) {
                                     selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
                                 }
                                 return@onPreviewKeyEvent true
                             }
                             false
                         }
+                        .focusRequester(listeningFocusRequester)
+                        .focusable()
                 } else {
                     Modifier
                 }

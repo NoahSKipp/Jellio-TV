@@ -108,6 +108,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.84.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.84.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Groups, "Quick Hub Group Watch", "Group Watch has moved into Quick Hub alongside Now Playing and Notifications, offering live party tracking, group creation, invite handling, and instant code entry in one unified drawer."),
+            ChangelogFeature(Icons.Filled.SettingsRemote, "Refined Remote Shortcuts & Google TV Support", "Full Google TV remote button capture in the shortcut recorder with smart debouncing and robust long-press handling that prevents the Back button from closing the drawer on release."),
+            ChangelogFeature(Icons.Filled.Notifications, "Media Posters & User Profile Pictures", "Notification alerts now display media artwork and announcement posters, and active stream cards show Jellyfin user profile pictures alongside device information."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Cycling Active Streams Pill & UI Polish", "The floating Home pill smoothly cycles through multiple concurrent active streams every 4.5 seconds with animated transitions, non-overlapping header tabs, and a refined Quick Hub launcher icon."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.83.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.83.0",

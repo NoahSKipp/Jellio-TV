@@ -207,6 +207,8 @@ fun HomeScreen(
                         topSession = nowPlayingSessions.firstOrNull(),
                         localPaused = nowPlayingLocalPaused,
                         onClick = onOpenNowPlaying,
+                        sessions = nowPlayingSessions,
+                        session = session,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(top = 28.dp, end = 40.dp),

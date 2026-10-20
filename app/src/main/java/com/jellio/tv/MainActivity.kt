@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private var isPlayerActive: Boolean = false
     var isQuickHubOpen: Boolean = false
     var isRecordingShortcut: Boolean = false
+    var onShortcutKeyRecorded: ((Int, KeyEvent) -> Boolean)? = null
     var onMenuPressed: (() -> Unit)? = null
     var onQuickHubShortcut: (() -> Unit)? = null
 
@@ -101,14 +102,49 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (isPlayerActive || isRecordingShortcut) return super.dispatchKeyEvent(event)
+        if (isPlayerActive) return super.dispatchKeyEvent(event)
+
+        if (isRecordingShortcut) {
+            if (onShortcutKeyRecorded?.invoke(event.keyCode, event) == true) return true
+            return super.dispatchKeyEvent(event)
+        }
+
+        val keyCode = event.keyCode
+
+        // If a long-press gesture is currently in progress for this keyCode, handle its repeat DOWN and release UP first,
+        // even if isQuickHubOpen became true while the button was still being held down.
+        if (keyCode == longPressKeyCode) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                return true
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                longPressJob?.cancel()
+                longPressJob = null
+                val wasConsumed = longPressConsumed
+                longPressConsumed = false
+                longPressKeyCode = null
+
+                if (wasConsumed) {
+                    // Consumed by Quick Hub long-press hold: swallow ACTION_UP completely
+                    // so neither Compose, views, nor BackHandler / dismissOnBack receive it.
+                    return true
+                } else {
+                    // User released before 450ms elapsed (short press).
+                    if (keyCode == KeyEvent.KEYCODE_BACK) {
+                        onBackPressedDispatcher.onBackPressed()
+                        return true
+                    }
+                    // Synthesize DOWN + UP for other buttons (e.g. Center / Custom) so short clicks work:
+                    val down = KeyEvent(event.downTime, event.eventTime, KeyEvent.ACTION_DOWN, keyCode, 0, event.metaState, event.deviceId, event.scanCode)
+                    super.dispatchKeyEvent(down)
+                    return super.dispatchKeyEvent(event)
+                }
+            }
+        }
 
         val button = QuickHubPreferences.button
         if (button == QuickHubButton.NONE) return super.dispatchKeyEvent(event)
 
-        val keyCode = event.keyCode
-
-        // If the Quick Hub is already open on screen and the user presses Back,
+        // If the Quick Hub is already open on screen and the user presses Back (not a continuation of the opening hold),
         // let standard dispatch handle it so BackHandler dismisses the drawer immediately.
         if (isQuickHubOpen && keyCode == KeyEvent.KEYCODE_BACK) {
             return super.dispatchKeyEvent(event)
@@ -137,30 +173,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 return true
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                if (keyCode == longPressKeyCode) {
-                    longPressJob?.cancel()
-                    longPressJob = null
-                    val wasConsumed = longPressConsumed
-                    longPressConsumed = false
-                    longPressKeyCode = null
-
-                    if (wasConsumed) {
-                        // Consumed by Quick Hub long-press hold: swallow ACTION_UP completely
-                        // so neither Compose, views, nor BackHandler receive it.
-                        return true
-                    } else {
-                        // User released before 450ms elapsed (short press).
-                        if (keyCode == KeyEvent.KEYCODE_BACK) {
-                            onBackPressedDispatcher.onBackPressed()
-                            return true
-                        }
-                        // Synthesize DOWN + UP for other buttons (e.g. Center / Custom) so short clicks work:
-                        val down = KeyEvent(event.downTime, event.eventTime, KeyEvent.ACTION_DOWN, keyCode, 0, event.metaState, event.deviceId, event.scanCode)
-                        super.dispatchKeyEvent(down)
-                        return super.dispatchKeyEvent(event)
-                    }
-                }
             }
         }
 
@@ -702,6 +714,7 @@ private fun JellioTvApp(
                 nowPlayingCount = nowPlayingActiveCount,
                 onSelect = { clicked ->
                     if (clicked is JellioRoute.NowPlaying) {
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
                         showNowPlayingDrawer = true
                     } else if (clicked is JellioRoute.Library) {
                         showLibraryPicker = true
@@ -736,9 +749,15 @@ private fun JellioTvApp(
                     onViewProfile = { push(JellioRoute.Profile()) },
                     onOpenSettings = { switchTab(JellioRoute.Settings) },
                     onSignOut = { appViewModel.logout() },
-                    onOpenGroupWatch = { showGroupWatch = true },
+                    onOpenGroupWatch = {
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.GROUP_WATCH
+                        showNowPlayingDrawer = true
+                    },
                     onOpenNotifications = { showNotifications = true },
-                    onOpenNowPlaying = { showNowPlayingDrawer = true },
+                    onOpenNowPlaying = {
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING
+                        showNowPlayingDrawer = true
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -760,7 +779,11 @@ private fun JellioTvApp(
                     },
                     onOpenItem = { itemId -> onNavigateToDetail(itemId.replace("-", "")) },
                     onOpenLiveTv = { switchTab(JellioRoute.LiveTv) },
-                    onOpenGroupWatch = { showGroupWatch = true },
+                    onOpenGroupWatch = {
+                        showNotifications = false
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.GROUP_WATCH
+                        showNowPlayingDrawer = true
+                    },
                 )
             }
             if (showLibraryPicker) {
@@ -829,8 +852,8 @@ private fun JellioTvApp(
                         push(JellioRoute.LivePlayer(channelId))
                     },
                     onJoinWatchParty = { sess ->
-                        showNowPlayingDrawer = false
-                        showGroupWatch = true
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.GROUP_WATCH
+                        showNowPlayingDrawer = true
                     },
                     onResumeLocal = {
                         showNowPlayingDrawer = false
@@ -846,8 +869,8 @@ private fun JellioTvApp(
                         switchTab(JellioRoute.LiveTv)
                     },
                     onOpenGroupWatch = {
-                        showNowPlayingDrawer = false
-                        showGroupWatch = true
+                        quickHubInitialTab = com.jellio.tv.ui.nowplaying.QuickHubTab.GROUP_WATCH
+                        showNowPlayingDrawer = true
                     },
                     onRefreshNowPlaying = {
                         appViewModel.nowPlayingManager.refresh()

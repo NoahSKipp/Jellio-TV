@@ -58,6 +58,10 @@ object QuickHubPreferences {
         android.view.KeyEvent.KEYCODE_DPAD_CENTER,
         android.view.KeyEvent.KEYCODE_ENTER,
         android.view.KeyEvent.KEYCODE_NUMPAD_ENTER -> "OK / Center"
+        android.view.KeyEvent.KEYCODE_DPAD_UP -> "D-Pad Up"
+        android.view.KeyEvent.KEYCODE_DPAD_DOWN -> "D-Pad Down"
+        android.view.KeyEvent.KEYCODE_DPAD_LEFT -> "D-Pad Left"
+        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> "D-Pad Right"
         android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "Play / Pause"
         android.view.KeyEvent.KEYCODE_MEDIA_PLAY -> "Play"
         android.view.KeyEvent.KEYCODE_MEDIA_PAUSE -> "Pause"
@@ -69,6 +73,7 @@ object QuickHubPreferences {
         android.view.KeyEvent.KEYCODE_BACK -> "Back"
         android.view.KeyEvent.KEYCODE_GUIDE -> "Guide"
         android.view.KeyEvent.KEYCODE_INFO -> "Info"
+        android.view.KeyEvent.KEYCODE_SEARCH -> "Search"
         android.view.KeyEvent.KEYCODE_CAPTIONS -> "Subtitles / Captions"
         android.view.KeyEvent.KEYCODE_CHANNEL_UP -> "Channel Up"
         android.view.KeyEvent.KEYCODE_CHANNEL_DOWN -> "Channel Down"
@@ -78,7 +83,9 @@ object QuickHubPreferences {
         android.view.KeyEvent.KEYCODE_PROG_BLUE -> "Blue Button"
         android.view.KeyEvent.KEYCODE_BOOKMARK -> "Bookmark"
         android.view.KeyEvent.KEYCODE_SETTINGS -> "Settings"
+        android.view.KeyEvent.KEYCODE_TV -> "TV"
         android.view.KeyEvent.KEYCODE_TV_INPUT -> "Input"
+        android.view.KeyEvent.KEYCODE_DVR -> "DVR"
         else -> android.view.KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_").replace('_', ' ').lowercase()
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
@@ -90,7 +97,11 @@ object QuickHubPreferences {
         android.view.KeyEvent.KEYCODE_VOLUME_UP,
         android.view.KeyEvent.KEYCODE_VOLUME_DOWN,
         android.view.KeyEvent.KEYCODE_VOLUME_MUTE,
-        android.view.KeyEvent.KEYCODE_VOICE_ASSIST -> true
+        android.view.KeyEvent.KEYCODE_VOICE_ASSIST,
+        android.view.KeyEvent.KEYCODE_DPAD_UP,
+        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> true
         else -> false
     }
 

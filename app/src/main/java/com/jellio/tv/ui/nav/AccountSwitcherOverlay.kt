@@ -150,18 +150,6 @@ fun AccountSwitcherOverlay(
                             Text(text = com.jellio.tv.ui.i18n.string("nav_settings"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
-                            onClick = { onDismiss(); onOpenGroupWatch() },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                            colors = ClickableSurfaceDefaults.colors(
-                                containerColor = JellioBg,
-                                contentColor = JellioText,
-                                focusedContainerColor = Color.White.copy(alpha = 0.18f),
-                                focusedContentColor = JellioText,
-                            ),
-                        ) {
-                            Text(text = com.jellio.tv.ui.i18n.string("nav_group_watch"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
-                        }
-                        Surface(
                             onClick = onSignOut,
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = com.jellio.tv.ui.common.dangerButtonColors(),
