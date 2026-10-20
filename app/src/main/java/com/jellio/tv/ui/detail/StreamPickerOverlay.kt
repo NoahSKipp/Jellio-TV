@@ -326,7 +326,7 @@ fun StreamPickerOverlay(
             val loaded = loadSources(reloadKey > 0)
             val kept = if (policy.blocking) loaded.filterNot { policy.needsReencode(it) } else loaded
             if (policy.blocking && loaded.isNotEmpty() && kept.isEmpty()) {
-                SourcesState.Error("Every stream for this title would need the server to re-encode the video, which is turned off on this server.")
+                SourcesState.Error(com.jellio.tv.ui.i18n.Strings.get("stream_policy_blocked"))
             } else {
                 SourcesState.Loaded(
                     kept.sortedBy {
@@ -336,7 +336,7 @@ fun StreamPickerOverlay(
                 )
             }
         } catch (err: Exception) {
-            SourcesState.Error(err.message ?: "Could not load streams")
+            SourcesState.Error(err.message ?: com.jellio.tv.ui.i18n.Strings.get("stream_load_error"))
         }
     }
     LaunchedEffect(item.Id) { remembered = rememberedSourceId() }
@@ -377,7 +377,7 @@ fun StreamPickerOverlay(
 
             when (val currentState = state) {
                 is SourcesState.Loading -> Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                    Text(text = "Loading...", color = JellioTextSecondary)
+                    Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary)
                 }
                 is SourcesState.Error -> Column(modifier = Modifier.padding(top = 48.dp)) {
                     Text(text = currentState.message, color = JellioTextSecondary)
@@ -415,7 +415,7 @@ fun StreamPickerOverlay(
                                 Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Filled.Refresh,
-                                        contentDescription = "Refresh streams",
+                                        contentDescription = com.jellio.tv.ui.i18n.string("stream_refresh"),
                                         modifier = Modifier.size(18.dp),
                                     )
                                 }
@@ -438,7 +438,7 @@ fun StreamPickerOverlay(
                                         right = FocusRequester.Cancel
                                     },
                             ) {
-                                Text(text = "All", modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+                                Text(text = com.jellio.tv.ui.i18n.string("stream_all"), modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
                             }
                         }
                         Surface(
@@ -470,12 +470,12 @@ fun StreamPickerOverlay(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = "📅 Digital Release Filter",
+                                    text = com.jellio.tv.ui.i18n.string("stream_release_filter_title"),
                                     color = JellioText,
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                                 Text(
-                                    text = "⚠ No streams found. Perhaps there is no digital release available for this media yet.",
+                                    text = com.jellio.tv.ui.i18n.string("stream_release_filter_desc"),
                                     color = JellioTextSecondary,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(top = 4.dp),
@@ -592,7 +592,7 @@ fun StreamPickerOverlay(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
-                                        Text(text = "Resume from ${formatResumeLabel(resumeTicks)}", modifier = Modifier.padding(start = 8.dp))
+                                        Text(text = com.jellio.tv.ui.i18n.formatString("stream_resume_from", formatResumeLabel(resumeTicks)), modifier = Modifier.padding(start = 8.dp))
                                     }
                                 }
                             }
@@ -600,7 +600,7 @@ fun StreamPickerOverlay(
                         item(key = "header_chips") {
                             if (showLanguages) {
                                 FilterChipRow(
-                                    chips = listOf<Pair<String?, String>>(null to "All") + languages.map { it to languageName(it) },
+                                    chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.string("stream_all")) + languages.map { it to languageName(it) },
                                     selected = selectedLanguage,
                                     onSelect = { selectedLanguage = it },
                                     firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
@@ -623,7 +623,7 @@ fun StreamPickerOverlay(
                         }
                         item(key = "header_text") {
                             Text(
-                                text = if (filteredSources.isEmpty()) "No streams match these filters" else "${filteredSources.size} stream${if (filteredSources.size == 1) "" else "s"} found",
+                                text = if (filteredSources.isEmpty()) com.jellio.tv.ui.i18n.string("stream_no_matches") else com.jellio.tv.ui.i18n.formatString("stream_count_found", filteredSources.size),
                                 color = JellioTextSecondary,
                                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp),
                             )
@@ -718,7 +718,7 @@ private fun RetryButton(onClick: () -> Unit, focusRequester: FocusRequester? = n
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         modifier = Modifier.padding(top = 20.dp).let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
     ) {
-        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
     }
 }
 
@@ -779,7 +779,7 @@ internal fun SourceCard(
         // this real list fits on screen at once without scrolling.
         Column(modifier = Modifier.padding(12.dp)) {
             if (recentlyFailed) {
-                Text(text = "⚠ Didn't play recently", color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
+                Text(text = com.jellio.tv.ui.i18n.string("stream_bad_flag"), color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
             }
             if (classification != null) {
                 OutlookBadge(com.jellio.tv.data.playback.playbackOutlook(classification, policy.policy))

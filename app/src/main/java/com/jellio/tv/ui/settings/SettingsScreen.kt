@@ -216,17 +216,17 @@ fun SettingsScreen(
             Text(text = category.label, style = MaterialTheme.typography.headlineSmall, color = JellioText, modifier = Modifier.padding(top = 4.dp))
             when (category) {
                 SettingsCategory.ACCOUNT -> {
-                SettingsSection(title = "Profile", icon = Icons.Filled.AccountCircle, description = "Signed in as ${session.userName} on ${session.serverAddress}.") {
+                SettingsSection(title = string("onboarding_step_profile"), icon = Icons.Filled.AccountCircle, description = formatString("settings_signed_in_on", session.userName, session.serverAddress)) {
                     SettingsActionRow(
-                        label = "Change avatar",
+                        label = string("settings_change_avatar"),
                         icon = Icons.Filled.AddAPhoto,
                         onClick = { viewModel.openAvatarPicker() },
                         modifier = Modifier.focusRequester(changeAvatarFocusRequester).onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
                     )
                     SettingsDivider()
                     SettingsActionRow(
-                        label = "View profile",
-                        description = "Banner, badges and activity.",
+                        label = string("settings_view_profile"),
+                        description = string("settings_view_profile_desc"),
                         icon = Icons.Filled.Badge,
                         onClick = onViewProfile,
                         modifier = Modifier.onFocusChanged { if (it.isFocused) coroutineScope.launch { scrollState.animateScrollTo(0) } },
@@ -234,22 +234,22 @@ fun SettingsScreen(
                 }
 
                 val isPrivate by viewModel.isPrivate.collectAsState()
-                SettingsSection(title = "Privacy", icon = Icons.Filled.Lock) {
+                SettingsSection(title = string("onboarding_summary_profile_privacy"), icon = Icons.Filled.Lock) {
                     SettingsToggleRow(
-                        label = "Private profile",
-                        description = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users.",
+                        label = string("settings_private_profile"),
+                        description = string("settings_private_profile_desc"),
                         checked = isPrivate,
                         onToggle = { viewModel.setPrivate(!isPrivate) },
                     )
                 }
 
-                SettingsSection(title = "Security", icon = Icons.Filled.Key, form = true) {
+                SettingsSection(title = string("settings_security"), icon = Icons.Filled.Key, form = true) {
                     PasswordSection(session = session, viewModel = viewModel)
                 }
 
                 SettingsSection(title = null) {
                     SettingsActionRow(
-                        label = "Log Out",
+                        label = string("nav_log_out"),
                         icon = Icons.AutoMirrored.Filled.Logout,
                         onClick = onLogout,
                         danger = true,
@@ -257,43 +257,43 @@ fun SettingsScreen(
                 }
                 }
                 SettingsCategory.PLAYBACK -> {
-                SettingsSection(title = "Playback", icon = Icons.Filled.PlayCircle) {
+                SettingsSection(title = string("settings_cat_playback"), icon = Icons.Filled.PlayCircle) {
                     SettingsToggleRow(
-                        label = "Remember stream choice",
-                        description = "Skip the stream picker on a title you already picked one for, for 4 days.",
+                        label = string("settings_remember_stream"),
+                        description = string("settings_remember_stream_desc"),
                         checked = rememberStream,
                         onToggle = { viewModel.setRememberStream(!rememberStream) },
                     )
                     val playerContext = LocalContext.current
                     SettingsDivider()
                     SettingsToggleRow(
-                        label = "Auto-skip intros",
-                        description = "Jump past an episode's intro by itself when the server knows where it is.",
+                        label = string("settings_skip_intros"),
+                        description = string("settings_skip_intros_desc"),
                         checked = PlayerPrefs.autoSkipIntro,
                         onToggle = { PlayerPrefs.setAutoSkipIntro(playerContext, !PlayerPrefs.autoSkipIntro) },
                     )
                     SettingsDivider()
                     SettingsToggleRow(
-                        label = "Dialogue Boost / Night Mode",
-                        description = "Boosts speech frequencies and compresses dynamic range so quiet dialogue is clear without loud action jumps.",
+                        label = string("settings_dialogue_boost"),
+                        description = string("settings_dialogue_boost_desc"),
                         checked = PlayerPrefs.dialogueBoost,
                         onToggle = { PlayerPrefs.setDialogueBoost(playerContext, !PlayerPrefs.dialogueBoost) },
                     )
                     SettingsDivider()
                     SettingsToggleRow(
-                        label = "Audio passthrough (HDMI)",
-                        description = "Pass multichannel audio bitstreams directly to your AV receiver or soundbar without software downmixing.",
+                        label = string("settings_audio_passthrough"),
+                        description = string("settings_audio_passthrough_desc"),
                         checked = PlayerPrefs.audioPassthrough,
                         onToggle = { PlayerPrefs.setAudioPassthrough(playerContext, !PlayerPrefs.audioPassthrough) },
                     )
                     SettingsDivider()
                     // Each press steps to the next level.
                     SettingsPickerRow(
-                        label = "Pre-buffer",
+                        label = string("settings_prebuffer_label"),
                         value = when (PlayerPrefs.prebuffer) {
-                            "more" -> "More: 3 s to start, loads 90 s ahead, 5 min when paused"
-                            "max" -> "Maximum: 6 s to start, loads 3 min ahead, 10 min when paused"
-                            else -> "Standard"
+                            "more" -> string("settings_prebuffer_more")
+                            "max" -> string("settings_prebuffer_max")
+                            else -> string("settings_prebuffer_standard")
                         },
                         onClick = {
                             val next = when (PlayerPrefs.prebuffer) {
@@ -306,7 +306,7 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Language", icon = Icons.Filled.Translate) {
+                SettingsSection(title = string("settings_display_language"), icon = Icons.Filled.Translate) {
                     SettingsPickerRow(
                         label = string("settings_preferred_audio"),
                         value = audioLanguage?.let { languageName(it) } ?: string("settings_no_preference"),
@@ -324,7 +324,7 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = "Sleep Timer", icon = Icons.Filled.Bedtime, form = true) {
+                SettingsSection(title = string("settings_sleep_timer"), icon = Icons.Filled.Bedtime, form = true) {
                     SleepTimerSection(viewModel = viewModel)
                 }
                 }
@@ -336,13 +336,13 @@ fun SettingsScreen(
                     val selectedGenres by viewModel.selectedGenres.collectAsState()
 
                     SettingsSection(
-                        title = "What Others Are Watching",
+                        title = string("home_community_watching"),
                         icon = Icons.Filled.Group,
-                        description = "Show titles currently being watched or recently finished by other users on this server.",
+                        description = string("settings_community_desc"),
                     ) {
                         SettingsToggleRow(
-                            label = "Display row on Home",
-                            description = "Show the What Others Are Watching row among your home screen recommendations.",
+                            label = string("settings_community_row"),
+                            description = string("settings_community_row_desc"),
                             checked = communityRowEnabled,
                             onToggle = { viewModel.setCommunityRowEnabled(session.userId, !communityRowEnabled) },
                         )
@@ -350,13 +350,13 @@ fun SettingsScreen(
                             SettingsDivider()
                             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                                 Text(
-                                    text = "Included Users",
+                                    text = string("settings_community_included"),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = JellioText,
                                     modifier = Modifier.padding(bottom = 4.dp),
                                 )
                                 Text(
-                                    text = "Choose whose activity appears in your community row. Toggle off any user to hide their activity.",
+                                    text = string("settings_community_included_desc"),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = JellioTextSecondary,
                                     modifier = Modifier.padding(bottom = 8.dp),
@@ -400,21 +400,21 @@ fun SettingsScreen(
                     }
 
                     SettingsSection(
-                        title = "Genre Recommendations",
+                        title = string("settings_genres_title"),
                         icon = Icons.Filled.MovieFilter,
-                        description = "Choose which genre rows appear on your Home screen. When none are selected, rows are chosen automatically based on your library.",
+                        description = string("settings_genres_desc"),
                     ) {
                         SettingsActionRow(
-                            label = "Reset to automatic",
+                            label = string("settings_genres_reset"),
                             icon = Icons.Filled.Sync,
-                            description = if (selectedGenres.isEmpty()) "Currently using automatic discovery." else "${selectedGenres.size} genres selected. Click to reset to automatic.",
+                            description = if (selectedGenres.isEmpty()) string("settings_genres_auto_active") else formatString("settings_genres_selected_count", selectedGenres.size),
                             onClick = { viewModel.resetSelectedGenres(session.userId) },
                         )
                         if (allGenres.isNotEmpty()) {
                             SettingsDivider()
                             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                                 Text(
-                                    text = "Available Genres",
+                                    text = string("settings_genres_available"),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = JellioText,
                                     modifier = Modifier.padding(bottom = 8.dp),
@@ -424,7 +424,7 @@ fun SettingsScreen(
                                     SettingsRowSurface(onClick = { viewModel.toggleSelectedGenre(session.userId, genre) }) {
                                         SettingsRowText(
                                             label = genre,
-                                            description = if (isSelected) "Included in Home rows" else null,
+                                            description = if (isSelected) string("settings_genres_included") else null,
                                             color = if (isSelected) JellioSecondary else JellioText,
                                         )
                                         SettingsSwitch(checked = isSelected)
@@ -454,12 +454,12 @@ fun SettingsScreen(
                 }
                 }
                 SettingsCategory.ABOUT -> {
-                SettingsSection(title = "About", icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
+                SettingsSection(title = string("settings_cat_about"), icon = Icons.Filled.Info, description = "Jellio TV " + BuildConfig.VERSION_NAME) {
                     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                         SettingsActionRow(
-                            label = "What's New",
+                            label = string("settings_whats_new"),
                             icon = Icons.Filled.AutoAwesome,
-                            description = "View new features and improvements in version " + BuildConfig.VERSION_NAME,
+                            description = string("settings_whats_new_desc") + " " + BuildConfig.VERSION_NAME,
                             onClick = onShowChangelog,
                         )
                         SettingsActionRow(
@@ -743,23 +743,23 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
     Column {
         if (!open) {
             status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(bottom = 12.dp)) }
-            PasswordButton(label = "Change password", onClick = { open = true }, modifier = Modifier.focusRequester(openButton))
+            PasswordButton(label = string("settings_change_password"), onClick = { open = true }, modifier = Modifier.focusRequester(openButton))
             return@Column
         }
-        JellioTextField(value = current, onValueChange = { current = it }, label = "Current password", isPassword = true, modifier = Modifier.fillMaxWidth().focusRequester(firstField))
+        JellioTextField(value = current, onValueChange = { current = it }, label = com.jellio.tv.ui.i18n.string("settings_password_current"), isPassword = true, modifier = Modifier.fillMaxWidth().focusRequester(firstField))
         Spacer(modifier = Modifier.height(12.dp))
-        JellioTextField(value = next, onValueChange = { next = it }, label = "New password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        JellioTextField(value = next, onValueChange = { next = it }, label = com.jellio.tv.ui.i18n.string("settings_password_new"), isPassword = true, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(12.dp))
-        JellioTextField(value = confirm, onValueChange = { confirm = it }, label = "Confirm new password", isPassword = true, modifier = Modifier.fillMaxWidth())
+        JellioTextField(value = confirm, onValueChange = { confirm = it }, label = com.jellio.tv.ui.i18n.string("settings_password_confirm"), isPassword = true, modifier = Modifier.fillMaxWidth())
         status?.let { Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp)) }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 16.dp)) {
             PasswordButton(
-                label = if (isUpdating) "Updating..." else "Update password",
+                label = if (isUpdating) string("settings_updating_password") else string("settings_update_password"),
                 enabled = !isUpdating,
                 onClick = { viewModel.updatePassword(session, current, next, confirm) },
             )
             PasswordButton(
-                label = "Cancel",
+                label = string("action_cancel"),
                 enabled = !isUpdating,
                 onClick = {
                     current = ""
@@ -818,7 +818,7 @@ private fun SleepTimerSection(viewModel: SettingsViewModel) {
                 colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                 modifier = Modifier.padding(top = 16.dp),
             ) {
-                Text(text = if (isCancelling) "Cancelling..." else "Cancel timer", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                Text(text = if (isCancelling) string("settings_sleep_timer_cancelling") else string("settings_sleep_timer_cancel"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
             }
         }
     }
@@ -1028,18 +1028,18 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                 )
             ),
         ) {
-            Text(text = "Check for Updates", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            Text(text = string("settings_check_updates"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
         }
         when (val current = result) {
             null -> {}
             ManualCheckResult.Checking -> {
-                Text(text = "Checking...", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+                Text(text = string("settings_check_updates_checking"), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
             }
             ManualCheckResult.UpToDate -> {
-                Text(text = "You're on the latest version.", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+                Text(text = string("settings_check_updates_latest"), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
             }
             ManualCheckResult.Error -> {
-                Text(text = "Couldn't check for updates.", color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+                Text(text = string("settings_check_updates_error"), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
             }
             is ManualCheckResult.UpdateFound -> {
                 Text(
@@ -1096,9 +1096,9 @@ private fun MotionRow() {
         },
     ) {
         SettingsRowText(
-            label = "Seasonal animations: " + labelOf(preference),
-            description = "Reduced redraws less often and keeps menus smoother on slower devices. " +
-                (profile?.let { "This device: " + it.describe() + "." } ?: ""),
+            label = com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_animations") + labelOf(preference),
+            description = com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_animations_desc") +
+                (profile?.let { com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_device_tier") + it.describe() + "." } ?: ""),
         )
         Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
     }

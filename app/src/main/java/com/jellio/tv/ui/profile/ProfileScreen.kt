@@ -98,18 +98,18 @@ fun ProfileScreen(
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: "Could not load this profile", color = JellioTextSecondary)
+                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("profile_load_error"), color = JellioTextSecondary)
                     Surface(
                         onClick = { viewModel.retry(session, userId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                         modifier = Modifier.padding(top = 20.dp),
                     ) {
-                        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
                     }
                 }
             }
@@ -141,7 +141,7 @@ fun ProfileScreen(
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
                                                 Icon(Icons.Filled.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                Text(text = "Private", modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
+                                                Text(text = com.jellio.tv.ui.i18n.Strings.get("settings_private_profile"), modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
                                             }
                                         }
                                     }
@@ -167,7 +167,7 @@ fun ProfileScreen(
                             Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Filled.VisibilityOff, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(32.dp))
-                                    Text(text = "This profile is private.", color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
+                                    Text(text = com.jellio.tv.ui.i18n.Strings.get("profile_is_private"), color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
                                 }
                             }
                         }
@@ -192,7 +192,7 @@ fun ProfileScreen(
                         }
                         if (achievements.RecentActivity.isEmpty()) {
                             item {
-                                Text(text = "Nothing here yet.", color = JellioTextSecondary, modifier = Modifier.padding(start = 48.dp))
+                                Text(text = com.jellio.tv.ui.i18n.Strings.get("feed_nothing_here"), color = JellioTextSecondary, modifier = Modifier.padding(start = 48.dp))
                             }
                         } else {
                             items(achievements.RecentActivity) { entry ->
@@ -213,7 +213,7 @@ fun ProfileScreen(
                                 colors = com.jellio.tv.ui.common.dangerButtonColors(),
                                 modifier = Modifier.padding(start = 48.dp, top = 32.dp, bottom = 48.dp),
                             ) {
-                                Text(text = "Log Out", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+                                Text(text = com.jellio.tv.ui.i18n.Strings.get("nav_log_out"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
                             }
                         }
                     } else {
@@ -260,7 +260,7 @@ private fun BioSection(
             JellioTextField(
                 value = draft,
                 onValueChange = onDraftChange,
-                label = "Add a short bio",
+                label = com.jellio.tv.ui.i18n.string("profile_bio_prompt"),
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(modifier = Modifier.padding(top = 8.dp)) {
@@ -277,7 +277,7 @@ private fun BioSection(
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                     modifier = Modifier.padding(start = 8.dp),
                 ) {
-                    Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         } else if (!bio.isNullOrEmpty()) {

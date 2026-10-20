@@ -261,14 +261,14 @@ fun DetailScreen(
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: "Could not load this title", color = JellioTextSecondary)
+                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("detail_load_error"), color = JellioTextSecondary)
                     Surface(
                         onClick = { viewModel.retry(session, itemId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                         modifier = Modifier.padding(top = 20.dp),
                     ) {
-                        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
                     }
                 }
             }
@@ -426,11 +426,11 @@ private fun EpisodeOptionsMenu(
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(vertical = 12.dp),
         ) {
-            EpisodeMenuRow(label = if (isPlayed) "Mark as unwatched" else "Mark as watched", onClick = { onToggleWatched(); onDismiss() })
+            EpisodeMenuRow(label = if (isPlayed) com.jellio.tv.ui.i18n.string("detail_mark_unwatched") else com.jellio.tv.ui.i18n.string("detail_mark_watched"), onClick = { onToggleWatched(); onDismiss() })
             if (hasPrevious) {
-                EpisodeMenuRow(label = "Mark previous as watched", onClick = { onMarkPreviousWatched(); onDismiss() })
+                EpisodeMenuRow(label = com.jellio.tv.ui.i18n.string("detail_mark_previous_watched"), onClick = { onMarkPreviousWatched(); onDismiss() })
             }
-            EpisodeMenuRow(label = "Mark season as watched", onClick = { onMarkSeasonWatched(); onDismiss() })
+            EpisodeMenuRow(label = com.jellio.tv.ui.i18n.string("detail_mark_season_watched"), onClick = { onMarkSeasonWatched(); onDismiss() })
         }
     }
 }
@@ -574,32 +574,32 @@ private fun DetailHero(
                         IconActionButton(
                             icon = if (state.isWatchlisted) Icons.Filled.BookmarkAdded else Icons.Filled.BookmarkAdd,
                             active = state.isWatchlisted,
-                            contentDescription = "Watchlist",
+                            contentDescription = com.jellio.tv.ui.i18n.string("nav_watchlist"),
                             onClick = onToggleWatchlist,
                         )
                         IconActionButton(
                             icon = Icons.Filled.Check,
                             active = state.isWatched,
-                            contentDescription = "Mark watched",
+                            contentDescription = com.jellio.tv.ui.i18n.string("detail_mark_watched"),
                             onClick = onToggleWatched,
                         )
                         IconActionButton(
                             icon = Icons.Filled.ThumbUp,
                             active = state.likes == true,
-                            contentDescription = "Like",
+                            contentDescription = com.jellio.tv.ui.i18n.string("detail_like"),
                             onClick = onLike,
                         )
                         IconActionButton(
                             icon = Icons.Filled.ThumbDown,
                             active = state.likes == false,
-                            contentDescription = "Dislike",
+                            contentDescription = com.jellio.tv.ui.i18n.string("detail_dislike"),
                             onClick = onDislike,
                         )
                         if (onChangeStream != null) {
                             IconActionButton(
                                 icon = Icons.Filled.SwapHoriz,
                                 active = false,
-                                contentDescription = "Change Stream",
+                                contentDescription = com.jellio.tv.ui.i18n.string("detail_change_stream"),
                                 onClick = onChangeStream,
                             )
                         }
@@ -608,7 +608,7 @@ private fun DetailHero(
                 IconActionButton(
                     icon = Icons.Filled.MoreVert,
                     active = actionsExpanded,
-                    contentDescription = if (actionsExpanded) "Fewer actions" else "More actions",
+                    contentDescription = if (actionsExpanded) com.jellio.tv.ui.i18n.string("detail_fewer_actions") else com.jellio.tv.ui.i18n.string("detail_more_actions"),
                     onClick = { actionsExpanded = !actionsExpanded },
                 )
             }
@@ -641,7 +641,7 @@ private fun DetailLoading(art: TitleLoadingArtInfo?) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             com.jellio.tv.ui.common.ScreenSpinner(size = 44.dp)
             Text(
-                text = art?.title?.takeIf { it.isNotBlank() }?.let { "Loading $it" } ?: "Loading",
+                text = art?.title?.takeIf { it.isNotBlank() }?.let { com.jellio.tv.ui.i18n.formatString("detail_loading_title", it) } ?: com.jellio.tv.ui.i18n.string("status_loading"),
                 color = JellioText,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp),
@@ -694,7 +694,7 @@ private fun SeasonsSection(
 ) {
     if (state.seasons.isEmpty()) return
     Column(modifier = Modifier.padding(top = 16.dp)) {
-        Text(text = "Episodes", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
+        Text(text = com.jellio.tv.ui.i18n.string("detail_episodes"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(state.seasons, key = { it.Id }) { season ->
                 val selected = season.Id == state.selectedSeasonId
@@ -813,7 +813,7 @@ private fun EpisodeCard(
 @Composable
 private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, Int) -> String, onPersonClick: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
-        Text(text = "Cast", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
+        Text(text = com.jellio.tv.ui.i18n.string("detail_cast"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val avatarWidth = 140.dp.scaled()
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -867,7 +867,7 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
 @Composable
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
-        Text(text = "Trailers", style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
+        Text(text = com.jellio.tv.ui.i18n.string("detail_trailers"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val trailerCardWidth = 280.dp.scaled()
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -896,7 +896,7 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                                 Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
                             }
                             Text(
-                                text = trailer.Name ?: "Trailer",
+                                text = trailer.Name ?: com.jellio.tv.ui.i18n.string("action_trailer"),
                                 color = JellioText,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,

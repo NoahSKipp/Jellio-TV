@@ -102,6 +102,7 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.54.2",
         features = listOf(
+            ChangelogFeature(Icons.Filled.Info, "Complete Multi-Language Localization", "Full end-to-end translation parity across English, German, Spanish, French, Italian, Polish, and Portuguese for all screens, settings, overlays, and playback controls."),
             ChangelogFeature(Icons.Filled.Tune, "Intuitive Onboarding Focus", "Initial focus on setup wizard pages now lands directly on the logical default selection (such as English on the language step or Center on overscan calibration) instead of defaulting to Next."),
             ChangelogFeature(Icons.Filled.PlayCircle, "Smooth Completion Flow", "Focus reliably lands on the Start Exploring action on the final setup summary screen."),
         ),

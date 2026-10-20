@@ -109,7 +109,7 @@ class GroupWatchViewModel @Inject constructor(
                         is GroupEvent.Started -> if (!isPlaying(event.target.itemId)) {
                             val name = itemName(session, event.target.itemId)
                             _prompt.value = GroupPrompt(
-                                title = "Group Watch",
+                                title = com.jellio.tv.ui.i18n.Strings.get("nav_group_watch"),
                                 text = "The group started watching " + (name ?: "something"),
                                 actionLabel = "Join",
                                 onAction = { openItem(event.target.itemId) },
@@ -134,7 +134,7 @@ class GroupWatchViewModel @Inject constructor(
             lastInviteId = maxOf(lastInviteId, invite.Id)
             _invites.update { list -> (listOf(invite) + list.filterNot { it.GroupId == invite.GroupId }).take(10) }
             _prompt.value = GroupPrompt(
-                title = "Group Watch invite",
+                title = com.jellio.tv.ui.i18n.Strings.get("groupwatch_invite_title"),
                 text = (invite.FromUserName ?: "Someone") + " invited you to join " + (invite.GroupName ?: "Group Watch"),
                 actionLabel = "Join",
                 onAction = { acceptInvite(invite) },
@@ -299,7 +299,7 @@ private fun GroupPromptCard(prompt: GroupPrompt, onAnswer: (Boolean) -> Unit, mo
         Text(text = prompt.text, color = JellioText, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp, bottom = 16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GroupButton(label = prompt.actionLabel, primary = true, onClick = { onAnswer(true) }, modifier = Modifier.focusRequester(actionFocus))
-            GroupButton(label = "Not now", onClick = { onAnswer(false) })
+            GroupButton(label = com.jellio.tv.ui.i18n.Strings.get("action_not_now"), onClick = { onAnswer(false) })
         }
     }
 }
@@ -344,7 +344,7 @@ fun GroupWatchPanelContent(userName: String, viewModel: GroupWatchViewModel = hi
             }
         }
         if (current != null) {
-            Text(text = "You're in " + current.groupName, color = JellioText, style = MaterialTheme.typography.titleSmall)
+            Text(text = com.jellio.tv.ui.i18n.Strings.format("groupwatch_in_group", current.groupName), color = JellioText, style = MaterialTheme.typography.titleSmall)
             Text(
                 text = current.participants.joinToString(", ").ifEmpty { "Just you" },
                 color = JellioTextSecondary,
@@ -353,7 +353,7 @@ fun GroupWatchPanelContent(userName: String, viewModel: GroupWatchViewModel = hi
                 text = "Whatever the group plays opens here too. Use React in the player to send a quick emoji.",
                 color = JellioTextSecondary,
             )
-            GroupButton(label = "Leave group", onClick = { viewModel.leave() })
+            GroupButton(label = com.jellio.tv.ui.i18n.string("gw_leave_group"), onClick = { viewModel.leave() })
         } else {
             Text(
                 text = "Watch in sync with others on Jellio, Jellio TV or Jellyfin. Invites from other users pop up here too.",
@@ -365,18 +365,18 @@ fun GroupWatchPanelContent(userName: String, viewModel: GroupWatchViewModel = hi
                         Text(text = candidate.GroupName ?: "Group Watch", color = JellioText)
                         Text(text = candidate.Participants.joinToString(", "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
                     }
-                    GroupButton(label = "Join", primary = true, onClick = { viewModel.join(candidate.GroupId) })
+                    GroupButton(label = com.jellio.tv.ui.i18n.string("gw_join"), primary = true, onClick = { viewModel.join(candidate.GroupId) })
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GroupButton(
-                    label = "Start a group",
+                    label = com.jellio.tv.ui.i18n.Strings.get("gw_start_group"),
                     onClick = {
                         viewModel.create("$userName's group")
                         refreshKey++
                     },
                 )
-                GroupButton(label = "Refresh", onClick = { refreshKey++ })
+                GroupButton(label = com.jellio.tv.ui.i18n.string("gw_refresh"), onClick = { refreshKey++ })
             }
         }
     }
@@ -389,8 +389,8 @@ fun InviteRow(invite: com.jellio.tv.data.model.GroupWatchInviteDto, onJoin: () -
             Text(text = (invite.FromUserName ?: "Someone") + " invited you", color = JellioText)
             Text(text = invite.GroupName ?: "Group Watch", color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
         }
-        GroupButton(label = "Join", primary = true, onClick = onJoin)
-        GroupButton(label = "Dismiss", onClick = onDismiss)
+        GroupButton(label = com.jellio.tv.ui.i18n.string("gw_join"), primary = true, onClick = onJoin)
+        GroupButton(label = com.jellio.tv.ui.i18n.string("action_dismiss"), onClick = onDismiss)
     }
 }
 
@@ -435,7 +435,7 @@ fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable 
 
 @Composable
 fun GroupWatchOverlay(userName: String, onDismiss: () -> Unit) {
-    SidePanelOverlay(title = "Group Watch", onDismiss = onDismiss) {
+    SidePanelOverlay(title = com.jellio.tv.ui.i18n.string("nav_group_watch"), onDismiss = onDismiss) {
         GroupWatchPanelContent(userName = userName)
     }
 }

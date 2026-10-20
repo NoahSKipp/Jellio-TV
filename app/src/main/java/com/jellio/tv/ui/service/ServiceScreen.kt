@@ -113,14 +113,14 @@ fun ServiceScreen(
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
                     ScreenSpinner()
-                    Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
+                    Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
                 }
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "Could not load $serviceName", color = JellioTextSecondary)
+                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.formatString("service_load_error", serviceName), color = JellioTextSecondary)
             }
             uiState.rows.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nothing imported for $serviceName yet.", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.formatString("service_nothing_imported", serviceName), color = JellioTextSecondary)
             }
             else -> {
                 // A row title opens the row's full collection, not the subset

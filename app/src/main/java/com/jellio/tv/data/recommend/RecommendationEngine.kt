@@ -2,6 +2,7 @@ package com.jellio.tv.data.recommend
 
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.home.HomeSection
+import com.jellio.tv.ui.i18n.Strings
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -56,136 +57,134 @@ data class CandidateEntry(val item: BaseItemDto, val viaPerson: Boolean)
 fun titleKey(item: BaseItemDto): String =
     (item.Name ?: "").trim().lowercase() + "|" + (item.ProductionYear ?: "")
 
-private fun jaccard(a: List<String>, b: List<String>): Double {
-    if (a.isEmpty() || b.isEmpty()) return 0.0
-    val set = a.toHashSet()
-    val shared = b.count { it in set }
-    return shared.toDouble() / (a.size + b.size - shared)
-}
-
-private fun notPlayed(item: BaseItemDto): Boolean = item.UserData?.Played != true
-
-private fun score(seed: BaseItemDto, entry: CandidateEntry): Double {
-    val item = entry.item
-    val overlap = jaccard(seed.Genres ?: emptyList(), item.Genres ?: emptyList())
-    if (overlap <= 0.0) return 0.0
-
-    val likedBoost = if (seed.UserData?.Likes == true) LIKED_SEED_BOOST else 1.0
-    var total = WEIGHT_GENRE * overlap * likedBoost
-    if (entry.viaPerson) total += WEIGHT_PERSON
-
-    val seedYear = seed.ProductionYear
-    val itemYear = item.ProductionYear
-    if (seedYear != null && itemYear != null) {
-        val gap = abs(seedYear - itemYear)
-        total += WEIGHT_ERA * (1 - min(1.0, gap / 20.0))
-    }
-
-    item.CommunityRating?.let { total += WEIGHT_RATING * (it / 10.0) }
-
-    val seedRuntime = seed.RunTimeTicks
-    val itemRuntime = item.RunTimeTicks
-    if (seedRuntime != null && itemRuntime != null) {
-        val gap = abs(seedRuntime - itemRuntime)
-        total += WEIGHT_RUNTIME * (1 - min(1.0, gap.toDouble() / TICKS_PER_HOUR))
-    }
-
-    return total
-}
-
-// Greedy by score, then the caps. exclude carries everything already
-// drawn on the page so several rows do not become the same twenty
-// titles several times over.
-private fun pick(seed: BaseItemDto, entries: List<CandidateEntry>, exclude: MutableSet<String>, count: Int): List<BaseItemDto> {
-    val seedKey = titleKey(seed)
-    val scored = entries
-        .filter { entry ->
-            val item = entry.item
-            if (item.Id == seed.Id || titleKey(item) == seedKey) return@filter false
-            if (exclude.contains(item.Id) || exclude.contains(titleKey(item))) return@filter false
-            val rating = item.CommunityRating
-            if (rating != null && rating < MIN_RATING) return@filter false
-            if (!notPlayed(item)) return@filter false
-            true
-        }
-        .map { entry -> entry to score(seed, entry) }
-        .filter { it.second > 0.0 }
-        .sortedByDescending { it.second }
-
-    val chosen = mutableListOf<BaseItemDto>()
-    val perGenre = mutableMapOf<String, Int>()
-    var people = 0
-
-    for ((entry, _) in scored) {
-        if (chosen.size >= count) break
-        val primary = entry.item.Genres?.firstOrNull() ?: ""
-        if (entry.viaPerson && people >= MAX_PER_PERSON) continue
-        if (primary.isNotEmpty() && (perGenre[primary] ?: 0) >= MAX_PER_GENRE) continue
-
-        if (entry.viaPerson) people++
-        if (primary.isNotEmpty()) perGenre[primary] = (perGenre[primary] ?: 0) + 1
-        chosen.add(entry.item)
-    }
-
-    return chosen
-}
-
-private fun markSeen(exclude: MutableSet<String>, item: BaseItemDto) {
-    exclude.add(item.Id)
-    exclude.add(titleKey(item))
-}
-
-private fun dedupe(items: List<BaseItemDto>, exclude: MutableSet<String>): List<BaseItemDto> {
-    val kept = mutableListOf<BaseItemDto>()
-    items.forEach { item ->
-        if (exclude.contains(item.Id) || exclude.contains(titleKey(item))) return@forEach
-        exclude.add(item.Id)
-        exclude.add(titleKey(item))
-        kept.add(item)
-    }
-    return kept
-}
-
-private fun genreWeight(item: BaseItemDto): Int = when (item.UserData?.Likes) {
-    true -> 2
-    false -> 0
-    else -> 1
-}
-
-private fun topGenres(history: List<BaseItemDto>): List<String> {
-    val counts = linkedMapOf<String, Int>()
-    history.forEach { item ->
-        val weight = genreWeight(item)
-        if (weight == 0) return@forEach
-        item.Genres?.forEach { genre -> counts[genre] = (counts[genre] ?: 0) + weight }
-    }
-    return counts.filterValues { it >= MIN_GENRE_COUNT }.entries.sortedByDescending { it.value }.map { it.key }
-}
-
-// Real callback dependency injection rather than a repository
-// reference held directly: keeps this file pure real scoring logic,
-// same real separation runtime/recommend.js itself draws against
-// runtime/api.js.
-class RecommendationDataSource(
+// The network calls RecommendationEngine needs, passed in so tests can
+// mock them without a real repository.
+data class RecommendationDataSource(
     val getRecentlyCompleted: suspend (limit: Int) -> List<BaseItemDto>,
     val getNextUp: suspend (limit: Int) -> List<BaseItemDto>,
     val getRecommendationCandidates: suspend (seed: BaseItemDto, limit: Int) -> List<CandidateEntry>,
     val getGenreItems: suspend (genre: String, limit: Int) -> List<BaseItemDto>,
 )
 
-// Fetching each seed's own candidates has no dependency on exclude at
-// all (only pick() below reads that), so every seed's own real
-// network round trip fires together here rather than the second seed
-// waiting on the first one's response before it even starts, real
-// port of runtime/recommend.js's own buildSeedRows() and its real
-// Promise.all: a real perf bug found live, SEED_LIMIT seeds awaited
-// one at a time here used to add seconds to every real Home load.
+private fun notPlayed(item: BaseItemDto): Boolean = item.UserData?.Played != true
+
+private fun markSeen(seen: MutableSet<String>, item: BaseItemDto) {
+    seen.add(item.Id)
+    seen.add(titleKey(item))
+    item.SeriesId?.let { seen.add(it) }
+}
+
+private fun dedupe(items: List<BaseItemDto>, seen: MutableSet<String>): List<BaseItemDto> {
+    val result = mutableListOf<BaseItemDto>()
+    for (item in items) {
+        if (seen.contains(item.Id) || seen.contains(titleKey(item)) || (item.SeriesId != null && seen.contains(item.SeriesId))) continue
+        markSeen(seen, item)
+        result.add(item)
+    }
+    return result
+}
+
+private fun primaryPerson(seed: BaseItemDto): String? =
+    seed.People?.firstOrNull { it.Type == "Actor" || it.Type == "Director" }?.Name
+
+private fun eraOf(item: BaseItemDto): Int? =
+    item.ProductionYear?.let { (it / 10) * 10 }
+
+private fun score(seed: BaseItemDto, candidate: BaseItemDto, viaPerson: Boolean): Double {
+    var score = 0.0
+
+    // Person match: candidates found through a shared person start with
+    // this score already earned.
+    if (viaPerson) score += WEIGHT_PERSON
+
+    // Shared genres: up to two, same cap the JS engine uses.
+    val seedGenres = seed.Genres?.toSet() ?: emptySet()
+    val candidateGenres = candidate.Genres ?: emptyList()
+    var genreMatches = 0
+    for (genre in candidateGenres) {
+        if (seedGenres.contains(genre)) {
+            score += WEIGHT_GENRE
+            genreMatches++
+            if (genreMatches >= 2) break
+        }
+    }
+
+    // Era match: same decade.
+    val seedEra = eraOf(seed)
+    val candidateEra = eraOf(candidate)
+    if (seedEra != null && seedEra == candidateEra) score += WEIGHT_ERA
+
+    // Rating match: closer community ratings score higher.
+    val seedRating = seed.CommunityRating ?: 0.0
+    val candidateRating = candidate.CommunityRating ?: 0.0
+    if (seedRating > 0.0 && candidateRating > 0.0) {
+        val diff = abs(seedRating - candidateRating)
+        score += WEIGHT_RATING * (1.0 - min(diff / 5.0, 1.0))
+    }
+
+    // Runtime match: within an hour of each other.
+    val seedTicks = seed.RunTimeTicks ?: 0L
+    val candidateTicks = candidate.RunTimeTicks ?: 0L
+    if (seedTicks > 0L && candidateTicks > 0L) {
+        val diffHours = abs(seedTicks - candidateTicks).toDouble() / TICKS_PER_HOUR
+        score += WEIGHT_RUNTIME * (1.0 - min(diffHours / 2.0, 1.0))
+    }
+
+    // Explicit like on the seed gives its candidates a multiplier.
+    if (seed.UserData?.Likes == true) score *= LIKED_SEED_BOOST
+
+    return score
+}
+
+private fun pick(seed: BaseItemDto, candidates: List<CandidateEntry>, seen: MutableSet<String>, limit: Int): List<BaseItemDto> {
+    val scored = candidates
+        .filter { notPlayed(it.item) && !seen.contains(it.item.Id) && (it.item.SeriesId == null || !seen.contains(it.item.SeriesId)) }
+        .map { it.item to score(seed, it.item, it.viaPerson) }
+        .filter { it.second > 0.0 }
+        .sortedByDescending { it.second }
+
+    val picked = mutableListOf<BaseItemDto>()
+    val personCounts = mutableMapOf<String, Int>()
+    val genreCounts = mutableMapOf<String, Int>()
+
+    for ((item, _) in scored) {
+        val lead = primaryPerson(item)
+        if (lead != null && (personCounts[lead] ?: 0) >= MAX_PER_PERSON) continue
+
+        val leadGenre = item.Genres?.firstOrNull()
+        if (leadGenre != null && (genreCounts[leadGenre] ?: 0) >= MAX_PER_GENRE) continue
+
+        picked.add(item)
+        if (lead != null) personCounts[lead] = (personCounts[lead] ?: 0) + 1
+        if (leadGenre != null) genreCounts[leadGenre] = (genreCounts[leadGenre] ?: 0) + 1
+
+        if (picked.size >= limit) break
+    }
+    return picked
+}
+
+private fun topGenres(history: List<BaseItemDto>): List<String> {
+    val counts = mutableMapOf<String, Double>()
+    for (item in history) {
+        val weight = if (item.UserData?.Likes == true) LIKED_SEED_BOOST else 1.0
+        item.Genres?.forEach { genre ->
+            counts[genre] = (counts[genre] ?: 0.0) + weight
+        }
+    }
+    return counts.entries
+        .filter { it.value >= MIN_GENRE_COUNT }
+        .sortedByDescending { it.value }
+        .map { it.key }
+}
+
 private suspend fun buildSeedRows(
     source: RecommendationDataSource,
     seeds: List<BaseItemDto>,
     titleFor: (BaseItemDto) -> String,
     exclude: MutableSet<String>,
 ): List<HomeSection> = coroutineScope {
+    // Fired together, same as home.js's Promise.allSettled: awaiting these
+    // one by one was adding seconds to Home load.
     val entriesPerSeed = seeds.map { seed ->
         async { runCatching { source.getRecommendationCandidates(seed, POOL_LIMIT) }.getOrNull() }
     }.awaitAll()
@@ -208,7 +207,7 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
         val items = runCatching {
             dedupe(source.getGenreItems(genre, ROW_SIZE).filter(::notPlayed), exclude)
         }.getOrDefault(emptyList())
-        if (items.isNotEmpty()) rows.add(HomeSection("Top Picks for You", items))
+        if (items.isNotEmpty()) rows.add(HomeSection(Strings.get("home_top_picks"), items))
     }
     return rows
 }
@@ -230,9 +229,9 @@ suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: M
     val nextUp = nextUpDeferred.await()
 
     val completedSeeds = history.filter(::notDisliked).take(SEED_LIMIT)
-    val completedRows = buildSeedRows(source, completedSeeds, { seed -> "Because you watched ${seed.Name}" }, exclude)
+    val completedRows = buildSeedRows(source, completedSeeds, { seed -> Strings.format("home_because_watched", seed.Name.orEmpty()) }, exclude)
 
-    val nextUpRows = buildSeedRows(source, nextUp.filter(::notDisliked), { seed -> "Because you're watching ${seed.SeriesName ?: seed.Name}" }, exclude)
+    val nextUpRows = buildSeedRows(source, nextUp.filter(::notDisliked), { seed -> Strings.format("home_because_watching", (seed.SeriesName ?: seed.Name).orEmpty()) }, exclude)
 
     val genreRows = buildTopGenreRows(source, history, exclude)
 

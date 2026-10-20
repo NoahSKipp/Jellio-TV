@@ -74,7 +74,7 @@ fun NotificationsOverlay(
     LaunchedEffect(Unit) { viewModel.load() }
     val items by viewModel.items.collectAsState()
     val invites by groupWatch.invites.collectAsState()
-    SidePanelOverlay(title = "Notifications", onDismiss = onDismiss) {
+    SidePanelOverlay(title = com.jellio.tv.ui.i18n.string("notifications_title"), onDismiss = onDismiss) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             invites.forEach { invite ->
                 InviteRow(
@@ -88,8 +88,8 @@ fun NotificationsOverlay(
             }
             val list = items
             when {
-                list == null -> Text(text = "Loading...", color = JellioTextSecondary)
-                list.isEmpty() && invites.isEmpty() -> Text(text = "Nothing new.", color = JellioTextSecondary)
+                list == null -> Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary)
+                list.isEmpty() && invites.isEmpty() -> Text(text = com.jellio.tv.ui.i18n.string("notifications_nothing_new"), color = JellioTextSecondary)
                 else -> list.forEach { n ->
                     val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
                     Surface(

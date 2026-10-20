@@ -45,10 +45,10 @@ fun WatchlistScreen(
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
             uiState.movies.isEmpty() && uiState.series.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nothing on your Watchlist yet.", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("watchlist_empty"), color = JellioTextSecondary)
             }
             else -> LazyColumn(
                 state = listState,

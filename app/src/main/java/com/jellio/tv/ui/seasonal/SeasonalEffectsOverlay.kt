@@ -1066,7 +1066,7 @@ private fun NewYearTitle(modifier: Modifier) {
     }
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "Happy New Year",
+            text = com.jellio.tv.ui.i18n.string("seasons_happy_new_year"),
             color = Color(0xFFFFF3C4),
             fontSize = 72.sp,
             fontWeight = FontWeight.ExtraBold,

@@ -38,7 +38,7 @@ data class DetailUiState(
     val selectedSeasonEpisodes: List<BaseItemDto> = emptyList(),
     val cast: List<com.jellio.tv.data.model.PersonDto> = emptyList(),
     val trailers: List<com.jellio.tv.data.model.TrailerDto> = emptyList(),
-    val playLabel: String = "Play",
+    val playLabel: String = com.jellio.tv.ui.i18n.Strings.get("action_play"),
     val isWatchlisted: Boolean = false,
     val isWatched: Boolean = false,
     val likes: Boolean? = null,
@@ -160,7 +160,7 @@ class DetailViewModel @Inject constructor(
             } catch (err: Exception) {
                 // A page already drawn from memory stays up.
                 if (preloaded == null) {
-                    _uiState.value = DetailUiState(isLoading = false, error = err.message ?: "Could not load this title")
+                    _uiState.value = DetailUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
                 }
             }
         }
@@ -191,7 +191,7 @@ class DetailViewModel @Inject constructor(
         val target = runCatching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return null
         if (target.resume) {
             _uiState.value = _uiState.value.copy(
-                playLabel = "Resume S${target.episode.ParentIndexNumber} E${target.episode.IndexNumber}",
+                playLabel = com.jellio.tv.ui.i18n.Strings.format("detail_resume_episode", target.episode.ParentIndexNumber ?: 0, target.episode.IndexNumber ?: 0),
             )
         }
         return target.episode

@@ -57,16 +57,16 @@ fun watchActivityText(
     lastEpisodeNumber: Int?,
     itemName: String?,
 ): AnnotatedString = buildAnnotatedString {
-    append("Watched ")
+    append(com.jellio.tv.ui.i18n.Strings.get("activity_watched") + " ")
     if (itemType == "Episode" && !seriesName.isNullOrEmpty()) {
-        val season = if (seasonNumber != null) "Season $seasonNumber, " else ""
+        val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("detail_season_number", seasonNumber) + ", " else ""
         if (episodeCount > 1) {
             val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
                 "Episodes $firstEpisodeNumber-$lastEpisodeNumber"
             } else {
                 "$episodeCount episodes"
             }
-            append(season + range + " of ")
+            append(season + range + " " + com.jellio.tv.ui.i18n.Strings.get("word_of") + " ")
         } else if (firstEpisodeNumber != null) {
             append(season + "Episode " + firstEpisodeNumber + " of ")
         }
@@ -83,7 +83,7 @@ fun watchActivityText(
 // title.style.color, not a plain SemiBold like watchActivityText's own
 // series/item name.
 fun badgeActivityText(badgeName: String?, rarity: String?): AnnotatedString = buildAnnotatedString {
-    append("Unlocked ")
+    append(com.jellio.tv.ui.i18n.Strings.get("activity_unlocked") + " ")
     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = rarityColor(rarity))) {
         append(badgeName ?: "")
     }

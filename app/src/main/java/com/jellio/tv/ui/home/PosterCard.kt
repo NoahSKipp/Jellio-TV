@@ -534,23 +534,23 @@ fun CardOptionsMenu(
     val actions = buildList {
         when {
             continueWatching -> {
-                onGoToDetails?.let { add(MenuAction("Go to details", it)) }
-                onPlayManually?.let { add(MenuAction("Play manually", it)) }
-                onStartOver?.let { add(MenuAction("Start from beginning", it)) }
-                onRemoveFromRow?.let { add(MenuAction("Remove from Continue Watching", it, danger = true)) }
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
+                onPlayManually?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_play_manually"), it)) }
+                onStartOver?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_start_beginning"), it)) }
+                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_continue"), it, danger = true)) }
             }
             upNext -> {
                 onGoToDetails?.let { add(MenuAction("Go to details", it)) }
                 // Jellyfin can't hide one episode from Next Up; marking it
                 // played is what drops it off the row.
-                onRemoveFromRow?.let { add(MenuAction("Remove from Up Next", it, danger = true)) }
+                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_up_next"), it, danger = true)) }
                 // Hides the whole show server side, so its next episode
                 // doesn't take its place.
-                onRemoveShowFromRow?.let { add(MenuAction("Remove Show from Up Next", it, danger = true)) }
+                onRemoveShowFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_show_up_next"), it, danger = true)) }
             }
             else -> {
-                onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) "Remove from Watchlist" else "Add to Watchlist", it)) }
-                onToggleWatched?.let { add(MenuAction(if (isPlayed) "Mark as unwatched" else "Mark as watched", it)) }
+                onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) com.jellio.tv.ui.i18n.Strings.get("menu_remove_watchlist") else com.jellio.tv.ui.i18n.Strings.get("menu_add_watchlist"), it)) }
+                onToggleWatched?.let { add(MenuAction(if (isPlayed) com.jellio.tv.ui.i18n.Strings.get("detail_mark_unwatched") else com.jellio.tv.ui.i18n.Strings.get("detail_mark_watched"), it)) }
             }
         }
     }

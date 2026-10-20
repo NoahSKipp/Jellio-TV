@@ -69,14 +69,14 @@ fun LibraryPickerOverlay(
                 .padding(16.dp),
         ) {
             Text(
-                text = "Select Library",
+                text = com.jellio.tv.ui.i18n.string("library_select"),
                 style = MaterialTheme.typography.titleMedium,
                 color = JellioText,
                 modifier = Modifier.padding(start = 12.dp, bottom = 12.dp, top = 4.dp),
             )
             
             if (libraries.isEmpty()) {
-                Text(text = "No libraries yet.", modifier = Modifier.padding(12.dp), color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("library_no_libraries"), modifier = Modifier.padding(12.dp), color = JellioTextSecondary)
             }
             
             libraries.forEachIndexed { index, library ->

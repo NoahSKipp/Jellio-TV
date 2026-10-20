@@ -171,12 +171,12 @@ fun RowExpandButton(onClick: () -> Unit, height: Dp, modifier: Modifier = Modifi
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ViewList,
-                contentDescription = "View all",
+                contentDescription = com.jellio.tv.ui.i18n.Strings.get("action_see_all"),
                 tint = JellioText,
                 modifier = Modifier.size(32.dp),
             )
             Text(
-                text = "View All",
+                text = com.jellio.tv.ui.i18n.string("action_see_all"),
                 style = MaterialTheme.typography.labelLarge,
                 color = JellioText,
                 modifier = Modifier.padding(top = 8.dp)

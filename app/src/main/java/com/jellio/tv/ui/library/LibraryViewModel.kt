@@ -59,11 +59,11 @@ private const val ANIME_EMPTY_MESSAGE =
 // this page's own top row, the per genre rows below stay fixed
 // "browse by genre" shortcuts either way, same real reason that
 // file's own header comment gives.
-data class LibrarySortOption(val value: String, val label: String)
+data class LibrarySortOption(val value: String, val label: String, val key: String = "")
 
 val LIBRARY_SORT_OPTIONS = listOf(
-    LibrarySortOption("CommunityRating:Descending", "Top rated"),
-    LibrarySortOption("PremiereDate:Descending", "Newest release"),
+    LibrarySortOption("CommunityRating:Descending", "Top rated", "library_sort_top_rated"),
+    LibrarySortOption("PremiereDate:Descending", "Newest release", "library_sort_newest"),
 )
 
 data class LibraryUiState(
@@ -294,7 +294,7 @@ class LibraryViewModel @Inject constructor(
     private fun isAnime(item: BaseItemDto): Boolean =
         animeIds.isNotEmpty() && item.Id.replace("-", "").lowercase() in animeIds
 
-    private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.label ?: "Browse"
+    private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort_browse")
 
     // Real port of screens/library.js's own loadMainRow(): only this
     // one row re-fetches, the coverflow and every fixed per genre row
@@ -350,7 +350,7 @@ class LibraryViewModel @Inject constructor(
             .filter { repository.isAnimeCollection(it) }
 
         if (collections.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
+            _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"), emptyMessage = ANIME_EMPTY_MESSAGE)
             return@coroutineScope
         }
 
@@ -401,7 +401,7 @@ class LibraryViewModel @Inject constructor(
             if (progressive) {
                 _uiState.value = LibraryUiState(
                     isLoading = false,
-                    title = "Anime",
+                    title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
                     coverflowItems = coverflowSource,
                     coverflowBadge = if (coverflowSource.isNotEmpty()) "Trending on AniList" else null,
                     sections = sections.toList(),
@@ -423,20 +423,20 @@ class LibraryViewModel @Inject constructor(
         val sectionsWithTheme = if (themed.size >= MIN_THEMED_ITEMS) listOf(HomeSection(theme.title, themed)) + sections else sections.toList()
 
         if (sectionsWithTheme.isEmpty() && coverflowSource.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = "Anime", emptyMessage = ANIME_EMPTY_MESSAGE)
+            _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"), emptyMessage = ANIME_EMPTY_MESSAGE)
             return@coroutineScope
         }
 
         val badge = if (coverflowSource.isNotEmpty()) "Trending on AniList" else null
         _uiState.value = LibraryUiState(
             isLoading = false,
-            title = "Anime",
+            title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
             sections = sectionsWithTheme,
         )
         val snapshot = LibrarySnapshot(
-            title = "Anime",
+            title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
             sections = sectionsWithTheme.map { it.toCachedRowDto() },

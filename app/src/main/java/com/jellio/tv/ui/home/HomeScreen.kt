@@ -166,11 +166,11 @@ fun HomeScreen(
         when {
             uiState.isLoading -> HomeSkeleton()
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "Something went wrong", color = JellioTextSecondary)
+                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("status_error"), color = JellioTextSecondary)
             }
             uiState.rows.isEmpty() && !uiState.loadingMore -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = "Nothing here yet.", color = JellioTextSecondary)
+                    Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
                 }
             }
             // Real gap real feedback caught live across several rounds:
@@ -375,7 +375,7 @@ private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onRese
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
                     Icon(imageVector = Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                    Text(text = "Reset")
+                    Text(text = com.jellio.tv.ui.i18n.string("home_reset_order"))
                 }
             }
         }
@@ -389,7 +389,7 @@ private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onRese
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
                 Icon(imageVector = Icons.Filled.Tune, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
-                Text(text = if (editMode) "Done" else "Customize")
+                Text(text = if (editMode) com.jellio.tv.ui.i18n.string("action_done") else com.jellio.tv.ui.i18n.string("home_customize"))
             }
         }
     }
@@ -458,8 +458,8 @@ private fun HomeRowEditorBar(
             modifier = Modifier.weight(1f),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            HomeRowEditorButton(icon = Icons.Filled.ArrowUpward, enabled = canMoveUp, onClick = onMoveUp, contentDescription = "Move row up")
-            HomeRowEditorButton(icon = Icons.Filled.ArrowDownward, enabled = canMoveDown, onClick = onMoveDown, contentDescription = "Move row down")
+            HomeRowEditorButton(icon = Icons.Filled.ArrowUpward, enabled = canMoveUp, onClick = onMoveUp, contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_up"))
+            HomeRowEditorButton(icon = Icons.Filled.ArrowDownward, enabled = canMoveDown, onClick = onMoveDown, contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_down"))
             HomeRowEditorButton(
                 icon = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                 enabled = true,

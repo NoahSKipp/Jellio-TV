@@ -145,13 +145,13 @@ fun JellioRoute.iconScale(): Float = when (this) {
 }
 
 fun JellioRoute.label(): String = when (this) {
-    is JellioRoute.Profile -> "Profile"
+    is JellioRoute.Profile -> com.jellio.tv.ui.i18n.Strings.get("nav_profile")
     JellioRoute.Home -> com.jellio.tv.ui.i18n.Strings.get("nav_home")
     JellioRoute.Search -> com.jellio.tv.ui.i18n.Strings.get("nav_search")
-    JellioRoute.Watchlist -> "Watchlist"
-    JellioRoute.Calendar -> "Calendar"
+    JellioRoute.Watchlist -> com.jellio.tv.ui.i18n.Strings.get("nav_watchlist")
+    JellioRoute.Calendar -> com.jellio.tv.ui.i18n.Strings.get("nav_calendar")
     JellioRoute.Library -> com.jellio.tv.ui.i18n.Strings.get("nav_library")
-    JellioRoute.Feed -> "Feed"
+    JellioRoute.Feed -> com.jellio.tv.ui.i18n.Strings.get("nav_feed")
     is JellioRoute.LibraryTab -> name
     JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""

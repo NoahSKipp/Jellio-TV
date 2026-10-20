@@ -143,7 +143,7 @@ fun AccountSwitcherOverlay(
                             ),
                             modifier = Modifier.focusRequester(viewProfileFocusRequester),
                         ) {
-                            Text(text = "View Profile", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                            Text(text = com.jellio.tv.ui.i18n.string("settings_view_profile"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
                             onClick = { onDismiss(); onOpenSettings() },
@@ -155,7 +155,7 @@ fun AccountSwitcherOverlay(
                                 focusedContentColor = JellioText,
                             ),
                         ) {
-                            Text(text = "Settings", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                            Text(text = com.jellio.tv.ui.i18n.string("nav_settings"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
                             onClick = { onDismiss(); onOpenGroupWatch() },
@@ -167,7 +167,7 @@ fun AccountSwitcherOverlay(
                                 focusedContentColor = JellioText,
                             ),
                         ) {
-                            Text(text = "Group Watch", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                            Text(text = com.jellio.tv.ui.i18n.string("nav_group_watch"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
                             onClick = { onDismiss(); onOpenNotifications() },
@@ -181,7 +181,7 @@ fun AccountSwitcherOverlay(
                         ) {
                             androidx.tv.material3.Icon(
                                 imageVector = Icons.Filled.Notifications,
-                                contentDescription = "Notifications",
+                                contentDescription = com.jellio.tv.ui.i18n.string("notifications_title"),
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).size(22.dp),
                             )
                         }
@@ -190,23 +190,23 @@ fun AccountSwitcherOverlay(
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = com.jellio.tv.ui.common.dangerButtonColors(),
                         ) {
-                            Text(text = "Sign Out", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                            Text(text = com.jellio.tv.ui.i18n.string("nav_log_out"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                     }
                 }
             }
 
             Text(
-                text = "Switch Profile",
+                text = com.jellio.tv.ui.i18n.string("nav_switch_account"),
                 style = MaterialTheme.typography.titleMedium,
                 color = JellioTextSecondary,
                 modifier = Modifier.padding(top = 28.dp, bottom = 12.dp),
             )
 
             if (uiState.isLoading) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary)
             } else if (uiState.remembered.isEmpty() && uiState.publicOnly.isEmpty()) {
-                Text(text = "No other profiles on this server.", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("account_no_other_profiles"), color = JellioTextSecondary)
             } else {
                 // Real bug found live, on a real screenshot: this grid
                 // had no real weight of its own inside this real Column,
@@ -244,7 +244,7 @@ fun AccountSwitcherOverlay(
                         )
                     }
                     item(key = "add") {
-                        SwitcherTile(name = "Other user", imageUrl = null, busy = false, onClick = onSignOut, isAddTile = true)
+                        SwitcherTile(name = com.jellio.tv.ui.i18n.string("auth_other_user"), imageUrl = null, busy = false, onClick = onSignOut, isAddTile = true)
                     }
                 }
             }

@@ -121,7 +121,7 @@ fun AnnouncementToast(modifier: Modifier = Modifier, viewModel: AnnouncementView
     ) {
         Icon(imageVector = Icons.Filled.Campaign, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(28.dp))
         Column(modifier = Modifier.padding(start = 14.dp)) {
-            Text(text = "From the server", color = JellioTextSecondary, style = MaterialTheme.typography.labelMedium)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("announcements_from_server"), color = JellioTextSecondary, style = MaterialTheme.typography.labelMedium)
             if (announcement.imageUrl != null) {
                 // Shown shrunk to fit, never full size.
                 coil3.compose.AsyncImage(

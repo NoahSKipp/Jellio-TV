@@ -91,7 +91,7 @@ fun SearchScreen(
             .fillMaxSize()
             .padding(top = 32.dp, start = 48.dp, end = 48.dp),
     ) {
-        Text(text = "Search", style = MaterialTheme.typography.titleLarge)
+        Text(text = com.jellio.tv.ui.i18n.string("nav_search"), style = MaterialTheme.typography.titleLarge)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -100,14 +100,14 @@ fun SearchScreen(
             JellioTextField(
                 value = uiState.query,
                 onValueChange = { viewModel.onQueryChange(session, it) },
-                label = "Search movies and shows",
+                label = com.jellio.tv.ui.i18n.string("search_placeholder"),
                 modifier = Modifier.width(480.dp),
             )
             Surface(
                 onClick = {
                     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak a title to search...")
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, com.jellio.tv.ui.i18n.Strings.get("search_voice_prompt"))
                     }
                     speechLauncher.launch(intent)
                 },
@@ -122,7 +122,7 @@ fun SearchScreen(
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(
                         imageVector = Icons.Filled.Mic,
-                        contentDescription = "Voice search",
+                        contentDescription = com.jellio.tv.ui.i18n.string("search_voice_btn"),
                         tint = JellioText,
                         modifier = Modifier.size(24.dp),
                     )
@@ -186,7 +186,7 @@ fun SearchScreen(
                 Text(text = uiState.error ?: "", color = JellioTextSecondary)
             }
             uiState.hasSearched -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "No results for \"${uiState.query}\"", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.formatString("search_no_results_for", uiState.query), color = JellioTextSecondary)
             }
         }
     }

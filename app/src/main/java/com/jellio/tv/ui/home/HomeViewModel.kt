@@ -110,22 +110,22 @@ private data class SeasonalSpec(
 // Maps active theme to its seasonal title, genres, and holiday terms.
 private val SEASONS_SPEC = mapOf(
     "halloween" to SeasonalSpec(
-        title = "Spooky Season",
+        title = com.jellio.tv.ui.i18n.Strings.get("seasons_halloween"),
         genres = listOf("Horror", "Mystery"),
         searchTerms = listOf("Halloween", "Spooky", "Ghost", "Haunted", "Witch", "Vampire", "Zombie"),
     ),
     "christmas" to SeasonalSpec(
-        title = "Holiday Favorites",
+        title = com.jellio.tv.ui.i18n.Strings.get("seasons_christmas"),
         genres = listOf("Holiday", "Christmas", "Family"),
         searchTerms = listOf("Christmas", "Holiday", "Santa", "Noel", "Xmas"),
     ),
     "newyear" to SeasonalSpec(
-        title = "New Year Celebrations",
+        title = com.jellio.tv.ui.i18n.Strings.get("seasons_newyear"),
         genres = listOf("Comedy", "Music", "Musical"),
         searchTerms = listOf("New Year", "Countdown", "Celebration", "Party"),
     ),
     "valentine" to SeasonalSpec(
-        title = "Romance & Date Night",
+        title = com.jellio.tv.ui.i18n.Strings.get("seasons_valentine"),
         genres = listOf("Romance"),
         searchTerms = listOf("Valentine", "Love", "Romance", "Romantic"),
     ),
@@ -256,10 +256,10 @@ class HomeViewModel @Inject constructor(
                             greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name),
                             rows = buildList {
                                 if (continueWatching.isNotEmpty()) {
-                                    add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
+                                    add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
                                 }
                                 if (upNext.isNotEmpty()) {
-                                    add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
+                                    add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_next_up"), upNext, key = "up-next"), landscape = true))
                                 }
                             },
                             customization = customization,
@@ -299,10 +299,10 @@ class HomeViewModel @Inject constructor(
                         val watchlistMovies = watchlist.filter { it.Type == "Movie" }
                         val watchlistSeries = watchlist.filter { it.Type == "Series" }
                         if (watchlistMovies.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Watchlist Movies", watchlistMovies, key = "watchlist-movies")))
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_movies"), watchlistMovies, key = "watchlist-movies")))
                         }
                         if (watchlistSeries.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Watchlist Shows", watchlistSeries, key = "watchlist-shows")))
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_shows"), watchlistSeries, key = "watchlist-shows")))
                         }
                         if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
@@ -360,7 +360,8 @@ class HomeViewModel @Inject constructor(
 
                     fun assembled(): List<HomeRow> = buildList {
                         addAll(topRows)
-                        val (topPicks, perTitle) = recommendationRows.partition { it.title == "Top Picks for You" }
+                        val topPicksTitle = com.jellio.tv.ui.i18n.Strings.get("home_top_picks")
+                        val (topPicks, perTitle) = recommendationRows.partition { it.title == topPicksTitle }
                         topPicks.forEach { add(PosterHomeRow(it)) }
                         seasonalSection?.let { add(PosterHomeRow(it)) }
                         communitySection?.let { add(PosterHomeRow(it)) }
@@ -390,7 +391,7 @@ class HomeViewModel @Inject constructor(
                             val eligible = raw.distinctBy { it.Id }
                             if (eligible.isEmpty()) return@launch
                             communitySection = HomeSection(
-                                title = "What Others Are Watching",
+                                title = com.jellio.tv.ui.i18n.Strings.get("home_community_watching"),
                                 items = eligible.take(24),
                                 key = "rec:What Others Are Watching",
                             )
@@ -401,7 +402,7 @@ class HomeViewModel @Inject constructor(
                     val recommendationJob = async {
                         val recs = runCatching { buildRecommendationRows(recommendationSource, exclude) }.getOrDefault(emptyList())
                         recommendationRows = recs.map { it.copy(key = "rec:${it.title}") }
-                        val picks = (recs.firstOrNull { it.title == "Top Picks for You" } ?: recs.firstOrNull())?.items
+                        val picks = (recs.firstOrNull { it.title == com.jellio.tv.ui.i18n.Strings.get("home_top_picks") } ?: recs.firstOrNull())?.items
                         if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
                         publish()
                     }

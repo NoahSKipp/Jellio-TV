@@ -76,7 +76,7 @@ private fun kindLabel(entry: CalendarEntryDto): String =
     if (entry.Kind == "episode") {
         if (!entry.Detail.isNullOrEmpty()) "New episode · ${entry.Detail}" else "New episode"
     } else {
-        "Digital release"
+        com.jellio.tv.ui.i18n.Strings.get("calendar_digital_release")
     }
 
 @Composable
@@ -94,10 +94,10 @@ fun CalendarScreen(
     Box(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Loading...", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "Could not load the calendar", color = JellioTextSecondary)
+                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("calendar_load_error"), color = JellioTextSecondary)
             }
             uiState.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(

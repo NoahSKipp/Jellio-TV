@@ -143,7 +143,7 @@ fun AvatarPickerOverlay(
                 .padding(32.dp)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = {}),
         ) {
-            Text(text = "Choose an avatar", color = JellioText, style = MaterialTheme.typography.titleLarge)
+            Text(text = com.jellio.tv.ui.i18n.string("avatar_choose"), color = JellioText, style = MaterialTheme.typography.titleLarge)
             status?.let {
                 Text(text = it, color = JellioTextSecondary, modifier = Modifier.padding(top = 8.dp))
             }
@@ -242,8 +242,8 @@ private fun AvatarUploadTile(busy: Boolean, onClick: () -> Unit, focusRequester:
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(imageVector = Icons.Filled.AddAPhoto, contentDescription = "Upload your own picture or gif", tint = JellioText)
-            Text(text = "Upload", color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+            Icon(imageVector = Icons.Filled.AddAPhoto, contentDescription = com.jellio.tv.ui.i18n.Strings.get("avatar_upload_prompt"), tint = JellioText)
+            Text(text = com.jellio.tv.ui.i18n.string("avatar_upload_btn"), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

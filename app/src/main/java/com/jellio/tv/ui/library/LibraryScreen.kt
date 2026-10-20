@@ -99,7 +99,7 @@ fun LibraryScreen(
 
         val featuredRow = remember(uiState.coverflowItems, uiState.coverflowBadge, uiState.editorial) {
             uiState.coverflowItems.takeIf { it.isNotEmpty() }?.let { items ->
-                HomeSection(uiState.coverflowBadge ?: uiState.editorial?.tagline ?: "Featured", items)
+                HomeSection(uiState.coverflowBadge ?: uiState.editorial?.tagline ?: com.jellio.tv.ui.i18n.Strings.get("library_featured"), items)
             }
         }
 
@@ -108,14 +108,14 @@ fun LibraryScreen(
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
                     ScreenSpinner()
-                    Text(text = "Loading...", color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
+                    Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
                 }
             }
             uiState.emptyMessage != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.emptyMessage ?: "", color = JellioTextSecondary)
             }
             uiState.sections.all { it.items.isEmpty() } && (uiState.mainRow?.items?.isEmpty() != false) && featuredRow == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nothing here yet.", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
             }
             else -> {
                 val screenHeight = LocalConfiguration.current.screenHeightDp.dp
@@ -216,8 +216,8 @@ fun LibraryScreen(
         openFilterField?.let { target ->
             when (target) {
                 LibraryFilterFieldTarget.Sort -> LibraryFilterFieldOverlay(
-                    title = "Sort by",
-                    options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(it.label, it.value) },
+                    title = com.jellio.tv.ui.i18n.string("library_sort_by"),
+                    options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(com.jellio.tv.ui.i18n.Strings.get(it.key), it.value) },
                     selectedValue = uiState.selectedSort,
                     onSelect = { value ->
                         sortFieldFocusRequester.requestFocus()
@@ -230,8 +230,8 @@ fun LibraryScreen(
                     },
                 )
                 LibraryFilterFieldTarget.Genre -> LibraryFilterFieldOverlay(
-                    title = "Genre",
-                    options = listOf(LibraryFilterOption("All genres", null)) +
+                    title = com.jellio.tv.ui.i18n.string("library_filter_genre"),
+                    options = listOf(LibraryFilterOption(com.jellio.tv.ui.i18n.Strings.get("library_all_genres"), null)) +
                         uiState.genreOptions.map { LibraryFilterOption(it, it) },
                     selectedValue = uiState.selectedGenre,
                     onSelect = { value ->
@@ -309,8 +309,8 @@ private fun LibraryFilterFields(
     sortFieldFocusRequester: FocusRequester,
     genreFieldFocusRequester: FocusRequester,
 ) {
-    val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.label ?: "Sort"
-    val genreLabel = selectedGenre ?: "All genres"
+    val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort")
+    val genreLabel = selectedGenre ?: com.jellio.tv.ui.i18n.Strings.get("library_all_genres")
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(bottom = 12.dp),

@@ -65,7 +65,7 @@ fun UpdateToast(
                 .padding(24.dp)
                 .focusProperties { onExit = { FocusRequester.Cancel } },
         ) {
-            Text(text = "Update available", style = MaterialTheme.typography.titleMedium, color = JellioText)
+            Text(text = com.jellio.tv.ui.i18n.string("update_available_title"), style = MaterialTheme.typography.titleMedium, color = JellioText)
             Text(
                 text = "Jellio TV $version is ready to download.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -79,7 +79,7 @@ fun UpdateToast(
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText),
                 ) {
-                    Text(text = "Cancel", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.string("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onDownload,

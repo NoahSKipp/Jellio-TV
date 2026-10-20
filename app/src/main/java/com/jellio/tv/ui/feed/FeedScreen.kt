@@ -99,19 +99,19 @@ fun FeedScreen(
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: "Could not load the activity feed", color = JellioTextSecondary)
+                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("feed_load_error"), color = JellioTextSecondary)
                     Surface(
                         onClick = { viewModel.retry() },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                         modifier = Modifier.padding(top = 20.dp),
                     ) {
-                        Text(text = "Retry", modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
                     }
                 }
             }
             uiState.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "Nothing here yet.", color = JellioTextSecondary)
+                Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
             }
             else -> {
                 val counts = remember(uiState.entries) { uiState.entries.groupingBy(::feedType).eachCount() }
@@ -179,10 +179,10 @@ private fun groupByDay(entries: List<FeedEntryDto>): List<FeedGroup> {
         val day = runCatching { Instant.parse(entry.OccurredAtUtc).atZone(zone).toLocalDate() }.getOrNull() ?: return "Earlier"
         val daysAgo = ChronoUnit.DAYS.between(day, today)
         return when {
-            daysAgo <= 0L -> "Today"
-            daysAgo == 1L -> "Yesterday"
+            daysAgo <= 0L -> com.jellio.tv.ui.i18n.Strings.get("calendar_today")
+            daysAgo == 1L -> com.jellio.tv.ui.i18n.Strings.get("time_yesterday")
             daysAgo < 7L -> "This week"
-            else -> "Earlier"
+            else -> com.jellio.tv.ui.i18n.Strings.get("time_earlier")
         }
     }
     return entries.groupBy(::label).map { (label, list) -> FeedGroup(label, list) }

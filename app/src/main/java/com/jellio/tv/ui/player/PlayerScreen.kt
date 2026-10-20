@@ -375,7 +375,7 @@ private fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 8.dp),
             )
-            EndScreenButton(label = "Stop", onClick = onStop, modifier = Modifier.padding(top = 20.dp).focusRequester(stopFocus))
+            EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("action_stop"), onClick = onStop, modifier = Modifier.padding(top = 20.dp).focusRequester(stopFocus))
         }
     }
 }
@@ -1431,7 +1431,7 @@ private fun PlayerSurface(
                     showSleepMenu = false
                     if (sleepTimerEndTimeMs != null) onCancelSleepTimer()
                     EpisodeSleepTimer.remaining = count
-                    onShowToast(if (count == 1) "Stopping after this episode" else "Stopping after $count episodes")
+                    onShowToast(if (count == 1) com.jellio.tv.ui.i18n.Strings.get("player_this_episode") else com.jellio.tv.ui.i18n.Strings.format("player_stop_episodes", count))
                 },
                 onCancel = {
                     showSleepMenu = false
@@ -1587,15 +1587,15 @@ private fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.Center),
         ) {
-            TransportButton(icon = Icons.Filled.Replay10, label = "Back 10 seconds", size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
+            TransportButton(icon = Icons.Filled.Replay10, label = com.jellio.tv.ui.i18n.Strings.get("player_back_10s"), size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
             TransportButton(
                 icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                label = if (isPlaying) "Pause" else "Play",
+                label = if (isPlaying) com.jellio.tv.ui.i18n.Strings.get("action_pause") else com.jellio.tv.ui.i18n.Strings.get("action_play"),
                 size = 96.dp,
                 onClick = onPlayPause,
                 modifier = Modifier.focusRequester(playPauseFocusRequester),
             )
-            TransportButton(icon = Icons.Filled.Forward10, label = "Forward 10 seconds", size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
+            TransportButton(icon = Icons.Filled.Forward10, label = com.jellio.tv.ui.i18n.Strings.get("player_forward_10s"), size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
         }
 
         Column(
@@ -1674,7 +1674,7 @@ private fun PlayerControls(
                     ) {
                         PlayerPillButton(icon = Icons.Filled.Speed, label = speedLabel, onClick = onOpenSpeedMenu)
                         if (hasSubtitleTracks) {
-                            PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = "Subtitles", onClick = onOpenSubtitleMenu)
+                            PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_track"), onClick = onOpenSubtitleMenu)
                         }
                         // Real port of the pill's own audioButton: disabled
                         // (rebuildAudioMenu()'s own early return) whenever this
@@ -1682,7 +1682,7 @@ private fun PlayerControls(
                         // condition hasAudioTracks already checks before this
                         // button even renders.
                         if (hasAudioTracks) {
-                            PlayerPillButton(icon = Icons.Filled.GraphicEq, label = "Audio", onClick = onOpenAudioMenu)
+                            PlayerPillButton(icon = Icons.Filled.GraphicEq, label = com.jellio.tv.ui.i18n.Strings.get("player_audio_track"), onClick = onOpenAudioMenu)
                         }
                         // Real port of the pill's own sourceButton: disabled
                         // (sourceButton.disabled) until getMediaSources(itemId)
@@ -1690,7 +1690,7 @@ private fun PlayerControls(
                         // condition hasSourceOptions already checks before this
                         // button even renders.
                         if (hasSourceOptions) {
-                            PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = "Sources", onClick = onOpenSourceMenu)
+                            PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = com.jellio.tv.ui.i18n.Strings.get("detail_streams"), onClick = onOpenSourceMenu)
                         }
                         // Real port of the pill's own episodesButton: disabled
                         // (episodesButton.disabled) until getSeasons(item.SeriesId)
@@ -1700,7 +1700,7 @@ private fun PlayerControls(
                         // this file's own isEpisodeItem && item.SeriesId check
                         // applies before that fetch ever fires.
                         if (hasEpisodes) {
-                            PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = "Episodes", onClick = onOpenEpisodesMenu)
+                            PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = com.jellio.tv.ui.i18n.Strings.get("detail_episodes"), onClick = onOpenEpisodesMenu)
                         }
                         // Real port of the pill's own sleepButton: no live
                         // countdown label the way that file's own button never
@@ -1709,12 +1709,12 @@ private fun PlayerControls(
                         // off, ported here as the same real active tint.
                         PlayerPillButton(
                             icon = Icons.Filled.Bedtime,
-                            label = "Sleep",
+                            label = com.jellio.tv.ui.i18n.Strings.get("settings_sleep_timer"),
                             active = sleepTimerActive,
                             onClick = onOpenSleepMenu,
                         )
                         if (inGroup) {
-                            PlayerPillButton(icon = Icons.Filled.EmojiEmotions, label = "React", onClick = onOpenReactMenu)
+                            PlayerPillButton(icon = Icons.Filled.EmojiEmotions, label = com.jellio.tv.ui.i18n.Strings.get("player_react"), onClick = onOpenReactMenu)
                         }
                     }
                 }
@@ -1965,7 +1965,7 @@ private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) 
                 .padding(start = 48.dp, end = 96.dp, bottom = 72.dp)
                 .widthIn(max = 720.dp),
         ) {
-            Text(text = "You're watching", color = JellioTextSecondary, fontSize = 17.sp)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_youre_watching"), color = JellioTextSecondary, fontSize = 17.sp)
             Spacer(modifier = Modifier.height(10.dp))
             var logoFailed by remember(info.logoUrl) { mutableStateOf(false) }
             if (info.logoUrl != null && !logoFailed) {
@@ -2072,7 +2072,7 @@ private fun UpNextOverlay(
             )
         }
         Column(modifier = Modifier.padding(start = 16.dp)) {
-            Text(text = "Next Episode", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_next_episode"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
             Text(
                 text = info.title,
                 color = JellioText,
@@ -2093,7 +2093,7 @@ private fun UpNextOverlay(
                     ),
                     modifier = Modifier.focusRequester(playFocus),
                 ) {
-                    Text(text = "Play now ($secondsRemaining)", maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.format("player_play_now_countdown", secondsRemaining), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onDismiss,
@@ -2111,7 +2111,7 @@ private fun UpNextOverlay(
                         )
                     ),
                 ) {
-                    Text(text = "Dismiss", maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("notifications_dismiss"), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
             }
         }
@@ -2149,7 +2149,7 @@ private fun EndScreen(
             modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 900.dp),
         ) {
             if (next != null) {
-                Text(text = "Up next", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("player_up_next"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
                 next.seriesName?.let {
                     Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
                 }
@@ -2170,7 +2170,7 @@ private fun EndScreen(
                     }
                 }
             } else {
-                Text(text = "Finished", color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("action_done"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
                 Text(text = finishedTitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
                 if (finishedSubtitle.isNotEmpty()) {
                     Text(text = finishedSubtitle, color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
@@ -2179,16 +2179,16 @@ private fun EndScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 28.dp)) {
                 if (next != null) {
                     EndScreenButton(
-                        label = if (countdown != null && countdown > 0) "Play next episode ($countdown)" else "Play next episode",
+                        label = if (countdown != null && countdown > 0) com.jellio.tv.ui.i18n.Strings.format("player_play_next_episode_countdown", countdown) else com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
                         primary = true,
                         onClick = onPlayNext,
                         modifier = Modifier.focusRequester(firstFocus),
                     )
-                    EndScreenButton(label = "Replay", onClick = onReplay)
-                    EndScreenButton(label = "Back to show", onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), onClick = onReplay)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), onClick = onBack)
                 } else {
-                    EndScreenButton(label = "Replay", primary = true, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
-                    EndScreenButton(label = "Back", onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), onClick = onBack)
                 }
             }
         }
@@ -2260,9 +2260,9 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
             modifier = Modifier.background(JellioBgElevated, RoundedCornerShape(16.dp)).padding(horizontal = 32.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = "Resume playback?", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_resume_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             if (percent != null) {
-                Text(text = "$percent% watched", color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+                Text(text = com.jellio.tv.ui.i18n.Strings.format("player_percent_watched", percent ?: 0), color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
             Row(modifier = Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
@@ -2277,7 +2277,7 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                     ),
                     modifier = Modifier.focusRequester(resumeFocusRequester),
                 ) {
-                    Text(text = "Resume", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_resume"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
                 Surface(
                     onClick = onRestart,
@@ -2295,7 +2295,7 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
                         )
                     ),
                 ) {
-                    Text(text = "Start Over", modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_start_over"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
             }
         }
@@ -2461,7 +2461,7 @@ private fun SleepMenu(
             LazyColumn {
                 item {
                     SubtitleMenuRow(
-                        label = "Cancel timer",
+                        label = com.jellio.tv.ui.i18n.Strings.get("settings_sleep_timer_cancel"),
                         isSelected = false,
                         onClick = {
                             onCancel()
@@ -2470,10 +2470,10 @@ private fun SleepMenu(
                         modifier = Modifier.focusRequester(firstItemFocusRequester),
                     )
                 }
-                item { SleepMenuHeading(if (minutesActive) "Stop after (running)" else "Stop after") }
+                item { SleepMenuHeading(if (minutesActive) com.jellio.tv.ui.i18n.Strings.get("player_stop_after") + " (" + com.jellio.tv.ui.i18n.Strings.get("state_on") + ")" else com.jellio.tv.ui.i18n.Strings.get("player_stop_after")) }
                 items(SLEEP_TIMER_OPTIONS) { minutes ->
                     SubtitleMenuRow(
-                        label = "$minutes min",
+                        label = com.jellio.tv.ui.i18n.Strings.format("player_minutes_short", minutes),
                         isSelected = false,
                         onClick = {
                             onSelect(minutes)
@@ -2481,10 +2481,10 @@ private fun SleepMenu(
                         },
                     )
                 }
-                item { SleepMenuHeading("Or stop after") }
+                item { SleepMenuHeading(com.jellio.tv.ui.i18n.Strings.get("player_or_stop_after")) }
                 items(EPISODE_SLEEP_TIMER_OPTIONS) { count ->
                     SubtitleMenuRow(
-                        label = if (count == 1) "This episode" else "$count episodes",
+                        label = if (count == 1) com.jellio.tv.ui.i18n.Strings.get("player_this_episode") else com.jellio.tv.ui.i18n.Strings.format("player_stop_episodes", count),
                         isSelected = activeEpisodes == count,
                         onClick = {
                             onSelectEpisodes(count)
@@ -2675,7 +2675,7 @@ private fun AudioMenu(
                 )
             }
             SubtitleMenuRow(
-                label = "Dialogue Boost: " + if (PlayerPrefs.dialogueBoost) "On" else "Off",
+                label = com.jellio.tv.ui.i18n.Strings.format("player_dialogue_boost", if (PlayerPrefs.dialogueBoost) com.jellio.tv.ui.i18n.Strings.get("state_on") else com.jellio.tv.ui.i18n.Strings.get("state_off")),
                 isSelected = PlayerPrefs.dialogueBoost,
                 onClick = onToggleDialogueBoost,
             )
@@ -2742,7 +2742,7 @@ private fun SourcePanel(
                 .background(JellioBgElevated)
                 .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
-            Text(text = "Sources", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("detail_streams"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 4.dp),
@@ -2750,7 +2750,7 @@ private fun SourcePanel(
                 if (showLanguages) {
                     item(key = "languages") {
                         FilterChipRow(
-                            chips = listOf<Pair<String?, String>>(null to "All") + languages.map { it to languageName(it) },
+                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + languages.map { it to languageName(it) },
                             selected = selectedLanguage,
                             onSelect = { selectedLanguage = it },
                             chipFocusRequesters = languageFocus,
@@ -2841,7 +2841,7 @@ private fun EpisodesPanel(
                 .background(JellioBgElevated)
                 .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
-            Text(text = "Episodes", color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("detail_episodes"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyRow(
                 state = seasonRowState,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2999,7 +2999,7 @@ private fun SubtitleMenu(
             LazyColumn {
                 item {
                     SubtitleMenuRow(
-                        label = "Off",
+                        label = com.jellio.tv.ui.i18n.Strings.get("state_off"),
                         isSelected = selectedIndex == null,
                         onClick = { onSelect(null) },
                         modifier = Modifier.focusRequester(firstFocusRequester),
@@ -3014,16 +3014,16 @@ private fun SubtitleMenu(
                 // buildStyleGroup() twice over, Size then Background.
                 item {
                     SubtitleStyleGroup(
-                        label = "Size",
-                        options = SUBTITLE_SIZES.map { it.value to it.label },
+                        label = com.jellio.tv.ui.i18n.string("player_subtitle_size"),
+                        options = SUBTITLE_SIZES.map { it.value to com.jellio.tv.ui.i18n.Strings.get("subtitle_size_" + it.value) },
                         selected = subtitleStyle.size,
                         onSelect = onSetSubtitleSize,
                     )
                 }
                 item {
                     SubtitleStyleGroup(
-                        label = "Background",
-                        options = SUBTITLE_BACKGROUNDS.map { it.value to it.label },
+                        label = com.jellio.tv.ui.i18n.string("player_subtitle_bg"),
+                        options = SUBTITLE_BACKGROUNDS.map { it.value to com.jellio.tv.ui.i18n.Strings.get("subtitle_bg_" + it.value) },
                         selected = subtitleStyle.background,
                         onSelect = onSetSubtitleBackground,
                     )

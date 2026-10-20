@@ -728,7 +728,7 @@ private fun PlaybackPreferenceRow(
                 .then(if (bottomFocusTarget != null) Modifier.focusProperties { down = bottomFocusTarget } else Modifier),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(imageVector = Icons.Filled.HelpOutline, contentDescription = "Help", modifier = Modifier.size(22.dp))
+                Icon(imageVector = Icons.Filled.HelpOutline, contentDescription = com.jellio.tv.ui.i18n.string("onboarding_help"), modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -821,7 +821,7 @@ private fun StepOverscanContent(
                 },
             ) {
                 Text(
-                    text = "- Less Inset",
+                    text = com.jellio.tv.ui.i18n.string("onboarding_overscan_less"),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp),
@@ -849,7 +849,7 @@ private fun StepOverscanContent(
                     },
             ) {
                 Text(
-                    text = "+ More Inset",
+                    text = com.jellio.tv.ui.i18n.string("onboarding_overscan_more"),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp),
@@ -1033,7 +1033,7 @@ private fun TvLanguagePickerModal(
                         }
                         items(LANGUAGE_OPTIONS) { option: LanguageOption ->
                             LanguagePickerItem(
-                                label = option.name,
+                                label = com.jellio.tv.data.model.languageName(option.code),
                                 isSelected = selectedCode == option.code,
                                 onClick = { onSelect(option.code) },
                             )
