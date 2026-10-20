@@ -670,9 +670,7 @@ private fun WatchersBadge(
     val overflow = watchers.size - displayWatchers.size
 
     Row(
-        modifier = modifier
-            .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 4.dp, vertical = 3.dp),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy((-6).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -684,9 +682,9 @@ private fun WatchersBadge(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(22.dp)
                     .clip(CircleShape)
-                    .border(1.5.dp, JellioBg, CircleShape)
+                    .border(1.5.dp, Color(0xFF141414), CircleShape)
                     .background(JellioSecondary),
             ) {
                 if (avatarUrl != null) {
@@ -702,7 +700,7 @@ private fun WatchersBadge(
                         text = initial,
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                         ),
                     )
@@ -713,16 +711,16 @@ private fun WatchersBadge(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(22.dp)
                     .clip(CircleShape)
-                    .border(1.5.dp, JellioBg, CircleShape)
+                    .border(1.5.dp, Color(0xFF141414), CircleShape)
                     .background(Color.White.copy(alpha = 0.2f)),
             ) {
                 Text(
                     text = "+$overflow",
                     color = JellioText,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 8.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                     ),
                 )

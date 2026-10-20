@@ -26,7 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -65,7 +68,7 @@ fun HomeItemShowcase(
     imageUrl: (BaseItemDto, String, Int) -> String,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxWidth().background(JellioBg)) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().background(JellioBg).clipToBounds()) {
         if (item == null) return@BoxWithConstraints
         val details = info?.item?.takeIf { it.Id == item.Id } ?: item
         val series = info?.series?.takeIf { info.item.Id == item.Id }
@@ -135,27 +138,39 @@ private fun ShowcaseBackdrop(
     val url = candidates.getOrNull(index) ?: return
     val context = LocalContext.current
     BoxWithConstraints(
-        modifier = modifier.drawWithCache {
-            val sideFade = Brush.horizontalGradient(
-                0f to JellioBg,
-                0.18f to JellioBg.copy(alpha = 0.9f),
-                0.42f to JellioBg.copy(alpha = 0.55f),
-                0.68f to JellioBg.copy(alpha = 0.15f),
-                1f to Color.Transparent,
-                endX = size.width * 0.7f,
-            )
-            val bottomFade = Brush.verticalGradient(
-                0f to Color.Transparent,
-                0.55f to Color.Transparent,
-                0.8f to JellioBg.copy(alpha = 0.7f),
-                1f to JellioBg,
-            )
-            onDrawWithContent {
-                drawContent()
-                drawRect(sideFade)
-                drawRect(bottomFade)
-            }
-        },
+        modifier = modifier
+            .clipToBounds()
+            .drawWithCache {
+                val sideFade = Brush.horizontalGradient(
+                    0f to JellioBg,
+                    0.18f to JellioBg.copy(alpha = 0.9f),
+                    0.42f to JellioBg.copy(alpha = 0.55f),
+                    0.68f to JellioBg.copy(alpha = 0.15f),
+                    1f to Color.Transparent,
+                    endX = size.width * 0.7f,
+                )
+                // Mirrors Jellio Web .jellio-detail-hero multi-stop gradient:
+                // gradual ramp that reaches solid JellioBg comfortably before
+                // the bottom edge rather than exactly at 1.0f, eliminating any
+                // bright pixel seam or hard cutoff along the bottom.
+                val bottomFade = Brush.verticalGradient(
+                    0f to JellioBg.copy(alpha = 0.05f),
+                    0.35f to JellioBg.copy(alpha = 0.25f),
+                    0.55f to JellioBg.copy(alpha = 0.55f),
+                    0.75f to JellioBg.copy(alpha = 0.85f),
+                    0.90f to JellioBg,
+                    1f to JellioBg,
+                )
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(sideFade)
+                    drawRect(
+                        brush = bottomFade,
+                        topLeft = Offset.Zero,
+                        size = Size(size.width, size.height + 8f),
+                    )
+                }
+            },
     ) {
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
@@ -174,7 +189,7 @@ private fun ShowcaseBackdrop(
             contentScale = ContentScale.Crop,
             alignment = Alignment.TopCenter,
             onError = { index += 1 },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().clipToBounds(),
         )
     }
 }
