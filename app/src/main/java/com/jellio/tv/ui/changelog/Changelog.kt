@@ -98,6 +98,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.54.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.54.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Setup Wizard Layout Fixed", "Optimized onboarding modal dimensions and spacing for TV screens so Next and Finish buttons are always clearly visible and never cut off."),
+            ChangelogFeature(Icons.Filled.Palette, "Language Grid Alignment", "Portuguese and single odd-numbered languages now align in a balanced column instead of stretching across the screen."),
+            ChangelogFeature(Icons.Filled.Info, "Localization Fixes", "Corrected step counter formatting and TV-specific text for French, Italian, and Portuguese."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.54.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.54.0",

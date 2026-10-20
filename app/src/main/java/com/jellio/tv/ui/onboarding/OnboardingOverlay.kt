@@ -216,11 +216,11 @@ fun OnboardingOverlay(
             // Main Card container
             Column(
                 modifier = Modifier
-                    .widthIn(max = 680.dp)
+                    .widthIn(max = 720.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .background(JellioBgElevated)
                     .border(1.dp, JellioBorder, RoundedCornerShape(24.dp))
-                    .padding(32.dp),
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
             ) {
                 // Header: Logo Mark, Step Counter, and Skip button
                 Row(
@@ -235,7 +235,7 @@ fun OnboardingOverlay(
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     Brush.linearGradient(listOf(JellioRarityRare, JellioSecondary))
@@ -245,7 +245,7 @@ fun OnboardingOverlay(
                                 imageVector = Icons.Filled.Tv,
                                 contentDescription = null,
                                 tint = Color.Black,
-                                modifier = Modifier.size(22.dp),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                         Column {
@@ -279,13 +279,13 @@ fun OnboardingOverlay(
                     ) {
                         Text(
                             text = string("onboarding_skip"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Pill Progress Bar
                 Row(
@@ -297,17 +297,17 @@ fun OnboardingOverlay(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(4.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(999.dp))
                                 .background(if (isActive) JellioSecondary else Color.White.copy(alpha = 0.15f)),
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(26.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Step Body
-                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 280.dp)) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     when (currentStep) {
                         OnboardingStep.LANGUAGE -> {
                             StepLanguageContent(
@@ -351,7 +351,7 @@ fun OnboardingOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Footer Buttons
                 Row(
@@ -378,7 +378,7 @@ fun OnboardingOverlay(
                             Text(
                                 text = string("onboarding_back"),
                                 style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                             )
                         }
                     } else {
@@ -414,9 +414,9 @@ fun OnboardingOverlay(
                     ) {
                         Text(
                             text = if (isLastStep) string("onboarding_finish") else string("onboarding_next"),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 11.dp),
+                            modifier = Modifier.padding(horizontal = 26.dp, vertical = 8.dp),
                         )
                     }
                 }
@@ -467,24 +467,24 @@ private fun StepLanguageContent(
             text = string("onboarding_welcome_sub"),
             style = MaterialTheme.typography.bodyMedium,
             color = JellioTextSecondary,
-            modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
         )
 
         val languages = AppLanguage.entries
         Column(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             languages.chunked(2).forEach { rowPair ->
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     rowPair.forEach { lang ->
                         val isSelected = lang == selectedLang
                         Surface(
                             onClick = { onSelectLang(lang) },
-                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(14.dp)),
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
                             colors = ClickableSurfaceDefaults.colors(
                                 containerColor = if (isSelected) JellioSecondary.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f),
                                 contentColor = JellioText,
@@ -505,13 +505,13 @@ private fun StepLanguageContent(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                             ) {
                                 Box(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(30.dp)
                                         .clip(CircleShape)
                                         .background(if (isSelected) JellioSecondary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f)),
                                 ) {
@@ -519,13 +519,13 @@ private fun StepLanguageContent(
                                         imageVector = Icons.Filled.Translate,
                                         contentDescription = null,
                                         tint = if (isSelected) JellioSecondary else JellioText,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(16.dp),
                                     )
                                 }
                                 Column {
                                     Text(
                                         text = lang.nativeName,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = JellioText,
                                     )
@@ -537,6 +537,9 @@ private fun StepLanguageContent(
                                 }
                             }
                         }
+                    }
+                    if (rowPair.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -565,14 +568,14 @@ private fun StepPlaybackContent(
             color = JellioText,
         )
         Text(
-            text = string("settings_display_language_desc"),
+            text = string("onboarding_playback_sub"),
             style = MaterialTheme.typography.bodyMedium,
             color = JellioTextSecondary,
-            modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
         )
 
         Column(
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             PlaybackPreferenceRow(
@@ -630,7 +633,7 @@ private fun PlaybackPreferenceRow(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -638,7 +641,7 @@ private fun PlaybackPreferenceRow(
                 ) {
                     Icon(imageVector = icon, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(22.dp))
                     Column {
-                        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = JellioTextSecondary)
+                        Text(text = label, style = MaterialTheme.typography.bodySmall, color = JellioTextSecondary)
                         Text(text = currentValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = JellioText)
                     }
                 }
@@ -660,7 +663,7 @@ private fun PlaybackPreferenceRow(
                 focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-            modifier = Modifier.size(54.dp),
+            modifier = Modifier.size(46.dp),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(imageVector = Icons.Filled.HelpOutline, contentDescription = "Help", modifier = Modifier.size(22.dp))
@@ -689,7 +692,7 @@ private fun StepOverscanContent(
             style = MaterialTheme.typography.bodyMedium,
             color = JellioTextSecondary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp, bottom = 24.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 14.dp),
         )
 
         Box(
@@ -698,7 +701,7 @@ private fun StepOverscanContent(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.White.copy(alpha = 0.06f))
                 .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 32.dp, vertical = 18.dp),
+                .padding(horizontal = 28.dp, vertical = 12.dp),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -716,10 +719,10 @@ private fun StepOverscanContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
@@ -739,9 +742,9 @@ private fun StepOverscanContent(
             ) {
                 Text(
                     text = "- Less Inset",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp),
                 )
             }
 
@@ -762,9 +765,9 @@ private fun StepOverscanContent(
             ) {
                 Text(
                     text = "+ More Inset",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp),
                 )
             }
         }
@@ -787,14 +790,14 @@ private fun StepSummaryContent(
             color = JellioText,
         )
         Text(
-            text = string("onboarding_settings_hint"),
+            text = string("onboarding_ready_desc"),
             style = MaterialTheme.typography.bodyMedium,
             color = JellioTextSecondary,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
         )
 
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             SummaryItemRow(
@@ -827,34 +830,6 @@ private fun StepSummaryContent(
                 badge = if (hasSharedAccountSettings) string("onboarding_synced_badge") else null,
             )
         }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(JellioSecondary.copy(alpha = 0.08f))
-                .border(1.dp, JellioSecondary.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Info,
-                    contentDescription = null,
-                    tint = JellioSecondary,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    text = string("onboarding_settings_hint"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = JellioText,
-                )
-            }
-        }
     }
 }
 
@@ -873,7 +848,7 @@ private fun SummaryItemRow(
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White.copy(alpha = 0.04f))
             .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
