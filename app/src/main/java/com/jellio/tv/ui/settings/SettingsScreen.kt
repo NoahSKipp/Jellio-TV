@@ -315,7 +315,11 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsPickerRow(
                         label = string("settings_preferred_subtitle"),
-                        value = subtitleLanguage?.let { languageName(it) } ?: string("settings_no_preference"),
+                        value = when (subtitleLanguage) {
+                            "off" -> string("settings_subtitles_off")
+                            null, "" -> string("settings_no_preference")
+                            else -> languageName(subtitleLanguage)
+                        },
                         onClick = { openField = LanguageField.SUBTITLE },
                     )
                 }
@@ -490,6 +494,7 @@ fun SettingsScreen(
         LanguagePickerOverlay(
             title = if (field == LanguageField.AUDIO) string("settings_preferred_audio") else string("settings_preferred_subtitle"),
             selectedCode = selectedCode,
+            isSubtitle = field == LanguageField.SUBTITLE,
             onSelect = { code ->
                 if (field == LanguageField.AUDIO) viewModel.setAudioLanguage(session, code) else viewModel.setSubtitleLanguage(session, code)
                 openField = null
@@ -595,6 +600,7 @@ private fun DisplayLanguagePickerOverlay(
 private fun LanguagePickerOverlay(
     title: String,
     selectedCode: String?,
+    isSubtitle: Boolean = false,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -636,12 +642,22 @@ private fun LanguagePickerOverlay(
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
             )
             LazyColumn {
+                if (isSubtitle) {
+                    item {
+                        LanguagePickerRow(
+                            label = string("settings_subtitles_off"),
+                            isSelected = selectedCode == "off",
+                            onClick = { onSelect("off") },
+                            focusRequester = firstRowFocusRequester,
+                        )
+                    }
+                }
                 item {
                     LanguagePickerRow(
-                        label = "No preference",
-                        isSelected = selectedCode == null,
-                        onClick = { onSelect(null) },
-                        focusRequester = firstRowFocusRequester,
+                        label = string("settings_no_preference"),
+                        isSelected = if (isSubtitle) selectedCode.isNullOrEmpty() else selectedCode == null,
+                        onClick = { onSelect(if (isSubtitle) "" else null) },
+                        focusRequester = if (!isSubtitle) firstRowFocusRequester else remember { FocusRequester() },
                     )
                 }
                 items(LANGUAGE_OPTIONS) { option: LanguageOption ->

@@ -98,7 +98,7 @@ fun OnboardingOverlay(
     val context = LocalContext.current
 
     // Detect if the user previously set up audio/subtitle preferences on Web
-    val hasSharedAccountSettings = !initialAudioLang.isNullOrBlank() || !initialSubtitleLang.isNullOrBlank()
+    val hasSharedAccountSettings = !initialAudioLang.isNullOrBlank() || (!initialSubtitleLang.isNullOrBlank() && initialSubtitleLang != "off")
 
     // Determine the list of relevant steps: if Web set it up, skip audio/subtitle and only show TV-specific settings
     val steps = remember(hasSharedAccountSettings) {
@@ -115,7 +115,7 @@ fun OnboardingOverlay(
     var selectedLang by remember { mutableStateOf(DisplayPreferences.displayLanguage) }
     var currentOverscan by remember { mutableIntStateOf(DisplayPreferences.overscanPercent) }
     var selectedAudio by remember { mutableStateOf(initialAudioLang) }
-    var selectedSubtitle by remember { mutableStateOf(initialSubtitleLang) }
+    var selectedSubtitle by remember { mutableStateOf<String?>(initialSubtitleLang ?: "off") }
 
     var choosingField by remember { mutableStateOf<String?>(null) }
     var activeHelpDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -431,6 +431,7 @@ fun OnboardingOverlay(
             TvLanguagePickerModal(
                 title = title,
                 selectedCode = currentCode,
+                isSubtitle = !isAudio,
                 onSelect = { code ->
                     if (isAudio) selectedAudio = code else selectedSubtitle = code
                     choosingField = null
@@ -585,7 +586,11 @@ private fun StepPlaybackContent(
             PlaybackPreferenceRow(
                 icon = Icons.Filled.Subtitles,
                 label = string("settings_preferred_subtitle"),
-                currentValue = selectedSubtitle?.let { languageName(it) } ?: string("settings_no_preference"),
+                currentValue = when (selectedSubtitle) {
+                    "off" -> string("settings_subtitles_off")
+                    null, "" -> string("settings_no_preference")
+                    else -> languageName(selectedSubtitle)
+                },
                 onClick = onOpenSubtitlePicker,
                 onHelpClick = { onShowHelp(subHelpTitle, subHelpDesc) },
             )
@@ -814,7 +819,11 @@ private fun StepSummaryContent(
             SummaryItemRow(
                 icon = Icons.Filled.Subtitles,
                 label = string("settings_preferred_subtitle"),
-                value = subtitleLang?.let { languageName(it) } ?: string("settings_no_preference"),
+                value = when (subtitleLang) {
+                    "off" -> string("settings_subtitles_off")
+                    null, "" -> string("settings_no_preference")
+                    else -> languageName(subtitleLang)
+                },
                 badge = if (hasSharedAccountSettings) string("onboarding_synced_badge") else null,
             )
         }
@@ -901,6 +910,7 @@ private fun SummaryItemRow(
 private fun TvLanguagePickerModal(
     title: String,
     selectedCode: String?,
+    isSubtitle: Boolean = false,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -945,11 +955,20 @@ private fun TvLanguagePickerModal(
                     )
 
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        if (isSubtitle) {
+                            item {
+                                LanguagePickerItem(
+                                    label = string("settings_subtitles_off"),
+                                    isSelected = selectedCode == "off" || selectedCode.isNullOrBlank(),
+                                    onClick = { onSelect("off") },
+                                )
+                            }
+                        }
                         item {
                             LanguagePickerItem(
                                 label = string("settings_no_preference"),
-                                isSelected = selectedCode == null,
-                                onClick = { onSelect(null) },
+                                isSelected = if (isSubtitle) selectedCode == "" else selectedCode == null,
+                                onClick = { onSelect(if (isSubtitle) "" else null) },
                             )
                         }
                         items(LANGUAGE_OPTIONS) { option: LanguageOption ->

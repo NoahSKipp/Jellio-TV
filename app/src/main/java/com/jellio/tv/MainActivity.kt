@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
         com.jellio.tv.data.prefs.DisplayPreferences.init(this)
         com.jellio.tv.ui.player.PlayerPrefs.init(this)
         com.jellio.tv.ui.player.BadStreams.init(this)
+        com.jellio.tv.ui.onboarding.OnboardingPrefs.init(this)
         com.jellio.tv.data.playback.DeviceDecoderCaps.attach(this)
         enableEdgeToEdge()
         handleIntent(intent)
@@ -311,7 +312,9 @@ private fun JellioTvApp(
         if (com.jellio.tv.ui.onboarding.OnboardingPrefs.shouldShowOnboarding(context, session.userId)) {
             val config = appViewModel.getUserConfiguration(session.userId)
             initialAudioLang = config?.AudioLanguagePreference?.trim()?.ifBlank { null }
-            initialSubtitleLang = config?.SubtitleLanguagePreference?.trim()?.ifBlank { null }
+            val subMode = config?.SubtitleMode?.trim()
+            val subPref = config?.SubtitleLanguagePreference?.trim()?.ifBlank { null }
+            initialSubtitleLang = if (subMode.equals("None", ignoreCase = true) || subPref == "off") "off" else subPref
             showNotifications = false
             showChangelog = false
             showOnboarding = true

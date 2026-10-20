@@ -1509,9 +1509,11 @@ class JellioRepository @Inject constructor(
     // PlaybackInfo negotiation already reads server side.
     suspend fun updateLanguagePreferences(userId: String, audioLanguage: String?, subtitleLanguage: String?) {
         val current = api.getUser(userId).Configuration ?: UserConfigurationDto()
+        val isOff = subtitleLanguage == "off" || subtitleLanguage == "none"
         val configuration = current.copy(
             AudioLanguagePreference = audioLanguage.orEmpty(),
-            SubtitleLanguagePreference = subtitleLanguage.orEmpty(),
+            SubtitleLanguagePreference = if (isOff) "" else subtitleLanguage.orEmpty(),
+            SubtitleMode = if (isOff) "None" else if (current.SubtitleMode == "None") "Default" else current.SubtitleMode,
         )
         api.updateUserConfiguration(userId, configuration)
         cache.invalidate("user:$userId")

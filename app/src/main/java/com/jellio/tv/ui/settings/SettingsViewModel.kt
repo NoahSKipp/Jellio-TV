@@ -134,7 +134,7 @@ class SettingsViewModel @Inject constructor(
             val user = runCatching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
             user.Configuration?.let { configuration ->
                 _audioLanguage.value = matchLanguageOption(configuration.AudioLanguagePreference)?.code
-                _subtitleLanguage.value = matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
+                _subtitleLanguage.value = if (configuration.SubtitleMode.equals("None", ignoreCase = true) || configuration.SubtitleLanguagePreference == "off") "off" else matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
             }
         }
         // Real screens/settings.js's own async loaded Privacy card:
