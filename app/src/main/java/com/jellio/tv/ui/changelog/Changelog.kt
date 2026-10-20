@@ -97,6 +97,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.54.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.54.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "TV Setup Wizard", "A guided onboarding flow starting from Jellyfin server connection with automatic protocol autofill, user sign-in, language selection, and screen margin calibration. Access it again anytime from Settings > About."),
+            ChangelogFeature(Icons.Filled.Tune, "Display Safe Area Inset", "Interactive 4-corner bracket calibration tool in Settings > Display to easily adjust screen margins from 0% to 8% and fix TV overscan."),
+            ChangelogFeature(Icons.Filled.Palette, "Display Languages", "Full TV interface localization in English, Deutsch, Español, and Polski. Automatically requests media overviews in your chosen language."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Smart Account Sync", "Audio and subtitle preferences configured on Jellio Web are automatically recognized on your TV."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.53.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.53.3",
