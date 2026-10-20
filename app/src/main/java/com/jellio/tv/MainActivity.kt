@@ -293,6 +293,9 @@ private fun JellioTvApp(
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    var showOnboarding by remember { mutableStateOf(false) }
+    var initialAudioLang by remember { mutableStateOf<String?>(null) }
+    var initialSubtitleLang by remember { mutableStateOf<String?>(null) }
     var changelogReleaseToDisplay by remember { mutableStateOf(com.jellio.tv.ui.changelog.CURRENT_CHANGELOG) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
@@ -305,7 +308,14 @@ private fun JellioTvApp(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(session.userId) {
-        if (com.jellio.tv.ui.changelog.ChangelogPrefs.shouldShowChangelog(context)) {
+        if (com.jellio.tv.ui.onboarding.OnboardingPrefs.shouldShowOnboarding(context, session.userId)) {
+            val config = appViewModel.getUserConfiguration(session.userId)
+            initialAudioLang = config?.AudioLanguagePreference?.trim()?.ifBlank { null }
+            initialSubtitleLang = config?.SubtitleLanguagePreference?.trim()?.ifBlank { null }
+            showNotifications = false
+            showChangelog = false
+            showOnboarding = true
+        } else if (com.jellio.tv.ui.changelog.ChangelogPrefs.shouldShowChangelog(context)) {
             changelogReleaseToDisplay = com.jellio.tv.ui.changelog.LATEST_BIG_CHANGELOG
             showNotifications = false
             showChangelog = true
@@ -525,6 +535,7 @@ private fun JellioTvApp(
                     changelogReleaseToDisplay = com.jellio.tv.ui.changelog.CURRENT_CHANGELOG
                     showChangelog = true
                 },
+                onLaunchOnboarding = { showOnboarding = true },
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.Detail -> DetailScreen(
@@ -688,6 +699,20 @@ private fun JellioTvApp(
                         selectedLibrary = library
                         showLibraryPicker = false
                         switchTab(JellioRoute.Library)
+                    },
+                )
+            }
+            if (showOnboarding) {
+                com.jellio.tv.ui.onboarding.OnboardingOverlay(
+                    userId = session.userId,
+                    initialAudioLang = initialAudioLang,
+                    initialSubtitleLang = initialSubtitleLang,
+                    onSavePreferences = { audio, subtitle ->
+                        appViewModel.saveLanguagePreferences(session, audio, subtitle)
+                    },
+                    onComplete = {
+                        showOnboarding = false
+                        runCatching { sidebarFocusRequester.requestFocus() }
                     },
                 )
             }

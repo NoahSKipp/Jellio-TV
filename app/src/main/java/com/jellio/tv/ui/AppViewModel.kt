@@ -175,4 +175,13 @@ class AppViewModel @Inject constructor(
         }
         return PlayAction.ShowPicker(item)
     }
+
+    suspend fun getUserConfiguration(userId: String) =
+        runCatching { repository.getUser(userId)?.Configuration }.getOrNull()
+
+    fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
+        viewModelScope.launch {
+            runCatching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
+        }
+    }
 }

@@ -1,6 +1,25 @@
 package com.jellio.tv.ui.auth
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.tv.material3.Border
+import com.jellio.tv.data.prefs.AppLanguage
+import com.jellio.tv.data.prefs.DisplayPreferences
+import com.jellio.tv.ui.i18n.string
+import com.jellio.tv.ui.theme.JellioBorder
+import com.jellio.tv.ui.theme.JellioRarityRare
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,34 +144,182 @@ private fun ServerAddressForm(
     onContinue: (String) -> Unit,
 ) {
     var serverAddress by remember(uiState.serverAddress) { mutableStateOf(uiState.serverAddress) }
+    var currentLanguage by remember { mutableStateOf(DisplayPreferences.displayLanguage) }
 
     Column(
-        modifier = Modifier.width(420.dp),
+        modifier = Modifier
+            .widthIn(max = 560.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(JellioBgElevated)
+            .border(1.dp, JellioBorder, RoundedCornerShape(24.dp))
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "Jellio TV", style = MaterialTheme.typography.titleLarge)
+        // Header: Logo Mark, Step Badge, and Quick Language Switcher
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.linearGradient(listOf(JellioRarityRare, JellioSecondary))
+                        ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Tv,
+                        contentDescription = null,
+                        tint = Color.Black,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Column {
+                    Text(
+                        text = "Jellio TV",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = JellioText,
+                    )
+                    Text(
+                        text = string("onboarding_welcome_title") + " • " + string("auth_step_server"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = JellioTextSecondary,
+                    )
+                }
+            }
+
+            // Language quick toggle pill
+            val context = LocalContext.current
+            Surface(
+                onClick = {
+                    val allLangs = AppLanguage.entries
+                    val next = allLangs[(allLangs.indexOf(currentLanguage) + 1) % allLangs.size]
+                    DisplayPreferences.setDisplayLanguage(context, next)
+                    currentLanguage = next
+                },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = Color.White.copy(alpha = 0.06f),
+                    contentColor = JellioText,
+                    focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                    focusedContentColor = JellioText,
+                ),
+                border = ClickableSurfaceDefaults.border(
+                    focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
+                ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Translate,
+                        contentDescription = null,
+                        tint = JellioSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = currentLanguage.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = "Enter your Jellio server address to get started",
-            style = MaterialTheme.typography.bodyLarge,
-            color = JellioTextSecondary,
-            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
+            text = string("auth_connect_title"),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = JellioText,
+            modifier = Modifier.fillMaxWidth(),
         )
+        Text(
+            text = string("auth_connect_subtitle"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = JellioTextSecondary,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 20.dp),
+        )
+
         JellioTextField(
             value = serverAddress,
             onValueChange = { serverAddress = it },
-            label = "Server address (e.g. jellyfin.example.com)",
+            label = string("auth_server_address") + " (" + string("auth_server_hint") + ")",
             modifier = Modifier.fillMaxWidth(),
         )
-        uiState.error?.let { error ->
-            Text(text = error, color = JellioDanger, modifier = Modifier.padding(top = 16.dp))
+
+        // Protocol autofill explanation callout
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.04f))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = JellioSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = string("auth_autofill_tip"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = JellioTextSecondary,
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(24.dp))
+
+        uiState.error?.let { error ->
+            Text(
+                text = error,
+                color = JellioDanger,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
         Surface(
             onClick = { onContinue(serverAddress) },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
-            Text(text = "Continue", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = string("onboarding_next"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -170,7 +337,7 @@ private fun ProfilePicker(
         modifier = Modifier.width(760.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "Who’s watching?", style = MaterialTheme.typography.titleLarge)
+        Text(text = string("auth_who_is_watching"), style = MaterialTheme.typography.titleLarge)
         uiState.error?.let { error ->
             Text(text = error, color = JellioDanger, modifier = Modifier.padding(top = 12.dp))
         }
@@ -200,7 +367,7 @@ private fun ProfilePicker(
                 )
             }
             item(key = "add") {
-                ProfileTile(name = "Other user", imageUrl = null, busy = false, onClick = onAddOther, onRemove = null, isAddTile = true)
+                ProfileTile(name = string("auth_other_user"), imageUrl = null, busy = false, onClick = onAddOther, onRemove = null, isAddTile = true)
             }
         }
     }
@@ -275,34 +442,70 @@ private fun ManualLoginForm(
     var password by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier.width(420.dp),
+        modifier = Modifier
+            .widthIn(max = 560.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(JellioBgElevated)
+            .border(1.dp, JellioBorder, RoundedCornerShape(24.dp))
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "Jellio TV", style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = "Sign in to your Jellio server",
-            style = MaterialTheme.typography.bodyLarge,
-            color = JellioTextSecondary,
-            modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.linearGradient(listOf(JellioRarityRare, JellioSecondary))
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tv,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column {
+                Text(
+                    text = "Jellio TV",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = JellioText,
+                )
+                Text(
+                    text = string("auth_sign_in"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = JellioTextSecondary,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         JellioTextField(
             value = serverAddress,
             onValueChange = { serverAddress = it },
-            label = "Server address (e.g. jellyfin.example.com)",
+            label = string("auth_server_address") + " (" + string("auth_server_hint") + ")",
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         JellioTextField(
             value = username,
             onValueChange = { username = it },
-            label = "Username",
+            label = string("auth_username"),
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         JellioTextField(
             value = password,
             onValueChange = { password = it },
-            label = "Password",
+            label = string("auth_password"),
             isPassword = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -310,7 +513,7 @@ private fun ManualLoginForm(
             Text(
                 text = error,
                 color = JellioDanger,
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = 14.dp),
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
@@ -321,17 +524,17 @@ private fun ManualLoginForm(
             colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(
-                text = if (uiState.isLoading) "Signing in..." else "Sign In",
-                modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp),
+                text = if (uiState.isLoading) string("auth_sign_in") + "..." else string("auth_sign_in"),
+                modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
             )
         }
         Surface(
             onClick = { onForgotPassword(username) },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioTextSecondary),
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = 10.dp),
         ) {
-            Text(text = "Forgot password?", modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp))
+            Text(text = string("auth_forgot_password"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         }
     }
 }
