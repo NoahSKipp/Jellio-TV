@@ -98,6 +98,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.54.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.54.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Intuitive Onboarding Focus", "Initial focus on setup wizard pages now lands directly on the logical default selection (such as English on the language step or Center on overscan calibration) instead of defaulting to Next."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Smooth Completion Flow", "Focus reliably lands on the Start Exploring action on the final setup summary screen."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.54.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.54.1",
