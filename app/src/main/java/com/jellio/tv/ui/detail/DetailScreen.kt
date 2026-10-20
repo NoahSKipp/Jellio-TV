@@ -61,7 +61,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -465,25 +464,18 @@ private fun DetailHero(
 ) {
     val backdropUrl = heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
     val heroHeight = HeroHeight.scaled()
-    Box(modifier = Modifier.fillMaxWidth().height(heroHeight).clipToBounds()) {
+    Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
         if (backdropUrl != null) {
             AsyncImage(
                 model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(heroHeight).clipToBounds(),
+                modifier = Modifier.fillMaxWidth().height(heroHeight),
             )
         }
         Box(
-            modifier = Modifier.fillMaxWidth().height(heroHeight).clipToBounds().background(
-                Brush.verticalGradient(
-                    0f to JellioBg.copy(alpha = 0.05f),
-                    0.35f to JellioBg.copy(alpha = 0.25f),
-                    0.55f to JellioBg.copy(alpha = 0.55f),
-                    0.75f to JellioBg.copy(alpha = 0.85f),
-                    0.90f to JellioBg,
-                    1f to JellioBg,
-                ),
+            modifier = Modifier.fillMaxWidth().height(heroHeight).background(
+                Brush.verticalGradient(listOf(Color.Transparent, JellioBg), startY = 0f, endY = Float.POSITIVE_INFINITY),
             ),
         )
         Box(

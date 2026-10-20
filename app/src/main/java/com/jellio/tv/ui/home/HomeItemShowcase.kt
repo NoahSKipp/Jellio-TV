@@ -149,16 +149,10 @@ private fun ShowcaseBackdrop(
                     1f to Color.Transparent,
                     endX = size.width * 0.7f,
                 )
-                // Mirrors Jellio Web .jellio-detail-hero multi-stop gradient:
-                // gradual ramp that reaches solid JellioBg comfortably before
-                // the bottom edge rather than exactly at 1.0f, eliminating any
-                // bright pixel seam or hard cutoff along the bottom.
                 val bottomFade = Brush.verticalGradient(
-                    0f to JellioBg.copy(alpha = 0.05f),
-                    0.35f to JellioBg.copy(alpha = 0.25f),
-                    0.55f to JellioBg.copy(alpha = 0.55f),
-                    0.75f to JellioBg.copy(alpha = 0.85f),
-                    0.90f to JellioBg,
+                    0f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.8f to JellioBg.copy(alpha = 0.7f),
                     1f to JellioBg,
                 )
                 onDrawWithContent {
@@ -167,7 +161,7 @@ private fun ShowcaseBackdrop(
                     drawRect(
                         brush = bottomFade,
                         topLeft = Offset.Zero,
-                        size = Size(size.width, size.height + 8f),
+                        size = Size(size.width, size.height + 12.dp.toPx()),
                     )
                 }
             },
