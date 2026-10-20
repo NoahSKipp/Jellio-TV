@@ -603,3 +603,15 @@ data class FeedEntryDto(
 
 @com.squareup.moshi.JsonClass(generateAdapter = true)
 data class UserDataUpdate(val PlaybackPositionTicks: Long)
+
+@com.squareup.moshi.JsonClass(generateAdapter = true)
+data class QuickConnectResultDto(
+    val Code: String? = null,
+    val Secret: String? = null,
+    val Authenticated: Boolean = false,
+)
+
+@com.squareup.moshi.JsonClass(generateAdapter = true)
+data class QuickConnectAuthBody(
+    val Secret: String,
+)

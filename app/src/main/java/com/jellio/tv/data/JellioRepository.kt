@@ -1525,6 +1525,32 @@ class JellioRepository @Inject constructor(
 
     suspend fun authorizeQuickConnect(code: String): Boolean = api.authorizeQuickConnect(code)
 
+    suspend fun initiateQuickConnect(serverAddress: String): com.jellio.tv.data.model.QuickConnectResultDto? = runCatching {
+        sessionManager.saveServerAddress(com.jellio.tv.di.normalizeServerAddress(serverAddress))
+        api.initiateQuickConnect()
+    }.getOrNull()
+
+    suspend fun checkQuickConnect(secret: String): com.jellio.tv.data.model.QuickConnectResultDto? = runCatching {
+        api.checkQuickConnect(secret)
+    }.getOrNull()
+
+    suspend fun authenticateWithQuickConnect(serverAddress: String, secret: String): LoginResult {
+        return try {
+            val normalized = resolveServerAddress(serverAddress).getOrElse {
+                return LoginResult.Failure(it.message ?: "Could not reach that server")
+            }
+            val result = api.authenticateWithQuickConnect(com.jellio.tv.data.model.QuickConnectAuthBody(secret))
+            val user = result.User ?: return LoginResult.Failure("Invalid user response from server")
+            val token = result.AccessToken ?: return LoginResult.Failure("Missing access token")
+            clearCache()
+            sessionManager.saveSession(normalized, token, user.Id, user.Name)
+            rememberUser(normalized, user.Id, token, user.Name, user.PrimaryImageTag)
+            LoginResult.Success
+        } catch (err: Exception) {
+            LoginResult.Failure(err.message ?: "Quick Connect authentication failed")
+        }
+    }
+
     suspend fun getAvatarPresets(): List<AvatarPresetDto> = api.getAvatarPresets()
 
     // id can carry a real "/" (a grouped preset's own subfolder, see

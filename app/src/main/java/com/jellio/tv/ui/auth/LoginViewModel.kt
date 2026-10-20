@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
-enum class LoginMode { CHECKING, SERVER_ENTRY, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN }
+enum class LoginMode { CHECKING, SERVER_ENTRY, PROFILE_PICKER, MANUAL, FORGOT_USERNAME, FORGOT_PIN, QUICK_CONNECT }
 
 data class RememberedProfile(val userId: String, val name: String, val primaryImageTag: String?, val accessToken: String? = null)
 
@@ -26,6 +28,9 @@ data class LoginUiState(
     val canReturnToProfiles: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
+    val quickConnectCode: String? = null,
+    val quickConnectSecret: String? = null,
+    val isQuickConnectPolling: Boolean = false,
     // Real port of screens/login.js's own forgot password state: the
     // username step 2 (FORGOT_PIN) carries forward, same real reason
     // that file's own renderForgotPassword() passes it straight into
@@ -297,11 +302,76 @@ class LoginViewModel @Inject constructor(
             }
         }
     }
-}
+private var quickConnectJob: kotlinx.coroutines.Job? = null
 
-// The account a switch is heading to when it needs a password: the login
-// screen opens straight on the form with that name filled in.
-object LoginHandoff {
+    fun startQuickConnect() {
+        val serverAddress = _uiState.value.serverAddress
+        if (serverAddress.isBlank()) return
+        quickConnectJob?.cancel()
+        quickConnectJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                mode = LoginMode.QUICK_CONNECT,
+                isLoading = true,
+                error = null,
+                quickConnectCode = null,
+                quickConnectSecret = null,
+                isQuickConnectPolling = false,
+            )
+            val result = repository.initiateQuickConnect(serverAddress)
+            if (result == null || result.Code.isNullOrBlank() || result.Secret.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Could not start Quick Connect. Make sure Quick Connect is enabled on your Jellyfin server.",
+                )
+                return@launch
+            }
+            val secret = result.Secret
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                quickConnectCode = result.Code,
+                quickConnectSecret = secret,
+                isQuickConnectPolling = true,
+            )
+            while (isActive) {
+                kotlinx.coroutines.delay(2000L)
+                val check = repository.checkQuickConnect(secret)
+                if (check?.Authenticated == true) {
+                    _uiState.value = _uiState.value.copy(isQuickConnectPolling = false, isLoading = true)
+                    when (val authResult = repository.authenticateWithQuickConnect(serverAddress, secret)) {
+                        is LoginResult.Success -> {
+                            return@launch
+                        }
+                        is LoginResult.Failure -> {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = authResult.message,
+                            )
+                            return@launch
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun cancelQuickConnect() {
+        quickConnectJob?.cancel()
+        quickConnectJob = null
+        _uiState.value = _uiState.value.copy(
+            mode = if (_uiState.value.canReturnToProfiles) LoginMode.PROFILE_PICKER else LoginMode.MANUAL,
+            isQuickConnectPolling = false,
+            isLoading = false,
+            quickConnectCode = null,
+            quickConnectSecret = null,
+            error = null,
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        quickConnectJob?.cancel()
+    }
+}object LoginHandoff {
     @Volatile private var username: String? = null
 
     fun put(name: String) {

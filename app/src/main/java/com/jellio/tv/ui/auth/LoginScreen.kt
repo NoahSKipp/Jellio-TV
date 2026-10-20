@@ -41,6 +41,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -96,6 +98,9 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
     BackHandler(enabled = uiState.mode == LoginMode.FORGOT_USERNAME || uiState.mode == LoginMode.FORGOT_PIN) {
         viewModel.cancelForgotPassword()
     }
+    BackHandler(enabled = uiState.mode == LoginMode.QUICK_CONNECT) {
+        viewModel.cancelQuickConnect()
+    }
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (uiState.mode) {
@@ -112,12 +117,14 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
                 onForget = { viewModel.forgetRememberedUser(it) },
                 onSelectPublicUser = { viewModel.selectPublicUser(it) },
                 onAddOther = { viewModel.showManualForm() },
+                onQuickConnect = { viewModel.startQuickConnect() },
                 avatarUrl = { userId, tag -> viewModel.avatarUrl(userId, tag) },
             )
             LoginMode.MANUAL -> ManualLoginForm(
                 uiState = uiState,
                 onLogin = { server, username, password -> viewModel.login(server, username, password) },
                 onForgotPassword = { username -> viewModel.showForgotPassword(username) },
+                onQuickConnect = { viewModel.startQuickConnect() },
             )
             LoginMode.FORGOT_USERNAME -> ForgotUsernameForm(
                 uiState = uiState,
@@ -126,6 +133,11 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
             LoginMode.FORGOT_PIN -> ForgotPinForm(
                 uiState = uiState,
                 onSubmit = { pin, newPassword, confirmPassword -> viewModel.redeemPasswordReset(pin, newPassword, confirmPassword) },
+            )
+            LoginMode.QUICK_CONNECT -> QuickConnectForm(
+                uiState = uiState,
+                onRetry = { viewModel.startQuickConnect() },
+                onBack = { viewModel.cancelQuickConnect() },
             )
         }
     }
@@ -331,6 +343,7 @@ private fun ProfilePicker(
     onForget: (String) -> Unit,
     onSelectPublicUser: (UserDto) -> Unit,
     onAddOther: () -> Unit,
+    onQuickConnect: () -> Unit,
     avatarUrl: (String, String?) -> String,
 ) {
     Column(
@@ -369,6 +382,9 @@ private fun ProfilePicker(
             item(key = "add") {
                 ProfileTile(name = string("auth_other_user"), imageUrl = null, busy = false, onClick = onAddOther, onRemove = null, isAddTile = true)
             }
+            item(key = "quick_connect") {
+                ProfileTile(name = string("auth_quick_connect_tile"), imageUrl = null, busy = false, onClick = onQuickConnect, onRemove = null, isQuickConnectTile = true)
+            }
         }
     }
 }
@@ -381,6 +397,7 @@ private fun ProfileTile(
     onClick: () -> Unit,
     onRemove: (() -> Unit)?,
     isAddTile: Boolean = false,
+    isQuickConnectTile: Boolean = false,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box {
@@ -388,10 +405,22 @@ private fun ProfileTile(
                 onClick = onClick,
                 enabled = !busy,
                 shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = if (isQuickConnectTile) Color.White.copy(alpha = 0.08f) else JellioBgElevated,
+                    contentColor = if (isQuickConnectTile) JellioSecondary else JellioText,
+                    focusedContainerColor = if (isQuickConnectTile) JellioSecondary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.18f),
+                    focusedContentColor = JellioText,
+                ),
+                border = ClickableSurfaceDefaults.border(
+                    focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
+                ),
                 modifier = Modifier.size(112.dp),
             ) {
-                if (isAddTile) {
+                if (isQuickConnectTile) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Filled.Sync, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(36.dp))
+                    }
+                } else if (isAddTile) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(imageVector = Icons.Filled.Add, contentDescription = null, tint = JellioText)
                     }
@@ -436,6 +465,7 @@ private fun ManualLoginForm(
     uiState: LoginUiState,
     onLogin: (String, String, String) -> Unit,
     onForgotPassword: (String) -> Unit,
+    onQuickConnect: () -> Unit,
 ) {
     var serverAddress by remember(uiState.serverAddress) { mutableStateOf(uiState.serverAddress) }
     var username by remember(uiState.manualPrefillUsername) { mutableStateOf(uiState.manualPrefillUsername) }
@@ -529,10 +559,26 @@ private fun ManualLoginForm(
             )
         }
         Surface(
+            onClick = onQuickConnect,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.2f), focusedContentColor = JellioText),
+            border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, JellioSecondary))),
+            modifier = Modifier.padding(top = 12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            ) {
+                Icon(imageVector = Icons.Filled.Sync, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(16.dp))
+                Text(text = string("auth_sign_in_quick_connect"), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        Surface(
             onClick = { onForgotPassword(username) },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioTextSecondary),
-            modifier = Modifier.padding(top = 10.dp),
+            modifier = Modifier.padding(top = 8.dp),
         ) {
             Text(text = string("auth_forgot_password"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
         }
@@ -635,6 +681,189 @@ private fun ForgotPinForm(
             colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
             Text(text = "Reset password", modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+        }
+    }
+}
+@Composable
+private fun QuickConnectForm(
+    uiState: LoginUiState,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 580.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(JellioBgElevated)
+            .border(1.dp, JellioBorder, RoundedCornerShape(24.dp))
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.linearGradient(listOf(JellioRarityRare, JellioSecondary))
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Tv,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column {
+                Text(
+                    text = "Jellio TV",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = JellioText,
+                )
+                Text(
+                    text = string("auth_quick_connect"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = JellioTextSecondary,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = string("auth_sign_in_quick_connect"),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = JellioText,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = string("auth_quick_connect_desc"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = JellioTextSecondary,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 20.dp),
+        )
+
+        val code = uiState.quickConnectCode
+        if (code != null) {
+            val formattedCode = if (code.length == 6) "${code.take(3)} ${code.drop(3)}" else code
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.05f))
+                    .border(1.dp, JellioSecondary.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .padding(vertical = 20.dp, horizontal = 24.dp),
+            ) {
+                Text(
+                    text = formattedCode,
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = JellioSecondary,
+                    letterSpacing = 6.sp,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = JellioSecondary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = string("auth_quick_connect_instructions"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = JellioTextSecondary,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Sync,
+                    contentDescription = null,
+                    tint = JellioSecondary,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = string("auth_quick_connect_waiting"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = JellioTextSecondary,
+                )
+            }
+        } else if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                com.jellio.tv.ui.common.ScreenSpinner()
+            }
+        }
+
+        uiState.error?.let { err ->
+            Text(
+                text = err,
+                color = JellioDanger,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Surface(
+                onClick = onRetry,
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                colors = com.jellio.tv.ui.common.primaryButtonColors(),
+            ) {
+                Text(
+                    text = string("action_retry"),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Surface(
+            onClick = onBack,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = Color.White.copy(alpha = 0.08f),
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.2f),
+                focusedContentColor = JellioText,
+            ),
+            border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, JellioSecondary))),
+        ) {
+            Text(
+                text = string("action_cancel"),
+                modifier = Modifier.padding(horizontal = 32.dp, vertical = 10.dp),
+            )
         }
     }
 }

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
@@ -102,8 +103,9 @@ val CHANGELOG_RELEASES = listOf(
         subtitle = "Version 0.54.0",
         features = listOf(
             ChangelogFeature(Icons.Filled.AutoAwesome, "TV Setup Wizard", "A guided onboarding flow starting from Jellyfin server connection with automatic protocol autofill, user sign-in, language selection, and screen margin calibration. Access it again anytime from Settings > About."),
+            ChangelogFeature(Icons.Filled.Sync, "Sign In with Quick Connect", "Sign into your Jellyfin account seamlessly using a 6-digit Quick Connect code from your phone, tablet, or browser without typing your password."),
             ChangelogFeature(Icons.Filled.Tune, "Display Safe Area Inset", "Interactive 4-corner bracket calibration tool in Settings > Display to easily adjust screen margins from 0% to 8% and fix TV overscan."),
-            ChangelogFeature(Icons.Filled.Palette, "Display Languages", "Full TV interface localization in English, Deutsch, Español, and Polski. Automatically requests media overviews in your chosen language."),
+            ChangelogFeature(Icons.Filled.Palette, "Display Languages", "Full TV interface localization in English, Deutsch, Español, Français, Italiano, Polski, and Português. Automatically requests media overviews in your chosen language."),
             ChangelogFeature(Icons.Filled.PlayCircle, "Smart Account Sync", "Audio and subtitle preferences configured on Jellio Web are automatically recognized on your TV."),
         ),
     ),

@@ -10,7 +10,10 @@ enum class AppLanguage(val code: String, val label: String, val nativeName: Stri
     ENGLISH("en", "English", "English", "en-US"),
     GERMAN("de", "German", "Deutsch", "de-DE"),
     SPANISH("es", "Spanish", "Español", "es-ES"),
-    POLISH("pl", "Polish", "Polski", "pl-PL");
+    FRENCH("fr", "French", "Français", "fr-FR"),
+    ITALIAN("it", "Italian", "Italiano", "it-IT"),
+    POLISH("pl", "Polish", "Polski", "pl-PL"),
+    PORTUGUESE("pt", "Portuguese", "Português", "pt-BR");
 
     companion object {
         fun fromCode(code: String?): AppLanguage =

@@ -419,6 +419,15 @@ interface JellyfinApi {
     @POST("QuickConnect/Authorize")
     suspend fun authorizeQuickConnect(@Query("code") code: String): Boolean
 
+    @POST("QuickConnect/Initiate")
+    suspend fun initiateQuickConnect(): com.jellio.tv.data.model.QuickConnectResultDto
+
+    @GET("QuickConnect/Connect")
+    suspend fun checkQuickConnect(@Query("Secret") secret: String): com.jellio.tv.data.model.QuickConnectResultDto
+
+    @POST("Users/AuthenticateWithQuickConnect")
+    suspend fun authenticateWithQuickConnect(@Body body: com.jellio.tv.data.model.QuickConnectAuthBody): AuthenticationResultDto
+
     // Real Controllers/AvatarsController.cs endpoints: real preset
     // images an admin dropped into Jellio's own plugin data directory,
     // confirmed against components/avatarPicker.js's own real
