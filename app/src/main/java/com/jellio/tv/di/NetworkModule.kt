@@ -115,11 +115,21 @@ object NetworkModule {
             val original = chain.request()
             // A request carrying its own credentials (checking a saved
             // profile's token) keeps them.
-            if (original.header("Authorization") != null) return@Interceptor chain.proceed(original)
+            val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
+            if (original.header("Authorization") != null) {
+                return@Interceptor chain.proceed(
+                    original.newBuilder()
+                        .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
+                        .build()
+                )
+            }
             val token = sessionManager.getCachedAccessToken()
             val deviceId = sessionManager.getCachedDeviceId()
             val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
-            val request = original.newBuilder().header("Authorization", header).build()
+            val request = original.newBuilder()
+                .header("Authorization", header)
+                .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
+                .build()
             chain.proceed(request)
         }
 

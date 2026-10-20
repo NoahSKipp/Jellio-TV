@@ -98,7 +98,7 @@ fun HomeItemShowcase(
             val status = (series ?: details).Status
             if (status.equals("Continuing", ignoreCase = true)) {
                 Text(
-                    text = "ONGOING",
+                    text = com.jellio.tv.ui.i18n.Strings.get("home_editorial_ongoing").uppercase(),
                     color = JellioText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -244,7 +244,7 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
             val year = details.ProductionYear?.toString() ?: details.PremiereDate?.take(4)
             if (!year.isNullOrBlank()) {
                 val ongoing = !isEpisode && details.Status.equals("Continuing", ignoreCase = true)
-                add(if (ongoing) "$year–" else year)
+                add(if (ongoing) "$year-" else year)
             }
         }
     }

@@ -108,15 +108,21 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.ManualCheckResult
+import com.jellio.tv.data.prefs.AppLanguage
+import com.jellio.tv.ui.i18n.string
+import com.jellio.tv.ui.i18n.formatString
 
-private enum class LanguageField { AUDIO, SUBTITLE }
+private enum class LanguageField { AUDIO, SUBTITLE, DISPLAY }
 
-private enum class SettingsCategory(val label: String, val icon: ImageVector) {
-    ACCOUNT("Account", Icons.Filled.Person),
-    PLAYBACK("Playback", Icons.Filled.PlayCircle),
-    RECOMMENDATIONS("Recommendations", Icons.Filled.AutoAwesome),
-    DISPLAY("Display", Icons.Filled.Palette),
-    ABOUT("About", Icons.Filled.Info),
+private enum class SettingsCategory(val labelKey: String, val icon: ImageVector) {
+    ACCOUNT("settings_cat_account", Icons.Filled.Person),
+    PLAYBACK("settings_cat_playback", Icons.Filled.PlayCircle),
+    RECOMMENDATIONS("settings_cat_recommendations", Icons.Filled.AutoAwesome),
+    DISPLAY("settings_cat_display", Icons.Filled.Palette),
+    ABOUT("settings_cat_about", Icons.Filled.Info);
+
+    val label: String
+        @Composable get() = string(labelKey)
 }
 
 // A real port of screens/settings.js: this app's own real
@@ -133,6 +139,7 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onViewProfile: () -> Unit,
     onShowChangelog: () -> Unit = {},
+    onLaunchOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     // AppBootGate's own hiltViewModel() call already checks once per
@@ -173,7 +180,7 @@ fun SettingsScreen(
     var contentHasFocus by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
         Column(modifier = Modifier.width(280.dp)) {
-            Text(text = "Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
+            Text(text = string("settings_title"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.focusRestorer(firstCategory),
@@ -301,14 +308,14 @@ fun SettingsScreen(
 
                 SettingsSection(title = "Language", icon = Icons.Filled.Translate) {
                     SettingsPickerRow(
-                        label = "Default audio language",
-                        value = audioLanguage?.let { languageName(it) } ?: "No preference",
+                        label = string("settings_preferred_audio"),
+                        value = audioLanguage?.let { languageName(it) } ?: string("settings_no_preference"),
                         onClick = { openField = LanguageField.AUDIO },
                     )
                     SettingsDivider()
                     SettingsPickerRow(
-                        label = "Default subtitle language",
-                        value = subtitleLanguage?.let { languageName(it) } ?: "No preference",
+                        label = string("settings_preferred_subtitle"),
+                        value = subtitleLanguage?.let { languageName(it) } ?: string("settings_no_preference"),
                         onClick = { openField = LanguageField.SUBTITLE },
                     )
                 }
@@ -424,13 +431,20 @@ fun SettingsScreen(
                     }
                 }
                 SettingsCategory.DISPLAY -> {
-                SettingsSection(title = "Display", icon = Icons.Filled.Tv) {
+                SettingsSection(title = string("settings_cat_display"), icon = Icons.Filled.Tv) {
+                    val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
+                    SettingsPickerRow(
+                        label = string("settings_display_language"),
+                        value = "${activeLang.nativeName} (${activeLang.label})",
+                        onClick = { openField = LanguageField.DISPLAY },
+                    )
+                    SettingsDivider()
                     MotionRow()
                     SettingsDivider()
                     val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent
                     SettingsPickerRow(
-                        label = "Display safe area (overscan)",
-                        value = if (overscan == 0) "Full screen (0%)" else "Inset by $overscan%",
+                        label = string("settings_overscan"),
+                        value = if (overscan == 0) string("settings_overscan_fullscreen") else formatString("settings_overscan_inset", overscan),
                         onClick = { com.jellio.tv.data.prefs.DisplayPreferences.isCalibrating = true },
                     )
                 }
@@ -444,6 +458,12 @@ fun SettingsScreen(
                             description = "View new features and improvements in version " + BuildConfig.VERSION_NAME,
                             onClick = onShowChangelog,
                         )
+                        SettingsActionRow(
+                            label = string("onboarding_wizard_card_title"),
+                            icon = Icons.Filled.Tv,
+                            description = string("onboarding_wizard_card_desc"),
+                            onClick = onLaunchOnboarding,
+                        )
                         UpdateCheckRow(viewModel = appUpdateViewModel)
                     }
                 }
@@ -455,10 +475,20 @@ fun SettingsScreen(
     }
 
     val field = openField
-    if (field != null) {
+    if (field == LanguageField.DISPLAY) {
+        val currentContext = LocalContext.current
+        DisplayLanguagePickerOverlay(
+            selectedLanguage = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage,
+            onSelect = { lang ->
+                com.jellio.tv.data.prefs.DisplayPreferences.setDisplayLanguage(currentContext, lang)
+                openField = null
+            },
+            onDismiss = { openField = null },
+        )
+    } else if (field != null) {
         val selectedCode = if (field == LanguageField.AUDIO) audioLanguage else subtitleLanguage
         LanguagePickerOverlay(
-            title = if (field == LanguageField.AUDIO) "Default audio language" else "Default subtitle language",
+            title = if (field == LanguageField.AUDIO) string("settings_preferred_audio") else string("settings_preferred_subtitle"),
             selectedCode = selectedCode,
             onSelect = { code ->
                 if (field == LanguageField.AUDIO) viewModel.setAudioLanguage(session, code) else viewModel.setSubtitleLanguage(session, code)
@@ -511,6 +541,55 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
 // right the same way the player's own subtitle popover already is:
 // "No preference" first, then every real LANGUAGE_OPTIONS entry,
 // saving on selection rather than needing a separate confirm step.
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun DisplayLanguagePickerOverlay(
+    selectedLanguage: com.jellio.tv.data.prefs.AppLanguage,
+    onSelect: (com.jellio.tv.data.prefs.AppLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+    val firstRowFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .dismissOnBack(onDismiss)
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(360.dp)
+                .fillMaxSize()
+                .background(JellioBgElevated)
+                .padding(top = 48.dp, bottom = 48.dp),
+        ) {
+            Text(
+                text = string("settings_display_language"),
+                color = JellioText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+            )
+            LazyColumn {
+                items(com.jellio.tv.data.prefs.AppLanguage.entries) { lang ->
+                    LanguagePickerRow(
+                        label = "${lang.nativeName} (${lang.label})",
+                        isSelected = lang == selectedLanguage,
+                        onClick = { onSelect(lang) },
+                        focusRequester = if (lang == com.jellio.tv.data.prefs.AppLanguage.entries.first()) firstRowFocusRequester else null,
+                    )
+                }
+            }
+        }
+    }
+}
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun LanguagePickerOverlay(
