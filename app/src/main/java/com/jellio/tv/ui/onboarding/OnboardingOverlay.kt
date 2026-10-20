@@ -79,6 +79,7 @@ import com.jellio.tv.ui.theme.JellioRarityRare
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import kotlinx.coroutines.delay
 
 private enum class OnboardingStep {
     LANGUAGE,
@@ -119,6 +120,19 @@ fun OnboardingOverlay(
 
     var choosingField by remember { mutableStateOf<String?>(null) }
     var activeHelpDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val isLastStep = stepIndex == steps.size - 1
+    val nextFocusRequester = remember { FocusRequester() }
+    val backFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(currentStep) {
+        if (currentStep == OnboardingStep.SUMMARY) {
+            repeat(6) {
+                if (runCatching { nextFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+                delay(16)
+            }
+        }
+    }
 
     fun finishWizard() {
         DisplayPreferences.setDisplayLanguage(context, selectedLang)
@@ -316,6 +330,8 @@ fun OnboardingOverlay(
                                     selectedLang = it
                                     DisplayPreferences.setDisplayLanguage(context, it)
                                 },
+                                nextFocusRequester = nextFocusRequester,
+                                backFocusRequester = if (stepIndex > 0) backFocusRequester else null,
                             )
                         }
                         OnboardingStep.PLAYBACK -> {
@@ -325,6 +341,8 @@ fun OnboardingOverlay(
                                 onOpenAudioPicker = { choosingField = "audio" },
                                 onOpenSubtitlePicker = { choosingField = "subtitle" },
                                 onShowHelp = { title, desc -> activeHelpDialog = title to desc },
+                                nextFocusRequester = nextFocusRequester,
+                                backFocusRequester = backFocusRequester,
                             )
                         }
                         OnboardingStep.OVERSCAN -> {
@@ -337,6 +355,8 @@ fun OnboardingOverlay(
                                     )
                                     DisplayPreferences.setOverscan(context, currentOverscan)
                                 },
+                                nextFocusRequester = nextFocusRequester,
+                                backFocusRequester = backFocusRequester,
                             )
                         }
                         OnboardingStep.SUMMARY -> {
@@ -374,6 +394,7 @@ fun OnboardingOverlay(
                                 focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
                             ),
                             scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                            modifier = Modifier.focusRequester(backFocusRequester),
                         ) {
                             Text(
                                 text = string("onboarding_back"),
@@ -383,12 +404,6 @@ fun OnboardingOverlay(
                         }
                     } else {
                         Spacer(modifier = Modifier.width(1.dp))
-                    }
-
-                    val isLastStep = stepIndex == steps.size - 1
-                    val nextFocusRequester = remember { FocusRequester() }
-                    LaunchedEffect(stepIndex) {
-                        runCatching { nextFocusRequester.requestFocus() }
                     }
 
                     Surface(
@@ -401,12 +416,13 @@ fun OnboardingOverlay(
                         },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
-                            containerColor = JellioSecondary,
-                            contentColor = Color.Black,
+                            containerColor = if (isLastStep) JellioSecondary else Color.White.copy(alpha = 0.12f),
+                            contentColor = if (isLastStep) Color.Black else JellioText,
                             focusedContainerColor = Color.White,
                             focusedContentColor = Color.Black,
                         ),
                         border = ClickableSurfaceDefaults.border(
+                            border = Border(BorderStroke(1.dp, if (isLastStep) Color.Transparent else Color.White.copy(alpha = 0.20f))),
                             focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                         ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
@@ -455,7 +471,20 @@ fun OnboardingOverlay(
 private fun StepLanguageContent(
     selectedLang: AppLanguage,
     onSelectLang: (AppLanguage) -> Unit,
+    nextFocusRequester: FocusRequester,
+    backFocusRequester: FocusRequester?,
 ) {
+    val languages = AppLanguage.entries
+    val initialFocusRequester = remember { FocusRequester() }
+    val initialFocusTargetLang = remember { selectedLang }
+
+    LaunchedEffect(Unit) {
+        repeat(6) {
+            if (runCatching { initialFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(16)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = string("onboarding_welcome_title"),
@@ -470,7 +499,6 @@ private fun StepLanguageContent(
             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
         )
 
-        val languages = AppLanguage.entries
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -482,6 +510,10 @@ private fun StepLanguageContent(
                 ) {
                     rowPair.forEach { lang ->
                         val isSelected = lang == selectedLang
+                        val isInitialTarget = lang == initialFocusTargetLang
+                        val isPortuguese = lang == AppLanguage.PORTUGUESE
+                        val isPolish = lang == AppLanguage.POLISH
+
                         Surface(
                             onClick = { onSelectLang(lang) },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
@@ -501,7 +533,17 @@ private fun StepLanguageContent(
                                 focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                             ),
                             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(if (isInitialTarget) Modifier.focusRequester(initialFocusRequester) else Modifier)
+                                .focusProperties {
+                                    if (isPortuguese) {
+                                        down = nextFocusRequester
+                                        right = nextFocusRequester
+                                    } else if (isPolish) {
+                                        down = nextFocusRequester
+                                    }
+                                },
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -554,11 +596,22 @@ private fun StepPlaybackContent(
     onOpenAudioPicker: () -> Unit,
     onOpenSubtitlePicker: () -> Unit,
     onShowHelp: (title: String, desc: String) -> Unit,
+    nextFocusRequester: FocusRequester,
+    backFocusRequester: FocusRequester?,
 ) {
     val audioHelpTitle = string("onboarding_audio_help_title")
     val audioHelpDesc = string("onboarding_audio_help_desc")
     val subHelpTitle = string("onboarding_subtitle_help_title")
     val subHelpDesc = string("onboarding_subtitle_help_desc")
+
+    val audioRowFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        repeat(6) {
+            if (runCatching { audioRowFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(16)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -584,6 +637,7 @@ private fun StepPlaybackContent(
                 currentValue = selectedAudio?.let { languageName(it) } ?: string("settings_no_preference"),
                 onClick = onOpenAudioPicker,
                 onHelpClick = { onShowHelp(audioHelpTitle, audioHelpDesc) },
+                focusRequester = audioRowFocusRequester,
             )
 
             PlaybackPreferenceRow(
@@ -596,6 +650,7 @@ private fun StepPlaybackContent(
                 },
                 onClick = onOpenSubtitlePicker,
                 onHelpClick = { onShowHelp(subHelpTitle, subHelpDesc) },
+                bottomFocusTarget = nextFocusRequester,
             )
         }
     }
@@ -608,6 +663,8 @@ private fun PlaybackPreferenceRow(
     currentValue: String,
     onClick: () -> Unit,
     onHelpClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+    bottomFocusTarget: FocusRequester? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -628,7 +685,10 @@ private fun PlaybackPreferenceRow(
                 focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.01f),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .then(if (bottomFocusTarget != null) Modifier.focusProperties { down = bottomFocusTarget } else Modifier),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -663,7 +723,9 @@ private fun PlaybackPreferenceRow(
                 focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-            modifier = Modifier.size(46.dp),
+            modifier = Modifier
+                .size(46.dp)
+                .then(if (bottomFocusTarget != null) Modifier.focusProperties { down = bottomFocusTarget } else Modifier),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(imageVector = Icons.Filled.HelpOutline, contentDescription = "Help", modifier = Modifier.size(22.dp))
@@ -676,7 +738,18 @@ private fun PlaybackPreferenceRow(
 private fun StepOverscanContent(
     currentPercent: Int,
     onChangePercent: (Int) -> Unit,
+    nextFocusRequester: FocusRequester,
+    backFocusRequester: FocusRequester?,
 ) {
+    val overscanFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        repeat(6) {
+            if (runCatching { overscanFocusRequester.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(16)
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth(),
@@ -739,6 +812,13 @@ private fun StepOverscanContent(
                     focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
                 ),
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                modifier = Modifier.focusProperties {
+                    if (backFocusRequester != null) {
+                        down = backFocusRequester
+                    } else {
+                        down = nextFocusRequester
+                    }
+                },
             ) {
                 Text(
                     text = "- Less Inset",
@@ -762,6 +842,11 @@ private fun StepOverscanContent(
                     focusedBorder = Border(BorderStroke(2.dp, JellioSecondary)),
                 ),
                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                modifier = Modifier
+                    .focusRequester(overscanFocusRequester)
+                    .focusProperties {
+                        down = nextFocusRequester
+                    },
             ) {
                 Text(
                     text = "+ More Inset",
