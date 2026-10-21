@@ -98,6 +98,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.54.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.54.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Leaner and Faster", "Jellio TV is now built as a smaller, optimised app, so it installs quicker and runs a little lighter on your TV."),
+            ChangelogFeature(Icons.Filled.Tv, "Smoother Navigation", "Moving around Settings and between screens lands where you expect, focus highlights are clearer, and the top of the screen no longer cuts off the backdrop."),
+            ChangelogFeature(Icons.Filled.Info, "Steadier Connection", "When your server is briefly busy, show pages, seasons and episodes try again on their own instead of failing, and Group Watch checks in less often while you're not in a group."),
+            ChangelogFeature(Icons.Filled.Settings, "Better German", "The German translation now uses the informal Du everywhere, and genres, seasons and episodes show in your language."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.54.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.54.3",
