@@ -37,6 +37,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -45,6 +50,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -690,6 +696,24 @@ private fun QuickConnectForm(
     onRetry: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val cancelRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        repeat(15) {
+            withFrameNanos {}
+            runCatching { cancelRequester.requestFocus() }
+            focusManager.moveFocus(FocusDirection.Next)
+        }
+    }
+    LaunchedEffect(uiState.quickConnectCode) {
+        if (uiState.quickConnectCode != null) {
+            repeat(15) {
+                withFrameNanos {}
+                runCatching { cancelRequester.requestFocus() }
+                focusManager.moveFocus(FocusDirection.Next)
+            }
+        }
+    }
     Column(
         modifier = Modifier
             .widthIn(max = 580.dp)
@@ -851,14 +875,16 @@ private fun QuickConnectForm(
 
         Surface(
             onClick = onBack,
+            modifier = Modifier.focusRequester(cancelRequester),
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = Color.White.copy(alpha = 0.08f),
                 contentColor = JellioText,
-                focusedContainerColor = Color.White.copy(alpha = 0.2f),
-                focusedContentColor = JellioText,
+                focusedContainerColor = JellioSecondary,
+                focusedContentColor = JellioBg,
             ),
-            border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, JellioSecondary))),
+            border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, Color.White))),
         ) {
             Text(
                 text = string("action_cancel"),

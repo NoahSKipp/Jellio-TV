@@ -18,16 +18,16 @@ import java.time.temporal.ChronoUnit
 fun formatRelativeTime(isoUtc: String?): String {
     val then = isoUtc?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return ""
     val minutes = ChronoUnit.MINUTES.between(then, Instant.now())
-    if (minutes < 1) return "just now"
-    if (minutes < 60) return "$minutes " + if (minutes == 1L) "minute ago" else "minutes ago"
+    if (minutes < 1) return com.jellio.tv.ui.i18n.Strings.get("time_just_now")
+    if (minutes < 60) return if (minutes == 1L) com.jellio.tv.ui.i18n.Strings.get("time_minute_ago") else com.jellio.tv.ui.i18n.Strings.format("time_minutes_ago", minutes)
     val hours = Math.round(minutes / 60.0)
-    if (hours < 24) return "$hours " + if (hours == 1L) "hour ago" else "hours ago"
+    if (hours < 24) return if (hours == 1L) com.jellio.tv.ui.i18n.Strings.get("time_hour_ago") else com.jellio.tv.ui.i18n.Strings.format("time_hours_ago", hours)
     val days = Math.round(hours / 24.0)
-    if (days < 30) return "$days " + if (days == 1L) "day ago" else "days ago"
+    if (days < 30) return if (days == 1L) com.jellio.tv.ui.i18n.Strings.get("time_day_ago") else com.jellio.tv.ui.i18n.Strings.format("time_days_ago", days)
     val months = Math.round(days / 30.0)
-    if (months < 12) return "$months " + if (months == 1L) "month ago" else "months ago"
+    if (months < 12) return if (months == 1L) com.jellio.tv.ui.i18n.Strings.get("time_month_ago") else com.jellio.tv.ui.i18n.Strings.format("time_months_ago", months)
     val years = Math.round(months / 12.0)
-    return "$years " + if (years == 1L) "year ago" else "years ago"
+    return if (years == 1L) com.jellio.tv.ui.i18n.Strings.get("time_year_ago") else com.jellio.tv.ui.i18n.Strings.format("time_years_ago", years)
 }
 
 // Real FeedController.cs/AchievementCatalog.cs shape: only these four
@@ -43,11 +43,7 @@ fun rarityColor(rarity: String?): Color = when (rarity?.lowercase()) {
 // Real port of screens/feed.js's own appendWatchDescription(): shared
 // by Feed rows (Kind == "Watch") and Profile's own recent activity
 // list, both fed by the exact same real ActivityGrouping.Group output
-// server side, just through two different real endpoints
-// (Jellio/feed's merged FeedEntry vs Jellio/achievements/{userId}'s
-// own GroupedActivityEntry). itemType/seriesName/episodeCount/
-// seasonNumber/firstEpisodeNumber/lastEpisodeNumber/itemName are the
-// exact fields both real DTOs share.
+// server side.
 fun watchActivityText(
     itemType: String?,
     seriesName: String?,
@@ -57,22 +53,47 @@ fun watchActivityText(
     lastEpisodeNumber: Int?,
     itemName: String?,
 ): AnnotatedString = buildAnnotatedString {
-    append(com.jellio.tv.ui.i18n.Strings.get("activity_watched") + " ")
-    if (itemType == "Episode" && !seriesName.isNullOrEmpty()) {
-        val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("detail_season_number", seasonNumber) + ", " else ""
-        if (episodeCount > 1) {
-            val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
-                "Episodes $firstEpisodeNumber-$lastEpisodeNumber"
-            } else {
-                "$episodeCount episodes"
+    val lang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code.lowercase()
+    val isEpisode = itemType == "Episode" && !seriesName.isNullOrEmpty()
+    val isGerman = lang == "de"
+
+    if (isGerman) {
+        if (isEpisode) {
+            val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
+            if (episodeCount > 1) {
+                val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
+                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
+                } else {
+                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_count", episodeCount)
+                }
+                append("$season$range ")
+            } else if (firstEpisodeNumber != null) {
+                append(season + com.jellio.tv.ui.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
             }
-            append(season + range + " " + com.jellio.tv.ui.i18n.Strings.get("word_of") + " ")
-        } else if (firstEpisodeNumber != null) {
-            append(season + "Episode " + firstEpisodeNumber + " of ")
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
+            append(" " + com.jellio.tv.ui.i18n.Strings.get("activity_watched").lowercase())
+        } else {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(itemName ?: "") }
+            append(" " + com.jellio.tv.ui.i18n.Strings.get("activity_watched").lowercase())
         }
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
     } else {
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(itemName ?: "") }
+        append(com.jellio.tv.ui.i18n.Strings.get("activity_watched") + " ")
+        if (isEpisode) {
+            val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
+            if (episodeCount > 1) {
+                val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
+                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
+                } else {
+                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_count", episodeCount)
+                }
+                append("$season$range ")
+            } else if (firstEpisodeNumber != null) {
+                append(season + com.jellio.tv.ui.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
+            }
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
+        } else {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(itemName ?: "") }
+        }
     }
 }
 

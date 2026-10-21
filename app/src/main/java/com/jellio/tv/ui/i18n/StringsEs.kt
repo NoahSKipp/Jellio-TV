@@ -904,6 +904,8 @@ internal object StringsEs {
         m["settings_community_no_users"] = "No se encontraron otros usuarios en este servidor."
         m["settings_community_toggle"] = "Mostrar fila en Inicio"
         m["settings_community_toggle_desc"] = "Muestra la fila \"Lo que otros están viendo\" en tus recomendaciones de inicio."
+        m["settings_community_row"] = "Mostrar fila en Inicio"
+        m["settings_community_row_desc"] = "Muestra la fila \"Lo que otros están viendo\" en tus recomendaciones de inicio."
         m["settings_confirm_password"] = "Confirmar contraseña"
         m["settings_current_password"] = "Contraseña actual"
         m["settings_default_audio"] = "Idioma de audio predeterminado"

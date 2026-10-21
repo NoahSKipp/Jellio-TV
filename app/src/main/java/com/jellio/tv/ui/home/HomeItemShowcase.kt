@@ -151,9 +151,12 @@ private fun ShowcaseBackdrop(
                 )
                 val bottomFade = Brush.verticalGradient(
                     0f to Color.Transparent,
-                    0.55f to Color.Transparent,
-                    0.8f to JellioBg.copy(alpha = 0.7f),
+                    0.35f to Color.Transparent,
+                    0.65f to JellioBg.copy(alpha = 0.75f),
+                    0.85f to JellioBg,
                     1f to JellioBg,
+                    startY = 0f,
+                    endY = size.height,
                 )
                 onDrawWithContent {
                     drawContent()
@@ -161,7 +164,13 @@ private fun ShowcaseBackdrop(
                     drawRect(
                         brush = bottomFade,
                         topLeft = Offset.Zero,
-                        size = Size(size.width, size.height + 12.dp.toPx()),
+                        size = size,
+                    )
+                    // Guarantee solid background covers the bottom edge completely
+                    drawRect(
+                        color = JellioBg,
+                        topLeft = Offset(0f, size.height * 0.90f),
+                        size = Size(size.width, size.height * 0.10f),
                     )
                 }
             },

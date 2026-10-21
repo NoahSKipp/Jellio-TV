@@ -904,6 +904,8 @@ internal object StringsFr {
         m["settings_community_no_users"] = "Aucun autre utilisateur trouvé sur ce serveur."
         m["settings_community_toggle"] = "Afficher la ligne sur l'accueil"
         m["settings_community_toggle_desc"] = "Affiche la ligne \"Ce que les autres regardent\" parmi vos recommandations d'accueil."
+        m["settings_community_row"] = "Afficher la ligne sur l'accueil"
+        m["settings_community_row_desc"] = "Affiche la ligne \"Ce que les autres regardent\" parmi vos recommandations d'accueil."
         m["settings_confirm_password"] = "Confirmer le mot de passe"
         m["settings_current_password"] = "Mot de passe actuel"
         m["settings_default_audio"] = "Langue audio par défaut"

@@ -904,6 +904,8 @@ internal object StringsEn {
         m["settings_community_no_users"] = "No other users found on this server."
         m["settings_community_toggle"] = "Display row on Home"
         m["settings_community_toggle_desc"] = "Show the \"What Others Are Watching\" row among your home screen recommendations."
+        m["settings_community_row"] = "Display row on Home"
+        m["settings_community_row_desc"] = "Show the \"What Others Are Watching\" row among your home screen recommendations."
         m["settings_confirm_password"] = "Confirm password"
         m["settings_current_password"] = "Current password"
         m["settings_default_audio"] = "Default audio language"

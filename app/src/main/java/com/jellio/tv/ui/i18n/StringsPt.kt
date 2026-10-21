@@ -904,6 +904,8 @@ internal object StringsPt {
         m["settings_community_no_users"] = "Nenhum outro usuário encontrado neste servidor."
         m["settings_community_toggle"] = "Exibir linha na tela inicial"
         m["settings_community_toggle_desc"] = "Exibe a linha \"O que outros estão assistindo\" nas recomendações da tela inicial."
+        m["settings_community_row"] = "Exibir linha na tela inicial"
+        m["settings_community_row_desc"] = "Exibe a linha \"O que outros estão assistindo\" nas recomendações da tela inicial."
         m["settings_confirm_password"] = "Confirmar nova senha"
         m["settings_current_password"] = "Senha atual"
         m["settings_default_audio"] = "Idioma de áudio padrão"

@@ -133,7 +133,7 @@ fun LibraryScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(screenHeight - rowsViewportHeight + 36.dp),
+                        .height(screenHeight - rowsViewportHeight),
                 )
 
                 val rowsSpec = remember(density) {
@@ -232,7 +232,7 @@ fun LibraryScreen(
                 LibraryFilterFieldTarget.Genre -> LibraryFilterFieldOverlay(
                     title = com.jellio.tv.ui.i18n.string("library_filter_genre"),
                     options = listOf(LibraryFilterOption(com.jellio.tv.ui.i18n.Strings.get("library_all_genres"), null)) +
-                        uiState.genreOptions.map { LibraryFilterOption(it, it) },
+                        uiState.genreOptions.map { LibraryFilterOption(com.jellio.tv.ui.i18n.genreDisplayName(it), it) },
                     selectedValue = uiState.selectedGenre,
                     onSelect = { value ->
                         genreFieldFocusRequester.requestFocus()
@@ -310,7 +310,7 @@ private fun LibraryFilterFields(
     genreFieldFocusRequester: FocusRequester,
 ) {
     val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort")
-    val genreLabel = selectedGenre ?: com.jellio.tv.ui.i18n.Strings.get("library_all_genres")
+    val genreLabel = selectedGenre?.let { com.jellio.tv.ui.i18n.genreDisplayName(it) } ?: com.jellio.tv.ui.i18n.Strings.get("library_all_genres")
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(bottom = 12.dp),

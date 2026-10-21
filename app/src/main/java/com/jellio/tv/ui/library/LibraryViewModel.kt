@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.ui.i18n.genreDisplayName
 import com.jellio.tv.data.model.ShowsEditorial
 import com.jellio.tv.data.model.animeTimeOfDay
 import com.jellio.tv.data.model.moviesTimeOfDay
@@ -257,7 +258,7 @@ class LibraryViewModel @Inject constructor(
             if (items.isNotEmpty()) {
                 sections.add(
                     HomeSection(
-                        genre,
+                        genreDisplayName(genre),
                         items,
                         fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
                     ),
@@ -323,7 +324,7 @@ class LibraryViewModel @Inject constructor(
             }.getOrDefault(emptyList()).filterNot { isAnime(it) }
             _uiState.value = _uiState.value.copy(
                 mainRow = HomeSection(
-                    genre ?: sortLabel(sort),
+                    genre?.let { genreDisplayName(it) } ?: sortLabel(sort),
                     items,
                     fetchAll = {
                         repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIST_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)

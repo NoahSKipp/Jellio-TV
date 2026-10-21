@@ -904,6 +904,8 @@ internal object StringsPl {
         m["settings_community_no_users"] = "Nie znaleziono innych użytkowników na tym serwerze."
         m["settings_community_toggle"] = "Wyświetlaj rząd na stronie głównej"
         m["settings_community_toggle_desc"] = "Wyświetlaj rząd \"Co oglądają inni\" w rekomendacjach strony głównej."
+        m["settings_community_row"] = "Wyświetlaj rząd na stronie głównej"
+        m["settings_community_row_desc"] = "Wyświetlaj rząd \"Co oglądają inni\" w rekomendacjach strony głównej."
         m["settings_confirm_password"] = "Potwierdź hasło"
         m["settings_current_password"] = "Bieżące hasło"
         m["settings_default_audio"] = "Domyślny język dźwięku"

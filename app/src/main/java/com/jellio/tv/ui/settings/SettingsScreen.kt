@@ -53,6 +53,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import com.jellio.tv.ui.i18n.genreDisplayName
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -133,6 +136,9 @@ private enum class SettingsCategory(val labelKey: String, val icon: ImageVector)
 // has not turned the whole real feature off, real Quick Connect
 // approval.
 @OptIn(ExperimentalComposeUiApi::class)
+
+private val LocalActiveCategoryFocus = compositionLocalOf<FocusRequester?> { null }
+
 @Composable
 fun SettingsScreen(
     session: Session,
@@ -192,24 +198,34 @@ fun SettingsScreen(
                         selected = entry == category,
                         onFocus = { category = entry },
                         onClick = { runCatching { contentFocus.requestFocus() } },
-                        modifier = Modifier.focusRequester(categoryFocus.getValue(entry)),
+                        modifier = Modifier
+                            .focusRequester(categoryFocus.getValue(entry))
+                            .focusProperties { right = contentFocus },
                     )
                 }
             }
         }
         Spacer(modifier = Modifier.width(48.dp))
+        val currentCategoryFocus = categoryFocus.getValue(category)
+        CompositionLocalProvider(LocalActiveCategoryFocus provides currentCategoryFocus) {
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxSize()
                 .onFocusChanged { contentHasFocus = it.hasFocus }
                 .onPreviewKeyEvent { event ->
-                    if (event.key != Key.Back || !contentHasFocus) return@onPreviewKeyEvent false
-                    if (event.type == KeyEventType.KeyUp) runCatching { categoryFocus.getValue(category).requestFocus() }
-                    true
+                    if (!contentHasFocus) return@onPreviewKeyEvent false
+                    if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                        runCatching { currentCategoryFocus.requestFocus() }
+                        return@onPreviewKeyEvent true
+                    }
+                    false
                 }
                 .focusRequester(contentFocus)
                 .focusRestorer()
+                .focusProperties {
+                    left = currentCategoryFocus
+                }
                 .verticalScroll(scrollState),
         ) {
           Column(modifier = Modifier.widthIn(max = 820.dp)) {
@@ -306,7 +322,7 @@ fun SettingsScreen(
                     )
                 }
 
-                SettingsSection(title = string("settings_display_language"), icon = Icons.Filled.Translate) {
+                SettingsSection(title = string("onboarding_step_playback"), icon = Icons.Filled.Translate) {
                     SettingsPickerRow(
                         label = string("settings_preferred_audio"),
                         value = audioLanguage?.let { languageName(it) } ?: string("settings_no_preference"),
@@ -341,8 +357,8 @@ fun SettingsScreen(
                         description = string("settings_community_desc"),
                     ) {
                         SettingsToggleRow(
-                            label = string("settings_community_row"),
-                            description = string("settings_community_row_desc"),
+                            label = string("settings_community_toggle"),
+                            description = string("settings_community_toggle_desc"),
                             checked = communityRowEnabled,
                             onToggle = { viewModel.setCommunityRowEnabled(session.userId, !communityRowEnabled) },
                         )
@@ -423,7 +439,7 @@ fun SettingsScreen(
                                     val isSelected = selectedGenres.contains(genre)
                                     SettingsRowSurface(onClick = { viewModel.toggleSelectedGenre(session.userId, genre) }) {
                                         SettingsRowText(
-                                            label = genre,
+                                            label = genreDisplayName(genre),
                                             description = if (isSelected) string("settings_genres_included") else null,
                                             color = if (isSelected) JellioSecondary else JellioText,
                                         )
@@ -475,6 +491,7 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(64.dp))
           }
+        }
         }
     }
 
@@ -774,6 +791,7 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
 
 @Composable
 private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
+    val activeCategoryFocus = LocalActiveCategoryFocus.current
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -790,7 +808,7 @@ private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean 
                 shape = RoundedCornerShape(999.dp),
             )
         ),
-        modifier = modifier,
+        modifier = modifier.then(if (activeCategoryFocus != null) Modifier.focusProperties { left = activeCategoryFocus } else Modifier),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
     }
@@ -804,22 +822,32 @@ private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean 
 // same real condition that file's own real.Active check gates both on.
 @Composable
 private fun SleepTimerSection(viewModel: SettingsViewModel) {
-    val statusText by viewModel.sleepTimerStatusText.collectAsState()
     val active by viewModel.sleepTimerActive.collectAsState()
     val isCancelling by viewModel.isCancellingSleepTimer.collectAsState()
 
-    Column {
-        Text(text = statusText, color = JellioTextSecondary)
-        if (active) {
-            Surface(
-                onClick = { viewModel.cancelSleepTimer() },
-                enabled = !isCancelling,
-                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                modifier = Modifier.padding(top = 16.dp),
-            ) {
-                Text(text = if (isCancelling) string("settings_sleep_timer_cancelling") else string("settings_sleep_timer_cancel"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
-            }
+    if (active) {
+        SettingsActionRow(
+            label = if (isCancelling) string("settings_sleep_timer_cancelling") else string("settings_sleep_timer_cancel"),
+            description = string("settings_sleep_timer_running"),
+            icon = Icons.Filled.Bedtime,
+            onClick = { viewModel.cancelSleepTimer() },
+            danger = true,
+        )
+    } else {
+        SettingsRowSurface(
+            onClick = { /* info row */ },
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Bedtime,
+                contentDescription = null,
+                tint = JellioTextSecondary,
+                modifier = Modifier.size(22.dp),
+            )
+            SettingsRowText(
+                label = string("settings_sleep_timer_none"),
+                description = string("settings_sleep_timer_empty"),
+                color = JellioTextSecondary,
+            )
         }
     }
 }
@@ -918,6 +946,7 @@ private fun SettingsRowSurface(
     content: @Composable RowScope.() -> Unit,
 ) {
     val accent = if (danger) DangerColor else JellioSecondary
+    val activeCategoryFocus = LocalActiveCategoryFocus.current
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
@@ -931,7 +960,10 @@ private fun SettingsRowSurface(
             focusedBorder = Border(border = BorderStroke(2.dp, accent), shape = RoundedCornerShape(12.dp)),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+        modifier = modifier
+            .then(if (activeCategoryFocus != null) Modifier.focusProperties { left = activeCategoryFocus } else Modifier)
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1011,6 +1043,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
     val updateState by viewModel.uiState.collectAsState()
 
     Column(modifier = Modifier.padding(top = 12.dp)) {
+        val activeCategoryFocus = LocalActiveCategoryFocus.current
         Surface(
             onClick = { viewModel.checkForUpdateManually() },
             enabled = result != ManualCheckResult.Checking,
@@ -1027,6 +1060,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     shape = RoundedCornerShape(999.dp),
                 )
             ),
+            modifier = if (activeCategoryFocus != null) Modifier.focusProperties { left = activeCategoryFocus } else Modifier,
         ) {
             Text(text = string("settings_check_updates"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
         }

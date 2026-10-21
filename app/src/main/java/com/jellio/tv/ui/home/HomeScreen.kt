@@ -216,7 +216,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(topFixtureHeight + 36.dp),
+                        .height(topFixtureHeight),
                 )
 
                 // Scrollable rows in the bottom viewport

@@ -904,6 +904,8 @@ internal object StringsIt {
         m["settings_community_no_users"] = "Nessun altro utente trovato su questo server."
         m["settings_community_toggle"] = "Mostra riga nella Home"
         m["settings_community_toggle_desc"] = "Mostra la riga \"Cosa guardano gli altri\" tra i consigli della schermata iniziale."
+        m["settings_community_row"] = "Mostra riga nella Home"
+        m["settings_community_row_desc"] = "Mostra la riga \"Cosa guardano gli altri\" tra i consigli della schermata iniziale."
         m["settings_confirm_password"] = "Conferma password"
         m["settings_current_password"] = "Password attuale"
         m["settings_default_audio"] = "Lingua audio predefinita"

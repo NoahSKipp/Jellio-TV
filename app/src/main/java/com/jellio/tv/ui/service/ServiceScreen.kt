@@ -141,7 +141,7 @@ fun ServiceScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(screenHeight - rowsViewportHeight + 36.dp),
+                        .height(screenHeight - rowsViewportHeight),
                 )
 
                 // The service's colour washes in from the top, over the backdrop.
