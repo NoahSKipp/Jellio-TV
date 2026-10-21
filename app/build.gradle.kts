@@ -52,7 +52,12 @@ android {
         }
         // The published build. Same key as debug builds so it installs over them.
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
         }
     }
