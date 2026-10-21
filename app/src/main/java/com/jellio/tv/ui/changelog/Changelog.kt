@@ -108,6 +108,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.84.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.84.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Centered Pill Action Buttons", "Quick Hub drawer action buttons now feature centered icons and labels with sleek 999dp pill curves, 40dp height, and refined semi-bold typography."),
+            ChangelogFeature(Icons.Filled.Tv, "Show Name Priority in Streams Pill", "The floating Now Playing pill and Quick Hub session cards now display the series show name instead of the episode title for TV series."),
+            ChangelogFeature(Icons.Filled.Notifications, "Notifications Clean Up Polish", "The notifications 'Clear all' action button now sports a matching pill aesthetic with centered icon and text."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.84.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.84.0",

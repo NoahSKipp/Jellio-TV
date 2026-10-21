@@ -191,9 +191,11 @@ fun NowPlayingPill(
                         val activeSess = displayedSession
                         val subtitle = when {
                             localPaused != null && activeCount == 0 -> localPaused.title
-                            activeSess?.Item?.Name != null -> {
+                            activeSess?.Item != null -> {
                                 val user = activeSess.UserName ?: Strings.get("tv_someone")
-                                "$user · ${activeSess.Item.Name}"
+                                val mediaName = activeSess.Item.SeriesName?.takeIf { it.isNotBlank() }
+                                    ?: activeSess.Item.Name.orEmpty()
+                                if (mediaName.isNotBlank()) "$user · $mediaName" else null
                             }
                             else -> null
                         }

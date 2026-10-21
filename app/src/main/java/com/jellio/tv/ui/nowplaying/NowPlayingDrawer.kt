@@ -391,7 +391,7 @@ fun NowPlayingDrawer(
                                     Spacer(modifier = Modifier.height(20.dp))
                                     Surface(
                                         onClick = onDismiss,
-                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
                                         colors = ClickableSurfaceDefaults.colors(
                                             containerColor = Color.White.copy(alpha = 0.08f),
@@ -405,8 +405,11 @@ fun NowPlayingDrawer(
                                     ) {
                                         Text(
                                             text = Strings.get("action_cancel"),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            ),
+                                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
                                         )
                                     }
                                 }
@@ -466,7 +469,7 @@ fun NowPlayingDrawer(
                                     Spacer(modifier = Modifier.height(20.dp))
                                     Surface(
                                         onClick = onDismiss,
-                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
                                         colors = ClickableSurfaceDefaults.colors(
                                             containerColor = Color.White.copy(alpha = 0.08f),
@@ -480,8 +483,11 @@ fun NowPlayingDrawer(
                                     ) {
                                         Text(
                                             text = Strings.get("action_cancel"),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            ),
+                                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
                                         )
                                     }
                                 }
@@ -511,7 +517,7 @@ fun NowPlayingDrawer(
                                             )
                                             Surface(
                                                 onClick = { notificationsViewModel.clearAll() },
-                                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                                                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
                                                 colors = ClickableSurfaceDefaults.colors(
                                                     containerColor = Color.White.copy(alpha = 0.08f),
@@ -526,7 +532,8 @@ fun NowPlayingDrawer(
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                                    horizontalArrangement = Arrangement.Center,
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Filled.DeleteSweep,
@@ -1030,6 +1037,7 @@ private fun GroupWatchTabContent(
                                         }
                                     }
                                 },
+                                modifier = Modifier.weight(0.65f),
                             )
                         }
 
@@ -1204,6 +1212,7 @@ private fun GroupWatchTabContent(
                                 label = Strings.get("gw_join"),
                                 primary = true,
                                 onClick = { groupWatchViewModel.join(candidate.GroupId) },
+                                modifier = Modifier.width(96.dp),
                             )
                         }
                     }
@@ -1592,17 +1601,20 @@ private fun SessionCard(
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
+                    val isEpisode = !item.SeriesName.isNullOrBlank()
+                    val primaryTitle = if (isEpisode) item.SeriesName else item.Name.orEmpty()
+                    val secondaryTitle = if (isEpisode) item.Name else if (isLive) item.Source else null
+
                     Text(
-                        text = item.Name.orEmpty(),
+                        text = primaryTitle,
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = JellioText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val subTitle = item.SeriesName ?: if (isLive) item.Source else null
-                    if (!subTitle.isNullOrBlank()) {
+                    if (!secondaryTitle.isNullOrBlank()) {
                         Text(
-                            text = subTitle,
+                            text = secondaryTitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = JellioTextSecondary,
                             maxLines = 1,
@@ -1889,7 +1901,7 @@ private fun DrawerActionButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(999.dp)
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = shape),
@@ -1899,7 +1911,7 @@ private fun DrawerActionButton(
         ),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (primary) Color.White else Color.White.copy(alpha = 0.08f),
-            focusedContainerColor = if (primary) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.22f),
+            focusedContainerColor = if (primary) Color.White else Color.White.copy(alpha = 0.24f),
             contentColor = if (primary) Color.Black else JellioText,
             focusedContentColor = if (primary) Color.Black else Color.White,
         ),
@@ -1913,27 +1925,36 @@ private fun DrawerActionButton(
                 shape = shape,
             ),
         ),
-        modifier = modifier.height(38.dp),
+        modifier = modifier.height(40.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 12.dp),
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
         ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(6.dp))
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
