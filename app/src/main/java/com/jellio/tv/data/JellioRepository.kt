@@ -42,12 +42,15 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -988,9 +991,29 @@ class JellioRepository @Inject constructor(
     // Title info through /Items?ids=, never with MediaSources or
     // MediaStreams. A title Gelato has not imported yet only exists once
     // it is asked for by id, so that request stays as the fallback.
+    private suspend fun <T> withRetry(maxAttempts: Int = 3, initialDelayMs: Long = 1000L, block: suspend () -> T): T {
+        var currentDelay = initialDelayMs
+        repeat(maxAttempts - 1) {
+            try {
+                return block()
+            } catch (e: Exception) {
+                val isTransient = (e is HttpException && e.code() in 500..504) || e is IOException
+                if (isTransient) {
+                    delay(currentDelay)
+                    currentDelay = (currentDelay * 1.5).toLong()
+                } else {
+                    throw e
+                }
+            }
+        }
+        return block()
+    }
+
     private suspend fun fetchItemInfo(userId: String, itemId: String, fields: String?): BaseItemDto =
-        runCatching { api.getItemsByIds(userId, itemId, fields).Items.firstOrNull() }.getOrNull()
-            ?: api.getItem(userId, itemId, fields)
+        withRetry {
+            runCatching { api.getItemsByIds(userId, itemId, fields).Items.firstOrNull() }.getOrNull()
+                ?: api.getItem(userId, itemId, fields)
+        }
 
     // screens/person.js's own real getPerson(): a plain item lookup,
     // real Jellyfin Person items share the same BaseItemDto shape as
@@ -1016,7 +1039,7 @@ class JellioRepository @Inject constructor(
         }
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
-        cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { api.getSeasons(seriesId, userId).Items }
+        cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { withRetry { api.getSeasons(seriesId, userId).Items } }
             .also { recentLists["seasons:$seriesId"] = System.currentTimeMillis() to it }
 
     // Seasons and episodes as last seen, to draw a series page at once.
@@ -1105,7 +1128,9 @@ class JellioRepository @Inject constructor(
 
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
-            api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+            withRetry {
+                api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+            }
         }.also {
             seedPreviews(it)
             if (recentLists.size > 300) recentLists.clear()
@@ -1250,7 +1275,7 @@ class JellioRepository @Inject constructor(
     }
 
     private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
-        val item = api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear")
+        val item = withRetry { api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear") }
         val sources = item.MediaSources ?: emptyList()
         if (sources.size == 1 && !hasStreamInfo(sources[0])) {
             return emptyList()

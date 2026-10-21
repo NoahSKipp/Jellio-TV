@@ -246,15 +246,15 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
             if (isEpisode) {
                 val label = episodeLabel(details)
                 if (label.isNotEmpty()) add(label)
-                details.Name?.takeIf { it.isNotBlank() && label.isNotEmpty() }?.let { add(it) }
+                details.Name?.takeIf { it.isNotBlank() && label.isNotEmpty() }?.let { add(com.jellio.tv.ui.i18n.episodeDisplayName(it, details.IndexNumber)) }
             } else {
                 when (details.Type?.lowercase(Locale.US)) {
-                    "movie" -> add("Movie")
-                    "series" -> add("Series")
+                    "movie" -> add(com.jellio.tv.ui.i18n.Strings.get("search_filter_movies"))
+                    "series" -> add(com.jellio.tv.ui.i18n.Strings.get("nav_shows"))
                     "boxset" -> add("Collection")
                 }
             }
-            (details.Genres?.firstOrNull() ?: series?.Genres?.firstOrNull())?.takeIf { it.isNotBlank() }?.let { add(it) }
+            (details.Genres?.firstOrNull() ?: series?.Genres?.firstOrNull())?.takeIf { it.isNotBlank() }?.let { add(com.jellio.tv.ui.i18n.genreDisplayName(it)) }
             details.RunTimeTicks?.let { ticks ->
                 val minutes = ticks / TICKS_PER_MINUTE
                 if (minutes > 0) add(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m")

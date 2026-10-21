@@ -50,6 +50,7 @@ const val SYNC_TICKS_PER_MS = 10_000L
 private const val TAG = "JellioSyncPlay"
 private const val PING_INTERVAL_MS = 30_000L
 private const val RECONCILE_INTERVAL_MS = 15_000L
+private const val RECONCILE_IDLE_INTERVAL_MS = 60_000L
 private const val RECONNECT_DELAY_MS = 5_000L
 private const val MAX_MEASUREMENTS = 6
 private const val EXPLICIT_LEAVE_GRACE_MS = 20_000L
@@ -96,7 +97,8 @@ class SyncPlayManager @Inject constructor(
         launch {
             while (isActive) {
                 reconcile()
-                delay(RECONCILE_INTERVAL_MS)
+                val interval = if (_group.value != null) RECONCILE_INTERVAL_MS else RECONCILE_IDLE_INTERVAL_MS
+                delay(interval)
             }
         }
         while (isActive) {
@@ -104,6 +106,9 @@ class SyncPlayManager @Inject constructor(
             var keepAlive: Job? = null
             val socket = runCatching {
                 client.newWebSocket(socketRequest(session), object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        launch { reconcile() }
+                    }
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val message = runCatching { JSONObject(text) }.getOrNull() ?: return
                         if (message.optString("MessageType") == "ForceKeepAlive") {

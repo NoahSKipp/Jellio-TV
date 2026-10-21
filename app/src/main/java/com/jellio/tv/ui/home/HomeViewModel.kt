@@ -290,10 +290,10 @@ class HomeViewModel @Inject constructor(
                     val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
                     val topRows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Continue Watching", continueWatching, key = "continue-watching"), landscape = true))
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
                         }
                         if (upNext.isNotEmpty()) {
-                            add(PosterHomeRow(HomeSection("Up Next", upNext, key = "up-next"), landscape = true))
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_next_up"), upNext, key = "up-next"), landscape = true))
                         }
                         // The Watchlist, split by kind, in place of its own nav button.
                         val watchlistMovies = watchlist.filter { it.Type == "Movie" }

@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.i18n
 
+import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.prefs.DisplayPreferences
 
 object Genres {
@@ -57,3 +58,37 @@ object Genres {
 }
 
 fun genreDisplayName(genre: String?): String = Genres.translate(genre)
+
+fun seasonDisplayName(season: BaseItemDto): String {
+    val index = season.IndexNumber
+    if (index != null && index > 0) {
+        return Strings.format("detail_season_number", index)
+    }
+    val name = season.Name.orEmpty().trim()
+    val match = Regex("""(?i)^Season\s+(\d+)$""").matchEntire(name)
+    if (match != null) {
+        val num = match.groupValues[1].toIntOrNull()
+        if (num != null) {
+            return Strings.format("detail_season_number", num)
+        }
+    }
+    if (index == 0 || name.contains("special", ignoreCase = true)) {
+        return Strings.get("detail_specials").ifEmpty { "Specials" }
+    }
+    return name
+}
+
+fun episodeDisplayName(name: String?, indexNumber: Int? = null): String {
+    val raw = name.orEmpty().trim()
+    val match = Regex("""(?i)^Episode\s+(\d+)$""").matchEntire(raw)
+    if (match != null) {
+        val num = match.groupValues[1].toIntOrNull()
+        if (num != null) {
+            return Strings.format("detail_episode_number", num)
+        }
+    }
+    if (raw.isBlank() && indexNumber != null) {
+        return Strings.format("detail_episode_number", indexNumber)
+    }
+    return raw
+}

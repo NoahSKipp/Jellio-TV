@@ -303,7 +303,7 @@ class SettingsViewModel @Inject constructor(
                 _communityUsers.value = repository.getCommunityUsers()
             }
             runCatching {
-                _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sorted()
+                _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sortedBy { com.jellio.tv.ui.i18n.genreDisplayName(it) }
             }
         }
     }

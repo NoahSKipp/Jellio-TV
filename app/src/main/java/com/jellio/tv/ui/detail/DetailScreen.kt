@@ -499,7 +499,7 @@ private fun DetailHero(
 
             val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
             val titleText = if (item.Type == "Episode" && hasEpisodeCode) {
-                "S${item.ParentIndexNumber} E${item.IndexNumber} · ${item.Name.orEmpty()}"
+                "S${item.ParentIndexNumber} E${item.IndexNumber} \u00B7 ${com.jellio.tv.ui.i18n.episodeDisplayName(item.Name, item.IndexNumber)}"
             } else {
                 item.Name.orEmpty()
             }
@@ -520,7 +520,7 @@ private fun DetailHero(
             MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))
 
             item.Genres?.takeIf { it.isNotEmpty() }?.let {
-                Text(text = it.joinToString(", "), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+                Text(text = it.joinToString(", ") { g -> com.jellio.tv.ui.i18n.genreDisplayName(g) }, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
             }
 
             item.Overview?.let {
@@ -715,7 +715,7 @@ private fun SeasonsSection(
                     ),
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                 ) {
-                    Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         }
@@ -800,7 +800,7 @@ private fun EpisodeCard(
                     }
                 }
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = episode.Name.orEmpty(), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.Name, episode.IndexNumber), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     episode.Overview?.let {
                         Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     }

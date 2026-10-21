@@ -101,7 +101,7 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             // The player's loader, with art from the row the title was
             // picked in, until the full details arrive.
-            val preloaded = repository.preloadedDetails(itemId)
+            val preloaded = repository.preloadedDetails(itemId) ?: repository.previewItem(itemId)
             _uiState.value = if (preloaded != null) {
                 DetailUiState(
                     isLoading = false,
@@ -287,8 +287,8 @@ class DetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 findingStreams = false,
                 streamStatus = when {
-                    sources.isFailure -> "Could not check for streams."
-                    sources.getOrNull().isNullOrEmpty() -> "No streams found yet."
+                    sources.isFailure -> com.jellio.tv.ui.i18n.Strings.get("stream_load_error")
+                    sources.getOrNull().isNullOrEmpty() -> com.jellio.tv.ui.i18n.Strings.get("stream_none_found")
                     else -> null
                 },
             )

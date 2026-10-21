@@ -376,7 +376,7 @@ fun PosterCard(
                     }
                     if (progress && episode.isNotEmpty()) {
                         Text(
-                            text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                            text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }?.let { com.jellio.tv.ui.i18n.episodeDisplayName(it, item.IndexNumber) }).joinToString(" \u00B7 "),
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 13.sp,
                             maxLines = 1,

@@ -232,10 +232,10 @@ private fun filteredItems(row: ServiceRow, filter: String): List<BaseItemDto> {
 @Composable
 private fun ServiceHeader(name: String, logoUrl: String?, genres: List<String>, selected: String, onSelect: (String) -> Unit) {
     val chips = buildList {
-        add(ALL_FILTER to "All")
-        add("movies" to "Movies")
-        add("tvshows" to "Shows")
-        genres.forEach { genre -> add("genre:$genre" to genre) }
+        add(ALL_FILTER to com.jellio.tv.ui.i18n.string("search_filter_all"))
+        add("movies" to com.jellio.tv.ui.i18n.string("nav_movies"))
+        add("tvshows" to com.jellio.tv.ui.i18n.string("nav_shows"))
+        genres.forEach { genre -> add("genre:$genre" to com.jellio.tv.ui.i18n.genreDisplayName(genre)) }
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,

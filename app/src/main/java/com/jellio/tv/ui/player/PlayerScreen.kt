@@ -2865,7 +2865,7 @@ private fun EpisodesPanel(
                             )
                         ),
                     ) {
-                        Text(text = season.Name.orEmpty(), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                        Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -2937,7 +2937,7 @@ private fun EpisodeRow(
                 }
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(text = episode.title, color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.title), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (episode.overview != null) {
                     Text(
                         text = episode.overview,
