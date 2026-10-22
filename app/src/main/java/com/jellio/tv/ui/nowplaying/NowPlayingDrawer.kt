@@ -367,59 +367,81 @@ fun NowPlayingDrawer(
                 }
 
                 // Drawer Body
-                when (selectedTab) {
-                    QuickHubTab.NOW_PLAYING -> {
-                        val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
-                        if (totalCount == 0) {
-                            Box(
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Tv,
-                                        contentDescription = null,
-                                        tint = JellioTextSecondary.copy(alpha = 0.4f),
-                                        modifier = Modifier.size(44.dp),
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = Strings.get("now_playing_empty"),
-                                        color = JellioTextSecondary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    Surface(
-                                        onClick = onDismiss,
-                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
-                                        colors = ClickableSurfaceDefaults.colors(
-                                            containerColor = Color.White.copy(alpha = 0.08f),
-                                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
-                                            contentColor = JellioText,
-                                            focusedContentColor = Color.White,
-                                        ),
-                                        border = ClickableSurfaceDefaults.border(
-                                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
-                                        ),
-                                    ) {
-                                        Text(
-                                            text = Strings.get("action_cancel"),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                            ),
-                                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
-                                        )
-                                    }
+                val activeTabFocusRequester = when (selectedTab) {
+                    QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus
+                    QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus
+                    QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .focusProperties {
+                            up = activeTabFocusRequester
+                            onExit = {
+                                if (requestedFocusDirection == FocusDirection.Up) {
+                                    activeTabFocusRequester
+                                } else {
+                                    FocusRequester.Default
                                 }
                             }
-                        } else {
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(16.dp),
-                                contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                            ) {
+                        }
+                        .focusGroup(),
+                ) {
+                    when (selectedTab) {
+                        QuickHubTab.NOW_PLAYING -> {
+                            val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
+                            if (totalCount == 0) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Tv,
+                                            contentDescription = null,
+                                            tint = JellioTextSecondary.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(44.dp),
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = Strings.get("now_playing_empty"),
+                                            color = JellioTextSecondary,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        Surface(
+                                            onClick = onDismiss,
+                                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                            colors = ClickableSurfaceDefaults.colors(
+                                                containerColor = Color.White.copy(alpha = 0.08f),
+                                                focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                                contentColor = JellioText,
+                                                focusedContentColor = Color.White,
+                                            ),
+                                            border = ClickableSurfaceDefaults.border(
+                                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                            ),
+                                        ) {
+                                            Text(
+                                                text = Strings.get("action_cancel"),
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                ),
+                                                modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                                    modifier = Modifier.fillMaxSize(),
+                                ) {
                                 if (localPaused != null) {
                                     item(key = "local_paused") {
                                         LocalPausedCard(
@@ -450,7 +472,7 @@ fun NowPlayingDrawer(
                         val isEmpty = invites.isEmpty() && (notifList == null || notifList.isEmpty())
                         if (isEmpty) {
                             Box(
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -496,7 +518,7 @@ fun NowPlayingDrawer(
                             LazyColumn(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                modifier = Modifier.fillMaxSize(),
                             ) {
                                 // Clear all header
                                 if (notifList != null && notifList.isNotEmpty()) {
@@ -621,13 +643,14 @@ fun NowPlayingDrawer(
                             groups = groups,
                             invites = invites,
                             onRefresh = { gwRefreshKey++ },
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
                 }
             }
         }
     }
+}
 }
 
 @Composable

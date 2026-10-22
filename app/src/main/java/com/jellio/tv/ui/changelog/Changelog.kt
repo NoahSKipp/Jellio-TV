@@ -108,6 +108,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.84.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.84.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Quick Hub Focus Navigation", "Scrolling or navigating up from within the Quick Hub drawer now directly selects the currently active section badge (Now Playing, Notifications, or Group Watch)."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.84.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.84.1",
