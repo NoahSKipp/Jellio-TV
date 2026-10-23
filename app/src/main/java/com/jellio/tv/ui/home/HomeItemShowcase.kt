@@ -26,9 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -68,7 +66,7 @@ fun HomeItemShowcase(
     imageUrl: (BaseItemDto, String, Int) -> String,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxWidth().background(JellioBg).clipToBounds()) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().background(JellioBg)) {
         if (item == null) return@BoxWithConstraints
         val details = info?.item?.takeIf { it.Id == item.Id } ?: item
         val series = info?.series?.takeIf { info.item.Id == item.Id }
@@ -138,42 +136,27 @@ private fun ShowcaseBackdrop(
     val url = candidates.getOrNull(index) ?: return
     val context = LocalContext.current
     BoxWithConstraints(
-        modifier = modifier
-            .clipToBounds()
-            .drawWithCache {
-                val sideFade = Brush.horizontalGradient(
-                    0f to JellioBg,
-                    0.18f to JellioBg.copy(alpha = 0.9f),
-                    0.42f to JellioBg.copy(alpha = 0.55f),
-                    0.68f to JellioBg.copy(alpha = 0.15f),
-                    1f to Color.Transparent,
-                    endX = size.width * 0.7f,
-                )
-                val bottomFade = Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.35f to Color.Transparent,
-                    0.65f to JellioBg.copy(alpha = 0.75f),
-                    0.85f to JellioBg,
-                    1f to JellioBg,
-                    startY = 0f,
-                    endY = size.height,
-                )
-                onDrawWithContent {
-                    drawContent()
-                    drawRect(sideFade)
-                    drawRect(
-                        brush = bottomFade,
-                        topLeft = Offset.Zero,
-                        size = size,
-                    )
-                    // Guarantee solid background covers the bottom edge completely
-                    drawRect(
-                        color = JellioBg,
-                        topLeft = Offset(0f, size.height * 0.90f),
-                        size = Size(size.width, size.height * 0.10f),
-                    )
-                }
-            },
+        modifier = modifier.drawWithCache {
+            val sideFade = Brush.horizontalGradient(
+                0f to JellioBg,
+                0.18f to JellioBg.copy(alpha = 0.9f),
+                0.42f to JellioBg.copy(alpha = 0.55f),
+                0.68f to JellioBg.copy(alpha = 0.15f),
+                1f to Color.Transparent,
+                endX = size.width * 0.7f,
+            )
+            val bottomFade = Brush.verticalGradient(
+                0f to Color.Transparent,
+                0.55f to Color.Transparent,
+                0.8f to JellioBg.copy(alpha = 0.7f),
+                1f to JellioBg,
+            )
+            onDrawWithContent {
+                drawContent()
+                drawRect(sideFade)
+                drawRect(bottomFade)
+            }
+        },
     ) {
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
@@ -192,7 +175,7 @@ private fun ShowcaseBackdrop(
             contentScale = ContentScale.Crop,
             alignment = Alignment.TopCenter,
             onError = { index += 1 },
-            modifier = Modifier.fillMaxSize().clipToBounds(),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
@@ -262,7 +245,7 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
             val year = details.ProductionYear?.toString() ?: details.PremiereDate?.take(4)
             if (!year.isNullOrBlank()) {
                 val ongoing = !isEpisode && details.Status.equals("Continuing", ignoreCase = true)
-                add(if (ongoing) "$year-" else year)
+                add(if (ongoing) "$year–" else year)
             }
         }
     }
