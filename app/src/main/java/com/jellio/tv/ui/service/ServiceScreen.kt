@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -168,6 +169,7 @@ fun ServiceScreen(
                             .align(Alignment.BottomStart)
                             .fillMaxWidth()
                             .height(rowsViewportHeight)
+                            .clipToBounds()
                             .focusRequester(contentFocusRequester)
                             .focusRestorer(),
                     ) {

@@ -3,6 +3,7 @@ package com.jellio.tv.ui.home
 import com.jellio.tv.ui.common.rowEntry
 import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +39,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-private val CardWidth = 170.dp
 
 private val ISO_FORMATS = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
@@ -120,7 +120,8 @@ private fun ComingSoonCard(
     imageUrl: (String, String?, String, Int) -> String,
     onClick: () -> Unit,
 ) {
-    val cardWidth = CardWidth.scaled()
+    // Same size as the poster rows so the row lines up with the others.
+    val cardWidth = PosterWidth.scaled()
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
@@ -128,34 +129,38 @@ private fun ComingSoonCard(
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
         modifier = Modifier.width(cardWidth),
     ) {
-        Column {
-            Box {
-                AsyncImage(
-                    model = imageUrl(entry.ItemId, null, "Primary", 400),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.width(cardWidth).aspectRatio(2f / 3f),
+        Box {
+            AsyncImage(
+                model = imageUrl(entry.ItemId, null, "Primary", 400),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.width(cardWidth).aspectRatio(2f / 3f),
+            )
+            Box(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .align(Alignment.TopStart)
+                    .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp)),
+            ) {
+                Text(
+                    text = comingSoonDateLabel(entry),
+                    color = com.jellio.tv.ui.theme.JellioRarityLegendary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
-                Box(
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .align(Alignment.TopStart)
-                        .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp)),
-                ) {
-                    Text(
-                        text = comingSoonDateLabel(entry),
-                        color = com.jellio.tv.ui.theme.JellioRarityLegendary,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
             }
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(text = entry.Name ?: "", color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .width(cardWidth)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, JellioBg.copy(alpha = 0.92f))))
+                    .padding(start = 8.dp, end = 8.dp, top = 24.dp, bottom = 8.dp),
+            ) {
+                Text(text = entry.Name ?: "", color = JellioText, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = comingSoonKindLabel(entry),
                     color = JellioTextSecondary,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

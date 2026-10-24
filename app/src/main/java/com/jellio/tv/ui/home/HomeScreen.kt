@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -234,6 +235,7 @@ fun HomeScreen(
                             .align(Alignment.BottomStart)
                             .fillMaxWidth()
                             .height(rowsViewportHeight)
+                            .clipToBounds()
                             .focusRestorer(),
                     ) {
                         if (editMode) {
