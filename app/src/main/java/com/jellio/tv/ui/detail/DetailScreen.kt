@@ -462,7 +462,9 @@ private fun DetailHero(
     onLike: () -> Unit,
     onDislike: () -> Unit,
 ) {
-    val backdropUrl = heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
+    val season = state.selectedSeason?.takeIf { item.Type == "Series" }
+    val backdropUrl = season?.BackdropImageTags?.firstOrNull()?.let { imageUrl(season.Id, it, "Backdrop", 1920) }
+        ?: heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
     val heroHeight = HeroHeight.scaled()
     Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
         if (backdropUrl != null) {
@@ -523,7 +525,7 @@ private fun DetailHero(
                 Text(text = it.joinToString(", ") { g -> com.jellio.tv.ui.i18n.genreDisplayName(g) }, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
             }
 
-            item.Overview?.let {
+            (season?.Overview?.takeIf { it.isNotBlank() } ?: item.Overview)?.let {
                 Text(
                     text = it,
                     color = JellioTextSecondary,

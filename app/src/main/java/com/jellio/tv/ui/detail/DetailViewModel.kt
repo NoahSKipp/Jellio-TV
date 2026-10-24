@@ -36,6 +36,9 @@ data class DetailUiState(
     val seasons: List<BaseItemDto> = emptyList(),
     val selectedSeasonId: String? = null,
     val selectedSeasonEpisodes: List<BaseItemDto> = emptyList(),
+    // The picked season's own details: its description, cast and backdrop
+    // replace the show's where it has them.
+    val selectedSeason: BaseItemDto? = null,
     val cast: List<com.jellio.tv.data.model.PersonDto> = emptyList(),
     val trailers: List<com.jellio.tv.data.model.TrailerDto> = emptyList(),
     val playLabel: String = com.jellio.tv.ui.i18n.Strings.get("action_play"),
@@ -223,6 +226,13 @@ class DetailViewModel @Inject constructor(
             selectedSeasonId = seasonId,
             selectedSeasonEpisodes = known ?: if (showing) _uiState.value.selectedSeasonEpisodes else emptyList(),
         )
+        viewModelScope.launch {
+            val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
+            if (_uiState.value.selectedSeasonId != seasonId) return@launch
+            val seriesCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+            val seasonCast = season.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+            _uiState.value = _uiState.value.copy(selectedSeason = season, cast = seasonCast.ifEmpty { seriesCast })
+        }
         viewModelScope.launch {
             val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
             if (_uiState.value.selectedSeasonId == seasonId) {
