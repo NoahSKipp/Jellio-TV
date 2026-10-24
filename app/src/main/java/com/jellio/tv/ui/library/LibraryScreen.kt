@@ -120,7 +120,7 @@ fun LibraryScreen(
             else -> {
                 val screenHeight = LocalConfiguration.current.screenHeightDp.dp
                 val density = LocalDensity.current
-                val rowsViewportHeight = screenHeight * 0.54f
+                val rowsViewportHeight = screenHeight * 0.52f
                 val firstItem = featuredRow?.items?.firstOrNull()
                     ?: uiState.mainRow?.items?.firstOrNull()
                     ?: uiState.sections.firstNotNullOfOrNull { it.items.firstOrNull() }

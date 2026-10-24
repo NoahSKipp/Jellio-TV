@@ -85,8 +85,9 @@ fun HomeItemShowcase(
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 48.dp, top = 24.dp, end = 24.dp)
+                // Sits a fixed gap above the rows, which start 36dp above this box's bottom.
+                .align(Alignment.BottomStart)
+                .padding(start = 48.dp, top = 24.dp, end = 24.dp, bottom = 36.dp + 20.dp)
                 .width(maxWidth * 0.46f),
         ) {
             ShowcaseLogo(

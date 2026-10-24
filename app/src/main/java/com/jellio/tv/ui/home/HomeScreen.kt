@@ -205,7 +205,7 @@ fun HomeScreen(
 
                 val screenHeight = LocalConfiguration.current.screenHeightDp.dp
                 val density = LocalDensity.current
-                val rowsViewportHeight = screenHeight * 0.54f
+                val rowsViewportHeight = screenHeight * 0.52f
                 val topFixtureHeight = screenHeight - rowsViewportHeight
                 val firstRowItem = uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
                 ShowcaseHost(
