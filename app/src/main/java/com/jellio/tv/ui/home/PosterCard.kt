@@ -160,10 +160,14 @@ internal fun posterBackdropCandidates(
     val list = CandidateList(imageUrl, maxWidth)
     val ownPrimary = item.ImageTags?.get("Primary") ?: item.PrimaryImageTag
     if (episodeStill && item.isEpisodeLike()) list.tagged(item.Id, ownPrimary, "Primary")
-    list.tagged(item.Id, item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop"), "Backdrop")
+    // An episode's or season's own backdrop is often a small episode still
+    // (Gelato seasons), so the show's artwork goes first for those.
+    val ownBackdrop = item.BackdropImageTags?.firstOrNull() ?: item.ImageTags?.get("Backdrop")
+    if (!item.isEpisodeLike()) list.tagged(item.Id, ownBackdrop, "Backdrop")
     if (series != null) list.tagged(series.Id, series.BackdropImageTags?.firstOrNull(), "Backdrop")
     list.tagged(item.ParentBackdropItemId, item.ParentBackdropImageTags?.firstOrNull(), "Backdrop")
     list.untagged(item.SeriesId, "Backdrop")
+    if (item.isEpisodeLike()) list.tagged(item.Id, ownBackdrop, "Backdrop")
     list.tagged(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb")
     list.tagged(item.Id, item.ImageTags?.get("Thumb") ?: item.ThumbImageTag, "Thumb")
     if (item.isEpisodeLike()) list.tagged(item.Id, ownPrimary, "Primary")

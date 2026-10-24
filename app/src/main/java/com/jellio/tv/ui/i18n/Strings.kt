@@ -34,6 +34,11 @@ object Strings {
                 result = result.replace("{$token}", args[0].toString())
             }
         }
+        // Any other {word} placeholders take the remaining arguments in order.
+        var next = 0
+        result = Regex("\\{([a-z]+)\\}").replace(result) { match ->
+            if (next < args.size) args[next++].toString() else match.value
+        }
         return runCatching {
             String.format(result, *args)
         }.getOrDefault(result)

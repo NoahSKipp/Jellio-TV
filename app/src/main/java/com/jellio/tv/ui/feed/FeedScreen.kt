@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -196,11 +197,14 @@ private fun FeedList(
     focusedEntry: MutableState<FeedEntryDto?>,
     onUserClick: (String) -> Unit,
 ) {
+    // Entering the list from the filters lands on the newest entry, not the one nearest the focused chip.
+    val firstEntry = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+    val first = groups.firstOrNull()?.entries?.firstOrNull()
     LazyColumn(
         state = rememberLazyListState(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 48.dp, end = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize().focusRestorer(),
+        modifier = Modifier.fillMaxSize().focusRestorer(firstEntry),
     ) {
         groups.forEach { group ->
             item(key = "header:" + group.label) {
@@ -220,6 +224,7 @@ private fun FeedList(
                     userImageUrl = userImageUrl,
                     onFocus = { focusedEntry.value = entry },
                     onClick = { onUserClick(entry.UserId) },
+                    modifier = if (entry === first) Modifier.focusRequester(firstEntry) else Modifier,
                 )
             }
         }
@@ -233,6 +238,7 @@ private fun FeedListItem(
     userImageUrl: (String, String?, Int) -> String,
     onFocus: () -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
@@ -247,7 +253,7 @@ private fun FeedListItem(
             focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(14.dp)),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() },
+        modifier = modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() },
     ) {
         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box {

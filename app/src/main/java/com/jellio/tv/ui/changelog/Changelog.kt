@@ -103,6 +103,8 @@ val CHANGELOG_RELEASES = listOf(
         subtitle = "Version 0.54.8",
         features = listOf(
             ChangelogFeature(Icons.Filled.Tv, "Rows Stay in Their Lane", "Rows no longer slide over the description at the top while you scroll, and Coming Soon cards are the same size as the other rows so nothing gets cut off."),
+            ChangelogFeature(Icons.Filled.Tv, "Feed Reads Properly", "Feed entries show the real season and episode numbers again, and moving into the list starts at the newest entry."),
+            ChangelogFeature(Icons.Filled.Tv, "Sharper Show Headers", "Episodes and seasons now use the show's own artwork for the header instead of a small episode still."),
         ),
     ),
     ChangelogRelease(
