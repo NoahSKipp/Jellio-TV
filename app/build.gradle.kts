@@ -82,6 +82,15 @@ android {
     }
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(rootProject.layout.projectDirectory.file("compose_stability_config.conf"))
+    // ./gradlew assembleRelease -PcomposeReports writes which composables still can't skip.
+    if (project.hasProperty("composeReports")) {
+        reportsDestination = layout.buildDirectory.dir("compose_reports")
+        metricsDestination = layout.buildDirectory.dir("compose_metrics")
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
