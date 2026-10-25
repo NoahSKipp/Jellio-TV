@@ -13,6 +13,7 @@ object PlayerPrefs {
     private const val PREBUFFER = "prebuffer"
     private const val DIALOGUE_BOOST = "dialogue_boost"
     private const val AUDIO_PASSTHROUGH = "audio_passthrough"
+    private const val MATCH_FRAME_RATE = "match_frame_rate"
 
     var autoSkipIntro by mutableStateOf(false)
         private set
@@ -27,12 +28,17 @@ object PlayerPrefs {
     var audioPassthrough by mutableStateOf(false)
         private set
 
+    // Switch the TV's refresh rate to suit the video (24 Hz for most films).
+    var matchFrameRate by mutableStateOf(true)
+        private set
+
     fun init(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         autoSkipIntro = prefs.getBoolean(AUTO_SKIP, false)
         prebuffer = prefs.getString(PREBUFFER, "standard") ?: "standard"
         dialogueBoost = prefs.getBoolean(DIALOGUE_BOOST, false)
         audioPassthrough = prefs.getBoolean(AUDIO_PASSTHROUGH, false)
+        matchFrameRate = prefs.getBoolean(MATCH_FRAME_RATE, true)
     }
 
     fun setPrebuffer(context: Context, level: String) {
@@ -53,5 +59,10 @@ object PlayerPrefs {
     fun setAudioPassthrough(context: Context, enabled: Boolean) {
         audioPassthrough = enabled
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(AUDIO_PASSTHROUGH, enabled).apply()
+    }
+
+    fun setMatchFrameRate(context: Context, enabled: Boolean) {
+        matchFrameRate = enabled
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(MATCH_FRAME_RATE, enabled).apply()
     }
 }

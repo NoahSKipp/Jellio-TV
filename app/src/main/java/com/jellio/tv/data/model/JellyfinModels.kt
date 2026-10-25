@@ -105,6 +105,9 @@ data class TrailerDto(
 @JsonClass(generateAdapter = true)
 data class MediaStreamDto(
     val Type: String? = null,
+    // Frames per second of a video stream, as Jellyfin's probe found it.
+    val RealFrameRate: Float? = null,
+    val AverageFrameRate: Float? = null,
     val Codec: String? = null,
     val Language: String? = null,
     val Height: Int? = null,

@@ -1012,6 +1012,8 @@ internal object StringsPt {
         m["settings_signed_in_on"] = "Conectado como %s em %s."
         m["settings_skip_intros"] = "Saltar introduções automaticamente"
         m["settings_skip_intros_desc"] = "Salta a introdução de um episódio automaticamente quando o servidor sabe onde está."
+        m["settings_match_frame_rate"] = "Ajustar a taxa de fotogramas"
+        m["settings_match_frame_rate_desc"] = "Muda a televisão para a taxa do vídeo (24 Hz na maioria dos filmes) para movimento mais suave. O ecrã pode ficar preto um momento durante a mudança."
         m["settings_sleep_timer"] = "Temporizador de repouso"
         m["settings_sleep_timer_cancel"] = "Cancelar temporizador"
         m["settings_sleep_timer_cancelled"] = "Temporizador de repouso cancelado."

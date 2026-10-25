@@ -1012,6 +1012,8 @@ internal object StringsDe {
         m["settings_signed_in_on"] = "Angemeldet als %s auf %s."
         m["settings_skip_intros"] = "Intros automatisch überspringen"
         m["settings_skip_intros_desc"] = "Überspringt das Intro einer Folge automatisch, wenn die Zeitpunkte bekannt sind."
+        m["settings_match_frame_rate"] = "Bildrate anpassen"
+        m["settings_match_frame_rate_desc"] = "Stellt den Fernseher auf die Bildrate des Videos um (24 Hz bei den meisten Filmen) für flüssigere Bewegungen. Beim Umschalten kann das Bild kurz schwarz werden."
         m["settings_sleep_timer"] = "Sleeptimer"
         m["settings_sleep_timer_cancel"] = "Timer abbrechen"
         m["settings_sleep_timer_cancelled"] = "Sleeptimer abgebrochen."

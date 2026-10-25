@@ -369,22 +369,20 @@ fun PosterCard(
                             modifier = Modifier.height(40.dp.scaled()).fillMaxWidth(),
                         )
                     } else {
-                        Text(
+                        com.jellio.tv.ui.common.FocusMarqueeText(
                             text = if (item.isEpisodeLike()) item.SeriesName ?: item.Name.orEmpty() else item.Name.orEmpty(),
+                            focused = isFocused,
                             color = Color.White,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     if (progress && episode.isNotEmpty()) {
-                        Text(
+                        com.jellio.tv.ui.common.FocusMarqueeText(
                             text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }?.let { com.jellio.tv.ui.i18n.episodeDisplayName(it, item.IndexNumber) }).joinToString(" \u00B7 "),
+                            focused = isFocused,
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

@@ -1012,6 +1012,8 @@ internal object StringsPl {
         m["settings_signed_in_on"] = "Zalogowano jako %s na %s."
         m["settings_skip_intros"] = "Automatyczne pomijanie intro"
         m["settings_skip_intros_desc"] = "Automatycznie pomija intro odcinka, gdy serwer zna jego pozycję."
+        m["settings_match_frame_rate"] = "Dopasuj liczbę klatek"
+        m["settings_match_frame_rate_desc"] = "Przełącza telewizor na liczbę klatek filmu (24 Hz w większości filmów), by ruch był płynniejszy. Podczas przełączania ekran może na chwilę zgasnąć."
         m["settings_sleep_timer"] = "Wyłącznik czasowy"
         m["settings_sleep_timer_cancel"] = "Anuluj wyłącznik"
         m["settings_sleep_timer_cancelled"] = "Wyłącznik czasowy anulowany."

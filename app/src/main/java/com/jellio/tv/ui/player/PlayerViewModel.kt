@@ -156,6 +156,8 @@ data class PlayerUiState(
     val subtitle: String = "",
     // Poster shown by the system media controls (Google Home, the phone's remote).
     val artworkUrl: String? = null,
+    // The video's frame rate, for matching the TV's refresh rate.
+    val videoFrameRate: Float? = null,
     val subtitleTracks: List<SubtitleTrackUiState> = emptyList(),
     val selectedSubtitleIndex: Int? = null,
     val isSwitchingSubtitle: Boolean = false,
@@ -576,6 +578,8 @@ class PlayerViewModel @Inject constructor(
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
                     artworkUrl = artworkUrl(session, item, isEpisode),
+                    videoFrameRate = target.mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
+                        ?.let { it.RealFrameRate ?: it.AverageFrameRate },
                     subtitleTracks = subtitleTracks,
                     selectedSubtitleIndex = initialSubtitle,
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),

@@ -283,6 +283,13 @@ fun SettingsScreen(
                     val playerContext = LocalContext.current
                     SettingsDivider()
                     SettingsToggleRow(
+                        label = string("settings_match_frame_rate"),
+                        description = string("settings_match_frame_rate_desc"),
+                        checked = PlayerPrefs.matchFrameRate,
+                        onToggle = { PlayerPrefs.setMatchFrameRate(playerContext, !PlayerPrefs.matchFrameRate) },
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
                         label = string("settings_skip_intros"),
                         description = string("settings_skip_intros_desc"),
                         checked = PlayerPrefs.autoSkipIntro,

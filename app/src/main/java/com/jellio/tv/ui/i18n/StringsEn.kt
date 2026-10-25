@@ -1012,6 +1012,8 @@ internal object StringsEn {
         m["settings_signed_in_on"] = "Signed in as %s on %s."
         m["settings_skip_intros"] = "Auto-skip intros"
         m["settings_skip_intros_desc"] = "Jump past an episode's intro by itself when the server knows where it is."
+        m["settings_match_frame_rate"] = "Match frame rate"
+        m["settings_match_frame_rate_desc"] = "Switches the TV to the video's frame rate (24 Hz for most films) for smoother motion. The screen may go dark for a moment as it switches."
         m["settings_sleep_timer"] = "Sleep timer"
         m["settings_sleep_timer_cancel"] = "Cancel timer"
         m["settings_sleep_timer_cancelled"] = "Sleep timer cancelled."

@@ -1012,6 +1012,8 @@ internal object StringsFr {
         m["settings_signed_in_on"] = "Connecte en tant que %s sur %s."
         m["settings_skip_intros"] = "Passer automatiquement les intros"
         m["settings_skip_intros_desc"] = "Passe automatiquement l'intro d'un épisode lorsque le serveur en connaît l'emplacement."
+        m["settings_match_frame_rate"] = "Adapter la fréquence d'images"
+        m["settings_match_frame_rate_desc"] = "Règle le téléviseur sur la fréquence de la vidéo (24 Hz pour la plupart des films) pour des mouvements plus fluides. L'écran peut devenir noir un instant pendant le changement."
         m["settings_sleep_timer"] = "Minuteur de veille"
         m["settings_sleep_timer_cancel"] = "Annuler le minuteur"
         m["settings_sleep_timer_cancelled"] = "Minuteur de veille annulé."

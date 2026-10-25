@@ -1012,6 +1012,8 @@ internal object StringsEs {
         m["settings_signed_in_on"] = "Conectado como %s en %s."
         m["settings_skip_intros"] = "Saltar intros automáticamente"
         m["settings_skip_intros_desc"] = "Salta la intro de un episodio automáticamente si el servidor conoce la posición."
+        m["settings_match_frame_rate"] = "Ajustar la frecuencia de imagen"
+        m["settings_match_frame_rate_desc"] = "Cambia el televisor a la frecuencia del vídeo (24 Hz en la mayoría de películas) para un movimiento más fluido. La pantalla puede quedarse en negro un momento al cambiar."
         m["settings_sleep_timer"] = "Temporizador de apagado"
         m["settings_sleep_timer_cancel"] = "Cancelar temporizador"
         m["settings_sleep_timer_cancelled"] = "Temporizador cancelado."

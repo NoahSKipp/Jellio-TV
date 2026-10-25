@@ -248,6 +248,16 @@ fun PlayerScreen(
             viewModel.onScreenDisposed()
         }
     }
+    val frameRateActivity = LocalContext.current as? android.app.Activity
+    LaunchedEffect(uiState.videoFrameRate) {
+        val fps = uiState.videoFrameRate
+        if (frameRateActivity != null && fps != null && PlayerPrefs.matchFrameRate) {
+            FrameRateMatcher.apply(frameRateActivity, fps)
+        }
+    }
+    DisposableEffect(frameRateActivity) {
+        onDispose { frameRateActivity?.let { FrameRateMatcher.restore(it) } }
+    }
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {

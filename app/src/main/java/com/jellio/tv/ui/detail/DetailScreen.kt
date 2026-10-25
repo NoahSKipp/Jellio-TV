@@ -786,6 +786,7 @@ private fun EpisodeCard(
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
     val cardWidth = 320.dp.scaled()
+    var cardFocused by remember { mutableStateOf(false) }
     Box(modifier = Modifier.width(cardWidth)) {
         Surface(
             onClick = onClick,
@@ -806,7 +807,10 @@ private fun EpisodeCard(
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             modifier = Modifier
                 .width(cardWidth)
-                .onFocusChanged { if (it.isFocused) onFocused() },
+                .onFocusChanged {
+                    cardFocused = it.isFocused
+                    if (it.isFocused) onFocused()
+                },
         ) {
             Column {
                 Box(modifier = Modifier.width(cardWidth).aspectRatio(16f / 9f)) {
@@ -831,7 +835,7 @@ private fun EpisodeCard(
                     }
                 }
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.Name, episode.IndexNumber), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    com.jellio.tv.ui.common.FocusMarqueeText(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.Name, episode.IndexNumber), focused = cardFocused, color = JellioText)
                     episode.Overview?.let {
                         Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     }
