@@ -53,6 +53,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusable
@@ -119,8 +120,18 @@ private fun heroBackdropUrl(
     if (item.Type == "Episode") {
         item.ImageTags?.get("Primary")?.let { return rawImageUrl(item.Id, it, "Primary") }
     }
+    (item.ImageTags?.get("Thumb") ?: item.ThumbImageTag)?.let { return rawImageUrl(item.Id, it, "Thumb") }
+    if (item.ParentThumbItemId != null && item.ParentThumbImageTag != null) {
+        return rawImageUrl(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb")
+    }
     return null
 }
+
+// Last resort for the header: the poster, blurred to fill the wide frame.
+private fun heroPosterUrl(
+    item: BaseItemDto,
+    rawImageUrl: (itemId: String, tag: String?, imageType: String) -> String,
+): String? = (item.ImageTags?.get("Primary") ?: item.PrimaryImageTag)?.let { rawImageUrl(item.Id, it, "Primary") }
 
 private fun formatRuntime(ticks: Long?): String {
     if (ticks == null || ticks <= 0) return ""
@@ -467,6 +478,7 @@ private fun DetailHero(
         ?: heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
     val heroHeight = HeroHeight.scaled()
     Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
+        val posterFallback = if (backdropUrl == null) heroPosterUrl(item) { id, tag, type -> imageUrl(id, tag, type, 600) } else null
         if (backdropUrl != null) {
             AsyncImage(
                 model = backdropUrl,
@@ -474,6 +486,14 @@ private fun DetailHero(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().height(heroHeight),
             )
+        } else if (posterFallback != null) {
+            AsyncImage(
+                model = posterFallback,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().height(heroHeight).blur(28.dp),
+            )
+            Box(modifier = Modifier.fillMaxWidth().height(heroHeight).background(JellioBg.copy(alpha = 0.35f)))
         }
         Box(
             modifier = Modifier.fillMaxWidth().height(heroHeight).background(
@@ -866,6 +886,11 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
     }
 }
 
+// Same as screens/detail.js extractYouTubeId(): YouTube's own thumbnail, no API key needed.
+private val YOUTUBE_ID = Regex("(?:youtube\\.com/(?:watch\\?v=|embed/)|youtu\\.be/)([\\w-]{11})")
+
+private fun youTubeId(url: String): String? = YOUTUBE_ID.find(url)?.groupValues?.get(1)
+
 @Composable
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
@@ -896,6 +921,14 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                         Column {
                             Box(modifier = Modifier.width(trailerCardWidth).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                                 Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
+                                youTubeId(url)?.let { id ->
+                                    coil3.compose.AsyncImage(
+                                        model = "https://i.ytimg.com/vi/$id/hqdefault.jpg",
+                                        contentDescription = null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
                             }
                             Text(
                                 text = trailer.Name ?: com.jellio.tv.ui.i18n.string("action_trailer"),
