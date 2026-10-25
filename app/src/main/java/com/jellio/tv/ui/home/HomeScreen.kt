@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.jellio.tv.ui.common.dpadFastScroll
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -128,6 +129,11 @@ fun HomeScreen(
     // Read only inside ShowcaseHost: a focus move then recomposes the
     // showcase alone, not this whole screen.
     val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
+    // The last focused card (row key and item id), kept across visits to a
+    // title's page so coming back puts focus right where it was.
+    var lastFocus by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var restorePending by remember { mutableStateOf(true) }
+    val rowFocus = remember { mutableMapOf<String, androidx.compose.ui.focus.FocusRequester>() }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
@@ -236,7 +242,14 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .height(rowsViewportHeight)
                             .clipToBounds()
-                            .focusRestorer(),
+                            .focusRestorer()
+                            .dpadFastScroll(listState) {
+                                // Focus lands on the first row that is fully in view.
+                                val visible = listState.layoutInfo.visibleItemsInfo
+                                val target = visible.firstOrNull { it.offset >= 0 && rowFocus.containsKey(it.key) }
+                                    ?: visible.firstOrNull { rowFocus.containsKey(it.key) }
+                                target?.let { runCatching { rowFocus[it.key]?.requestFocus() } }
+                            },
                         // Room for the last rows to scroll up to the top, as in Nuvio.
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = rowsViewportHeight),
                     ) {
@@ -270,7 +283,12 @@ fun HomeScreen(
                                     is PosterHomeRow -> {
                                         val onRowTitle = remember(row.section) { { rowListTarget = row.section } }
                                         val onRowOptions = remember(row) { { item: BaseItemDto -> cardMenuTarget = CardMenuTarget(item, row) } }
-                                        val onCardFocus = remember { { item: BaseItemDto -> highlightedItem.value = item } }
+                                        val onCardFocus = remember(row.section.key) {
+                                            { item: BaseItemDto ->
+                                                highlightedItem.value = item
+                                                lastFocus = listOf(row.section.key, item.Id)
+                                            }
+                                        }
                                         val onShatterFinished = remember(row, session) {
                                             { item: BaseItemDto ->
                                                 val isShowRemoval = removingTarget?.second == true
@@ -293,6 +311,9 @@ fun HomeScreen(
                                             progress = row.landscape,
                                             removingItemId = if (row.landscape) removingTarget?.first else null,
                                             onShatterFinished = onShatterFinished,
+                                            rowFocusRequester = rowFocus.getOrPut(row.section.key) { androidx.compose.ui.focus.FocusRequester() },
+                                            restoreItemId = lastFocus?.takeIf { restorePending && it[0] == row.section.key }?.get(1),
+                                            onFocusRestored = { restorePending = false },
                                         )
                                     }
                                     is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)

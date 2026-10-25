@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +62,11 @@ fun PosterRow(
     progress: Boolean = false,
     removingItemId: String? = null,
     onShatterFinished: (BaseItemDto) -> Unit = {},
+    // Focus target for the whole row (enters at its last focused card).
+    rowFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    // Coming back to Home: this card takes focus once, then onFocusRestored.
+    restoreItemId: String? = null,
+    onFocusRestored: () -> Unit = {},
 ) {
     val rowItems = remember(section.items) { section.items.distinctBy { it.Id }.take(20) }
     if (rowItems.isEmpty()) return
@@ -73,7 +80,8 @@ fun PosterRow(
                 state = rowState,
                 contentPadding = PaddingValues(horizontal = RowStartPadding),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.rowEntry(firstCard),
+                modifier = (if (rowFocusRequester != null) Modifier.focusRequester(rowFocusRequester) else Modifier)
+                    .rowEntry(firstCard),
             ) {
                 // Real feedback live: a focusable heading blocked ordinary
                 // Left/Right between cards in the same row, the nearest
@@ -86,8 +94,17 @@ fun PosterRow(
                 items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
                     val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                     val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
+                    val restoreHere = item.Id == restoreItemId
+                    val restoreRequester = if (restoreHere) remember { androidx.compose.ui.focus.FocusRequester() } else null
+                    if (restoreRequester != null) {
+                        LaunchedEffect(Unit) {
+                            runCatching { restoreRequester.requestFocus() }
+                            onFocusRestored()
+                        }
+                    }
                     RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
                         PosterCard(
+                            modifier = if (restoreRequester != null) Modifier.focusRequester(restoreRequester) else Modifier,
                             item = item,
                             imageUrl = imageUrl,
                             onClick = onCardClick,

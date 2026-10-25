@@ -283,6 +283,8 @@ private fun JellioTvApp(
     // (screens/detail.js's own #/item and #/play routes, real browser
     // history underneath the web build's own back button).
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
+    // Home keeps its scroll positions and focused card while a title's page is open.
+    val screenStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val route = routeStack.last()
     LaunchedEffect(route) {
         com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen")
@@ -460,7 +462,8 @@ private fun JellioTvApp(
                 onUserClick = { userId -> push(JellioRoute.Profile(userId)) },
                 modifier = Modifier.fillMaxSize(),
             )
-            JellioRoute.Home -> HomeScreen(
+            JellioRoute.Home -> screenStates.SaveableStateProvider("home") {
+                HomeScreen(
                 session = session,
                 imageUrl = memoizedImageUrl,
                 rawImageUrl = memoizedRawImageUrl,
@@ -487,6 +490,7 @@ private fun JellioTvApp(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            }
             JellioRoute.Search -> SearchScreen(
                 session = session,
                 imageUrl = memoizedImageUrl,
