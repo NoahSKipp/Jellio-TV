@@ -222,9 +222,10 @@ fun HomeScreen(
                 )
 
                 // Scrollable rows in the bottom viewport
+                val defaultScrollSpec = LocalBringIntoViewSpec.current.scrollAnimationSpec
                 val verticalRowBringIntoViewSpec = remember(density) {
                     val topInsetPx = with(density) { RowHeaderHeight.toPx() }
-                    com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx) { listState.canScrollBackward }
+                    com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx, scrollAnimationSpec = defaultScrollSpec) { listState.canScrollBackward }
                 }
 
                 CompositionLocalProvider(LocalBringIntoViewSpec provides verticalRowBringIntoViewSpec) {

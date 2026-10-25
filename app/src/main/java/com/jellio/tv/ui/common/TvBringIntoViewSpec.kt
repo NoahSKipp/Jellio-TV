@@ -67,12 +67,13 @@ internal fun rememberTvHorizontalBringIntoViewSpec(leading: Dp = 48.dp): BringIn
 @OptIn(ExperimentalFoundationApi::class)
 internal class TvVerticalRowBringIntoViewSpec(
     private val topInsetPx: Float = 0f,
+    // The surrounding default spec's animation (LocalBringIntoViewSpec before ours).
+    override val scrollAnimationSpec: AnimationSpec<Float>,
     private val canScrollBackward: () -> Boolean = { true },
 ) : BringIntoViewSpec {
     // Nuvio's home: Compose's own default scroll animation, and the focused
     // card parked topInsetPx below the top. One target per move, so a scroll
     // never changes course halfway.
-    override val scrollAnimationSpec: AnimationSpec<Float> = BringIntoViewSpec.DefaultScrollAnimationSpec
 
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         if (kotlin.math.abs(offset - topInsetPx) < 1f) return 0f

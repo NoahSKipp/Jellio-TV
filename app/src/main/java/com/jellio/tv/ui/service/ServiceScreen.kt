@@ -161,8 +161,9 @@ fun ServiceScreen(
                     )
                 }
 
+                val defaultScrollSpec = LocalBringIntoViewSpec.current.scrollAnimationSpec
                 val rowsSpec = remember(density) {
-                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }) { listState.canScrollBackward }
+                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }, scrollAnimationSpec = defaultScrollSpec) { listState.canScrollBackward }
                 }
                 CompositionLocalProvider(LocalBringIntoViewSpec provides rowsSpec) {
                     LazyColumn(
