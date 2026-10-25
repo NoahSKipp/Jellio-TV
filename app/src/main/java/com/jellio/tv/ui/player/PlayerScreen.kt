@@ -34,6 +34,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Forward10
@@ -1499,6 +1502,7 @@ private fun PlayerSurface(
                 onReplay = onRestart,
                 onBack = onBack,
                 backdropUrl = pauseInfo?.backdropUrl,
+                info = pauseInfo,
             )
         }
 
@@ -2140,28 +2144,50 @@ private fun EndScreen(
     onReplay: () -> Unit,
     onBack: () -> Unit,
     backdropUrl: String?,
+    info: PauseOverlayInfo?,
 ) {
     val firstFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         delay(150)
         runCatching { firstFocus.requestFocus() }
     }
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    // The backdrop drifts in slowly behind the panel.
+    val drift = rememberInfiniteTransition(label = "endDrift")
+    val zoom by drift.animateFloat(
+        initialValue = 1.04f,
+        targetValue = 1.14f,
+        animationSpec = infiniteRepeatable(tween(20_000), RepeatMode.Reverse),
+        label = "endZoom",
+    )
+    Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
         if (backdropUrl != null) {
             AsyncImage(
                 model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(0.35f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { scaleX = zoom; scaleY = zoom }
+                    .alpha(0.7f),
             )
         }
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.horizontalGradient(0f to JellioBg, 0.45f to JellioBg.copy(alpha = 0.85f), 1f to Color.Transparent),
+            ),
+        )
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.55f to Color.Transparent, 1f to JellioBg),
+            ),
+        )
         Column(
-            modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 900.dp),
+            modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 760.dp),
         ) {
             if (next != null) {
-                Text(text = com.jellio.tv.ui.i18n.Strings.get("player_up_next"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                Text(text = com.jellio.tv.ui.i18n.Strings.get("player_up_next").uppercase(), color = JellioSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
                 next.seriesName?.let {
-                    Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
+                    Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                 }
                 Row(modifier = Modifier.padding(top = 20.dp), verticalAlignment = Alignment.Top) {
                     if (next.thumbnailUrl != null) {
@@ -2169,7 +2195,8 @@ private fun EndScreen(
                             model = next.thumbnailUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.width(320.dp).height(180.dp).clip(RoundedCornerShape(12.dp)),
+                            modifier = Modifier.width(320.dp).height(180.dp).clip(RoundedCornerShape(14.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(14.dp)),
                         )
                     }
                     Column(modifier = Modifier.padding(start = if (next.thumbnailUrl != null) 24.dp else 0.dp)) {
@@ -2180,10 +2207,58 @@ private fun EndScreen(
                     }
                 }
             } else {
-                Text(text = com.jellio.tv.ui.i18n.Strings.get("action_done"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
-                Text(text = finishedTitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 4.dp))
+                // Finished: a check badge, the title's logo (or its name), its
+                // details and a few lines of what it was about.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(JellioSecondary.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                ) {
+                    androidx.tv.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = JellioSecondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = com.jellio.tv.ui.i18n.Strings.get("action_done").uppercase(),
+                        color = JellioSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+                val logo = info?.logoUrl
+                if (logo != null) {
+                    AsyncImage(
+                        model = logo,
+                        contentDescription = finishedTitle,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                        modifier = Modifier.padding(top = 18.dp).height(120.dp).widthIn(max = 520.dp),
+                    )
+                } else {
+                    Text(
+                        text = finishedTitle,
+                        color = JellioText,
+                        style = androidx.tv.material3.MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                }
                 if (finishedSubtitle.isNotEmpty()) {
-                    Text(text = finishedSubtitle, color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+                    Text(text = finishedSubtitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                }
+                val details = listOfNotNull(info?.year, info?.officialRating, info?.rating?.let { "★ $it" })
+                if (details.isNotEmpty()) {
+                    Text(text = details.joinToString("  ·  "), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+                }
+                info?.overview?.takeIf { it.isNotBlank() }?.let {
+                    Text(text = it, color = JellioTextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 28.dp)) {
@@ -2191,14 +2266,15 @@ private fun EndScreen(
                     EndScreenButton(
                         label = if (countdown != null && countdown > 0) com.jellio.tv.ui.i18n.Strings.format("player_play_next_episode_countdown", countdown) else com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
                         primary = true,
+                        icon = Icons.Filled.PlayArrow,
                         onClick = onPlayNext,
                         modifier = Modifier.focusRequester(firstFocus),
                     )
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), onClick = onReplay)
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
                 } else {
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
                 }
             }
         }
@@ -2206,7 +2282,13 @@ private fun EndScreen(
 }
 
 @Composable
-private fun EndScreenButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false) {
+private fun EndScreenButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
@@ -2221,7 +2303,13 @@ private fun EndScreenButton(label: String, onClick: () -> Unit, modifier: Modifi
         ),
         modifier = modifier,
     ) {
-        Text(text = label, maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)) {
+            if (icon != null) {
+                androidx.tv.material3.Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp).padding(end = 0.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(text = label, maxLines = 1, softWrap = false)
+        }
     }
 }
 
