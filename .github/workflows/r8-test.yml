@@ -1,0 +1,49 @@
+name: R8 Test APK
+
+on:
+  push:
+    branches:
+      - r8-test
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # A release build (not debuggable, so ART fully optimises it and the
+      # Compose baseline profiles apply), signed with the same key as before.
+      - name: Restore signing key
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$RUNNER_TEMP/jellio-tv.keystore"
+            echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/jellio-tv.keystore" >> "$GITHUB_ENV"
+          fi
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+
+      - name: Assemble release APK
+        run: ./gradlew :app:assembleRelease
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jellio-tv-r8-test
+          path: app/build/outputs/apk/release/app-release.apk
