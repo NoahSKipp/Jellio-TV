@@ -128,6 +128,9 @@ import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
 import com.jellio.tv.data.model.SUBTITLE_SIZES
+import com.jellio.tv.data.model.SUBTITLE_COLORS
+import com.jellio.tv.data.model.SUBTITLE_EDGES
+import com.jellio.tv.data.model.SUBTITLE_POSITIONS
 import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.subtitleBackgroundOption
 import com.jellio.tv.data.model.subtitleSizeOption
@@ -319,6 +322,7 @@ fun PlayerScreen(
                 subtitleStyle = subtitleStyle,
                 onSetSubtitleSize = { viewModel.setSubtitleSize(it) },
                 onSetSubtitleBackground = { viewModel.setSubtitleBackground(it) },
+                onSetSubtitleLook = { viewModel.setSubtitleLook(it) },
                 onSelectAudioTrack = { streamIndex, positionTicks -> viewModel.switchAudioTrack(session, streamIndex, positionTicks) },
                 onSelectSource = { source, positionTicks -> viewModel.switchSource(session, source, positionTicks) },
                 onSelectSeason = { seasonId ->
@@ -436,6 +440,7 @@ private fun PlayerSurface(
     subtitleStyle: SubtitleStyle,
     onSetSubtitleSize: (String) -> Unit,
     onSetSubtitleBackground: (String) -> Unit,
+    onSetSubtitleLook: (SubtitleStyle) -> Unit,
     onSelectAudioTrack: (Int, Long) -> Unit,
     onSelectSource: (MediaSourceDto, Long) -> Unit,
     onSelectSeason: (String) -> Unit,
@@ -487,8 +492,28 @@ private fun PlayerSurface(
             )
     }
 
+    // Audio and subtitle sync, read by SyncDelayMediaSource as samples are read.
+    val syncDelays = remember(currentItemId) { SyncDelays(PlayerPrefs.audioDelayMs, SubtitleSync.load(context, currentItemId)) }
+    var subtitleOffsetMs by remember(currentItemId) { mutableStateOf(syncDelays.subtitleMs) }
+    var audioDelayMs by remember { mutableStateOf(syncDelays.audioMs) }
+    var subtitleResyncSeq by remember { mutableStateOf(0) }
+    fun setSubtitleOffset(ms: Int) {
+        subtitleOffsetMs = ms
+        syncDelays.subtitleMs = ms
+        SubtitleSync.save(context, currentItemId, ms)
+        subtitleResyncSeq++
+    }
+
     @OptIn(UnstableApi::class)
-    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
+    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource =
+        SyncDelayMediaSource(
+            buildBaseMediaSource(sideloadedTrack),
+            audioDelayUs = { syncDelays.audioMs * 1000L },
+            subtitleDelayUs = { syncDelays.subtitleMs * 1000L },
+        )
+
+    @OptIn(UnstableApi::class)
+    fun buildBaseMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
         val mediaItem = MediaItem.Builder()
             .setUri(streamUrl)
             .setMediaMetadata(
@@ -1257,6 +1282,7 @@ private fun PlayerSurface(
                 view.subtitleView?.let { subtitleView ->
                     subtitleView.setStyle(subtitleCaptionStyle(subtitleStyle))
                     subtitleView.setFractionalTextSize(subtitleFractionalTextSize(subtitleStyle))
+                    subtitleView.setBottomPaddingFraction(SUBTITLE_POSITIONS.firstOrNull { it.first == subtitleStyle.position }?.second ?: 0.08f)
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -1375,6 +1401,14 @@ private fun PlayerSurface(
             )
         }
 
+        // A subtitle offset change re-reads the subtitle track from where
+        // playback is, once the buttons have been left alone for a moment.
+        LaunchedEffect(subtitleResyncSeq) {
+            if (subtitleResyncSeq == 0) return@LaunchedEffect
+            kotlinx.coroutines.delay(600)
+            player.seekTo(player.currentPosition)
+        }
+
         if (showAudioMenu) {
             AudioMenu(
                 tracks = audioTracks,
@@ -1388,6 +1422,12 @@ private fun PlayerSurface(
                     val next = !PlayerPrefs.dialogueBoost
                     PlayerPrefs.setDialogueBoost(playerContext, next)
                     onShowToast(if (next) "Dialogue Boost enabled (night mode dynamic compression)" else "Dialogue Boost disabled")
+                },
+                audioDelayMs = audioDelayMs,
+                onAudioDelay = { ms ->
+                    audioDelayMs = ms
+                    syncDelays.audioMs = ms
+                    PlayerPrefs.setAudioDelay(playerContext, ms)
                 },
                 onDismiss = { showAudioMenu = false },
             )
@@ -1538,6 +1578,10 @@ private fun PlayerSurface(
                 subtitleStyle = subtitleStyle,
                 onSetSubtitleSize = onSetSubtitleSize,
                 onSetSubtitleBackground = onSetSubtitleBackground,
+                onSetSubtitleLook = onSetSubtitleLook,
+                subtitleOffsetMs = subtitleOffsetMs,
+                onSubtitleOffset = { ms -> setSubtitleOffset(ms) },
+                canSyncSubtitles = selectedSubtitleIndex != null && subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.isTextBased == true,
                 onDismiss = { showSubtitleMenu = false },
             )
         }
@@ -2719,6 +2763,8 @@ private fun AudioMenu(
     defaultStreamIndex: Int?,
     onSelect: (Int) -> Unit,
     onToggleDialogueBoost: () -> Unit,
+    audioDelayMs: Int,
+    onAudioDelay: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -2787,6 +2833,12 @@ private fun AudioMenu(
                 label = com.jellio.tv.ui.i18n.Strings.format("player_dialogue_boost", if (PlayerPrefs.dialogueBoost) com.jellio.tv.ui.i18n.Strings.get("state_on") else com.jellio.tv.ui.i18n.Strings.get("state_off")),
                 isSelected = PlayerPrefs.dialogueBoost,
                 onClick = onToggleDialogueBoost,
+            )
+            SyncAdjustRow(
+                label = com.jellio.tv.ui.i18n.Strings.get("player_audio_sync"),
+                valueMs = audioDelayMs,
+                stepMs = 50,
+                onChange = onAudioDelay,
             )
         }
     }
@@ -3075,6 +3127,10 @@ private fun SubtitleMenu(
     subtitleStyle: SubtitleStyle,
     onSetSubtitleSize: (String) -> Unit,
     onSetSubtitleBackground: (String) -> Unit,
+    onSetSubtitleLook: (SubtitleStyle) -> Unit,
+    subtitleOffsetMs: Int,
+    onSubtitleOffset: (Int) -> Unit,
+    canSyncSubtitles: Boolean,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -3105,6 +3161,7 @@ private fun SubtitleMenu(
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
             )
+            SubtitlePreview(style = subtitleStyle)
             LazyColumn {
                 item {
                     SubtitleMenuRow(
@@ -3136,6 +3193,40 @@ private fun SubtitleMenu(
                         selected = subtitleStyle.background,
                         onSelect = onSetSubtitleBackground,
                     )
+                }
+                item {
+                    SubtitleStyleGroup(
+                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_color"),
+                        options = SUBTITLE_COLORS.map { it.first to com.jellio.tv.ui.i18n.Strings.get("subtitle_color_" + it.first) },
+                        selected = subtitleStyle.color,
+                        onSelect = { onSetSubtitleLook(subtitleStyle.copy(color = it)) },
+                    )
+                }
+                item {
+                    SubtitleStyleGroup(
+                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_edge"),
+                        options = SUBTITLE_EDGES.map { it to com.jellio.tv.ui.i18n.Strings.get("subtitle_edge_" + it) },
+                        selected = subtitleStyle.edge,
+                        onSelect = { onSetSubtitleLook(subtitleStyle.copy(edge = it)) },
+                    )
+                }
+                item {
+                    SubtitleStyleGroup(
+                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_position"),
+                        options = SUBTITLE_POSITIONS.map { it.first to com.jellio.tv.ui.i18n.Strings.get("subtitle_pos_" + it.first) },
+                        selected = subtitleStyle.position,
+                        onSelect = { onSetSubtitleLook(subtitleStyle.copy(position = it)) },
+                    )
+                }
+                if (canSyncSubtitles) {
+                    item {
+                        SyncAdjustRow(
+                            label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_sync"),
+                            valueMs = subtitleOffsetMs,
+                            stepMs = 100,
+                            onChange = onSubtitleOffset,
+                        )
+                    }
                 }
             }
         }
@@ -3193,12 +3284,19 @@ private fun subtitleCaptionStyle(style: SubtitleStyle): CaptionStyleCompat {
         "solid" -> android.graphics.Color.argb(230, 0, 0, 0)
         else -> android.graphics.Color.argb(128, 0, 0, 0)
     }
+    val textColor = SUBTITLE_COLORS.firstOrNull { it.first == style.color }?.second ?: Color.White.toArgb()
+    val edgeType = when (style.edge) {
+        "outline" -> CaptionStyleCompat.EDGE_TYPE_OUTLINE
+        "shadow" -> CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW
+        "raised" -> CaptionStyleCompat.EDGE_TYPE_RAISED
+        else -> CaptionStyleCompat.EDGE_TYPE_NONE
+    }
     return CaptionStyleCompat(
-        Color.White.toArgb(),
+        textColor,
         backgroundColor,
         Color.Transparent.toArgb(),
-        CaptionStyleCompat.EDGE_TYPE_NONE,
-        Color.Transparent.toArgb(),
+        edgeType,
+        android.graphics.Color.BLACK,
         null,
     )
 }
@@ -3215,6 +3313,75 @@ private fun subtitleFractionalTextSize(style: SubtitleStyle): Float {
     val option = subtitleSizeOption(style.size)
     val medium = SUBTITLE_SIZES.first { it.value == "medium" }
     return SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * (option.rem / medium.rem)
+}
+
+// A sample line drawn the way subtitles will look, updating as the menu changes.
+@Composable
+private fun SubtitlePreview(style: SubtitleStyle) {
+    val textColor = Color(SUBTITLE_COLORS.firstOrNull { it.first == style.color }?.second ?: android.graphics.Color.WHITE)
+    val background = when (style.background) {
+        "none" -> Color.Transparent
+        "solid" -> Color.Black.copy(alpha = 0.9f)
+        else -> Color.Black.copy(alpha = 0.5f)
+    }
+    val shadow = when (style.edge) {
+        "outline" -> androidx.compose.ui.graphics.Shadow(Color.Black, androidx.compose.ui.geometry.Offset.Zero, 6f)
+        "shadow" -> androidx.compose.ui.graphics.Shadow(Color.Black, androidx.compose.ui.geometry.Offset(3f, 3f), 4f)
+        "raised" -> androidx.compose.ui.graphics.Shadow(Color.Black, androidx.compose.ui.geometry.Offset(-2f, -2f), 2f)
+        else -> null
+    }
+    val size = subtitleSizeOption(style.size).rem
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .height(84.dp)
+            .background(Brush.verticalGradient(listOf(Color(0xFF2B3A55), Color(0xFF151B28))), RoundedCornerShape(10.dp)),
+    ) {
+        Text(
+            text = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_preview"),
+            color = textColor,
+            fontSize = (13f * size).sp,
+            style = androidx.compose.ui.text.TextStyle(shadow = shadow),
+            modifier = Modifier.background(background, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+// Moves subtitles or sound earlier (-) or later (+) in steps, with a reset.
+@Composable
+private fun SyncAdjustRow(label: String, valueMs: Int, stepMs: Int, onChange: (Int) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+        Text(text = label, color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            SyncButton("−") { onChange((valueMs - stepMs).coerceAtLeast(-10_000)) }
+            Text(
+                text = (if (valueMs > 0) "+" else "") + String.format(java.util.Locale.US, "%.2f s", valueMs / 1000f),
+                color = JellioText,
+                modifier = Modifier.width(76.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            SyncButton("+") { onChange((valueMs + stepMs).coerceAtMost(10_000)) }
+            if (valueMs != 0) SyncButton(com.jellio.tv.ui.i18n.Strings.get("player_sync_reset")) { onChange(0) }
+        }
+    }
+}
+
+@Composable
+private fun SyncButton(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.White.copy(alpha = 0.1f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.3f),
+            focusedContentColor = JellioText,
+        ),
+    ) {
+        Text(text = label, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+    }
 }
 
 @Composable

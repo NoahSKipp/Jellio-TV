@@ -14,6 +14,7 @@ object PlayerPrefs {
     private const val DIALOGUE_BOOST = "dialogue_boost"
     private const val AUDIO_PASSTHROUGH = "audio_passthrough"
     private const val MATCH_FRAME_RATE = "match_frame_rate"
+    private const val AUDIO_DELAY = "audio_delay_ms"
 
     var autoSkipIntro by mutableStateOf(false)
         private set
@@ -32,6 +33,10 @@ object PlayerPrefs {
     var matchFrameRate by mutableStateOf(true)
         private set
 
+    // Sound later (+) or earlier (-) than the picture, for this TV's audio setup.
+    var audioDelayMs by mutableStateOf(0)
+        private set
+
     fun init(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         autoSkipIntro = prefs.getBoolean(AUTO_SKIP, false)
@@ -39,6 +44,7 @@ object PlayerPrefs {
         dialogueBoost = prefs.getBoolean(DIALOGUE_BOOST, false)
         audioPassthrough = prefs.getBoolean(AUDIO_PASSTHROUGH, false)
         matchFrameRate = prefs.getBoolean(MATCH_FRAME_RATE, true)
+        audioDelayMs = prefs.getInt(AUDIO_DELAY, 0)
     }
 
     fun setPrebuffer(context: Context, level: String) {
@@ -64,5 +70,10 @@ object PlayerPrefs {
     fun setMatchFrameRate(context: Context, enabled: Boolean) {
         matchFrameRate = enabled
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(MATCH_FRAME_RATE, enabled).apply()
+    }
+
+    fun setAudioDelay(context: Context, ms: Int) {
+        audioDelayMs = ms
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(AUDIO_DELAY, ms).apply()
     }
 }

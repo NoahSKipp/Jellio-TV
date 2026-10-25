@@ -98,6 +98,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.58.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.58.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Subtitles Your Way", "Pick the text colour, an outline or shadow, and how high subtitles sit, with a live preview right in the subtitle menu."),
+            ChangelogFeature(Icons.Filled.Tv, "Subtitle Sync", "Subtitles out of step? Shift them earlier or later in tenths of a second from the subtitle menu. Jellio remembers it for that title."),
+            ChangelogFeature(Icons.Filled.Tv, "Audio Sync", "If your soundbar or receiver lags behind the picture, shift the sound from the audio menu. The setting is kept for this TV."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.57.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.57.0",

@@ -393,6 +393,10 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { subtitleStylePreferences.setSize(size) }
     }
 
+    fun setSubtitleLook(style: SubtitleStyle) {
+        viewModelScope.launch { subtitleStylePreferences.setLook(style.color, style.edge, style.position) }
+    }
+
     fun setSubtitleBackground(background: String) {
         viewModelScope.launch { subtitleStylePreferences.setBackground(background) }
     }

@@ -8,6 +8,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
 import com.jellio.tv.data.model.SUBTITLE_SIZES
+import com.jellio.tv.data.model.SUBTITLE_COLORS
+import com.jellio.tv.data.model.SUBTITLE_EDGES
+import com.jellio.tv.data.model.SUBTITLE_POSITIONS
 import com.jellio.tv.data.model.SubtitleStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +33,9 @@ class SubtitleStylePreferences @Inject constructor(
     private object Keys {
         val SIZE = stringPreferencesKey("size")
         val BACKGROUND = stringPreferencesKey("background")
+        val COLOR = stringPreferencesKey("color")
+        val EDGE = stringPreferencesKey("edge")
+        val POSITION = stringPreferencesKey("position")
     }
 
     // The subtitle picked for a show, kept per series so the next episode
@@ -47,7 +53,18 @@ class SubtitleStylePreferences @Inject constructor(
         SubtitleStyle(
             size = prefs[Keys.SIZE]?.takeIf { v -> SUBTITLE_SIZES.any { it.value == v } } ?: "medium",
             background = prefs[Keys.BACKGROUND]?.takeIf { v -> SUBTITLE_BACKGROUNDS.any { it.value == v } } ?: "semi",
+            color = prefs[Keys.COLOR]?.takeIf { v -> SUBTITLE_COLORS.any { it.first == v } } ?: "white",
+            edge = prefs[Keys.EDGE]?.takeIf { it in SUBTITLE_EDGES } ?: "outline",
+            position = prefs[Keys.POSITION]?.takeIf { v -> SUBTITLE_POSITIONS.any { it.first == v } } ?: "default",
         )
+    }
+
+    suspend fun setLook(color: String, edge: String, position: String) {
+        context.subtitleStyleDataStore.edit {
+            it[Keys.COLOR] = color
+            it[Keys.EDGE] = edge
+            it[Keys.POSITION] = position
+        }
     }
 
     suspend fun setSize(size: String) {
