@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
@@ -126,6 +127,8 @@ private fun heroBackdropUrl(
     }
     return null
 }
+
+private data class HeroArt(val url: String, val blurred: Boolean)
 
 // Last resort for the header: the poster, blurred to fill the wide frame.
 private fun heroPosterUrl(
@@ -474,26 +477,32 @@ private fun DetailHero(
     onDislike: () -> Unit,
 ) {
     val season = state.selectedSeason?.takeIf { item.Type == "Series" }
-    val backdropUrl = season?.BackdropImageTags?.firstOrNull()?.let { imageUrl(season.Id, it, "Backdrop", 1920) }
-        ?: heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }
+    // Every candidate in order: the season's and the title's backdrops, their
+    // Thumb, then the poster blurred. A failed load moves on to the next one,
+    // and when none load the gradients below still frame the title.
+    val candidates = remember(item.Id, season?.Id, item.BackdropImageTags, item.ImageTags) {
+        buildList {
+            season?.BackdropImageTags?.forEachIndexed { i, tag -> add(HeroArt(imageUrl(season.Id, tag, if (i == 0) "Backdrop" else "Backdrop/$i", 1920), false)) }
+            item.BackdropImageTags?.forEachIndexed { i, tag -> add(HeroArt(imageUrl(item.Id, tag, if (i == 0) "Backdrop" else "Backdrop/$i", 1920), false)) }
+            heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }?.let { add(HeroArt(it, false)) }
+            heroPosterUrl(item) { id, tag, type -> imageUrl(id, tag, type, 600) }?.let { add(HeroArt(it, true)) }
+        }.distinctBy { it.url }
+    }
+    var artIndex by remember(candidates) { mutableIntStateOf(0) }
+    val art = candidates.getOrNull(artIndex)
     val heroHeight = HeroHeight.scaled()
     Box(modifier = Modifier.fillMaxWidth().height(heroHeight)) {
-        val posterFallback = if (backdropUrl == null) heroPosterUrl(item) { id, tag, type -> imageUrl(id, tag, type, 600) } else null
-        if (backdropUrl != null) {
+        if (art != null) {
             AsyncImage(
-                model = backdropUrl,
+                model = art.url,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(heroHeight),
+                onError = { artIndex++ },
+                modifier = Modifier.fillMaxWidth().height(heroHeight).then(if (art.blurred) Modifier.blur(28.dp) else Modifier),
             )
-        } else if (posterFallback != null) {
-            AsyncImage(
-                model = posterFallback,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(heroHeight).blur(28.dp),
-            )
-            Box(modifier = Modifier.fillMaxWidth().height(heroHeight).background(JellioBg.copy(alpha = 0.35f)))
+            if (art.blurred) {
+                Box(modifier = Modifier.fillMaxWidth().height(heroHeight).background(JellioBg.copy(alpha = 0.35f)))
+            }
         }
         Box(
             modifier = Modifier.fillMaxWidth().height(heroHeight).background(

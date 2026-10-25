@@ -98,6 +98,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.55.10",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.55.10",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Headers That Always Load", "A title's header now tries every backdrop it has, then its wide thumbnail, then a blurred poster, moving on whenever an image fails, and a slow connection gets a couple of retries."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.55.9",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.55.9",

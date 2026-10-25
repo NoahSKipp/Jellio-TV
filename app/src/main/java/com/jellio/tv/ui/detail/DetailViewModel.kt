@@ -124,7 +124,8 @@ class DetailViewModel @Inject constructor(
                     loadSeasons(session, preloaded.Id)
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, preloaded.Id) }
                 }
-                val item = repository.getItemDetails(session.userId, itemId)
+                // Two retries with backoff; the art drawn from memory stays up meanwhile.
+                val item = withRetries { repository.getItemDetails(session.userId, itemId) }
                 android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms" + if (preloaded != null) " (drawn from memory first)" else "")
                 ratingTargetId = item.Id
                 // Updates the page in place, keeping seasons and stream state.
@@ -378,5 +379,18 @@ class DetailViewModel @Inject constructor(
                 byId[episode.Id]?.let { episode.copy(UserData = it) } ?: episode
             },
         )
+    }
+
+    private suspend fun <T> withRetries(block: suspend () -> T): T {
+        repeat(2) { attempt ->
+            try {
+                return block()
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
+            } catch (err: Exception) {
+                kotlinx.coroutines.delay(800L shl attempt)
+            }
+        }
+        return block()
     }
 }
