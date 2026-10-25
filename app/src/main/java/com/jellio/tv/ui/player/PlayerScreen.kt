@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
@@ -2270,10 +2271,10 @@ private fun EndScreen(
                         onClick = onPlayNext,
                         modifier = Modifier.focusRequester(firstFocus),
                     )
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Refresh, onClick = onReplay)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay)
                     EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
                 } else {
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Refresh, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
                     EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
                 }
             }
