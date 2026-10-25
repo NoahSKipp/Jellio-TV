@@ -27,7 +27,7 @@ android {
         // upgrade). Falls back to 1 for a local dev build with no
         // real CI run behind it.
         versionCode = (System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
-        versionName = "0.55.7"
+        versionName = "0.55.8"
     }
 
     val signingKeystore = (System.getenv("SIGNING_KEYSTORE_FILE") ?: System.getenv("SIGNING_KEYSTORE_PATH"))
