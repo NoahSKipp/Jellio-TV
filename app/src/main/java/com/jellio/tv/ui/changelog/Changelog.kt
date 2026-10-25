@@ -98,6 +98,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.57.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.57.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Smoother Films", "Jellio now switches your TV to the video's frame rate, 24 Hz for most films, so camera pans no longer judder. Turn it off under Settings, Playback if your TV goes dark for too long while switching."),
+            ChangelogFeature(Icons.Filled.Tv, "Long Titles Scroll", "A title or episode name too long for its card now scrolls by while the card is focused."),
+            ChangelogFeature(Icons.Filled.Tv, "Episode Ratings at a Glance", "A show's page now shows every episode's rating in the season, coloured from weakest to best, with the season's top episode starred."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.56.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.56.1",
