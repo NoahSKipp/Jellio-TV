@@ -218,13 +218,13 @@ fun HomeScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(topFixtureHeight + 36.dp),
+                        .height(topFixtureHeight + HeaderOverlap),
                 )
 
                 // Scrollable rows in the bottom viewport
                 val verticalRowBringIntoViewSpec = remember(density) {
                     val topInsetPx = with(density) { RowHeaderHeight.toPx() }
-                    com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx, listState = listState) { listState.canScrollBackward }
+                    com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec(topInsetPx = topInsetPx) { listState.canScrollBackward }
                 }
 
                 CompositionLocalProvider(LocalBringIntoViewSpec provides verticalRowBringIntoViewSpec) {
@@ -236,6 +236,8 @@ fun HomeScreen(
                             .height(rowsViewportHeight)
                             .clipToBounds()
                             .focusRestorer(),
+                        // Room for the last rows to scroll up to the top, as in Nuvio.
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = rowsViewportHeight),
                     ) {
                         if (editMode) {
                             item(key = "customize_bar_top") {

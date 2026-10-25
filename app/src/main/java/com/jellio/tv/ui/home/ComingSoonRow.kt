@@ -94,14 +94,14 @@ fun ComingSoonRow(
     modifier: Modifier = Modifier,
 ) {
     if (entries.isEmpty()) return
-    Column(modifier = modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
+    Column(modifier = modifier.padding(bottom = RowSpacing)) {
         RowTitle(text = "Coming Soon")
         val firstCard = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 state = rememberTvRowState(),
-                contentPadding = PaddingValues(horizontal = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = RowStartPadding),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.rowEntry(firstCard),
             ) {
                 items(entries, key = { it.ItemId + (it.Date ?: "") }) { entry ->

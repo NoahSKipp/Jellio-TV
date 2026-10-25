@@ -48,14 +48,14 @@ fun StudioHubRow(
     onServiceClick: (String) -> Unit,
 ) {
     if (services.isEmpty()) return
-    Column(modifier = Modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
+    Column(modifier = Modifier.padding(bottom = RowSpacing)) {
         RowTitle(text = "Studio Hubs")
         val firstTile = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 state = rememberTvRowState(),
-                contentPadding = PaddingValues(horizontal = 48.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = RowStartPadding),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.rowEntry(firstTile),
             ) {
                 items(services, key = { it }) { service ->

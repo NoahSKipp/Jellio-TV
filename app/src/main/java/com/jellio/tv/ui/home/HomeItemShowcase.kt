@@ -85,12 +85,12 @@ fun HomeItemShowcase(
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
             modifier = Modifier
-                // Sits a fixed gap above the rows, which start 36dp above this box's bottom.
+                // Sits Nuvio's 16dp above the rows, which start HeaderOverlap above this box's bottom.
                 // A long title or logo shortens the description rather than pushing into them.
                 .align(Alignment.BottomStart)
                 .fillMaxHeight()
-                .padding(start = 48.dp, top = 24.dp, end = 24.dp, bottom = 36.dp + 28.dp)
-                .width(maxWidth * 0.46f),
+                .padding(start = RowStartPadding, top = 24.dp, end = 24.dp, bottom = HeaderOverlap + 16.dp)
+                .width(maxWidth * 0.42f),
         ) {
             ShowcaseLogo(
                 item = details,
@@ -344,3 +344,6 @@ suspend fun loadShowcaseInfo(repository: com.jellio.tv.data.JellioRepository, us
     val fetched = runCatching { repository.getShowcaseItems(userId, ids) }.getOrDefault(emptyMap())
     return ShowcaseInfo(fetched[item.Id] ?: item, seriesId?.let { fetched[it] })
 }
+
+// How far the header art runs under the first row: its title line plus 14dp, as in Nuvio.
+internal val HeaderOverlap = 38.dp

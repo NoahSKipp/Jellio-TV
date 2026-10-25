@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec
 import com.jellio.tv.ui.home.RowHeaderHeight
+import com.jellio.tv.ui.home.HeaderOverlap
 import com.jellio.tv.ui.home.ShowcaseHost
 import com.jellio.tv.ui.theme.JellioText
 import androidx.compose.foundation.layout.padding
@@ -135,11 +136,11 @@ fun LibraryScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(screenHeight - rowsViewportHeight + 36.dp),
+                        .height(screenHeight - rowsViewportHeight + HeaderOverlap),
                 )
 
                 val rowsSpec = remember(density) {
-                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }, listState = listState) { listState.canScrollBackward }
+                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }) { listState.canScrollBackward }
                 }
                 CompositionLocalProvider(LocalBringIntoViewSpec provides rowsSpec) {
                     LazyColumn(
@@ -150,6 +151,8 @@ fun LibraryScreen(
                             .height(rowsViewportHeight)
                             .clipToBounds()
                             .focusRestorer(),
+                        // Room for the last rows to scroll up to the top, as in Nuvio.
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = rowsViewportHeight),
                     ) {
                         item(key = "header") {
                             LibraryHeader(

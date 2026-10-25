@@ -58,6 +58,7 @@ import com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowHeaderHeight
+import com.jellio.tv.ui.home.HeaderOverlap
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.ShowcaseHost
 import com.jellio.tv.ui.home.rememberCardOptionsHost
@@ -143,7 +144,7 @@ fun ServiceScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth()
-                        .height(screenHeight - rowsViewportHeight + 36.dp),
+                        .height(screenHeight - rowsViewportHeight + HeaderOverlap),
                 )
 
                 // The service's colour washes in from the top, over the backdrop.
@@ -161,7 +162,7 @@ fun ServiceScreen(
                 }
 
                 val rowsSpec = remember(density) {
-                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }, listState = listState) { listState.canScrollBackward }
+                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }) { listState.canScrollBackward }
                 }
                 CompositionLocalProvider(LocalBringIntoViewSpec provides rowsSpec) {
                     LazyColumn(
@@ -173,6 +174,8 @@ fun ServiceScreen(
                             .clipToBounds()
                             .focusRequester(contentFocusRequester)
                             .focusRestorer(),
+                        // Room for the last rows to scroll up to the top, as in Nuvio.
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = rowsViewportHeight),
                     ) {
                         item(key = "header") {
                             ServiceHeader(

@@ -63,7 +63,7 @@ fun PosterRow(
 ) {
     val rowItems = remember(section.items) { section.items.distinctBy { it.Id }.take(20) }
     if (rowItems.isEmpty()) return
-    Column(modifier = modifier.padding(top = RowTopPadding, bottom = 8.dp)) {
+    Column(modifier = modifier.padding(bottom = RowSpacing)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
         val rowState = rememberTvRowState()
@@ -71,7 +71,7 @@ fun PosterRow(
         CompositionLocalProvider(LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 state = rowState,
-                contentPadding = PaddingValues(horizontal = 48.dp),
+                contentPadding = PaddingValues(horizontal = RowStartPadding),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.rowEntry(firstCard),
             ) {
@@ -118,33 +118,27 @@ fun PosterRow(
 // always spans an element's own full width, no way to make it read as
 // short without this. Plain, unfocusable text now: RowExpandButton
 // below carries whatever real "view all" action this used to.
+// Row layout copied from Nuvio's home: 16sp semibold titles 52dp in with
+// 14dp below, 24dp between rows, 12dp between cards.
 @Composable
 fun RowTitle(text: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Text(
-            text = text,
-            fontSize = RowTitleFontSize,
-            fontWeight = FontWeight.SemiBold,
-            color = JellioText,
-            maxLines = 1,
-            modifier = Modifier.padding(start = 48.dp),
-        )
-        Box(
-            modifier = Modifier
-                .padding(start = 48.dp, top = 6.dp, bottom = 12.dp)
-                .width(32.dp)
-                .height(3.dp)
-                .background(JellioSecondary, RoundedCornerShape(999.dp)),
-        )
-    }
+    Text(
+        text = text,
+        fontSize = RowTitleFontSize,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = JellioText,
+        maxLines = 1,
+        modifier = modifier.padding(start = RowStartPadding, bottom = 14.dp),
+    )
 }
 
-// Space above a focused row's cards on Home (row top padding, title line,
-// accent bar): Home keeps the focused cards this far below the showcase so
-// the title stays visible.
-internal val RowTopPadding = 8.dp
-internal val RowTitleFontSize = 20.sp
-internal val RowHeaderHeight = 60.dp
+internal val RowStartPadding = 52.dp
+internal val RowSpacing = 24.dp
+internal val RowTitleFontSize = 16.sp
+
+// Space kept above a focused row's cards so its title stays in view.
+internal val RowHeaderHeight = 40.dp
 
 // Real port of components/rowListModal.js's own makeRowTitleClickable():
 // the same "view all" action this used to hang off the row's own
