@@ -89,7 +89,7 @@ fun HomeItemShowcase(
                 // A long title or logo shortens the description rather than pushing into them.
                 .align(Alignment.BottomStart)
                 .fillMaxHeight()
-                .padding(start = 48.dp, top = 24.dp, end = 24.dp, bottom = 36.dp + 20.dp)
+                .padding(start = 48.dp, top = 24.dp, end = 24.dp, bottom = 36.dp + 28.dp)
                 .width(maxWidth * 0.46f),
         ) {
             ShowcaseLogo(

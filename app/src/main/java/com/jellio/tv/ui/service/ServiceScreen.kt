@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,7 +40,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -109,7 +109,7 @@ fun ServiceScreen(
         onToggleWatched = { viewModel.toggleWatched(session, it) },
     )
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
@@ -130,7 +130,8 @@ fun ServiceScreen(
                     val filtered = filteredItems(row, filter)
                     if (filtered.isEmpty()) null else row to filtered
                 }
-                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                // The space this screen really gets, which can be less than the display.
+                val screenHeight = maxHeight
                 val density = LocalDensity.current
                 val rowsViewportHeight = screenHeight * 0.52f
 

@@ -2,13 +2,13 @@ package com.jellio.tv.ui.library
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -104,7 +104,7 @@ fun LibraryScreen(
             }
         }
 
-        Box(modifier = modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize()) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
@@ -119,7 +119,8 @@ fun LibraryScreen(
                 Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
             }
             else -> {
-                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                // The space this screen really gets, which can be less than the display.
+                val screenHeight = maxHeight
                 val density = LocalDensity.current
                 val rowsViewportHeight = screenHeight * 0.52f
                 val firstItem = featuredRow?.items?.firstOrNull()

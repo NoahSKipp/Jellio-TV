@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +48,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -163,7 +163,7 @@ fun HomeScreen(
     LaunchedEffect(editMode) { onEditModeChange(editMode) }
     DisposableEffect(Unit) { onDispose { onEditModeChange(false) } }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> HomeSkeleton()
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -204,7 +204,8 @@ fun HomeScreen(
                     ord to visible
                 }
 
-                val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+                // The space this screen really gets, which can be less than the display.
+                val screenHeight = maxHeight
                 val density = LocalDensity.current
                 val rowsViewportHeight = screenHeight * 0.52f
                 val topFixtureHeight = screenHeight - rowsViewportHeight
