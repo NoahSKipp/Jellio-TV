@@ -103,6 +103,7 @@ val CHANGELOG_RELEASES = listOf(
         subtitle = "Version 0.55.9",
         features = listOf(
             ChangelogFeature(Icons.Filled.Tv, "Removing Stays Removed", "Removing a title or a whole show from Up Next or Continue Watching now takes it out for good, instead of the card popping back into its spot."),
+            ChangelogFeature(Icons.Filled.Tv, "Watchlist Rows Update", "Taking a title off your watchlist now removes it from the Watchlist rows on Home straight away."),
             ChangelogFeature(Icons.Filled.Tv, "A Proper Ending", "The screen after a movie now shows its logo, details and description over a slowly drifting backdrop, with clearer Replay and Back buttons."),
         ),
     ),

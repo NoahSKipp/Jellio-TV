@@ -486,6 +486,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+            // Taken off the watchlist: it leaves the watchlist rows too.
+            if (!newValue) {
+                val state = _uiState.value
+                _uiState.value = state.copy(
+                    rows = state.rows.map { row ->
+                        if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
+                            row.copy(section = row.section.copy(items = row.section.items.filterNot { it.Id == item.Id }))
+                        } else {
+                            row
+                        }
+                    },
+                )
+            }
         }
     }
 
