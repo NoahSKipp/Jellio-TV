@@ -52,11 +52,8 @@ android {
         }
         // The published build. Same key as debug builds so it installs over them.
         release {
-            // R8 stays off until its rules are verified on a device: with
-            // Retrofit 2.9 every API call failed in 0.54.4 (empty Home and
-            // menu). Still a non-debuggable release build.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
