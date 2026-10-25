@@ -829,8 +829,8 @@ private fun EpisodeCard(
                     }
                     // The episode's rating, the same chip as on Home's cards.
                     episode.CommunityRating?.takeIf { it > 0.0 }?.let { rating ->
-                        com.jellio.tv.ui.home.CardChip(
-                            text = String.format(java.util.Locale.US, "%.1f", rating),
+                        com.jellio.tv.ui.home.RatingChip(
+                            rating = rating,
                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                         )
                     }

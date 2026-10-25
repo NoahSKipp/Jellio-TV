@@ -98,6 +98,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.58.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.58.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "TMDB Ratings on Cards", "Ratings on cards and episodes now carry the TMDB badge, the same as the header."),
+            ChangelogFeature(Icons.Filled.Tv, "Softer Header Edge", "The header on Home now fades into the background behind it, seasonal scenes included, instead of ending in a hard line above the rows."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.58.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.58.1",

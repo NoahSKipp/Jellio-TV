@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Size
@@ -67,7 +68,14 @@ fun HomeItemShowcase(
     imageUrl: (BaseItemDto, String, Int) -> String,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxWidth().background(JellioBg)) {
+    // Solid at the top and see-through at the bottom, so the header melts into
+    // whatever is behind Home (the seasonal backdrop, or the plain background)
+    // instead of ending in a hard edge above the rows.
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth().background(
+            Brush.verticalGradient(0f to JellioBg, 0.62f to JellioBg, 0.86f to JellioBg.copy(alpha = 0.45f), 1f to Color.Transparent),
+        ),
+    ) {
         if (item == null) return@BoxWithConstraints
         val details = info?.item?.takeIf { it.Id == item.Id } ?: item
         val series = info?.series?.takeIf { info.item.Id == item.Id }
@@ -154,27 +162,31 @@ private fun ShowcaseBackdrop(
     val url = candidates.getOrNull(index) ?: return
     val context = LocalContext.current
     BoxWithConstraints(
-        modifier = modifier.drawWithCache {
-            val sideFade = Brush.horizontalGradient(
-                0f to JellioBg,
-                0.18f to JellioBg.copy(alpha = 0.9f),
-                0.42f to JellioBg.copy(alpha = 0.55f),
-                0.68f to JellioBg.copy(alpha = 0.15f),
-                1f to Color.Transparent,
-                endX = size.width * 0.7f,
-            )
-            val bottomFade = Brush.verticalGradient(
-                0f to Color.Transparent,
-                0.55f to Color.Transparent,
-                0.8f to JellioBg.copy(alpha = 0.7f),
-                1f to JellioBg,
-            )
-            onDrawWithContent {
-                drawContent()
-                drawRect(sideFade)
-                drawRect(bottomFade)
-            }
-        },
+        // The image fades out by transparency (a mask), not by painting the
+        // background colour over it, so it blends into whatever is beneath.
+        modifier = modifier
+            .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+            .drawWithCache {
+                val sideMask = Brush.horizontalGradient(
+                    0f to Color.Transparent,
+                    0.18f to Color.Black.copy(alpha = 0.1f),
+                    0.42f to Color.Black.copy(alpha = 0.45f),
+                    0.68f to Color.Black.copy(alpha = 0.85f),
+                    1f to Color.Black,
+                    endX = size.width * 0.7f,
+                )
+                val bottomMask = Brush.verticalGradient(
+                    0f to Color.Black,
+                    0.55f to Color.Black,
+                    0.8f to Color.Black.copy(alpha = 0.3f),
+                    1f to Color.Transparent,
+                )
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(sideMask, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                    drawRect(bottomMask, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                }
+            },
     ) {
         val density = LocalDensity.current
         val widthPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
@@ -307,11 +319,11 @@ private fun MetaDot() {
 
 // Ratings here are TMDB's (Gelato imports them), same badge Jellio Web shows.
 @Composable
-private fun TmdbBadge() {
+internal fun TmdbBadge(fontSize: androidx.compose.ui.unit.TextUnit = 10.sp) {
     Text(
         text = "TMDB",
         color = TmdbDark,
-        fontSize = 10.sp,
+        fontSize = fontSize,
         fontWeight = FontWeight.ExtraBold,
         maxLines = 1,
         softWrap = false,
