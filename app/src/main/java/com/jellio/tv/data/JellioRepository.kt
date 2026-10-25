@@ -184,6 +184,10 @@ private class TtlCache {
         entries.remove(key)
     }
 
+    fun invalidatePrefix(prefix: String) {
+        entries.keys.removeIf { it.startsWith(prefix) }
+    }
+
     fun clear() {
         entries.clear()
     }
@@ -1315,11 +1319,13 @@ class JellioRepository @Inject constructor(
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
-        return if (isFavorite) {
+        val result = if (isFavorite) {
             api.removeFavorite(userId, item.Id).IsFavorite
         } else {
             api.addFavorite(userId, item.Id).IsFavorite
         }
+        cache.invalidatePrefix("watchlist:$userId:")
+        return result
     }
 
     // Real bug found live: this app's own cache.get(key, ttl) wrapper

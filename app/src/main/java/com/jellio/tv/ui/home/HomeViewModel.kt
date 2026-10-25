@@ -285,7 +285,9 @@ class HomeViewModel @Inject constructor(
 
                     val studioHubs = groupByService(collections).keys.sorted()
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
-                    val watchlist = watchlistDeferred.await()
+                    // Titles taken off the watchlist here stay off even if a refresh
+                    // still gets the older list back.
+                    val watchlist = watchlistDeferred.await().filter { removedFromWatchlist[it.Id] == null }
                     val policy = user?.Policy
                     val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
                     val topRows = buildList<HomeRow> {
@@ -482,10 +484,13 @@ class HomeViewModel @Inject constructor(
     suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo =
         loadShowcaseInfo(repository, session.userId, item)
 
+    private val removedFromWatchlist = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
             val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+            if (newValue) removedFromWatchlist.remove(item.Id) else removedFromWatchlist[item.Id] = true
             // Taken off the watchlist: it leaves the watchlist rows too.
             if (!newValue) {
                 val state = _uiState.value
