@@ -61,10 +61,21 @@ class AppViewModel @Inject constructor(
         viewModelScope.launch {
             authState.collectLatest { state ->
                 if (state is AuthState.LoggedIn) {
-                    _libraries.value = try {
-                        repository.getLibraryNavEntries(state.session.userId)
-                    } catch (err: Exception) {
-                        emptyList()
+                    // Right after an update or wake the network or server may not
+                    // be ready yet; keep trying instead of leaving the menu empty.
+                    var waitMs = 1_000L
+                    while (true) {
+                        val entries = try {
+                            repository.getLibraryNavEntries(state.session.userId)
+                        } catch (err: Exception) {
+                            emptyList()
+                        }
+                        if (entries.isNotEmpty()) {
+                            _libraries.value = entries
+                            break
+                        }
+                        kotlinx.coroutines.delay(waitMs)
+                        waitMs = (waitMs * 2).coerceAtMost(30_000L)
                     }
                 } else {
                     _libraries.value = emptyList()
