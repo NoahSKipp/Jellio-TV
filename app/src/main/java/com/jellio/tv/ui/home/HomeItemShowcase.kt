@@ -83,10 +83,12 @@ fun HomeItemShowcase(
         )
 
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
             modifier = Modifier
                 // Sits a fixed gap above the rows, which start 36dp above this box's bottom.
+                // A long title or logo shortens the description rather than pushing into them.
                 .align(Alignment.BottomStart)
+                .fillMaxHeight()
                 .padding(start = 48.dp, top = 24.dp, end = 24.dp, bottom = 36.dp + 20.dp)
                 .width(maxWidth * 0.46f),
         ) {
@@ -119,6 +121,7 @@ fun HomeItemShowcase(
                     lineHeight = 19.sp,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
             }
         }
