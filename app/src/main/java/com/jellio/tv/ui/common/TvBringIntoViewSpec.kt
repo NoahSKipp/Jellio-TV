@@ -67,10 +67,10 @@ internal fun rememberTvHorizontalBringIntoViewSpec(leading: Dp = 48.dp): BringIn
 @OptIn(ExperimentalFoundationApi::class)
 internal class TvVerticalRowBringIntoViewSpec(
     private val topInsetPx: Float = 0f,
-    private val canScrollBackward: () -> Boolean = { true },
     // When set, the whole row holding the focused card is scrolled to the top
     // of the list, so nothing of the row above stays visible under the header.
     private val listState: androidx.compose.foundation.lazy.LazyListState? = null,
+    private val canScrollBackward: () -> Boolean = { true },
 ) : BringIntoViewSpec {
     override val scrollAnimationSpec: AnimationSpec<Float> =
         tween(durationMillis = 180, easing = FastOutSlowInEasing)
