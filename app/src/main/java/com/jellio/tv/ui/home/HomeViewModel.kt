@@ -522,10 +522,15 @@ class HomeViewModel @Inject constructor(
     // clears a saved resume position or drops a title off NextUp, see
     // that function's own header). Dropped from this screen's own row
     // state directly rather than waiting on next real reload.
+    // Removals take the card out at once, when its animation ends, and put the
+    // rows back only if the server call fails; waiting for the call let the
+    // card reappear in its old spot first.
     fun removeFromRow(session: Session, item: BaseItemDto) {
+        val before = _uiState.value.rows
+        removeItemFromRows(item.Id)
         viewModelScope.launch {
-            runCatching { repository.setPlayed(session.userId, item.Id, true) }.getOrNull() ?: return@launch
-            removeItemFromRows(item.Id)
+            runCatching { repository.setPlayed(session.userId, item.Id, true) }
+                .onFailure { _uiState.value = _uiState.value.copy(rows = before) }
         }
     }
 
@@ -538,10 +543,11 @@ class HomeViewModel @Inject constructor(
     // closes.
     fun hideShowFromRow(item: BaseItemDto) {
         val seriesId = item.SeriesId ?: return
+        val before = _uiState.value.rows
+        removeSeriesFromUpNext(seriesId, item.Id)
         viewModelScope.launch {
-            runCatching { repository.hideSeriesFromNextUp(seriesId) }.onSuccess {
-                removeItemFromRows(item.Id)
-            }
+            runCatching { repository.hideSeriesFromNextUp(seriesId) }
+                .onFailure { _uiState.value = _uiState.value.copy(rows = before) }
         }
     }
 
@@ -561,8 +567,22 @@ class HomeViewModel @Inject constructor(
     // Off Continue Watching without marking it watched: only its resume
     // position is cleared, so elsewhere it just loses its progress bar.
     fun removeFromContinueWatching(session: Session, item: BaseItemDto) {
+        val before = _uiState.value.rows
+        _uiState.value = _uiState.value.copy(
+            rows = before.map { row ->
+                if (row is PosterHomeRow && row.section.key == "continue-watching") {
+                    row.copy(section = row.section.copy(items = row.section.items.filterNot { it.Id == item.Id }))
+                } else {
+                    row
+                }
+            },
+        )
         viewModelScope.launch {
-            val updated = runCatching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull() ?: return@launch
+            val updated = runCatching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull()
+            if (updated == null) {
+                _uiState.value = _uiState.value.copy(rows = before)
+                return@launch
+            }
             val state = _uiState.value
             _uiState.value = state.copy(
                 rows = state.rows.map { row ->
@@ -577,6 +597,20 @@ class HomeViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    private fun removeSeriesFromUpNext(seriesId: String, itemId: String) {
+        val state = _uiState.value
+        _uiState.value = state.copy(
+            rows = state.rows.map { row ->
+                if (row is PosterHomeRow && row.section.key == "up-next") {
+                    row.copy(section = row.section.copy(items = row.section.items.filterNot { it.SeriesId == seriesId }))
+                } else {
+                    row
+                }
+            },
+        )
+        removeItemFromRows(itemId)
     }
 
     private fun removeItemFromRows(itemId: String) {
