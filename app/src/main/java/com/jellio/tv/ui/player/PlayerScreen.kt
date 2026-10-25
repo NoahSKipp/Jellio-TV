@@ -505,14 +505,6 @@ private fun PlayerSurface(
     }
 
     @OptIn(UnstableApi::class)
-    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource =
-        SyncDelayMediaSource(
-            buildBaseMediaSource(sideloadedTrack),
-            audioDelayUs = { syncDelays.audioMs * 1000L },
-            subtitleDelayUs = { syncDelays.subtitleMs * 1000L },
-        )
-
-    @OptIn(UnstableApi::class)
     fun buildBaseMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
         val mediaItem = MediaItem.Builder()
             .setUri(streamUrl)
@@ -542,6 +534,14 @@ private fun PlayerSurface(
             .createMediaSource(subtitleConfig, C.TIME_UNSET)
         return androidx.media3.exoplayer.source.MergingMediaSource(videoSource, subtitleSource)
     }
+
+    @OptIn(UnstableApi::class)
+    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource =
+        SyncDelayMediaSource(
+            buildBaseMediaSource(sideloadedTrack),
+            audioDelayUs = { syncDelays.audioMs * 1000L },
+            subtitleDelayUs = { syncDelays.subtitleMs * 1000L },
+        )
 
     // Direct play uses the container's native embedded subtitle tracks with
     // zero extra HTTP requests. Only external subtitles or transcoded streams
