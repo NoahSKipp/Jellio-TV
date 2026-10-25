@@ -78,6 +78,7 @@ fun HomeRow.toCachedRowDto(): CachedRowDto = when (this) {
         key = key,
         title = displayName,
         comingSoon = entries,
+        items = items.values.toList(),
         isComingSoon = true,
     )
     is StudioHubsHomeRow -> CachedRowDto(
@@ -89,7 +90,7 @@ fun HomeRow.toCachedRowDto(): CachedRowDto = when (this) {
 }
 
 fun CachedRowDto.toHomeRow(): HomeRow = when {
-    isComingSoon -> ComingSoonHomeRow(comingSoon)
+    isComingSoon -> ComingSoonHomeRow(comingSoon, items.associateBy { it.Id.replace("-", "").lowercase() })
     isStudioHubs -> StudioHubsHomeRow(studioHubs)
     else -> PosterHomeRow(
         section = HomeSection(title = title, items = items, key = key),

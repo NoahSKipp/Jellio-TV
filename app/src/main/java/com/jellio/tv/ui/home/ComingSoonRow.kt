@@ -92,6 +92,11 @@ fun ComingSoonRow(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onItemClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // With the entries' library items these are the regular cards: focus
+    // frame, widening, and the header following them.
+    items: Map<String, com.jellio.tv.data.model.BaseItemDto> = emptyMap(),
+    itemImageUrl: ((com.jellio.tv.data.model.BaseItemDto, String, Int) -> String)? = null,
+    onItemFocus: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
 ) {
     if (entries.isEmpty()) return
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
@@ -106,12 +111,37 @@ fun ComingSoonRow(
             ) {
                 items(entries, key = { it.ItemId + (it.Date ?: "") }) { entry ->
                     RowEntryTarget(if (entry == entries.first()) firstCard else null) {
-                        ComingSoonCard(entry = entry, imageUrl = imageUrl, onClick = { onItemClick(entry.ItemId) })
+                        val item = items[entry.ItemId.replace("-", "").lowercase()]
+                        if (item != null && itemImageUrl != null) {
+                            Box {
+                                PosterCard(
+                                    item = item,
+                                    imageUrl = itemImageUrl,
+                                    onClick = { onItemClick(entry.ItemId) },
+                                    onFocus = onItemFocus,
+                                )
+                                ComingSoonDateChip(entry, Modifier.align(Alignment.TopStart).padding(6.dp))
+                            }
+                        } else {
+                            ComingSoonCard(entry = entry, imageUrl = imageUrl, onClick = { onItemClick(entry.ItemId) })
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ComingSoonDateChip(entry: CalendarEntryDto, modifier: Modifier = Modifier) {
+    Text(
+        text = comingSoonDateLabel(entry),
+        color = com.jellio.tv.ui.theme.JellioRarityLegendary,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = modifier
+            .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
 }
 
 @Composable

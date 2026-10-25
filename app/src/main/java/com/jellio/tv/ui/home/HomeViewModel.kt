@@ -267,6 +267,9 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     val comingSoon = comingSoonDeferred.await().filterNot { normalizeId(it.ItemId) in animeIds }
+                    val comingSoonItems = runCatching { repository.getItemsInfo(session.userId, comingSoon.map { it.ItemId }) }
+                        .getOrDefault(emptyMap())
+                        .mapKeys { normalizeId(it.key) }
                     val collections = collectionsDeferred.await()
                     val config = configDeferred.await()
 
@@ -306,7 +309,7 @@ class HomeViewModel @Inject constructor(
                         if (watchlistSeries.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_shows"), watchlistSeries, key = "watchlist-shows")))
                         }
-                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon))
+                        if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon, comingSoonItems))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
                     }
                     // First open: show the top of Home now, the recommendation,

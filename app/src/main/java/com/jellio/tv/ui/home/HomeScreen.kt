@@ -316,7 +316,14 @@ fun HomeScreen(
                                             onFocusRestored = { restorePending = false },
                                         )
                                     }
-                                    is ComingSoonHomeRow -> ComingSoonRow(entries = row.entries, imageUrl = rawImageUrl, onItemClick = onComingSoonClick)
+                                    is ComingSoonHomeRow -> ComingSoonRow(
+                                        entries = row.entries,
+                                        imageUrl = rawImageUrl,
+                                        onItemClick = onComingSoonClick,
+                                        items = row.items,
+                                        itemImageUrl = imageUrl,
+                                        onItemFocus = { item -> highlightedItem.value = item },
+                                    )
                                     is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                                 }
                             }
