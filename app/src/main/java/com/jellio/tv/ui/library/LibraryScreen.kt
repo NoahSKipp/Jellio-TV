@@ -138,7 +138,7 @@ fun LibraryScreen(
                 )
 
                 val rowsSpec = remember(density) {
-                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }) { listState.canScrollBackward }
+                    TvVerticalRowBringIntoViewSpec(topInsetPx = with(density) { RowHeaderHeight.toPx() }, listState = listState) { listState.canScrollBackward }
                 }
                 CompositionLocalProvider(LocalBringIntoViewSpec provides rowsSpec) {
                     LazyColumn(
