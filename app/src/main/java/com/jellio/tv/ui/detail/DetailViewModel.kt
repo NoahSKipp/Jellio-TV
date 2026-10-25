@@ -198,6 +198,10 @@ class DetailViewModel @Inject constructor(
                 playLabel = com.jellio.tv.ui.i18n.Strings.format("detail_resume_episode", target.episode.ParentIndexNumber ?: 0, target.episode.IndexNumber ?: 0),
             )
         }
+        // The episode Play will start: its details and streams load now, so
+        // pressing Play starts right away.
+        repository.preloadDetails(target.episode.Id)
+        repository.prefetchStreams(target.episode.Id)
         return target.episode
     }
 

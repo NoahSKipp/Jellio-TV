@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -52,7 +53,7 @@ import java.util.Locale
 data class ShowcaseInfo(val item: BaseItemDto, val series: BaseItemDto?)
 
 private const val TICKS_PER_MINUTE = 10_000_000L * 60L
-private const val SHOWCASE_SETTLE_MS = 180L
+private const val SHOWCASE_SETTLE_MS = 350L
 private val TmdbDark = Color(0xFF0D253F)
 private val TmdbGreen = Color(0xFF90CEA1)
 private val TmdbBlue = Color(0xFF01B4E4)
@@ -82,8 +83,15 @@ fun HomeItemShowcase(
                 .fillMaxWidth(0.72f),
         )
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
+        // The text crossfades from one title to the next; more details for
+        // the same title fill in place.
+        androidx.compose.animation.AnimatedContent(
+            targetState = Triple(details, series, isEpisode),
+            contentKey = { it.first.Id },
+            transitionSpec = {
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)) togetherWith
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
+            },
             modifier = Modifier
                 // Sits Nuvio's 16dp above the rows, which start HeaderOverlap above this box's bottom.
                 // A long title or logo shortens the description rather than pushing into them.
@@ -91,6 +99,11 @@ fun HomeItemShowcase(
                 .fillMaxHeight()
                 .padding(start = RowStartPadding, top = 24.dp, end = 24.dp, bottom = HeaderOverlap + 16.dp)
                 .width(maxWidth * 0.42f),
+            label = "showcaseText",
+        ) { (details, series, isEpisode) ->
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
+            modifier = Modifier.fillMaxHeight(),
         ) {
             ShowcaseLogo(
                 item = details,
@@ -124,6 +137,7 @@ fun HomeItemShowcase(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
+        }
         }
     }
 }

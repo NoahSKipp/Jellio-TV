@@ -98,6 +98,18 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.56.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.56.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Hold to Glide", "Holding Up or Down now glides smoothly through Home instead of stuttering from row to row, and lands on the row you stop at."),
+            ChangelogFeature(Icons.Filled.Tv, "Right Where You Left It", "Coming back from a title's page puts you on the same row and card, scrolled exactly as before."),
+            ChangelogFeature(Icons.Filled.Tv, "Calmer Header", "The header waits until you stop on a title, then fades smoothly to it."),
+            ChangelogFeature(Icons.Filled.Tv, "Steadier Loading", "Rows still loading show placeholders the same size as the real rows, so nothing jumps when they arrive."),
+            ChangelogFeature(Icons.Filled.Tv, "Quicker Play on Shows", "A show's page now gets the next episode ready while you look, so Play starts sooner."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.55.11",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.55.11",
