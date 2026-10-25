@@ -38,6 +38,9 @@ jobs:
       - name: Assemble release APK
         run: ./gradlew :app:assembleRelease
         env:
+          # Same version code as the installed 0.55.6 (Publish APK run 171), so it
+          # installs over it, and the next real release still upgrades it.
+          VERSION_CODE: "171"
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -55,6 +58,7 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk test-apk/jellio-tv-r8-test.apk
           git config user.name "Noah S. Kipp"
           git config user.email "NoahSKipp@users.noreply.github.com"
+          git pull --rebase origin r8-test
           git add test-apk/jellio-tv-r8-test.apk
           git commit -m "chore: add R8 test APK"
           git push

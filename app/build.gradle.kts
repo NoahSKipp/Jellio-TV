@@ -26,7 +26,7 @@ android {
         // field, not versionName, to decide whether a build is an
         // upgrade). Falls back to 1 for a local dev build with no
         // real CI run behind it.
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()) ?: 1
+        versionCode = (System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
         versionName = "0.55.6"
     }
 
