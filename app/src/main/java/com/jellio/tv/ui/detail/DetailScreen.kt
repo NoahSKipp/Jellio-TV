@@ -752,7 +752,6 @@ private fun SeasonsSection(
                 }
             }
         }
-        EpisodeRatingsStrip(state.selectedSeasonEpisodes)
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
@@ -778,45 +777,6 @@ private fun SeasonsSection(
 // dispatch there is not something to trust without a device to test
 // on): a real D-pad-navigable stand in for screens/detail.js's own
 // hold/right-click trigger on this same card.
-// Every episode's rating in the season at a glance, coloured from red to
-// green and the season's best one starred, as on Nuvio's show pages. Shown
-// when at least two episodes have a rating.
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun EpisodeRatingsStrip(episodes: List<BaseItemDto>) {
-    val rated = episodes.filter { (it.CommunityRating ?: 0.0) > 0.0 }
-    if (rated.size < 2) return
-    val best = rated.maxOf { it.CommunityRating ?: 0.0 }
-    androidx.compose.foundation.layout.FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(start = 48.dp, end = 48.dp, top = 14.dp),
-    ) {
-        episodes.forEach { episode ->
-            val rating = episode.CommunityRating?.takeIf { it > 0.0 } ?: return@forEach
-            val top = rating == best
-            Text(
-                text = "E${episode.IndexNumber ?: "?"}  " + (if (top) "★ " else "") + String.format(java.util.Locale.US, "%.1f", rating),
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = if (top) FontWeight.Bold else FontWeight.SemiBold,
-                modifier = Modifier
-                    .background(ratingColor(rating), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-    }
-}
-
-private fun ratingColor(rating: Double): Color = when {
-    rating >= 9.0 -> Color(0xFF1B7F3B)
-    rating >= 8.0 -> Color(0xFF2E9B4E)
-    rating >= 7.0 -> Color(0xFF6E9B2E)
-    rating >= 6.0 -> Color(0xFFB58A1B)
-    rating >= 5.0 -> Color(0xFFB8612A)
-    else -> Color(0xFFA83A32)
-}
-
 @Composable
 private fun EpisodeCard(
     episode: BaseItemDto,
@@ -865,6 +825,13 @@ private fun EpisodeCard(
                             color = JellioText,
                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
                                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                    // The episode's rating, the same chip as on Home's cards.
+                    episode.CommunityRating?.takeIf { it > 0.0 }?.let { rating ->
+                        com.jellio.tv.ui.home.CardChip(
+                            text = String.format(java.util.Locale.US, "%.1f", rating),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                         )
                     }
                     if (episode.UserData?.Played == true) {

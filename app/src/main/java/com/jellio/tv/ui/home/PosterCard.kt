@@ -492,7 +492,7 @@ internal fun sizedImageRequest(
         .build()
 
 @Composable
-private fun CardChip(text: String, modifier: Modifier = Modifier) {
+internal fun CardChip(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         color = JellioText,
