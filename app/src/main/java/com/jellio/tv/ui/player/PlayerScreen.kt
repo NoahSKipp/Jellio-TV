@@ -266,6 +266,7 @@ fun PlayerScreen(
                 resumePercent = uiState.resumePercent,
                 title = uiState.title,
                 subtitle = uiState.subtitle,
+                artworkUrl = uiState.artworkUrl,
                 subtitleTracks = uiState.subtitleTracks,
                 selectedSubtitleIndex = uiState.selectedSubtitleIndex,
                 audioTracks = uiState.audioTracks,
@@ -388,6 +389,7 @@ private fun PlayerSurface(
     resumePercent: Int?,
     title: String,
     subtitle: String,
+    artworkUrl: String?,
     subtitleTracks: List<SubtitleTrackUiState>,
     selectedSubtitleIndex: Int?,
     audioTracks: List<AudioTrackUiState>,
@@ -475,7 +477,15 @@ private fun PlayerSurface(
     fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
         val mediaItem = MediaItem.Builder()
             .setUri(streamUrl)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setSubtitle(subtitle).build())
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setSubtitle(subtitle)
+                    .setDisplayTitle(title)
+                    .setArtist(subtitle.ifEmpty { null })
+                    .apply { artworkUrl?.let { setArtworkUri(Uri.parse(it)) } }
+                    .build()
+            )
             .build()
         val videoSource = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(httpDataSourceFactory)

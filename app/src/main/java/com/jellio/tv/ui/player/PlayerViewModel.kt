@@ -154,6 +154,8 @@ data class PlayerUiState(
     val resumePercent: Int? = null,
     val title: String = "",
     val subtitle: String = "",
+    // Poster shown by the system media controls (Google Home, the phone's remote).
+    val artworkUrl: String? = null,
     val subtitleTracks: List<SubtitleTrackUiState> = emptyList(),
     val selectedSubtitleIndex: Int? = null,
     val isSwitchingSubtitle: Boolean = false,
@@ -573,6 +575,7 @@ class PlayerViewModel @Inject constructor(
                     resumePercent = resumePercent,
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
+                    artworkUrl = artworkUrl(session, item, isEpisode),
                     subtitleTracks = subtitleTracks,
                     selectedSubtitleIndex = initialSubtitle,
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
@@ -734,6 +737,18 @@ class PlayerViewModel @Inject constructor(
     // other real pause screen shows here, so SeriesId/
     // ParentBackdropImageTags/SeriesPrimaryImageTag are what this reads
     // instead for one; a movie has no series to prefer over its own.
+    // The show's poster for an episode, the title's own otherwise. The token goes
+    // in the URL because the system loads it without our headers.
+    private fun artworkUrl(session: Session, item: BaseItemDto, isEpisode: Boolean): String? {
+        val (id, tag) = if (isEpisode && item.SeriesId != null) {
+            item.SeriesId to item.SeriesPrimaryImageTag
+        } else {
+            item.Id to (item.ImageTags?.get("Primary") ?: item.PrimaryImageTag)
+        }
+        if (tag == null) return null
+        return session.serverAddress.trimEnd('/') + "/Items/" + id + "/Images/Primary?maxWidth=600&tag=" + tag + "&api_key=" + session.accessToken
+    }
+
     private fun buildPauseOverlayInfo(session: Session, item: BaseItemDto, isEpisode: Boolean): PauseOverlayInfo {
         val seriesId = item.SeriesId
         val artId = if (isEpisode && seriesId != null) seriesId else item.Id
