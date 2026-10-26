@@ -30,7 +30,21 @@ object GitHubModule {
     @Singleton
     fun provideGitHubApi(moshi: Moshi): GitHubApi = Retrofit.Builder()
         .baseUrl("https://api.github.com/")
-        .client(OkHttpClient.Builder().build())
+        .client(
+            OkHttpClient.Builder()
+                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                // GitHub's API asks every client for a User-Agent naming it.
+                .addInterceptor { chain ->
+                    chain.proceed(
+                        chain.request().newBuilder()
+                            .header("User-Agent", "Jellio-TV/${com.jellio.tv.data.network.APP_VERSION}")
+                            .header("Accept", "application/vnd.github+json")
+                            .build(),
+                    )
+                }
+                .build(),
+        )
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(GitHubApi::class.java)

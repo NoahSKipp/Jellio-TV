@@ -900,6 +900,7 @@ internal object StringsEs {
         m["settings_check_updates_checking"] = "Comprobando..."
         m["settings_check_updates_desc"] = "Buscar versiones más recientes de Jellio TV"
         m["settings_check_updates_error"] = "No se pudieron comprobar actualizaciones."
+        m["settings_check_updates_preparing"] = "La versión %s se está preparando. Vuelve a comprobarlo en unos minutos."
         m["settings_check_updates_latest"] = "Ya tienes la última versión."
         m["settings_clear_cache_btn"] = "Borrar caché"
         m["settings_clear_cache_desc"] = "Forzar la actualización de filas y metadatos en caché."

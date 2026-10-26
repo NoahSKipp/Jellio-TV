@@ -44,8 +44,19 @@ sealed interface ManualCheckResult {
     data object Checking : ManualCheckResult
     data object UpToDate : ManualCheckResult
     data class UpdateFound(val version: String) : ManualCheckResult
+    // The release exists but its APK is still being built and attached.
+    data class Preparing(val version: String) : ManualCheckResult
     data object Error : ManualCheckResult
 }
+
+private sealed interface LatestRelease {
+    data class Ready(val version: String, val apkUrl: String) : LatestRelease
+    data class Preparing(val version: String) : LatestRelease
+    data object Failed : LatestRelease
+}
+
+// A release is published a few minutes before its APK is attached.
+private const val PREPARING_RECHECK_MS = 10L * 60 * 1000
 
 // Real feedback live: no in-app way at all to learn a new real
 // version had shipped short of checking GitHub by hand. Checked once
@@ -89,7 +100,14 @@ class AppUpdateViewModel @Inject constructor(
     private suspend fun runCheck() {
         lastCheckAt = System.currentTimeMillis()
         if (_uiState.value.availableVersion != null) return
-        val (latestVersion, apkUrl) = fetchLatestVersionAndApkUrl() ?: return
+        val (latestVersion, apkUrl) = when (val latest = fetchLatestRelease()) {
+            is LatestRelease.Ready -> latest.version to latest.apkUrl
+            is LatestRelease.Preparing -> {
+                lastCheckAt = System.currentTimeMillis() - UPDATE_CHECK_INTERVAL_MS + PREPARING_RECHECK_MS
+                return
+            }
+            LatestRelease.Failed -> return
+        }
         if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME) || latestVersion == dismissedVersion) return
         if (_uiState.value.availableVersion != null) return
         _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
@@ -116,12 +134,21 @@ class AppUpdateViewModel @Inject constructor(
     fun checkForUpdateManually() {
         viewModelScope.launch {
             _manualCheckResult.value = ManualCheckResult.Checking
-            val fetched = fetchLatestVersionAndApkUrl()
-            if (fetched == null) {
-                _manualCheckResult.value = ManualCheckResult.Error
-                return@launch
+            val (latestVersion, apkUrl) = when (val latest = fetchLatestRelease()) {
+                is LatestRelease.Ready -> latest.version to latest.apkUrl
+                is LatestRelease.Preparing -> {
+                    _manualCheckResult.value = if (isNewerVersion(latest.version, BuildConfig.VERSION_NAME)) {
+                        ManualCheckResult.Preparing(latest.version)
+                    } else {
+                        ManualCheckResult.UpToDate
+                    }
+                    return@launch
+                }
+                LatestRelease.Failed -> {
+                    _manualCheckResult.value = ManualCheckResult.Error
+                    return@launch
+                }
             }
-            val (latestVersion, apkUrl) = fetched
             if (!isNewerVersion(latestVersion, BuildConfig.VERSION_NAME)) {
                 _manualCheckResult.value = ManualCheckResult.UpToDate
                 return@launch
@@ -131,11 +158,20 @@ class AppUpdateViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchLatestVersionAndApkUrl(): Pair<String, String>? {
-        val release = runCatching { gitHubApi.getLatestRelease(GITHUB_OWNER, GITHUB_REPO) }.getOrNull() ?: return null
+    private suspend fun fetchLatestRelease(): LatestRelease {
+        val release = try {
+            gitHubApi.getLatestRelease(GITHUB_OWNER, GITHUB_REPO)
+        } catch (err: kotlinx.coroutines.CancellationException) {
+            throw err
+        } catch (err: Exception) {
+            val detail = (err as? retrofit2.HttpException)?.let { "HTTP ${it.code()}" } ?: err.javaClass.simpleName + ": " + err.message
+            android.util.Log.w("JellioUpdate", "update check failed: $detail")
+            return LatestRelease.Failed
+        }
         val latestVersion = release.tag_name.removePrefix("v")
-        val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") } ?: return null
-        return latestVersion to apkAsset.browser_download_url
+        val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
+            ?: return LatestRelease.Preparing(latestVersion)
+        return LatestRelease.Ready(latestVersion, apkAsset.browser_download_url)
     }
 
     fun dismiss() {

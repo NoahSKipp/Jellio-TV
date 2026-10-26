@@ -900,6 +900,7 @@ internal object StringsPl {
         m["settings_check_updates_checking"] = "Sprawdzanie..."
         m["settings_check_updates_desc"] = "Szukaj nowszych wydań Jellio TV"
         m["settings_check_updates_error"] = "Nie można sprawdzić aktualizacji."
+        m["settings_check_updates_preparing"] = "Wersja %s jest przygotowywana. Sprawdź ponownie za kilka minut."
         m["settings_check_updates_latest"] = "Masz najnowszą wersję."
         m["settings_clear_cache_btn"] = "Wyczyść pamięć podręczną"
         m["settings_clear_cache_desc"] = "Wymuś odświeżenie wierszy i metadanych w pamięci podręcznej."

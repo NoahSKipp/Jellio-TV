@@ -900,6 +900,7 @@ internal object StringsEn {
         m["settings_check_updates_checking"] = "Checking..."
         m["settings_check_updates_desc"] = "Look for newer Jellio TV releases"
         m["settings_check_updates_error"] = "Couldn't check for updates."
+        m["settings_check_updates_preparing"] = "Version %s is being prepared. Check again in a few minutes."
         m["settings_check_updates_latest"] = "You're on the latest version."
         m["settings_clear_cache_btn"] = "Clear cached rows"
         m["settings_clear_cache_desc"] = "Force refresh cached home rows and metadata."

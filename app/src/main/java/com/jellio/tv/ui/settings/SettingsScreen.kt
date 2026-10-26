@@ -1082,6 +1082,9 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
             ManualCheckResult.Error -> {
                 Text(text = string("settings_check_updates_error"), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
             }
+            is ManualCheckResult.Preparing -> {
+                Text(text = com.jellio.tv.ui.i18n.formatString("settings_check_updates_preparing", current.version), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+            }
             is ManualCheckResult.UpdateFound -> {
                 Text(
                     text = "Update available: ${current.version}",

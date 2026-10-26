@@ -900,6 +900,7 @@ internal object StringsIt {
         m["settings_check_updates_checking"] = "Verifica in corso..."
         m["settings_check_updates_desc"] = "Controlla aggiornamenti per Jellio TV"
         m["settings_check_updates_error"] = "Impossibile controllare gli aggiornamenti."
+        m["settings_check_updates_preparing"] = "La versione %s è in preparazione. Riprova tra qualche minuto."
         m["settings_check_updates_latest"] = "Stai usando l'ultima versione."
         m["settings_clear_cache_btn"] = "Svuota cache"
         m["settings_clear_cache_desc"] = "Forza l'aggiornamento delle righe e dei metadati nella cache."
