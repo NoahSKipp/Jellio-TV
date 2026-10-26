@@ -1724,6 +1724,7 @@ class JellioRepository @Inject constructor(
         burnInSubtitleStreamIndex: Int? = null,
         audioStreamIndex: Int? = null,
         forceTranscode: Boolean = false,
+        forceDirectPlay: Boolean = false,
     ): PlaybackTarget {
         val response = api.getPlaybackInfo(
             itemId,
@@ -1768,7 +1769,7 @@ class JellioRepository @Inject constructor(
         val shouldTranscode = forceTranscode ||
             burnInSubtitleStreamIndex != null ||
             audioNeedsTranscode
-        val directPlay = !shouldTranscode && canDirectPlay(mediaSource, audioStreamIndex)
+        val directPlay = forceDirectPlay || (!shouldTranscode && canDirectPlay(mediaSource, audioStreamIndex))
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
         val deviceId = sessionManager.deviceId()
@@ -1894,7 +1895,8 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null): Boolean {
+    // ignoreAudio: whether the picture and container alone can be played as is.
+    internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null, ignoreAudio: Boolean = false): Boolean {
         if (mediaSource.SupportsDirectPlay != true) return false
         val container = mediaSource.Container?.lowercase() ?: return false
         if (container !in DIRECT_PLAY_CONTAINERS) return false
@@ -1909,7 +1911,7 @@ class JellioRepository @Inject constructor(
             audioStreams.firstOrNull()
         }
         if (video != null && video.Codec?.lowercase() !in DIRECT_PLAY_VIDEO_CODECS) return false
-        if (audio != null && !canDirectPlayAudio(audio.Codec)) return false
+        if (!ignoreAudio && audio != null && !canDirectPlayAudio(audio.Codec)) return false
         return true
     }
 

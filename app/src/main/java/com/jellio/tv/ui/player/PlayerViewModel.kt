@@ -248,6 +248,7 @@ class PlayerViewModel @Inject constructor(
     val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()
     private val triedSourceIds = mutableListOf<String>()
     private val transcodeRetriedSourceIds = mutableSetOf<String>()
+    private val directRetriedSourceIds = mutableSetOf<String>()
     private var failoverLanguage: String? = null
     private var failingOver = false
     private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
@@ -324,7 +325,39 @@ class PlayerViewModel @Inject constructor(
         }
         failingOver = true
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
+        // A server remux or transcode that never started (the server could not
+        // open the stream) is not the stream's fault: streams this TV plays as
+        // they are go first, then this same one played as it is.
+        val remuxFailed = !state.directPlay && reason == "error before the first frame"
         viewModelScope.launch {
+            if (remuxFailed && sourceId != null) {
+                val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "failover") }.getOrDefault(emptyList())
+                val playable = sources.filter {
+                    it.Id != null && it.Id != sourceId && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) && repository.canDirectPlay(it)
+                }
+                if (playable.isEmpty() && repository.canDirectPlay(source, ignoreAudio = true) && directRetriedSourceIds.add(sourceId)) {
+                    android.util.Log.w("JellioPlayer", "server remux failed before the first frame, playing source $sourceId as is")
+                    _failover.value = FailoverNotice(attempt = triedSourceIds.size + 1, sourceLabel = sourceLabel(source), slowTranscode = false)
+                    val target = runCatching {
+                        repository.resolvePlayback(
+                            userId = session.userId,
+                            itemId = id,
+                            mediaSourceId = sourceId,
+                            startTimeTicks = state.startPositionTicks,
+                            forceDirectPlay = true,
+                        )
+                    }.getOrNull()
+                    if (target != null) {
+                        _uiState.value = state.copy(
+                            streamUrl = target.streamUrl,
+                            directPlay = true,
+                            subtitleTracks = buildSubtitleTracks(id, target.mediaSource, 0L),
+                        )
+                        failingOver = false
+                        return@launch
+                    }
+                }
+            }
             BadStreams.mark(id, source)
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
@@ -343,7 +376,8 @@ class PlayerViewModel @Inject constructor(
             // Avoid and Block try streams whose video can be copied first;
             // Block never falls back to one the server would re-encode.
             val policy = VideoTranscodePolicy
-            val next = if (policy.avoiding) {
+            val directFirst = if (remuxFailed) candidates.filter { repository.canDirectPlay(it) } else emptyList()
+            val next = pick(directFirst) ?: if (policy.avoiding) {
                 val (reencode, copyable) = candidates.partition { policy.needsReencode(it) }
                 pick(copyable) ?: if (policy.blocking) null else pick(reencode)
             } else {
@@ -470,6 +504,7 @@ class PlayerViewModel @Inject constructor(
         if (!fromFailover) {
             triedSourceIds.clear()
             transcodeRetriedSourceIds.clear()
+            directRetriedSourceIds.clear()
             failoverLanguage = null
             if (mediaSourceId != null) {
                 BadStreams.unmark(itemId, com.jellio.tv.data.model.MediaSourceDto(Id = mediaSourceId))
