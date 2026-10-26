@@ -98,6 +98,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.60.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.60.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Art for Every Title", "Title pages, the loading screen and the pause screen try every backdrop and Thumb a title has, then its poster softly blurred, and title pages show the title's logo."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Trailer Thumbnails", "Trailers show their YouTube thumbnail, with the link icon only when there is none."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Play", "Resting on Play gets the stream ready, so playback starts sooner after you press it."),
+            ChangelogFeature(Icons.Filled.Tv, "Steadier When the Server Is Busy", "A slow server no longer leaves a blank page: title pages keep what they show and offer Retry, and Home, the Feed and Studio Hubs ask again instead of showing nothing."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.59.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.59.3",
