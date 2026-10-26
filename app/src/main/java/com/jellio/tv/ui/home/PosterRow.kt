@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
@@ -67,7 +68,16 @@ fun PosterRow(
     // Coming back to Home: this card takes focus once, then onFocusRestored.
     restoreItemId: String? = null,
     onFocusRestored: () -> Unit = {},
+    // Up from any card enters this row (its last used card) instead of
+    // relying on the list's own focus search for a row scrolled out of view.
+    upTarget: (() -> androidx.compose.ui.focus.FocusRequester?)? = null,
+    // Told while this row is on screen, so rows below only jump to it then.
+    onRowAttached: (Boolean) -> Unit = {},
 ) {
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onRowAttached(true)
+        onDispose { onRowAttached(false) }
+    }
     val rowItems = remember(section.items) { section.items.distinctBy { it.Id }.take(20) }
     if (rowItems.isEmpty()) return
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
@@ -104,7 +114,8 @@ fun PosterRow(
                     }
                     RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
                         PosterCard(
-                            modifier = if (restoreRequester != null) Modifier.focusRequester(restoreRequester) else Modifier,
+                            modifier = (if (restoreRequester != null) Modifier.focusRequester(restoreRequester) else Modifier)
+                                .then(if (upTarget != null) Modifier.focusProperties { up = upTarget() ?: androidx.compose.ui.focus.FocusRequester.Default } else Modifier),
                             item = item,
                             imageUrl = imageUrl,
                             onClick = onCardClick,

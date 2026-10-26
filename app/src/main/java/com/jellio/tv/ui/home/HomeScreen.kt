@@ -134,6 +134,7 @@ fun HomeScreen(
     var lastFocus by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
     var restorePending by remember { mutableStateOf(true) }
     val rowFocus = remember { mutableMapOf<String, androidx.compose.ui.focus.FocusRequester>() }
+    val attachedRows = remember { mutableSetOf<String>() }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
@@ -314,6 +315,12 @@ fun HomeScreen(
                                             rowFocusRequester = rowFocus.getOrPut(row.section.key) { androidx.compose.ui.focus.FocusRequester() },
                                             restoreItemId = lastFocus?.takeIf { restorePending && it[0] == row.section.key }?.get(1),
                                             onFocusRestored = { restorePending = false },
+                                            upTarget = {
+                                                visibleRows.getOrNull(visibleRows.indexOfFirst { it.key == row.key } - 1)
+                                                    ?.takeIf { it.key in attachedRows }
+                                                    ?.let { rowFocus[it.key] }
+                                            },
+                                            onRowAttached = { on -> if (on) attachedRows.add(row.key) else attachedRows.remove(row.key) },
                                         )
                                     }
                                     is ComingSoonHomeRow -> ComingSoonRow(
