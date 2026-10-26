@@ -295,7 +295,7 @@ internal object StringsPl {
         m["detail_seasons"] = "Sezony"
         m["detail_specials"] = "Odcinki specjalne"
         m["detail_skip_notifications_show"] = "Pomiń powiadomienia o nowych odcinkach tego serialu"
-        m["detail_streams"] = "Strumienie i źródła"
+        m["detail_streams"] = "Źródła"
         m["detail_studios"] = "Wytwórnie"
         m["detail_track_anilist"] = "Śledź na AniList"
         m["detail_trailers"] = "Zwiastuny"

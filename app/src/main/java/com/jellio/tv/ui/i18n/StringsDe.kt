@@ -295,7 +295,7 @@ internal object StringsDe {
         m["detail_seasons"] = "Staffeln"
         m["detail_specials"] = "Specials"
         m["detail_skip_notifications_show"] = "Benachrichtigungen über neue Folgen für diese Serie überspringen"
-        m["detail_streams"] = "Streams & Quellen"
+        m["detail_streams"] = "Quellen"
         m["detail_studios"] = "Studios"
         m["detail_track_anilist"] = "Auf AniList verfolgen"
         m["detail_trailers"] = "Trailer"

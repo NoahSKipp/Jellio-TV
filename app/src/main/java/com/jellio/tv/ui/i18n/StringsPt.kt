@@ -295,7 +295,7 @@ internal object StringsPt {
         m["detail_seasons"] = "Temporadas"
         m["detail_specials"] = "Especiais"
         m["detail_skip_notifications_show"] = "Ignorar notificações de novos episódios desta série"
-        m["detail_streams"] = "Transmissões e fontes"
+        m["detail_streams"] = "Fontes"
         m["detail_studios"] = "Estúdios"
         m["detail_track_anilist"] = "Acompanhar no AniList"
         m["detail_trailers"] = "Trailers"
