@@ -84,7 +84,6 @@ internal object StringsDe {
         m["detail_dislike"] = "Gefällt mir nicht"
         m["detail_episode_number"] = "Folge %d"
         m["detail_episodes"] = "Episoden"
-        m["detail_all_episodes"] = "Alle Folgen"
         m["detail_current_episode"] = "Aktuelle Folge"
         m["detail_fewer_actions"] = "Weniger Aktionen"
         m["detail_like"] = "Gefällt mir"

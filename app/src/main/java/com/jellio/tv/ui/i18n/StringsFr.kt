@@ -84,7 +84,6 @@ internal object StringsFr {
         m["detail_dislike"] = "Je n'aime pas"
         m["detail_episode_number"] = "Épisode %d"
         m["detail_episodes"] = "Épisodes"
-        m["detail_all_episodes"] = "Tous les épisodes"
         m["detail_current_episode"] = "Épisode actuel"
         m["detail_fewer_actions"] = "Moins d'actions"
         m["detail_like"] = "J'aime"

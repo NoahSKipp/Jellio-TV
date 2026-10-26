@@ -86,6 +86,7 @@ class DetailViewModel @Inject constructor(
     private var episodesJob: Job? = null
     private var streamLookupJob: Job? = null
     private var seriesPlayDeferred: Deferred<BaseItemDto?>? = null
+    private var userPickedSeason = false
 
     private fun cancelActiveWork() {
         loadJob?.cancel()
@@ -114,6 +115,7 @@ class DetailViewModel @Inject constructor(
         cancelActiveWork()
         loadedItemId = itemId
         ratingTargetId = null
+        userPickedSeason = false
         val preview = repository.previewItem(itemId)
         val preloaded = repository.preloadedDetails(itemId) ?: preview
         ratingTargetId = preloaded?.SeriesId ?: preloaded?.Id
@@ -165,7 +167,7 @@ class DetailViewModel @Inject constructor(
                     loadSeasons(session, preloaded.Id)
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, preloaded.Id) }
                 } else if (preloaded?.Type == "Episode" && preloaded.SeriesId != null) {
-                    loadSeasons(session, preloaded.SeriesId, preferredSeasonId = preloaded.SeasonId, preferredSeasonNumber = preloaded.ParentIndexNumber)
+                    loadSeasons(session, preloaded.SeriesId)
                 }
                 // Two retries with backoff; the art drawn from memory stays up meanwhile.
                 val item = withRetries(
@@ -210,9 +212,14 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 } else if (item.Type == "Episode" && item.SeriesId != null) {
                     if (preloaded?.Type != "Episode" || (_uiState.value.seasons.isEmpty() && seasonsJob?.isActive != true)) {
-                        loadSeasons(session, item.SeriesId, preferredSeasonId = item.SeasonId, preferredSeasonNumber = item.ParentIndexNumber)
-                    } else if (_uiState.value.selectedSeasonId == null && item.SeasonId != null) {
-                        selectSeason(session, item.SeriesId, item.SeasonId)
+                        loadSeasons(session, item.SeriesId)
+                    } else if (!userPickedSeason) {
+                        // The preview may have lacked the season; the details settle it.
+                        val seasons = _uiState.value.seasons
+                        val target = if (seasons.isEmpty()) item.SeasonId else episodeSeason(seasons)?.Id
+                        if (target != null && target != _uiState.value.selectedSeasonId) {
+                            selectSeason(session, item.SeriesId, target)
+                        }
                     }
                 }
             } catch (err: kotlinx.coroutines.CancellationException) {
@@ -266,18 +273,21 @@ class DetailViewModel @Inject constructor(
         return target.episode
     }
 
-    private fun loadSeasons(session: Session, seriesId: String, preferredSeasonId: String? = null, preferredSeasonNumber: Int? = null) {
+    // An episode page opens on the episode's own season, specials included.
+    private fun episodeSeason(seasons: List<BaseItemDto>): BaseItemDto? {
+        val episode = _uiState.value.item?.takeIf { it.Type == "Episode" } ?: return null
+        return episode.SeasonId?.let { id -> seasons.firstOrNull { it.Id == id } }
+            ?: episode.ParentIndexNumber?.let { n -> seasons.firstOrNull { it.IndexNumber == n } }
+    }
+
+    private fun loadSeasons(session: Session, seriesId: String) {
         val ownerItemId = loadedItemId ?: return
         if (!isCurrentSeries(seriesId, ownerItemId)) return
         fun ordered(list: List<BaseItemDto>) = list.sortedBy { if (repository.isSpecialsSeason(it)) 1 else 0 }
         fun pickSeason(list: List<BaseItemDto>): BaseItemDto? {
-            if (preferredSeasonId != null) {
-                list.firstOrNull { it.Id == preferredSeasonId }?.let { return it }
-            }
-            if (preferredSeasonNumber != null) {
-                list.firstOrNull { it.IndexNumber == preferredSeasonNumber }?.let { return it }
-            }
-            return list.firstOrNull()
+            val selected = list.firstOrNull { it.Id == _uiState.value.selectedSeasonId }
+            if (userPickedSeason && selected != null) return selected
+            return episodeSeason(list) ?: selected ?: list.firstOrNull()
         }
         repository.recentSeasons(seriesId)?.let { known ->
             if (!isCurrentSeries(seriesId, ownerItemId)) return
@@ -285,8 +295,9 @@ class DetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(seasons = seasons)
             pickSeason(seasons)?.let { selectSeason(session, seriesId, it.Id) }
         }
-        if (preferredSeasonId != null && _uiState.value.selectedSeasonId == null) {
-            selectSeason(session, seriesId, preferredSeasonId)
+        val episodeSeasonId = _uiState.value.item?.takeIf { it.Type == "Episode" }?.SeasonId
+        if (episodeSeasonId != null && _uiState.value.selectedSeasonId == null) {
+            selectSeason(session, seriesId, episodeSeasonId)
         }
         seasonsJob?.cancel()
         seasonsJob = viewModelScope.launch {
@@ -294,21 +305,17 @@ class DetailViewModel @Inject constructor(
             if (!isCurrentSeries(seriesId, ownerItemId)) return@launch
             if (seasons.isEmpty() && _uiState.value.seasons.isNotEmpty()) return@launch
             _uiState.value = _uiState.value.copy(seasons = seasons)
-            val selected = _uiState.value.selectedSeasonId
-            val toSelect = if (selected != null && seasons.any { it.Id == selected }) {
-                seasons.firstOrNull { it.Id == selected }
-            } else {
-                pickSeason(seasons)
-            }
+            val toSelect = pickSeason(seasons)
             if (toSelect != null && (toSelect.Id != _uiState.value.selectedSeasonId || (_uiState.value.selectedSeasonEpisodes.isEmpty() && episodesJob?.isActive != true))) {
                 selectSeason(session, seriesId, toSelect.Id)
             }
         }
     }
 
-    fun selectSeason(session: Session, seriesId: String, seasonId: String) {
+    fun selectSeason(session: Session, seriesId: String, seasonId: String, byUser: Boolean = false) {
         val ownerItemId = loadedItemId ?: return
         if (!isCurrentSeries(seriesId, ownerItemId)) return
+        if (byUser) userPickedSeason = true
         val known = repository.recentEpisodes(seriesId, seasonId)
         val showing = _uiState.value.selectedSeasonId == seasonId && _uiState.value.selectedSeasonEpisodes.isNotEmpty()
         _uiState.value = _uiState.value.copy(

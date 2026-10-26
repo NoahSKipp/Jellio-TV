@@ -84,7 +84,6 @@ internal object StringsIt {
         m["detail_dislike"] = "Non mi piace"
         m["detail_episode_number"] = "Episodio %d"
         m["detail_episodes"] = "Episodi"
-        m["detail_all_episodes"] = "Tutti gli episodi"
         m["detail_current_episode"] = "Episodio corrente"
         m["detail_fewer_actions"] = "Meno azioni"
         m["detail_like"] = "Mi piace"

@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -295,7 +296,7 @@ fun DetailScreen(
                                 state = uiState,
                                 imageUrl = imageUrl,
                                 currentEpisodeId = if (item.Type == "Episode") item.Id else null,
-                                onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.SeriesId ?: item.Id, seasonId) },
+                                onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.SeriesId ?: item.Id, seasonId, byUser = true) },
                                 onEpisodeClick = if (item.Type == "Episode") onNavigateToDetailReplace else onNavigateToDetail,
                                 onEpisodeOptions = { episode -> episodeMenuTarget = episode },
                                 onEpisodeFocused = { episodeId -> viewModel.preloadEpisode(episodeId) },
@@ -622,48 +623,6 @@ private fun DetailHero(
                         Text(text = state.playLabel, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
-                if (item.Type == "Episode" && item.SeriesId != null) {
-                    val allEpisodesText = com.jellio.tv.ui.i18n.string("detail_all_episodes")
-                    Surface(
-                        onClick = { onSeriesClick(item.SeriesId) },
-                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(
-                            containerColor = Color.White.copy(alpha = 0.12f),
-                            contentColor = JellioText,
-                            focusedContainerColor = Color.White,
-                            focusedContentColor = JellioBg,
-                        ),
-                        border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(
-                                border = BorderStroke(2.dp, Color.White),
-                                shape = RoundedCornerShape(999.dp),
-                            ),
-                        ),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = if (actionsExpanded) 16.dp else 24.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Tv,
-                                contentDescription = allEpisodesText,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            AnimatedVisibility(
-                                visible = !actionsExpanded,
-                                enter = fadeIn() + expandHorizontally(),
-                                exit = fadeOut() + shrinkHorizontally(),
-                            ) {
-                                Text(
-                                    text = allEpisodesText,
-                                    modifier = Modifier.padding(start = 8.dp),
-                                )
-                            }
-                        }
-                    }
-                }
                 AnimatedVisibility(visible = actionsExpanded, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconActionButton(
@@ -850,6 +809,9 @@ private fun SeasonsSection(
     onEpisodeFocused: (String) -> Unit,
 ) {
     if (state.seasons.isEmpty() && state.selectedSeasonEpisodes.isEmpty()) return
+    // The episode the row was brought to, or the user took over first; saveable
+    // so the row does not jump again when this section scrolls back into view.
+    var settledFor by rememberSaveable { mutableStateOf<String?>(null) }
     Column(modifier = Modifier.padding(top = 16.dp)) {
         Text(text = com.jellio.tv.ui.i18n.string("detail_episodes"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         if (state.seasons.isNotEmpty()) {
@@ -857,7 +819,10 @@ private fun SeasonsSection(
                 items(state.seasons, key = { it.Id }) { season ->
                     val selected = season.Id == state.selectedSeasonId
                     Surface(
-                        onClick = { onSelectSeason(season.Id) },
+                        onClick = {
+                            settledFor = currentEpisodeId
+                            onSelectSeason(season.Id)
+                        },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = if (selected) JellioSecondary else JellioBgElevated,
@@ -881,13 +846,13 @@ private fun SeasonsSection(
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             val releaseLabels = remember(state.selectedSeasonEpisodes, state.streamVerifiedTick) { seasonEpisodeReleaseLabels(state.selectedSeasonEpisodes) }
             val episodesListState = rememberLazyListState()
-            LaunchedEffect(currentEpisodeId, state.selectedSeasonId, state.selectedSeasonEpisodes.size) {
-                if (currentEpisodeId != null && state.selectedSeasonEpisodes.isNotEmpty()) {
-                    val idx = state.selectedSeasonEpisodes.indexOfFirst { it.Id == currentEpisodeId }
-                    if (idx > 0) {
-                        episodesListState.scrollToItem(idx)
-                    }
-                }
+            LaunchedEffect(currentEpisodeId, state.selectedSeasonEpisodes) {
+                if (currentEpisodeId == null || settledFor == currentEpisodeId) return@LaunchedEffect
+                val idx = state.selectedSeasonEpisodes.indexOfFirst { it.Id == currentEpisodeId }
+                if (idx < 0) return@LaunchedEffect
+                // Offset 0 lands the card on the start padding, where focus parks a card.
+                episodesListState.scrollToItem(idx)
+                settledFor = currentEpisodeId
             }
             LazyRow(
                 state = episodesListState,
@@ -903,6 +868,7 @@ private fun SeasonsSection(
                         onClick = { onEpisodeClick(episode.Id) },
                         onOptionsClick = { onEpisodeOptions(episode) },
                         onFocused = {
+                            settledFor = currentEpisodeId
                             if (releaseLabels[episode.Id] == null) {
                                 onEpisodeFocused(episode.Id)
                             }

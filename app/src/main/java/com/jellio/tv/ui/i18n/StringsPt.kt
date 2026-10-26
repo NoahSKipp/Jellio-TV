@@ -84,7 +84,6 @@ internal object StringsPt {
         m["detail_dislike"] = "Não gosto"
         m["detail_episode_number"] = "Episódio %d"
         m["detail_episodes"] = "Episódios"
-        m["detail_all_episodes"] = "Todos os episódios"
         m["detail_current_episode"] = "Episódio atual"
         m["detail_fewer_actions"] = "Menos ações"
         m["detail_like"] = "Gosto"

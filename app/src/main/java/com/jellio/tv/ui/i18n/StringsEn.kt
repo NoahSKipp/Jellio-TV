@@ -84,7 +84,6 @@ internal object StringsEn {
         m["detail_dislike"] = "Dislike"
         m["detail_episode_number"] = "Episode %d"
         m["detail_episodes"] = "Episodes"
-        m["detail_all_episodes"] = "All Episodes"
         m["detail_current_episode"] = "Current Episode"
         m["detail_fewer_actions"] = "Fewer actions"
         m["detail_like"] = "Like"
