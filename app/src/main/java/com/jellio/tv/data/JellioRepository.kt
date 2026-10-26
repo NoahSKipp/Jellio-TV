@@ -203,6 +203,9 @@ class JellioRepository @Inject constructor(
     private val rememberedUsersStore: RememberedUsersStore,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
+
+    // One device id on every request, so Jellyfin lists a single device and session per TV.
+    val deviceId: String get() = sessionManager.getCachedDeviceId()
     private val cache = TtlCache()
 
     // Own scope rather than viewModelScope: prefetchStreams below is
@@ -555,7 +558,7 @@ class JellioRepository @Inject constructor(
         val token = sessionManager.accessToken() ?: return emptyMap()
         return mapOf(
             "X-Emby-Token" to token,
-            "Authorization" to com.jellio.tv.data.network.buildEmbyAuthorizationHeader("AndroidTV", com.jellio.tv.data.network.APP_VERSION, token),
+            "Authorization" to com.jellio.tv.data.network.buildEmbyAuthorizationHeader(sessionManager.getCachedDeviceId(), com.jellio.tv.data.network.APP_VERSION, token),
         )
     }
 

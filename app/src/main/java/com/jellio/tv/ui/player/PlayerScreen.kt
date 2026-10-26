@@ -489,7 +489,7 @@ private fun PlayerSurface(
             .setDefaultRequestProperties(
                 buildMap {
                     put("X-Emby-Token", session.accessToken)
-                    put("Authorization", buildEmbyAuthorizationHeader("AndroidTV", APP_VERSION, session.accessToken))
+                    put("Authorization", buildEmbyAuthorizationHeader(viewModel.deviceId, APP_VERSION, session.accessToken))
                 }
             )
     }

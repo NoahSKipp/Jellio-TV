@@ -235,6 +235,8 @@ class PlayerViewModel @Inject constructor(
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
 
+    val deviceId: String get() = repository.deviceId
+
     // ---- Stream failover -------------------------------------------------
     // A stream that errors before its first frame, shows no picture, or
     // turns out to be a placeholder clip is remembered as bad and the next
