@@ -266,7 +266,9 @@ fun PlayerScreen(
         when {
             // Same as the web player: the title's backdrop with its logo
             // gently pulsing while the stream is prepared.
+            // Without the title's art yet, the pulsing logo on its own rather than black.
             uiState.isLoading -> uiState.pauseInfo?.let { BufferingOverlay(info = it) }
+                ?: com.jellio.tv.ui.common.TitleLoadingArt(null, null, "", Modifier)
             uiState.error != null -> Box(Modifier.fillMaxSize()) {
                 uiState.pauseInfo?.backdropUrl?.let {
                     AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())

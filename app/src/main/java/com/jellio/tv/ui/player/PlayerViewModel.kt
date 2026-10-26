@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -489,6 +490,30 @@ class PlayerViewModel @Inject constructor(
                 // Warms the cached user and transcode policy while the item loads.
                 launch { runCatching { repository.getUser(session.userId) } }
                 launch { runCatching { repository.loadVideoTranscodePolicy() } }
+                // The loading art goes up at once from what the row or title
+                // page already knew, not after the server answers.
+                if (prewarmed == null) {
+                    repository.previewItem(itemId)?.let { preview ->
+                        val previewIsEpisode = preview.Type == "Episode" && preview.SeriesName != null
+                        _uiState.value = PlayerUiState(
+                            isLoading = true,
+                            title = if (previewIsEpisode) preview.SeriesName.orEmpty() else preview.Name.orEmpty(),
+                            pauseInfo = buildPauseOverlayInfo(session, preview, previewIsEpisode),
+                        )
+                    }
+                }
+                // With the title already known from its row, the stream lookup
+                // and the audio language start alongside the details instead
+                // of after them; the lookup is redone only if the resume
+                // point turns out different.
+                val preview = if (prewarmed == null) repository.previewItem(itemId) else null
+                val earlyTicks = preview?.UserData?.PlaybackPositionTicks
+                val earlyTarget = if (earlyTicks != null) {
+                    async { runCatching { repository.resolvePlayback(session.userId, itemId, mediaSourceId, earlyTicks) }.getOrNull() }
+                } else {
+                    null
+                }
+                val earlyAudio = if (prewarmed == null) async { runCatching { repository.getAudioLanguagePreference(session.userId) }.getOrNull() } else null
                 val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
@@ -499,9 +524,11 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
-                val audioPreference = prewarmed?.audioPreference ?: repository.getAudioLanguagePreference(session.userId)
+                val audioPreference = prewarmed?.audioPreference ?: earlyAudio?.await() ?: repository.getAudioLanguagePreference(session.userId)
                 audioLanguagePreference = audioPreference
-                var target = prewarmed?.target ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
+                var target = prewarmed?.target
+                    ?: earlyTarget?.await()?.takeIf { earlyTicks == startTicks }
+                    ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
                 // The reader's audio language wins over the file's default
                 // when the file has it; a transcode has to be asked for it.
                 val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
