@@ -103,41 +103,6 @@ import java.util.TimeZone
 
 private val HeroHeight = 480.dp
 
-// Mirrors screens/detail.js's own real section order (hero, overview,
-// seasons/episodes for a series, cast, trailers) and its own real
-// backdrop fallback chain, not an independently designed TV layout: an
-// Episode never carries its own BackdropImageTags (Jellyfin only ever
-// stores backdrop art against a Movie/Series/Season), so its own
-// series/season backdrop is next, then, only for an Episode with
-// neither, its own Primary still.
-private fun heroBackdropUrl(
-    session: Session,
-    item: BaseItemDto,
-    rawImageUrl: (itemId: String, tag: String?, imageType: String) -> String,
-): String? {
-    item.BackdropImageTags?.firstOrNull()?.let { return rawImageUrl(item.Id, it, "Backdrop") }
-    val parentTag = item.ParentBackdropImageTags?.firstOrNull()
-    if (item.ParentBackdropItemId != null && parentTag != null) {
-        return rawImageUrl(item.ParentBackdropItemId, parentTag, "Backdrop")
-    }
-    if (item.Type == "Episode") {
-        item.ImageTags?.get("Primary")?.let { return rawImageUrl(item.Id, it, "Primary") }
-    }
-    (item.ImageTags?.get("Thumb") ?: item.ThumbImageTag)?.let { return rawImageUrl(item.Id, it, "Thumb") }
-    if (item.ParentThumbItemId != null && item.ParentThumbImageTag != null) {
-        return rawImageUrl(item.ParentThumbItemId, item.ParentThumbImageTag, "Thumb")
-    }
-    return null
-}
-
-private data class HeroArt(val url: String, val blurred: Boolean)
-
-// Last resort for the header: the poster, blurred to fill the wide frame.
-private fun heroPosterUrl(
-    item: BaseItemDto,
-    rawImageUrl: (itemId: String, tag: String?, imageType: String) -> String,
-): String? = (item.ImageTags?.get("Primary") ?: item.PrimaryImageTag)?.let { rawImageUrl(item.Id, it, "Primary") }
-
 private fun formatRuntime(ticks: Long?): String {
     if (ticks == null || ticks <= 0) return ""
     val minutes = (ticks / 600000000L).toInt()
@@ -477,19 +442,19 @@ private fun DetailHero(
     onToggleWatched: () -> Unit,
     onLike: () -> Unit,
     onDislike: () -> Unit,
+    onRetryDetails: (() -> Unit)? = null,
+    onPlayFocusChanged: (Boolean) -> Unit = {},
 ) {
     val season = state.selectedSeason?.takeIf { item.Type == "Series" }
-    // Every candidate in order: the season's and the title's backdrops, their
-    // Thumb, then the poster blurred. A failed load moves on to the next one,
-    // and when none load the gradients below still frame the title.
+    // Backdrops, Thumb, then the poster blurred; a failed load moves on to the
+    // next one, and when none load the gradients below still frame the title.
     val candidates = remember(item.Id, season?.Id, item.BackdropImageTags, item.ImageTags) {
-        buildList {
-            season?.BackdropImageTags?.forEachIndexed { i, tag -> add(HeroArt(imageUrl(season.Id, tag, if (i == 0) "Backdrop" else "Backdrop/$i", 1920), false)) }
-            item.BackdropImageTags?.forEachIndexed { i, tag -> add(HeroArt(imageUrl(item.Id, tag, if (i == 0) "Backdrop" else "Backdrop/$i", 1920), false)) }
-            heroBackdropUrl(session, item) { id, tag, type -> imageUrl(id, tag, type, 1920) }?.let { add(HeroArt(it, false)) }
-            heroPosterUrl(item) { id, tag, type -> imageUrl(id, tag, type, 600) }?.let { add(HeroArt(it, true)) }
-        }.distinctBy { it.url }
+        com.jellio.tv.ui.common.titleArtCandidates(item, { id, tag, type, w -> imageUrl(id, tag, type, w) }, season = season)
     }
+    val logos = remember(item.Id, item.ImageTags) {
+        if (item.Type == "Episode") emptyList() else com.jellio.tv.ui.common.titleLogoCandidates(item, { id, tag, type, w -> imageUrl(id, tag, type, w) })
+    }
+    var logoIndex by remember(logos) { mutableIntStateOf(0) }
     var artIndex by remember(candidates) { mutableIntStateOf(0) }
     val art = candidates.getOrNull(artIndex)
     val heroHeight = HeroHeight.scaled()
@@ -536,7 +501,19 @@ private fun DetailHero(
             } else {
                 item.Name.orEmpty()
             }
-            Text(text = titleText, style = MaterialTheme.typography.titleLarge, color = JellioText, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val logo = logos.getOrNull(logoIndex)
+            if (logo != null) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = titleText,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    onError = { logoIndex++ },
+                    modifier = Modifier.widthIn(max = 520.dp).height(120.dp),
+                )
+            } else {
+                Text(text = titleText, style = MaterialTheme.typography.titleLarge, color = JellioText, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
 
             Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 val year = if (item.Type == "Episode") {
@@ -662,13 +639,8 @@ private fun DetailHero(
 @Composable
 private fun DetailLoading(art: TitleLoadingArtInfo?) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        art?.backdropUrl?.let { url ->
-            coil3.compose.AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+        art?.art?.takeIf { it.isNotEmpty() }?.let { candidates ->
+            com.jellio.tv.ui.common.TitleArtBackdrop(candidates, Modifier.fillMaxSize())
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -268,11 +268,9 @@ fun PlayerScreen(
             // gently pulsing while the stream is prepared.
             // Without the title's art yet, the pulsing logo on its own rather than black.
             uiState.isLoading -> uiState.pauseInfo?.let { BufferingOverlay(info = it) }
-                ?: com.jellio.tv.ui.common.TitleLoadingArt(null, null, "", Modifier)
+                ?: com.jellio.tv.ui.common.TitleLoadingArt(emptyList(), null, "", Modifier)
             uiState.error != null -> Box(Modifier.fillMaxSize()) {
-                uiState.pauseInfo?.backdropUrl?.let {
-                    AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                }
+                uiState.pauseInfo?.art?.let { com.jellio.tv.ui.common.TitleArtBackdrop(it, Modifier.fillMaxSize()) }
                 PlaybackErrorPanel(
                     problem = PlaybackProblem(uiState.error ?: "Couldn't start playback", uiState.errorDetail.orEmpty()),
                     onBack = onBack,
@@ -2017,13 +2015,13 @@ private fun TrickplayPreview(frame: TrickplayFrame, timeLabel: String, modifier:
 // naming what is playing, the series (or movie) own name and rating,
 // the exact episode this pause landed on and its own overview, not the
 // item alone (an Episode's own Overview is the episode's, its own Name
-// never was the series name). pauseInfo.backdropUrl already carries
+// never was the series name). pauseInfo.art already carries
 // seriesAwareArtworkUrl()'s own real fallback chain, computed once in
 // PlayerViewModel rather than here.
 
 @Composable
 private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
-    com.jellio.tv.ui.common.TitleLoadingArt(info.backdropUrl, info.logoUrl, info.title, modifier)
+    com.jellio.tv.ui.common.TitleLoadingArt(info.art, info.logoUrl, info.title, modifier)
 }
 
 // Shown after a few seconds paused, in place of the controls. Layout follows
@@ -2031,14 +2029,7 @@ private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifi
 @Composable
 private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
-        if (info.backdropUrl != null) {
-            AsyncImage(
-                model = info.backdropUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        com.jellio.tv.ui.common.TitleArtBackdrop(info.art, Modifier.fillMaxSize())
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.92f))),
@@ -2215,7 +2206,7 @@ private fun EndScreen(
     onPlayNext: () -> Unit,
     onReplay: () -> Unit,
     onBack: () -> Unit,
-    backdropUrl: String?,
+    art: List<com.jellio.tv.ui.common.ArtCandidate>,
     info: PauseOverlayInfo?,
 ) {
     val firstFocus = remember { FocusRequester() }
@@ -2232,17 +2223,13 @@ private fun EndScreen(
         label = "endZoom",
     )
     Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
-        if (backdropUrl != null) {
-            AsyncImage(
-                model = backdropUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { scaleX = zoom; scaleY = zoom }
-                    .alpha(0.7f),
-            )
-        }
+        com.jellio.tv.ui.common.TitleArtBackdrop(
+            art,
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { scaleX = zoom; scaleY = zoom }
+                .alpha(0.7f),
+        )
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(0f to JellioBg, 0.45f to JellioBg.copy(alpha = 0.85f), 1f to Color.Transparent),

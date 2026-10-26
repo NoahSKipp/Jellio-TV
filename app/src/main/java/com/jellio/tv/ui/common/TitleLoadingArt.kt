@@ -29,15 +29,10 @@ import com.jellio.tv.ui.theme.JellioText
 // A title loading: its backdrop with the logo bouncing gently, or its
 // name pulsing when it has no logo. Used by the player and title pages.
 @Composable
-fun TitleLoadingArt(backdropUrl: String?, logoUrl: String?, title: String, modifier: Modifier = Modifier) {
+fun TitleLoadingArt(art: List<ArtCandidate>, logoUrl: String?, title: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
-        if (backdropUrl != null) {
-            AsyncImage(
-                model = backdropUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+        if (art.isNotEmpty()) {
+            TitleArtBackdrop(art, Modifier.fillMaxSize())
             Box(
                 modifier = Modifier.fillMaxSize().background(
                     Brush.verticalGradient(

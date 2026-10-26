@@ -162,25 +162,25 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
-                // A page already drawn from memory stays up.
-                if (preloaded == null) {
-                    _uiState.value = DetailUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
+                android.util.Log.w("JellioDetail", "details for $itemId failed: ${err.message}")
+                // A page already drawn from memory stays up, with a Retry.
+                if (_uiState.value.item != null) {
+                    _uiState.value = _uiState.value.copy(detailsRetrying = false, detailsFailed = true)
+                } else {
+                    _uiState.value = DetailUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
                 }
             }
         }
     }
 
-    // A real backdrop only: an episode's own still, stretched to fill the
-    // screen, looked wrong.
     private fun loadingArt(session: Session, item: BaseItemDto): TitleLoadingArtInfo {
         val isEpisode = item.Type == "Episode"
-        val backdropUrl = if (isEpisode) {
-            val tag = item.ParentBackdropImageTags?.firstOrNull()
-            val id = item.ParentBackdropItemId ?: item.SeriesId
-            if (tag != null && id != null) repository.imageUrl(session.serverAddress, id, tag, "Backdrop", 1600, session.accessToken) else null
-        } else {
-            item.BackdropImageTags?.firstOrNull()?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Backdrop", 1600, session.accessToken) }
-        }
+        val art = com.jellio.tv.ui.common.titleArtCandidates(
+            item,
+            { id, tag, type, width -> repository.imageUrl(session.serverAddress, id, tag, type, width, session.accessToken) },
+            seriesFirst = isEpisode,
+            backdropWidth = 1600,
+        )
         val logoUrl = if (isEpisode) {
             val tag = item.ParentLogoImageTag
             val id = item.ParentLogoItemId ?: item.SeriesId
@@ -188,7 +188,7 @@ class DetailViewModel @Inject constructor(
         } else {
             item.ImageTags?.get("Logo")?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Logo", 800, session.accessToken) }
         }
-        return TitleLoadingArtInfo(backdropUrl, logoUrl, if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty())
+        return TitleLoadingArtInfo(art, logoUrl, if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty())
     }
 
     private suspend fun resolveSeriesPlay(session: Session, seriesId: String): BaseItemDto? {

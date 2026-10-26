@@ -46,7 +46,7 @@ data class SubtitleTrackUiState(
 // paused frame already sitting at the saved position, instead of just
 // always seeking straight there with no way back to the real start.
 data class PauseOverlayInfo(
-    val backdropUrl: String?,
+    val art: List<com.jellio.tv.ui.common.ArtCandidate>,
     val logoUrl: String?,
     val title: String,
     val rating: String?,
@@ -789,12 +789,12 @@ class PlayerViewModel @Inject constructor(
     private fun buildPauseOverlayInfo(session: Session, item: BaseItemDto, isEpisode: Boolean): PauseOverlayInfo {
         val seriesId = item.SeriesId
         val artId = if (isEpisode && seriesId != null) seriesId else item.Id
-        val backdropTag = if (isEpisode) item.ParentBackdropImageTags?.firstOrNull() else item.BackdropImageTags?.firstOrNull()
-        val primaryTag = if (isEpisode) item.SeriesPrimaryImageTag else item.ImageTags?.get("Primary")
-        val tag = backdropTag ?: primaryTag
-        val backdropUrl = tag?.let {
-            repository.imageUrl(session.serverAddress, artId, it, if (backdropTag != null) "Backdrop" else "Primary", 1600, session.accessToken)
-        }
+        val art = com.jellio.tv.ui.common.titleArtCandidates(
+            item,
+            { id, tag, type, width -> repository.imageUrl(session.serverAddress, id, tag, type, width, session.accessToken) },
+            seriesFirst = isEpisode,
+            backdropWidth = 1600,
+        )
         val logoTag = if (isEpisode) item.ParentLogoImageTag else item.ImageTags?.get("Logo")
         val logoArtId = if (isEpisode && item.ParentLogoItemId != null) item.ParentLogoItemId else artId
         val logoUrl = logoTag?.let {
@@ -802,7 +802,7 @@ class PlayerViewModel @Inject constructor(
         }
         val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
         return PauseOverlayInfo(
-            backdropUrl = backdropUrl,
+            art = art,
             logoUrl = logoUrl,
             title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
             rating = item.CommunityRating?.let { "%.1f ★".format(it) },
