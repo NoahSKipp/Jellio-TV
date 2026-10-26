@@ -104,6 +104,7 @@ val CHANGELOG_RELEASES = listOf(
         features = listOf(
             ChangelogFeature(Icons.Filled.Tv, "Profile Switcher Fixes", "Saved profiles show right away, the selection stays inside the switcher, a profile shows it is signing in and says why when it can't, and the switcher closes once you have switched."),
             ChangelogFeature(Icons.Filled.Tv, "TMDB Ratings Everywhere", "Title pages, the pause screen and the end screen show the rating with the TMDB label, like the cards, instead of a star."),
+            ChangelogFeature(Icons.Filled.Tv, "Smarter Stream Recovery", "When the server can't start converting a stream, Jellio tries a stream this TV plays as it is, or plays the same one as it is, before moving on."),
             ChangelogFeature(Icons.Filled.Tv, "Clearer Update Check", "Check for Updates says when a new version is still being prepared instead of reporting that it couldn't check."),
         ),
     ),
