@@ -231,13 +231,13 @@ class HomeViewModel @Inject constructor(
                     val animeIdsDeferred = async { repository.getAnimeIds() }
                     val watchlistDeferred = async { runCatching { repository.getWatchlistItems(session.userId) }.getOrDefault(emptyList()) }
 
-                    val continueWatching = continueWatchingDeferred.await()
+                    val upNext = upNextDeferred.await()
+                    val continueWatching = continueWatchingDeferred.await().withoutStaleEpisodes(upNext)
                     // Fired, not awaited: Google TV's own home Watch
                     // Next row is real background bookkeeping, not
                     // something this screen's own load has any reason
                     // to wait on before it can render.
-                    launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNextDeferred.await()) } }
-                    val upNext = upNextDeferred.await()
+                    launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNext) } }
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through exclude below) every discovery row.
                     animeIds = animeIdsDeferred.await()
@@ -779,5 +779,18 @@ class HomeViewModel @Inject constructor(
             fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
             key = "genre:${entry.genre}",
         )
+    }
+}
+
+// Continue Watching without what is already done: titles marked watched that
+// still carry an old resume position, and half-watched episodes of a show
+// whose Next Up has already moved past them.
+internal fun List<BaseItemDto>.withoutStaleEpisodes(upNext: List<BaseItemDto>): List<BaseItemDto> {
+    fun order(item: BaseItemDto) = (item.ParentIndexNumber ?: 0) * 10_000 + (item.IndexNumber ?: 0)
+    val nextBySeries = upNext.filter { it.SeriesId != null }.associateBy { it.SeriesId }
+    return filter { item ->
+        if (item.UserData?.Played == true) return@filter false
+        val next = item.SeriesId?.let { nextBySeries[it] } ?: return@filter true
+        order(item) >= order(next)
     }
 }
