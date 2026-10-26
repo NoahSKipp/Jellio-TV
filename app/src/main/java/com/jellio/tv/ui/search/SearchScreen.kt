@@ -185,6 +185,31 @@ fun SearchScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.error ?: "", color = JellioTextSecondary)
             }
+            uiState.hasSearched && uiState.suggestions != null -> {
+                val answer = uiState.suggestions!!
+                androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item(key = "intro") {
+                        Text(
+                            text = com.jellio.tv.ui.i18n.formatString("search_suggest_intro", answer.MatchedTitle ?: uiState.query),
+                            color = JellioTextSecondary,
+                            modifier = Modifier.padding(start = 52.dp, top = 8.dp, bottom = 16.dp),
+                        )
+                    }
+                    items(answer.Rows.size, key = { "suggest:$it" }) { index ->
+                        val row = answer.Rows[index]
+                        val title = when (row.Kind) {
+                            "similar" -> com.jellio.tv.ui.i18n.formatString("search_suggest_similar", answer.MatchedTitle ?: uiState.query)
+                            "person" -> com.jellio.tv.ui.i18n.formatString("search_suggest_person", row.Name ?: "")
+                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", row.Name ?: "")
+                        }
+                        com.jellio.tv.ui.home.PosterRow(
+                            section = com.jellio.tv.ui.home.HomeSection(title = title, items = row.Items),
+                            imageUrl = imageUrl,
+                            onItemClick = onItemClick,
+                        )
+                    }
+                }
+            }
             uiState.hasSearched -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = com.jellio.tv.ui.i18n.formatString("search_no_results_for", uiState.query), color = JellioTextSecondary)
             }

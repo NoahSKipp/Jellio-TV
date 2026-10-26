@@ -620,3 +620,16 @@ data class QuickConnectResultDto(
 data class QuickConnectAuthBody(
     val Secret: String,
 )
+
+// Jellio/search/suggestions: related library titles for a search that
+// found nothing (SearchSuggestionsController.cs).
+data class SearchSuggestionsDto(
+    val MatchedTitle: String? = null,
+    val Rows: List<SuggestionRowDto> = emptyList(),
+)
+
+data class SuggestionRowDto(
+    val Kind: String = "",
+    val Name: String? = null,
+    val Items: List<BaseItemDto> = emptyList(),
+)

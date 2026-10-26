@@ -250,6 +250,9 @@ interface JellyfinApi {
     @DELETE("Items/{itemId}")
     suspend fun deleteItem(@Path("itemId") itemId: String)
 
+    @GET("Jellio/search/suggestions")
+    suspend fun getSearchSuggestions(@Query("query") query: String): com.jellio.tv.data.model.SearchSuggestionsDto
+
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
 

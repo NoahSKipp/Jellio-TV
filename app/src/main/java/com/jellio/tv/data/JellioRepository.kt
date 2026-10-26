@@ -931,6 +931,8 @@ class JellioRepository @Inject constructor(
         ).Items
     }
 
+    suspend fun getSearchSuggestions(query: String): com.jellio.tv.data.model.SearchSuggestionsDto = api.getSearchSuggestions(query)
+
     suspend fun searchMovies(term: String): List<BaseItemDto> = api.searchGelatoMovies(term)
 
     suspend fun searchSeries(term: String): List<BaseItemDto> = api.searchGelatoSeries(term)

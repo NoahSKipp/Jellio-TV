@@ -29,6 +29,9 @@ data class SearchUiState(
     val hasSearched: Boolean = false,
     val error: String? = null,
     val canDeleteItems: Boolean = false,
+    // Nothing found: related titles in the library, the way Netflix answers a
+    // title it doesn't carry.
+    val suggestions: com.jellio.tv.data.model.SearchSuggestionsDto? = null,
 )
 
 // Mirrors runtime/api.js's own searchItems(): the real /Users/{id}/Items
@@ -71,11 +74,11 @@ class SearchViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(query = query)
         searchJob?.cancel()
         if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null)
+            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null, suggestions = null)
             return
         }
         searchJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, results = emptyList(), error = null)
+            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, results = emptyList(), error = null, suggestions = null)
             delay(DEBOUNCE_MS)
             if (_uiState.value.query != query) return@launch
 
@@ -108,6 +111,14 @@ class SearchViewModel @Inject constructor(
                         isSearching = false,
                         error = if (nothing && failures >= 3) "Could not load search results. Check your connection and try again." else null,
                     )
+                    if (nothing && failures < 3) {
+                        viewModelScope.launch {
+                            val answer = runCatching { repository.getSearchSuggestions(query) }.getOrNull()
+                            if (answer != null && answer.Rows.isNotEmpty() && _uiState.value.query == query) {
+                                _uiState.value = _uiState.value.copy(suggestions = answer)
+                            }
+                        }
+                    }
                 }
             }
 
