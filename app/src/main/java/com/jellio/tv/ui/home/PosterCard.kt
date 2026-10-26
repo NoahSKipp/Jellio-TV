@@ -225,6 +225,8 @@ fun PosterCard(
     progress: Boolean = false,
     isRemoving: Boolean = false,
     onShatterFinished: () -> Unit = {},
+    // A label in the card's top-left corner, such as a release date.
+    badge: String? = null,
 ) {
     val baseWidth = PosterWidth.scaled()
     val baseHeight = (PosterWidth * 1.5f).scaled()
@@ -427,10 +429,24 @@ fun PosterCard(
                         RatingChip(
                             rating = rating,
                             modifier = Modifier
-                                .align(if (!watchers.isNullOrEmpty()) Alignment.TopStart else Alignment.TopEnd)
+                                .align(if (!watchers.isNullOrEmpty() && badge == null) Alignment.TopStart else Alignment.TopEnd)
                                 .padding(6.dp),
                         )
                     }
+                }
+                if (badge != null) {
+                    Text(
+                        text = badge,
+                        color = com.jellio.tv.ui.theme.JellioRarityLegendary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
                 }
                 if (progress && episode.isNotEmpty()) {
                     CardChip(

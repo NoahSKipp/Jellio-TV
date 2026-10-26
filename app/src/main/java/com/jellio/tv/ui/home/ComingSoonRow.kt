@@ -113,15 +113,13 @@ fun ComingSoonRow(
                     RowEntryTarget(if (entry == entries.first()) firstCard else null) {
                         val item = items[entry.ItemId.replace("-", "").lowercase()]
                         if (item != null && itemImageUrl != null) {
-                            Box {
-                                PosterCard(
-                                    item = item,
-                                    imageUrl = itemImageUrl,
-                                    onClick = { onItemClick(entry.ItemId) },
-                                    onFocus = onItemFocus,
-                                )
-                                ComingSoonDateChip(entry, Modifier.align(Alignment.TopStart).padding(6.dp))
-                            }
+                            PosterCard(
+                                item = item,
+                                imageUrl = itemImageUrl,
+                                onClick = { onItemClick(entry.ItemId) },
+                                onFocus = onItemFocus,
+                                badge = comingSoonDateLabel(entry),
+                            )
                         } else {
                             ComingSoonCard(entry = entry, imageUrl = imageUrl, onClick = { onItemClick(entry.ItemId) })
                         }
@@ -130,18 +128,6 @@ fun ComingSoonRow(
             }
         }
     }
-}
-
-@Composable
-private fun ComingSoonDateChip(entry: CalendarEntryDto, modifier: Modifier = Modifier) {
-    Text(
-        text = comingSoonDateLabel(entry),
-        color = com.jellio.tv.ui.theme.JellioRarityLegendary,
-        style = MaterialTheme.typography.bodySmall,
-        modifier = modifier
-            .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    )
 }
 
 @Composable
