@@ -98,6 +98,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.58.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.58.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Rewatched", "Watching something again now shows as \"Rewatched\" in the feed instead of a second \"Watched\"."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.58.6",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.58.6",
