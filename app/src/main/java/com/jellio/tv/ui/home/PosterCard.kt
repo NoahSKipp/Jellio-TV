@@ -509,7 +509,12 @@ internal fun sizedImageRequest(
 
 // A title's TMDB rating on a card: the TMDB badge and the score in one chip.
 @Composable
-internal fun RatingChip(rating: Double?, modifier: Modifier = Modifier) {
+internal fun RatingChip(
+    rating: Double?,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
+    badgeFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -517,12 +522,12 @@ internal fun RatingChip(rating: Double?, modifier: Modifier = Modifier) {
             .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
             .padding(start = 5.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
     ) {
-        TmdbBadge(fontSize = 8.sp)
+        TmdbBadge(fontSize = badgeFontSize)
         Text(
             // No TMDB rating yet: a dash, so every card shows the same chip.
             text = rating?.takeIf { it > 0.0 }?.let { String.format(Locale.US, "%.1f", it) } ?: "–",
             color = JellioText,
-            fontSize = 12.sp,
+            fontSize = fontSize,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )

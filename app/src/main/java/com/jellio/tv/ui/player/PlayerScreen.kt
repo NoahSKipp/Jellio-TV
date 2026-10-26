@@ -2072,14 +2072,14 @@ private fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) 
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            val details = listOfNotNull(info.year, info.episodeCode?.takeIf { info.isEpisode }, info.officialRating, info.rating)
-            if (details.isNotEmpty()) {
-                Text(
-                    text = details.joinToString("  •  "),
-                    color = JellioTextSecondary,
-                    fontSize = 17.sp,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+            val details = listOfNotNull(info.year, info.episodeCode?.takeIf { info.isEpisode }, info.officialRating)
+            if (details.isNotEmpty() || info.rating != null) {
+                Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (details.isNotEmpty()) {
+                        Text(text = details.joinToString("  •  "), color = JellioTextSecondary, fontSize = 17.sp)
+                    }
+                    info.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
+                }
             }
             if (info.isEpisode) {
                 info.episodeTitle?.takeIf { it.isNotEmpty() }?.let {
@@ -2328,9 +2328,14 @@ private fun EndScreen(
                 if (finishedSubtitle.isNotEmpty()) {
                     Text(text = finishedSubtitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
                 }
-                val details = listOfNotNull(info?.year, info?.officialRating, info?.rating?.let { "★ $it" })
-                if (details.isNotEmpty()) {
-                    Text(text = details.joinToString("  ·  "), color = JellioTextSecondary, modifier = Modifier.padding(top = 10.dp))
+                val details = listOfNotNull(info?.year, info?.officialRating)
+                if (details.isNotEmpty() || info?.rating != null) {
+                    Row(modifier = Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (details.isNotEmpty()) {
+                            Text(text = details.joinToString("  ·  "), color = JellioTextSecondary)
+                        }
+                        info?.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
+                    }
                 }
                 info?.overview?.takeIf { it.isNotBlank() }?.let {
                     Text(text = it, color = JellioTextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))

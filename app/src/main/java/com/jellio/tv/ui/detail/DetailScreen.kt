@@ -520,7 +520,7 @@ private fun DetailHero(
                 Text(text = titleText, style = MaterialTheme.typography.titleLarge, color = JellioText, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
 
-            Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 val year = if (item.Type == "Episode") {
                     formatPremiereDate(item.PremiereDate) ?: item.ProductionYear?.toString()
                 } else {
@@ -529,7 +529,8 @@ private fun DetailHero(
                 year?.let { Text(text = it, color = JellioTextSecondary) }
                 formatRuntime(item.RunTimeTicks).takeIf { it.isNotEmpty() }?.let { Text(text = it, color = JellioTextSecondary) }
                 item.OfficialRating?.let { Text(text = it, color = JellioTextSecondary) }
-                item.CommunityRating?.let { Text(text = "%.1f ★".format(it), color = JellioTextSecondary) }
+                // TMDB's score, labelled like the cards.
+                item.CommunityRating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
             }
 
             MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))
