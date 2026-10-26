@@ -102,6 +102,7 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.58.6",
         features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Rating on Every Card", "Titles without a TMDB rating yet now show \"TMDB –\" instead of no rating at all."),
             ChangelogFeature(Icons.Filled.Tv, "Back Up to Resume", "In the source picker you can move up from the language and quality filters to Resume from again."),
             ChangelogFeature(Icons.Filled.Tv, "Steadier Playback Start", "Matching the frame rate is off by default for now, and audio or subtitle sync only switches on once you set an offset, so starting playback works as before."),
         ),

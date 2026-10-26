@@ -425,7 +425,7 @@ fun PosterCard(
                     )
                 }
                 if (!progress) {
-                    item.CommunityRating?.let { rating ->
+                    item.CommunityRating.let { rating ->
                         RatingChip(
                             rating = rating,
                             modifier = Modifier
@@ -509,7 +509,7 @@ internal fun sizedImageRequest(
 
 // A title's TMDB rating on a card: the TMDB badge and the score in one chip.
 @Composable
-internal fun RatingChip(rating: Double, modifier: Modifier = Modifier) {
+internal fun RatingChip(rating: Double?, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -519,7 +519,8 @@ internal fun RatingChip(rating: Double, modifier: Modifier = Modifier) {
     ) {
         TmdbBadge(fontSize = 8.sp)
         Text(
-            text = String.format(Locale.US, "%.1f", rating),
+            // No TMDB rating yet: a dash, so every card shows the same chip.
+            text = rating?.takeIf { it > 0.0 }?.let { String.format(Locale.US, "%.1f", it) } ?: "–",
             color = JellioText,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
