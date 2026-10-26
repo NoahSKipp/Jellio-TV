@@ -280,6 +280,8 @@ fun DetailScreen(
                                     session = session,
                                     item = item,
                                     state = uiState,
+                                    onRetryDetails = { viewModel.retry(session, itemId) },
+                                    onPlayFocusChanged = { viewModel.onPlayFocusChanged(session, it) },
                                     imageUrl = imageUrl,
                                     onSeriesClick = onNavigateToDetail,
                                     playButtonFocusRequester = playButtonFocusRequester,
@@ -622,13 +624,42 @@ private fun DetailHero(
                     onClick = { actionsExpanded = !actionsExpanded },
                 )
             }
-            state.streamStatus?.takeIf { !state.findingStreams }?.let { status ->
+            val status = when {
+                state.findingStreams -> com.jellio.tv.ui.i18n.string("detail_finding_streams")
+                else -> state.streamStatus
+            }
+            status?.let {
                 Text(
-                    text = status,
+                    text = it,
                     color = JellioTextSecondary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 10.dp),
                 )
+            }
+            if (state.detailsRetrying) {
+                Text(
+                    text = com.jellio.tv.ui.i18n.string("detail_refreshing"),
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            if (state.detailsFailed && onRetryDetails != null) {
+                Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = com.jellio.tv.ui.i18n.string("detail_refresh_failed"),
+                        color = JellioTextSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Surface(
+                        onClick = onRetryDetails,
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
+                        modifier = Modifier.padding(start = 12.dp),
+                    ) {
+                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                    }
+                }
             }
         }
     }

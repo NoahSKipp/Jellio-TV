@@ -51,9 +51,17 @@ data class DetailUiState(
     // Shown under the actions while the stream lookup runs or found nothing.
     val streamStatus: String? = null,
     val findingStreams: Boolean = false,
+    // The page is drawn and a slow details request is being asked again.
+    val detailsRetrying: Boolean = false,
+    // Every attempt failed; what is shown stays and Retry asks again.
+    val detailsFailed: Boolean = false,
 )
 
-data class TitleLoadingArtInfo(val backdropUrl: String?, val logoUrl: String?, val title: String)
+data class TitleLoadingArtInfo(val art: List<com.jellio.tv.ui.common.ArtCandidate>, val logoUrl: String?, val title: String)
+
+private const val DETAILS_ATTEMPT_TIMEOUT_MS = 9_000L
+
+private class DetailsTimeout : Exception("Timed out")
 
 // Real behavior ported from screens/detail.js: a series has no video
 // of its own, its own hero Play button lazily resolves which episode
@@ -104,7 +112,8 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             // The player's loader, with art from the row the title was
             // picked in, until the full details arrive.
-            val preloaded = repository.preloadedDetails(itemId) ?: repository.previewItem(itemId)
+            val preview = repository.previewItem(itemId)
+            val preloaded = repository.preloadedDetails(itemId) ?: preview
             _uiState.value = if (preloaded != null) {
                 DetailUiState(
                     isLoading = false,
@@ -115,7 +124,13 @@ class DetailViewModel @Inject constructor(
                     isWatched = preloaded.UserData?.Played ?: false,
                 )
             } else {
-                DetailUiState(isLoading = true, loadingArt = repository.previewItem(itemId)?.let { loadingArt(session, it) })
+                DetailUiState(isLoading = true, loadingArt = preview?.let { loadingArt(session, it) })
+            }
+            // The stream lookup does not wait for the details when the type is already known.
+            var streamsStarted = false
+            if (preloaded?.Type == "Movie" || preloaded?.Type == "Episode") {
+                lookForStreams(session, itemId)
+                streamsStarted = true
             }
             try {
                 val started = System.currentTimeMillis()
@@ -125,7 +140,9 @@ class DetailViewModel @Inject constructor(
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, preloaded.Id) }
                 }
                 // Two retries with backoff; the art drawn from memory stays up meanwhile.
-                val item = withRetries { repository.getItemDetails(session.userId, itemId) }
+                val item = withRetries(
+                    onRetry = { if (_uiState.value.item != null) _uiState.value = _uiState.value.copy(detailsRetrying = true, detailsFailed = false) },
+                ) { repository.getItemDetails(session.userId, itemId) }
                 android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms" + if (preloaded != null) " (drawn from memory first)" else "")
                 ratingTargetId = item.Id
                 // Updates the page in place, keeping seasons and stream state.
@@ -133,13 +150,15 @@ class DetailViewModel @Inject constructor(
                     isLoading = false,
                     item = item,
                     error = null,
+                    detailsRetrying = false,
+                    detailsFailed = false,
                     cast = item.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
                     trailers = item.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
                     isWatchlisted = item.UserData?.IsFavorite ?: false,
                     isWatched = item.UserData?.Played ?: false,
                 )
 
-                if (item.Type == "Movie" || item.Type == "Episode") lookForStreams(session, item.Id)
+                if (!streamsStarted && (item.Type == "Movie" || item.Type == "Episode")) lookForStreams(session, item.Id)
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     viewModelScope.launch {
@@ -260,6 +279,24 @@ class DetailViewModel @Inject constructor(
     suspend fun resolvePlayTarget(): BaseItemDto? {
         val item = _uiState.value.item ?: return null
         return if (item.Type == "Series") seriesPlayDeferred?.await() else item
+    }
+
+    private var playPrefetchJob: kotlinx.coroutines.Job? = null
+    private val playPrefetched = HashSet<String>()
+
+    // Resting on Play asks the server for the stream it will start, so the
+    // player finds it ready. Once per title, after a short dwell.
+    fun onPlayFocusChanged(session: Session, focused: Boolean) {
+        playPrefetchJob?.cancel()
+        if (!focused) return
+        playPrefetchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(1_000)
+            val target = resolvePlayTarget() ?: return@launch
+            if (target.Type != "Movie" && target.Type != "Episode") return@launch
+            if (!playPrefetched.add(target.Id)) return@launch
+            val remembered = if (streamPreferences.isRememberEnabled()) streamPreferences.rememberedMediaSourceId(target.Id) else null
+            repository.prefetchPlayback(session.userId, target.Id, remembered, target.UserData?.PlaybackPositionTicks ?: 0)
+        }
     }
 
     fun setResolvingPlay(resolving: Boolean) {
@@ -385,16 +422,21 @@ class DetailViewModel @Inject constructor(
         )
     }
 
-    private suspend fun <T> withRetries(block: suspend () -> T): T {
-        repeat(2) { attempt ->
+    // Each attempt is bounded, so a server busy with a database task turns
+    // into a retry instead of a page that waits a minute.
+    private suspend fun <T> withRetries(onRetry: () -> Unit, block: suspend () -> T): T {
+        suspend fun attempt(): T =
+            kotlinx.coroutines.withTimeoutOrNull(DETAILS_ATTEMPT_TIMEOUT_MS) { block() } ?: throw DetailsTimeout()
+        repeat(2) { n ->
             try {
-                return block()
+                return attempt()
             } catch (err: kotlinx.coroutines.CancellationException) {
                 throw err
             } catch (err: Exception) {
-                kotlinx.coroutines.delay(800L shl attempt)
+                onRetry()
+                kotlinx.coroutines.delay(1_000L shl n)
             }
         }
-        return block()
+        return attempt()
     }
 }
