@@ -629,7 +629,10 @@ private fun PlayerSurface(
 
     var isPlaying by remember(player) { mutableStateOf(false) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
-    var isEnded by remember { mutableStateOf(false) }
+    // Keyed on the stream: when the next episode's stream swaps in without a
+    // loading frame, the last one's ended state must not carry over and
+    // bring the end screen straight back.
+    var isEnded by remember(streamUrl) { mutableStateOf(false) }
     var endedAsPlaceholder by remember(streamUrl) { mutableStateOf(false) }
     var placeholderReported by remember(streamUrl) { mutableStateOf(false) }
     var stopAtEnd by remember { mutableStateOf(false) }
@@ -2202,6 +2205,8 @@ private fun UpNextOverlay(
 
 // The web player's end screen (buildEndScreenModal) for the TV: shown when
 // an episode or movie finishes, over the player and its controls.
+private const val END_SCREEN_INPUT_DELAY_MS = 800L
+
 @Composable
 private fun EndScreen(
     finishedTitle: String,
@@ -2215,6 +2220,12 @@ private fun EndScreen(
     info: PauseOverlayInfo?,
 ) {
     val firstFocus = remember { FocusRequester() }
+    // A press meant for the screen before (Play Next held or tapped twice)
+    // must not land on this one's buttons.
+    val shownAt = remember { System.currentTimeMillis() }
+    fun armed(action: () -> Unit): () -> Unit = {
+        if (System.currentTimeMillis() - shownAt >= END_SCREEN_INPUT_DELAY_MS) action()
+    }
     LaunchedEffect(Unit) {
         delay(150)
         runCatching { firstFocus.requestFocus() }
@@ -2331,14 +2342,14 @@ private fun EndScreen(
                         label = if (countdown != null && countdown > 0) com.jellio.tv.ui.i18n.Strings.format("player_play_next_episode_countdown", countdown) else com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
                         primary = true,
                         icon = Icons.Filled.PlayArrow,
-                        onClick = onPlayNext,
+                        onClick = armed(onPlayNext),
                         modifier = Modifier.focusRequester(firstFocus),
                     )
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay)
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay))
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
                 } else {
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = onReplay, modifier = Modifier.focusRequester(firstFocus))
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay), modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
                 }
             }
         }
