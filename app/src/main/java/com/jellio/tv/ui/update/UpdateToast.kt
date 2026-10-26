@@ -19,6 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -50,8 +55,19 @@ fun UpdateToast(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The prompt holds the focus until a choice is made: it takes it when it
+    // opens and takes it back if anything behind it grabs it (Home restoring
+    // a card, rows arriving), and focus can't be moved out of it.
     val downloadFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { downloadFocusRequester.requestFocus() }
+    var hasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(hasFocus) {
+        if (hasFocus) return@LaunchedEffect
+        repeat(20) {
+            if (hasFocus) return@LaunchedEffect
+            runCatching { downloadFocusRequester.requestFocus() }
+            kotlinx.coroutines.delay(100)
+        }
+    }
     BackHandler(onBack = onDismiss)
 
     Box(modifier = modifier, contentAlignment = Alignment.BottomCenter) {
@@ -63,7 +79,9 @@ fun UpdateToast(
                 .background(JellioBgElevated.copy(alpha = 0.98f))
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                 .padding(24.dp)
-                .focusProperties { onExit = { FocusRequester.Cancel } },
+                .onFocusChanged { hasFocus = it.hasFocus }
+                .focusProperties { onExit = { FocusRequester.Cancel } }
+                .focusGroup(),
         ) {
             Text(text = com.jellio.tv.ui.i18n.string("update_available_title"), style = MaterialTheme.typography.titleMedium, color = JellioText)
             Text(
@@ -74,16 +92,14 @@ fun UpdateToast(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
-                    onClick = onDismiss,
-                    enabled = !downloading,
+                    onClick = { if (!downloading) onDismiss() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = ClickableSurfaceDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = JellioText),
                 ) {
                     Text(text = com.jellio.tv.ui.i18n.string("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
-                    onClick = onDownload,
-                    enabled = !downloading,
+                    onClick = { if (!downloading) onDownload() },
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     modifier = Modifier.focusRequester(downloadFocusRequester),
