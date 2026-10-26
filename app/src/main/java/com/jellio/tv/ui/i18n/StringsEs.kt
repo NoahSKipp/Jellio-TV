@@ -677,7 +677,7 @@ internal object StringsEs {
         m["player_no_devices"] = "No se encontraron dispositivos disponibles"
         m["player_or_stop_after"] = "O detener después de"
         m["player_other_clients"] = "Otros clientes de Jellyfin"
-        m["player_percent_watched"] = "%d% visto"
+        m["player_percent_watched"] = "%d%% visto"
         m["player_pip"] = "Imagen en imagen"
         m["player_play_next_countdown"] = "Reproducir siguiente episodio (%d)"
         m["player_play_next_episode"] = "Reproducir siguiente episodio"

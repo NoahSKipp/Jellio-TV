@@ -677,7 +677,7 @@ internal object StringsDe {
         m["player_no_devices"] = "Keine verfügbaren Geräte gefunden"
         m["player_or_stop_after"] = "Oder stoppen nach"
         m["player_other_clients"] = "Andere Jellyfin-Clients"
-        m["player_percent_watched"] = "%d% angesehen"
+        m["player_percent_watched"] = "%d%% angesehen"
         m["player_pip"] = "Bild-in-Bild"
         m["player_play_next_countdown"] = "Nächste Folge abspielen (%d)"
         m["player_play_next_episode"] = "Nächste Episode abspielen"

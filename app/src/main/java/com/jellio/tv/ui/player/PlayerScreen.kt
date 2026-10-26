@@ -1603,6 +1603,7 @@ private fun PlayerSurface(
         if (showResumePrompt) {
             ResumePrompt(
                 percent = resumePercent,
+                resumeTicks = startPositionTicks,
                 onResume = {
                     resumePromptDismissed = true
                     player.play()
@@ -2416,7 +2417,7 @@ private fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modi
 // Start Over a real choice this player did not offer before rather
 // than something to dig for elsewhere.
 @Composable
-private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
+private fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
     val resumeFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { resumeFocusRequester.requestFocus() }
     Box(
@@ -2428,9 +2429,15 @@ private fun ResumePrompt(percent: Int?, onResume: () -> Unit, onRestart: () -> U
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(text = com.jellio.tv.ui.i18n.Strings.get("player_resume_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
-            if (percent != null) {
-                Text(text = com.jellio.tv.ui.i18n.Strings.format("player_percent_watched", percent ?: 0), color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
-            }
+            // Where it picks up, then how much of it that is.
+            val at = resumeTicks / TICKS_PER_MS / 1000
+            val atLabel = if (at >= 3600) "%d:%02d:%02d".format(at / 3600, (at % 3600) / 60, at % 60) else "%d:%02d".format(at / 60, at % 60)
+            Text(
+                text = com.jellio.tv.ui.i18n.Strings.format("stream_resume_from", atLabel) +
+                    (percent?.let { " · " + com.jellio.tv.ui.i18n.Strings.format("player_percent_watched", it) } ?: ""),
+                color = JellioTextSecondary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
             Row(modifier = Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     onClick = onResume,
