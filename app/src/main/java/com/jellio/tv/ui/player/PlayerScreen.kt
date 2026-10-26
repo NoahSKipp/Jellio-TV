@@ -278,6 +278,7 @@ fun PlayerScreen(
             }
             uiState.streamUrl != null -> PlayerSurface(
                 session = session,
+                deviceId = viewModel.deviceId,
                 streamUrl = uiState.streamUrl!!,
                 startPositionTicks = uiState.startPositionTicks,
                 resumePercent = uiState.resumePercent,
@@ -402,6 +403,7 @@ private fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
 @Composable
 private fun PlayerSurface(
     session: Session,
+    deviceId: String,
     streamUrl: String,
     startPositionTicks: Long,
     resumePercent: Int?,
@@ -487,7 +489,7 @@ private fun PlayerSurface(
             .setDefaultRequestProperties(
                 buildMap {
                     put("X-Emby-Token", session.accessToken)
-                    put("Authorization", buildEmbyAuthorizationHeader(viewModel.deviceId, APP_VERSION, session.accessToken))
+                    put("Authorization", buildEmbyAuthorizationHeader(deviceId, APP_VERSION, session.accessToken))
                 }
             )
     }
