@@ -38,16 +38,30 @@ class AccountSwitcherViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AccountSwitcherUiState())
     val uiState: StateFlow<AccountSwitcherUiState> = _uiState.asStateFlow()
 
+    // Profiles saved on this TV show at once; the server's public list
+    // (last answer kept for the next open) fills in behind them.
     fun load(session: Session) {
         viewModelScope.launch {
-            _uiState.value = AccountSwitcherUiState(isLoading = true)
             val remembered = repository.getRememberedUsers(session.serverAddress)
                 .map { (userId, entry) -> RememberedProfile(userId, entry.name, entry.primaryImageTag) }
                 .filter { it.userId != session.userId }
-            val publicUsers = runCatching { repository.getPublicUsers(session.serverAddress) }.getOrDefault(emptyList())
             val rememberedIds = remembered.map { it.userId }.toSet()
-            val publicOnly = publicUsers.filter { it.Id != null && it.Id != session.userId && it.Id !in rememberedIds }
-            _uiState.value = AccountSwitcherUiState(isLoading = false, remembered = remembered, publicOnly = publicOnly)
+            fun publicOnly(users: List<UserDto>) =
+                users.filter { it.Id != null && it.Id != session.userId && it.Id !in rememberedIds }
+            val known = publicUsersCache[session.serverAddress]
+            _uiState.value = AccountSwitcherUiState(
+                isLoading = remembered.isEmpty() && known == null,
+                remembered = remembered,
+                publicOnly = publicOnly(known.orEmpty()),
+            )
+            val fresh = kotlinx.coroutines.withTimeoutOrNull(PUBLIC_USERS_TIMEOUT_MS) {
+                runCatching { repository.getPublicUsers(session.serverAddress) }.getOrNull()
+            }
+            if (fresh != null) publicUsersCache[session.serverAddress] = fresh
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                publicOnly = publicOnly(fresh ?: known.orEmpty()),
+            )
         }
     }
 
@@ -58,14 +72,24 @@ class AccountSwitcherViewModel @Inject constructor(
     // swaps this whole app over to the newly signed in session, tearing
     // this entire overlay (and the screen underneath it) down with it.
     fun quickSignIn(session: Session, userId: String) {
+        if (_uiState.value.busyUserId != null) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(busyUserId = userId, error = null)
-            when (repository.quickSignIn(session.serverAddress, userId)) {
-                is LoginResult.Success -> Unit
-                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(
-                    busyUserId = null,
-                    error = "Could not switch to that profile.",
-                )
+            val result = kotlinx.coroutines.withTimeoutOrNull(QUICK_SIGN_IN_TIMEOUT_MS) {
+                repository.quickSignIn(session.serverAddress, userId)
+            } ?: LoginResult.Failure("The server took too long to answer. Try again.")
+            when (result) {
+                is LoginResult.Success -> _uiState.value = _uiState.value.copy(busyUserId = null)
+                is LoginResult.Failure -> {
+                    android.util.Log.w("JellioSwitch", "quick sign in failed: ${result.message}")
+                    // A saved sign-in the server turned down has been forgotten.
+                    val stillSaved = repository.getRememberedUsers(session.serverAddress).containsKey(userId)
+                    _uiState.value = _uiState.value.copy(
+                        busyUserId = null,
+                        error = result.message,
+                        remembered = if (stillSaved) _uiState.value.remembered else _uiState.value.remembered.filter { it.userId != userId },
+                    )
+                }
             }
         }
     }
@@ -87,6 +111,7 @@ class AccountSwitcherViewModel @Inject constructor(
             onNeedsPassword()
             return
         }
+        if (_uiState.value.busyUserId != null) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(busyUserId = user.Id, error = null)
             when (repository.connectAndLogin(session.serverAddress, user.Name.orEmpty(), "")) {
@@ -97,6 +122,12 @@ class AccountSwitcherViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    companion object {
+        private const val PUBLIC_USERS_TIMEOUT_MS = 8_000L
+        private const val QUICK_SIGN_IN_TIMEOUT_MS = 15_000L
+        private val publicUsersCache = java.util.concurrent.ConcurrentHashMap<String, List<UserDto>>()
     }
 
     fun avatarUrl(session: Session, userId: String, tag: String?): String =

@@ -4,6 +4,9 @@ import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -98,9 +101,14 @@ fun AccountSwitcherOverlay(
         modifier = modifier
             .fillMaxSize()
             .dismissOnBack(onDismiss)
-            .focusProperties { onExit = { FocusRequester.Cancel } }
             .background(Color.Black.copy(alpha = 0.7f))
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
+            // A tap outside closes it; not clickable, which would make the
+            // scrim itself a focus stop.
+            .pointerInput(Unit) { detectTapGestures { onDismiss() } }
+            // onExit only traps focus on a focus group; without it D-pad
+            // moves walked out onto the screen underneath.
+            .focusProperties { onExit = { FocusRequester.Cancel } }
+            .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -109,7 +117,7 @@ fun AccountSwitcherOverlay(
                 .wrapContentHeight()
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(32.dp)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = {}),
+                .pointerInput(Unit) { detectTapGestures { } },
         ) {
             // Real components/accountSwitcher.js's own header: the
             // signed in reader's own avatar/name plus View Profile/
@@ -203,6 +211,10 @@ fun AccountSwitcherOverlay(
                 modifier = Modifier.padding(top = 28.dp, bottom = 12.dp),
             )
 
+            uiState.error?.let { error ->
+                Text(text = error, color = JellioDanger, modifier = Modifier.padding(bottom = 12.dp))
+            }
+
             if (uiState.isLoading) {
                 Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary)
             } else if (uiState.remembered.isEmpty() && uiState.publicOnly.isEmpty()) {
@@ -249,9 +261,6 @@ fun AccountSwitcherOverlay(
                 }
             }
 
-            uiState.error?.let { error ->
-                Text(text = error, color = JellioDanger, modifier = Modifier.padding(top = 16.dp))
-            }
         }
     }
 }
@@ -266,8 +275,9 @@ private fun SwitcherTile(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(
-            onClick = onClick,
-            enabled = !busy,
+            // Stays enabled while signing in: a disabled tile drops focus,
+            // which then landed outside the switcher.
+            onClick = { if (!busy) onClick() },
             shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = JellioBg,
@@ -297,6 +307,11 @@ private fun SwitcherTile(
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.Person, contentDescription = null, tint = JellioText)
+                }
+            }
+            if (busy) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
+                    com.jellio.tv.ui.common.ScreenSpinner(size = 40.dp)
                 }
             }
         }

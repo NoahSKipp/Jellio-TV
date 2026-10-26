@@ -293,6 +293,8 @@ private fun JellioTvApp(
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }
+    // A profile switch swaps the session under the open switcher: close it.
+    LaunchedEffect(session.userId) { showAccountSwitcher = false }
     var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
