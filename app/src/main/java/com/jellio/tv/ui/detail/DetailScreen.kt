@@ -880,11 +880,6 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
     }
 }
 
-// Same as screens/detail.js extractYouTubeId(): YouTube's own thumbnail, no API key needed.
-private val YOUTUBE_ID = Regex("(?:youtube\\.com/(?:watch\\?v=|embed/)|youtu\\.be/)([\\w-]{11})")
-
-private fun youTubeId(url: String): String? = YOUTUBE_ID.find(url)?.groupValues?.get(1)
-
 @Composable
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
     Column(modifier = Modifier.padding(top = 24.dp)) {
@@ -914,12 +909,16 @@ private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
                     ) {
                         Column {
                             Box(modifier = Modifier.width(trailerCardWidth).aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
+                                // The icon stays underneath: it shows when there is no id or no thumbnail loads.
                                 Icon(imageVector = Icons.Filled.OpenInNew, contentDescription = null, tint = JellioText)
-                                youTubeId(url)?.let { id ->
+                                val thumbs = remember(url) { youTubeId(url)?.let(::youTubeThumbnails).orEmpty() }
+                                var thumbIndex by remember(thumbs) { mutableIntStateOf(0) }
+                                thumbs.getOrNull(thumbIndex)?.let { thumb ->
                                     coil3.compose.AsyncImage(
-                                        model = "https://i.ytimg.com/vi/$id/hqdefault.jpg",
+                                        model = thumb,
                                         contentDescription = null,
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        onError = { thumbIndex++ },
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
