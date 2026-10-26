@@ -159,6 +159,7 @@ private const val CACHE_TTL_MS = 60_000L
 // watchlist toggle reads correctly again well within the time it
 // takes to navigate back and look.
 private const val SHORT_CACHE_TTL_MS = 8_000L
+private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 // Same as the web row cache's genres/people class: a title's genre and
 // cast neighbours barely change, so Home refreshes reuse them.
 private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
@@ -1685,6 +1686,36 @@ class JellioRepository @Inject constructor(
     // URL carrying that source's own id is something ExoPlayer can just
     // open directly, same real flow, no jellyfin-web playbackManager
     // involved.
+    // PlaybackInfo asked for while Play is focused, used once by the player
+    // if it opens the same source at the same position soon after.
+    private class PrefetchedPlayback(val at: Long, val target: kotlinx.coroutines.Deferred<PlaybackTarget?>)
+    private val playbackPrefetch = ConcurrentHashMap<String, PrefetchedPlayback>()
+
+    private fun playbackKey(itemId: String, mediaSourceId: String?, startTicks: Long) = "$itemId|${mediaSourceId.orEmpty()}|$startTicks"
+
+    fun prefetchPlayback(userId: String, itemId: String, mediaSourceId: String?, startTicks: Long) {
+        val now = System.currentTimeMillis()
+        playbackPrefetch.entries.removeIf { now - it.value.at > PLAYBACK_PREFETCH_TTL_MS }
+        val key = playbackKey(itemId, mediaSourceId, startTicks)
+        if (playbackPrefetch.containsKey(key)) return
+        playbackPrefetch[key] = PrefetchedPlayback(
+            now,
+            prefetchScope.async { runCatching { resolvePlayback(userId, itemId, mediaSourceId, startTicks) }.getOrNull() },
+        )
+    }
+
+    suspend fun takePrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? {
+        val now = System.currentTimeMillis()
+        val keys = listOf(playbackKey(itemId, mediaSourceId, startTicks), playbackKey(itemId, null, startTicks)).distinct()
+        for (key in keys) {
+            val entry = playbackPrefetch.remove(key) ?: continue
+            if (now - entry.at > PLAYBACK_PREFETCH_TTL_MS) continue
+            val target = entry.target.await() ?: continue
+            if (mediaSourceId == null || target.mediaSource.Id == mediaSourceId) return target
+        }
+        return null
+    }
+
     suspend fun resolvePlayback(
         userId: String,
         itemId: String,

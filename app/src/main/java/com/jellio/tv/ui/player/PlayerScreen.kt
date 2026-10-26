@@ -812,6 +812,9 @@ private fun PlayerSurface(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                PlayStartTrace.end("first frame")
+            }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
             }
@@ -1566,7 +1569,7 @@ private fun PlayerSurface(
                 onPlayNext = { upNextInfo?.let { onPlayNext(it.itemId) } },
                 onReplay = onRestart,
                 onBack = onBack,
-                backdropUrl = pauseInfo?.backdropUrl,
+                art = pauseInfo?.art.orEmpty(),
                 info = pauseInfo,
             )
         }

@@ -56,7 +56,9 @@ data class PauseOverlayInfo(
     val episodeCode: String?,
     val episodeTitle: String?,
     val overview: String?,
-)
+) {
+    val backdropUrl: String? get() = art.firstOrNull { !it.blurred }?.url
+}
 
 // Real port of screens/player.js's own buildUpNextOverlay() data
 // needs. thumbnailUrl always requested as a real Primary image
@@ -483,6 +485,7 @@ class PlayerViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
+            PlayStartTrace.mark(itemId, "player open", if (fromFailover) "failover" else "source=${mediaSourceId ?: "default"}")
             try {
                 val prewarmed = if (mediaSourceId == null && !fromFailover && prewarmedPlayback?.itemId == itemId) {
                     prewarmedPlayback.also { prewarmedPlayback = null }
@@ -510,13 +513,18 @@ class PlayerViewModel @Inject constructor(
                 // point turns out different.
                 val preview = if (prewarmed == null) repository.previewItem(itemId) else null
                 val earlyTicks = preview?.UserData?.PlaybackPositionTicks
+                var targetFrom = "fresh"
                 val earlyTarget = if (earlyTicks != null) {
-                    async { runCatching { repository.resolvePlayback(session.userId, itemId, mediaSourceId, earlyTicks) }.getOrNull() }
+                    async {
+                        repository.takePrefetchedPlayback(itemId, mediaSourceId, earlyTicks)?.also { targetFrom = "prefetched" }
+                            ?: runCatching { repository.resolvePlayback(session.userId, itemId, mediaSourceId, earlyTicks) }.getOrNull()?.also { targetFrom = "early" }
+                    }
                 } else {
                     null
                 }
                 val earlyAudio = if (prewarmed == null) async { runCatching { repository.getAudioLanguagePreference(session.userId) }.getOrNull() } else null
                 val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
+                PlayStartTrace.mark(itemId, "details", if (prewarmed != null) "prewarmed" else "")
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
                 // is still being prepared, not a blank screen.
@@ -528,14 +536,17 @@ class PlayerViewModel @Inject constructor(
                 val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
                 val audioPreference = prewarmed?.audioPreference ?: earlyAudio?.await() ?: repository.getAudioLanguagePreference(session.userId)
                 audioLanguagePreference = audioPreference
-                var target = prewarmed?.target
+                var target = prewarmed?.target?.also { targetFrom = "prewarmed" }
                     ?: earlyTarget?.await()?.takeIf { earlyTicks == startTicks }
-                    ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks)
+                    ?: (if (fromFailover) null else repository.takePrefetchedPlayback(itemId, mediaSourceId, startTicks))?.also { targetFrom = "prefetched" }
+                    ?: repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks).also { targetFrom = "fresh" }
+                PlayStartTrace.mark(itemId, "playback info", "from=$targetFrom direct=${target.directPlay}")
                 // The reader's audio language wins over the file's default
                 // when the file has it; a transcode has to be asked for it.
                 val preferredAudio = preferredAudioIndex(target.mediaSource, audioPreference)
                 if (prewarmed == null && preferredAudio != null && !target.directPlay && preferredAudio != target.mediaSource.DefaultAudioStreamIndex) {
                     target = repository.resolvePlayback(session.userId, itemId, mediaSourceId, startTicks, audioStreamIndex = preferredAudio)
+                    PlayStartTrace.mark(itemId, "audio renegotiated", "index=$preferredAudio")
                 }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
                     "S${item.ParentIndexNumber} E${item.IndexNumber} · "
@@ -580,6 +591,7 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 currentSource = target.mediaSource
+                PlayStartTrace.mark(itemId, "stream url ready")
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
                 // Do not abort before playback starts based on cached
                 // target.mediaSource.RunTimeTicks: let ExoPlayer open the

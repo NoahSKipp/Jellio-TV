@@ -290,12 +290,15 @@ fun DetailScreen(
                                 // = true while its own targetPromise is still
                                 // resolving, re-enabled once it settles either
                                 // way (its own .finally()).
+                                com.jellio.tv.ui.player.PlayStartTrace.begin("title page")
                                 scope.launch {
                                     viewModel.setResolvingPlay(true)
                                     try {
                                         val target = viewModel.resolvePlayTarget()
                                         if (target != null) {
-                                            when (val action = viewModel.resolvePlayAction(session, target)) {
+                                            val action = viewModel.resolvePlayAction(session, target)
+                                            com.jellio.tv.ui.player.PlayStartTrace.mark(target.Id, "play target", if (action is PlayAction.Direct) "remembered stream" else "picker")
+                                            when (action) {
                                                 is PlayAction.Direct -> onPlayDirect(action.itemId, action.mediaSourceId)
                                                 is PlayAction.ShowPicker -> onOpenStreamPicker(action.item)
                                             }
@@ -574,7 +577,9 @@ private fun DetailHero(
                         ),
                     ),
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-                    modifier = Modifier.focusRequester(playButtonFocusRequester),
+                    modifier = Modifier
+                        .focusRequester(playButtonFocusRequester)
+                        .onFocusChanged { onPlayFocusChanged(it.isFocused) },
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
