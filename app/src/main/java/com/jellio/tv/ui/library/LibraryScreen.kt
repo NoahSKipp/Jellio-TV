@@ -217,6 +217,7 @@ fun LibraryScreen(
                 onItemClick = onItemClick,
                 onDismiss = { rowListTarget = null },
                 fetchAll = section.fetchAll,
+                fetchPage = section.fetchPage,
             )
         }
 

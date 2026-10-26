@@ -626,13 +626,14 @@ class JellioRepository @Inject constructor(
 
     // Not recursive, like the web client: a collection's titles are its
     // direct children, and a recursive walk of a large one is much slower.
-    suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24): List<BaseItemDto> =
+    suspend fun getCollectionItems(userId: String, collectionId: String, kind: String, limit: Int = 24, startIndex: Int? = null): List<BaseItemDto> =
         api.getItems(
             userId = userId,
             parentId = collectionId,
             includeItemTypes = if (kind == "movies") "Movie" else "Series",
             recursive = false,
             limit = limit,
+            startIndex = startIndex,
             sortBy = "SortName",
             // BackdropImageTags is not part of the default field set:
             // screens/service.js's own pickHeroItem() needs it to judge
@@ -779,6 +780,21 @@ class JellioRepository @Inject constructor(
     // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
         cachedUnlessEmpty("genre:$userId:$parentId:$itemType:$genre:$limit") { fetchGenreItems(userId, parentId, itemType, genre, limit) }
+
+    // One page of a genre, for grids that keep loading as they are scrolled.
+    suspend fun getGenreItemsPage(userId: String, parentId: String?, itemType: String, genre: String, startIndex: Int, limit: Int): List<BaseItemDto> =
+        api.getItems(
+            userId = userId,
+            parentId = parentId,
+            includeItemTypes = itemType,
+            recursive = true,
+            limit = limit,
+            startIndex = startIndex,
+            genres = genre,
+            sortBy = "CommunityRating",
+            sortOrder = "Descending",
+            fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
+        ).Items
 
     private suspend fun fetchGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int): List<BaseItemDto> =
         distinctTitles(

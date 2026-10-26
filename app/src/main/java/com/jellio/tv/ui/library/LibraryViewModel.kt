@@ -261,6 +261,7 @@ class LibraryViewModel @Inject constructor(
                         genreDisplayName(genre),
                         items,
                         fetchAll = { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
+                        fetchPage = { start, size -> repository.getGenreItemsPage(session.userId, library.Id, itemType, genre, start, size).filterNot { isAnime(it) } },
                     ),
                 )
                 publish(coverflowItems, featuredTitle, sections.toList())
@@ -397,6 +398,7 @@ class LibraryViewModel @Inject constructor(
                     collection.Name ?: "",
                     items,
                     fetchAll = { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIST_LIMIT) },
+                    fetchPage = { start, size -> repository.getCollectionItems(session.userId, collection.Id, "tvshows", size, start) },
                 )
             }
             if (progressive) {

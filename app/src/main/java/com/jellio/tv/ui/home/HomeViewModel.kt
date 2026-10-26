@@ -51,6 +51,9 @@ data class HomeSection(
     val items: List<BaseItemDto>,
     val fetchAll: (suspend () -> List<BaseItemDto>)? = null,
     val key: String = title,
+    // One page (start, size) of the full row, so View all keeps loading
+    // as it is scrolled instead of fetching everything up front.
+    val fetchPage: (suspend (Int, Int) -> List<BaseItemDto>)? = null,
 )
 
 data class HomeUiState(
@@ -737,6 +740,7 @@ class HomeViewModel @Inject constructor(
             title = entry.title,
             items = deduped,
             fetchAll = { repository.getCollectionItems(userId, entry.collectionId, entry.kind, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
+            fetchPage = { start, size -> repository.getCollectionItems(userId, entry.collectionId, entry.kind, size, start).filterNot { isAnime(it) } },
             key = "catalog:${entry.collectionId}",
         )
     }
@@ -777,6 +781,7 @@ class HomeViewModel @Inject constructor(
             title = entry.genre,
             items = deduped,
             fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
+            fetchPage = { start, size -> repository.getGenreItemsPage(userId, null, "Movie,Series", entry.genre, start, size).filterNot { isAnime(it) } },
             key = "genre:${entry.genre}",
         )
     }

@@ -70,16 +70,48 @@ fun RowListModal(
     onItemClick: (BaseItemDto) -> Unit,
     onDismiss: () -> Unit,
     fetchAll: (suspend () -> List<BaseItemDto>)? = null,
+    fetchPage: (suspend (Int, Int) -> List<BaseItemDto>)? = null,
 ) {
     BackHandler(onBack = onDismiss)
     var displayedItems by remember(items) { mutableStateOf(items) }
-    var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null) }
+    var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null || fetchPage != null) }
+    // Paged rows load ROW_PAGE_SIZE titles at a time, the next page once the
+    // focus nears the end, until the server runs out.
+    var nextStart by remember(items) { mutableStateOf(0) }
+    var exhausted by remember(items) { mutableStateOf(fetchPage == null) }
+    var columns by remember { mutableStateOf(1) }
     var initialFocusRequested by remember(items) { mutableStateOf(false) }
     val listFocusRequester = remember { FocusRequester() }
     val gridState = rememberTvGridState()
     val focusController = rememberGridFocusController()
+    suspend fun loadNextPage() {
+        val page = fetchPage ?: return
+        if (exhausted) return
+        isLoadingRest = true
+        val start = nextStart
+        val result = runCatching { page(start, ROW_PAGE_SIZE) }.getOrNull()
+        if (result == null) {
+            isLoadingRest = false
+            return
+        }
+        nextStart = start + ROW_PAGE_SIZE
+        if (result.size < ROW_PAGE_SIZE / 2) exhausted = true
+        val existingIds = displayedItems.mapTo(hashSetOf()) { it.Id }
+        val fresh = result.filterNot { it.Id in existingIds }
+        if (fresh.isNotEmpty()) displayedItems = displayedItems + fresh
+        isLoadingRest = false
+    }
+    LaunchedEffect(items, fetchPage) {
+        if (fetchPage == null) return@LaunchedEffect
+        loadNextPage()
+        // Keep loading while the focus sits within two rows of the end.
+        androidx.compose.runtime.snapshotFlow {
+            val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= displayedItems.size - columns * 2 && !exhausted && !isLoadingRest
+        }.collect { wantMore -> if (wantMore) loadNextPage() }
+    }
     LaunchedEffect(items, fetchAll) {
-        if (fetchAll == null) return@LaunchedEffect
+        if (fetchAll == null || fetchPage != null) return@LaunchedEffect
         val fullItems = runCatching { fetchAll() }.getOrNull()
         isLoadingRest = false
         if (fullItems != null) {
@@ -116,7 +148,11 @@ fun RowListModal(
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Text(
-                text = if (isLoadingRest) "${displayedItems.size} titles, loading the rest…" else "${displayedItems.size} titles",
+                text = when {
+                    isLoadingRest -> "${displayedItems.size} titles, loading more…"
+                    !exhausted -> "${displayedItems.size}+ titles"
+                    else -> "${displayedItems.size} titles"
+                },
                 color = JellioTextSecondary,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 20.dp),
@@ -125,6 +161,7 @@ fun RowListModal(
                 val scaledPosterWidth = PosterWidth.scaled()
                 val spacing = 16.dp
                 val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
+                columns = columnCount
                 val shownItems = displayedItems
                 val totalCount = shownItems.size
                 LazyVerticalGrid(
@@ -169,3 +206,5 @@ fun RowListModal(
         }
     }
 }
+
+private const val ROW_PAGE_SIZE = 60
