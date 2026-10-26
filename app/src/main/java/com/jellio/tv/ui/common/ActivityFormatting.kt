@@ -52,7 +52,9 @@ fun watchActivityText(
     firstEpisodeNumber: Int?,
     lastEpisodeNumber: Int?,
     itemName: String?,
+    rewatch: Boolean = false,
 ): AnnotatedString = buildAnnotatedString {
+    val verb = com.jellio.tv.ui.i18n.Strings.get(if (rewatch) "activity_rewatched" else "activity_watched")
     val lang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code.lowercase()
     val isEpisode = itemType == "Episode" && !seriesName.isNullOrEmpty()
     val isGerman = lang == "de"
@@ -71,13 +73,13 @@ fun watchActivityText(
                 append(season + com.jellio.tv.ui.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
             }
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
-            append(" " + com.jellio.tv.ui.i18n.Strings.get("activity_watched").lowercase())
+            append(" " + verb.lowercase())
         } else {
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(itemName ?: "") }
-            append(" " + com.jellio.tv.ui.i18n.Strings.get("activity_watched").lowercase())
+            append(" " + verb.lowercase())
         }
     } else {
-        append(com.jellio.tv.ui.i18n.Strings.get("activity_watched") + " ")
+        append("$verb ")
         if (isEpisode) {
             val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
             if (episodeCount > 1) {

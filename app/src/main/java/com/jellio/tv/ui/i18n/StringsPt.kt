@@ -72,6 +72,7 @@ internal object StringsPt {
         m["action_watch_now"] = "Assistir agora"
         m["activity_unlocked"] = "Desbloqueado"
         m["activity_watched"] = "Viu"
+        m["activity_rewatched"] = "Reassistido"
         m["announcements_from_server"] = "Do servidor"
         m["auth_autofill_tip"] = "http:// e https:// são preenchidos automaticamente. O Jellio testa conexões locais e seguras de forma automática."
         m["auth_classic_signin"] = "Usar login clássico"

@@ -72,6 +72,7 @@ internal object StringsDe {
         m["action_watch_now"] = "Jetzt ansehen"
         m["activity_unlocked"] = "Freigeschaltet"
         m["activity_watched"] = "Gesehen"
+        m["activity_rewatched"] = "Erneut gesehen"
         m["announcements_from_server"] = "Vom Server"
         m["auth_autofill_tip"] = "http:// und https:// werden automatisch ergänzt. Jellio prüft sichere und lokale Verbindungen selbstständig."
         m["auth_classic_signin"] = "Klassische Anmeldung verwenden"

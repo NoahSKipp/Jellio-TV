@@ -72,6 +72,7 @@ internal object StringsEs {
         m["action_watch_now"] = "Ver ahora"
         m["activity_unlocked"] = "Desbloqueado"
         m["activity_watched"] = "Vio"
+        m["activity_rewatched"] = "Visto de nuevo"
         m["announcements_from_server"] = "Del servidor"
         m["auth_autofill_tip"] = "http:// y https:// se completan automáticamente. Jellio prueba conexiones seguras y locales de forma automática."
         m["auth_classic_signin"] = "Usar inicio clásico"

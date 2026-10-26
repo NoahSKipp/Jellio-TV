@@ -311,6 +311,7 @@ private fun activityText(entry: FeedEntryDto) = if (entry.Kind == "Badge") {
         firstEpisodeNumber = entry.FirstEpisodeNumber,
         lastEpisodeNumber = entry.LastEpisodeNumber,
         itemName = entry.ItemName,
+        rewatch = entry.Rewatch,
     )
 }
 

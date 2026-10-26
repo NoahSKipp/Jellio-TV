@@ -72,6 +72,7 @@ internal object StringsPl {
         m["action_watch_now"] = "Oglądaj teraz"
         m["activity_unlocked"] = "Odblokowano"
         m["activity_watched"] = "Obejrzano"
+        m["activity_rewatched"] = "Obejrzano ponownie"
         m["announcements_from_server"] = "Z serwera"
         m["auth_autofill_tip"] = "http:// i https:// są uzupełniane automatycznie. Jellio sam testuje bezpieczne i lokalne połączenia."
         m["auth_classic_signin"] = "Użyj klasycznego logowania"

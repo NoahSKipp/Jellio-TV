@@ -602,6 +602,8 @@ data class FeedEntryDto(
     val BadgeName: String? = null,
     val BadgeDescription: String? = null,
     val BadgeRarity: String? = null,
+    // Already finished before: shown as "Rewatched".
+    val Rewatch: Boolean = false,
 )
 
 @com.squareup.moshi.JsonClass(generateAdapter = true)
