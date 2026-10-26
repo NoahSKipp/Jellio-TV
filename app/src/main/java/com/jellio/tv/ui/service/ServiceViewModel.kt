@@ -21,6 +21,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 private const val SERVICE_ROW_TIMEOUT_MS = 15_000L
+private const val SERVICE_ROW_ATTEMPTS = 3
+private const val SERVICE_BACKGROUND_RETRIES = 3
+private const val SERVICE_RETRY_DELAY_MS = 30_000L
 private const val SERVICE_ROW_LIMIT = 24
 private const val TOP_GENRES_LIMIT = 10
 private const val MIN_GENRE_COUNT = 3
@@ -84,38 +87,56 @@ class ServiceViewModel @Inject constructor(
     fun load(session: Session, serviceName: String) {
         if (loadedService == serviceName) return
         loadedService = serviceName
+        refresh(session, serviceName, retryRound = 0)
+    }
+
+    fun retry(session: Session, serviceName: String) {
+        loadedService = serviceName
+        refresh(session, serviceName, retryRound = 0)
+    }
+
+    // A timed out or failed collection is not an empty one: it is asked
+    // again with backoff, never cached as empty, and a page that lost rows
+    // to a busy server keeps what it showed before and tries again later.
+    private fun refresh(session: Session, serviceName: String, retryRound: Int) {
         viewModelScope.launch {
             // The last visit's rows show at once; the refresh replaces them
             // in one go when it's done so nothing moves while browsing.
-            val cached = runCatching { rowSnapshotStore.loadServiceSnapshot(session.userId, serviceName) }.getOrNull()
+            val showing = _uiState.value.takeIf { it.serviceName == serviceName && it.rows.isNotEmpty() }
+            val cached = if (showing != null) null else runCatching { rowSnapshotStore.loadServiceSnapshot(session.userId, serviceName) }.getOrNull()
                 ?.takeIf { it.rows.isNotEmpty() }
-            _uiState.value = if (cached != null) {
+            val baseline = showing ?: cached?.let {
                 ServiceUiState(
                     isLoading = false,
                     serviceName = serviceName,
-                    heroItem = cached.heroItem,
-                    rows = cached.rows.map { ServiceRow(it.title, it.kind, it.items, it.collectionId) },
-                    topGenres = cached.topGenres,
+                    heroItem = it.heroItem,
+                    rows = it.rows.map { row -> ServiceRow(row.title, row.kind, row.items, row.collectionId) },
+                    topGenres = it.topGenres,
                 )
-            } else {
-                ServiceUiState(isLoading = true, serviceName = serviceName)
             }
+            _uiState.value = baseline ?: ServiceUiState(isLoading = true, serviceName = serviceName)
             try {
-                val collections = repository.getCollections(session.userId)
+                val collections = withBackoff { repository.getCollections(session.userId) }
+                    ?: throw IllegalStateException("collections timed out")
                 val matching = groupByService(collections)[serviceName].orEmpty()
 
                 // Slots keep the collections' order while each row goes up as
                 // soon as its own answer arrives, not after the ones above it.
                 val slots = arrayOfNulls<ServiceRow>(matching.size)
+                var failedRows = 0
                 var heroItem: BaseItemDto? = null
                 var heroRating = -1.0
 
                 matching.mapIndexed { index, collection ->
                     launch {
                         val kind = repository.collectionKind(collection)
-                        val items = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) {
-                            runCatching { repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT) }.getOrDefault(emptyList())
-                        }.orEmpty()
+                        val items = withBackoff {
+                            repository.getCollectionItems(session.userId, collection.Id, kind, SERVICE_ROW_LIMIT)
+                        }
+                        if (items == null) {
+                            failedRows++
+                            return@launch
+                        }
                         if (items.isEmpty()) return@launch
                         slots[index] = ServiceRow(title = rowTitle(collection, serviceName, kind), kind = kind, items = items, collectionId = collection.Id)
                         // The best rated item with a backdrop across every
@@ -128,7 +149,7 @@ class ServiceViewModel @Inject constructor(
                                 heroRating = rating
                             }
                         }
-                        if (cached != null) return@launch
+                        if (baseline != null) return@launch
                         _uiState.value = ServiceUiState(
                             isLoading = false,
                             serviceName = serviceName,
@@ -142,14 +163,21 @@ class ServiceViewModel @Inject constructor(
 
                 val genres = topGenres(rows)
                 val finalRows = arrange(rows) + genreRows(rows, genres, serviceName)
-                _uiState.value = ServiceUiState(
-                    isLoading = false,
-                    serviceName = serviceName,
-                    heroItem = heroItem,
-                    rows = finalRows,
-                    topGenres = genres,
-                )
-                if (rows.isNotEmpty()) {
+                val complete = failedRows == 0
+                if (complete || baseline == null || finalRows.size >= baseline.rows.size) {
+                    _uiState.value = if (rows.isEmpty() && !complete) {
+                        ServiceUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.format("service_load_error", serviceName), serviceName = serviceName)
+                    } else {
+                        ServiceUiState(
+                            isLoading = false,
+                            serviceName = serviceName,
+                            heroItem = heroItem,
+                            rows = finalRows,
+                            topGenres = genres,
+                        )
+                    }
+                }
+                if (complete && rows.isNotEmpty()) {
                     rowSnapshotStore.saveServiceSnapshot(
                         session.userId,
                         serviceName,
@@ -160,11 +188,41 @@ class ServiceViewModel @Inject constructor(
                         ),
                     )
                 }
+                if (!complete) {
+                    android.util.Log.w("JellioService", "$serviceName: $failedRows of ${matching.size} rows failed, retrying later")
+                    scheduleRetry(session, serviceName, retryRound)
+                }
             } catch (err: Exception) {
-                if (cached != null) return@launch
-                _uiState.value = ServiceUiState(isLoading = false, error = err.message ?: "Could not load $serviceName", serviceName = serviceName)
+                if (err is kotlinx.coroutines.CancellationException) throw err
+                android.util.Log.w("JellioService", "$serviceName failed to load: ${err.message}")
+                if (baseline == null) {
+                    _uiState.value = ServiceUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.format("service_load_error", serviceName), serviceName = serviceName)
+                }
+                scheduleRetry(session, serviceName, retryRound)
             }
         }
+    }
+
+    private fun scheduleRetry(session: Session, serviceName: String, retryRound: Int) {
+        if (retryRound >= SERVICE_BACKGROUND_RETRIES) {
+            // Leaving and reopening the hub asks again.
+            if (loadedService == serviceName) loadedService = null
+            return
+        }
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(SERVICE_RETRY_DELAY_MS shl retryRound)
+            if (loadedService == serviceName) refresh(session, serviceName, retryRound + 1)
+        }
+    }
+
+    // Null when every attempt failed or timed out; an empty list is a real answer.
+    private suspend fun <T> withBackoff(block: suspend () -> T): T? {
+        repeat(SERVICE_ROW_ATTEMPTS) { attempt ->
+            val result = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { runCatching { block() } }
+            if (result != null && result.isSuccess) return result.getOrNull()
+            if (attempt < SERVICE_ROW_ATTEMPTS - 1) kotlinx.coroutines.delay(2_000L shl attempt)
+        }
+        return null
     }
 
     // Real port of screens/service.js's own makeRowTitleClickable()
