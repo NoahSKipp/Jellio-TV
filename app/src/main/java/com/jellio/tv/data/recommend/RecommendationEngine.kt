@@ -136,9 +136,21 @@ private fun score(seed: BaseItemDto, candidate: BaseItemDto, viaPerson: Boolean)
     return score
 }
 
+private fun nameKey(name: String?): String = name.orEmpty().trim().lowercase()
+
+private fun isSameTitle(seed: BaseItemDto, item: BaseItemDto): Boolean {
+    val seedIds = setOfNotNull(seed.Id, seed.SeriesId)
+    if (item.Id in seedIds || (item.SeriesId != null && item.SeriesId in seedIds)) return true
+    val seedNames = setOf(nameKey(seed.SeriesName ?: seed.Name), nameKey(seed.Name)) - ""
+    return nameKey(item.SeriesName ?: item.Name) in seedNames
+}
+
 private fun pick(seed: BaseItemDto, candidates: List<CandidateEntry>, seen: MutableSet<String>, limit: Int): List<BaseItemDto> {
     val scored = candidates
         .filter { notPlayed(it.item) && !seen.contains(it.item.Id) && (it.item.SeriesId == null || !seen.contains(it.item.SeriesId)) }
+        // Never the row's own title: not the seed, its show, or another
+        // version of it with the same name (a remake, a second import).
+        .filter { !isSameTitle(seed, it.item) }
         .map { it.item to score(seed, it.item, it.viaPerson) }
         .filter { it.second > 0.0 }
         .sortedByDescending { it.second }
