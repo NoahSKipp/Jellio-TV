@@ -7,6 +7,8 @@ import android.content.Context
 class SyncDelays(audio: Int, subtitle: Int) {
     @Volatile var audioMs: Int = audio
     @Volatile var subtitleMs: Int = subtitle
+    // Whether the current media source has the sync layer.
+    @Volatile var wrapped: Boolean = false
 }
 
 // Subtitle offset per title, like the web player's per-item subtitle sync.

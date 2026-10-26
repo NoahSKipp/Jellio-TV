@@ -535,13 +535,19 @@ private fun PlayerSurface(
         return androidx.media3.exoplayer.source.MergingMediaSource(videoSource, subtitleSource)
     }
 
+    // The sync layer only goes in once an offset is set, so normal playback
+    // reads the stream directly; setting one reloads the source with it.
     @OptIn(UnstableApi::class)
-    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource =
-        SyncDelayMediaSource(
-            buildBaseMediaSource(sideloadedTrack),
+    fun buildPlayerMediaSource(sideloadedTrack: SubtitleTrackUiState?): androidx.media3.exoplayer.source.MediaSource {
+        val base = buildBaseMediaSource(sideloadedTrack)
+        syncDelays.wrapped = syncDelays.audioMs != 0 || syncDelays.subtitleMs != 0
+        if (!syncDelays.wrapped) return base
+        return SyncDelayMediaSource(
+            base,
             audioDelayUs = { syncDelays.audioMs * 1000L },
             subtitleDelayUs = { syncDelays.subtitleMs * 1000L },
         )
+    }
 
     // Direct play uses the container's native embedded subtitle tracks with
     // zero extra HTTP requests. Only external subtitles or transcoded streams
@@ -1406,7 +1412,13 @@ private fun PlayerSurface(
         LaunchedEffect(subtitleResyncSeq) {
             if (subtitleResyncSeq == 0) return@LaunchedEffect
             kotlinx.coroutines.delay(600)
-            player.seekTo(player.currentPosition)
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            if (syncDelays.wrapped) {
+                player.seekTo(pos)
+            } else {
+                player.setMediaSource(buildPlayerMediaSource(activeSideloadedTrack), pos)
+                player.prepare()
+            }
         }
 
         if (showAudioMenu) {
@@ -1428,6 +1440,8 @@ private fun PlayerSurface(
                     audioDelayMs = ms
                     syncDelays.audioMs = ms
                     PlayerPrefs.setAudioDelay(playerContext, ms)
+                    // The first offset adds the sync layer, which needs a reload.
+                    if (!syncDelays.wrapped && ms != 0) subtitleResyncSeq++
                 },
                 onDismiss = { showAudioMenu = false },
             )

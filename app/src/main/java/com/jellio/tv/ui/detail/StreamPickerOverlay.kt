@@ -605,6 +605,8 @@ fun StreamPickerOverlay(
                                     onSelect = { selectedLanguage = it },
                                     firstChipFocusRequester = if (resumeTicks <= 0) initialFocusRequester else null,
                                     chipFocusRequesters = chipFocusRequesters,
+                                    // Up from the badges goes back to Resume from.
+                                    upTarget = if (resumeTicks > 0) resumeFocusRequester else null,
                                 )
                             }
                         }
@@ -616,7 +618,7 @@ fun StreamPickerOverlay(
                                     onSelect = { selectedQuality = it },
                                     firstChipFocusRequester = if (resumeTicks <= 0 && !showLanguages) initialFocusRequester else null,
                                     chipFocusRequesters = qualityFocusRequesters,
-                                    upTarget = if (showLanguages) chipFocusRequesters[selectedLanguage] else null,
+                                    upTarget = if (showLanguages) chipFocusRequesters[selectedLanguage] else if (resumeTicks > 0) resumeFocusRequester else null,
                                     topPadding = if (showLanguages) 12.dp else 20.dp,
                                 )
                             }
