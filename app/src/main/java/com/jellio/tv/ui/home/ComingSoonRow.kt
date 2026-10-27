@@ -71,12 +71,15 @@ private fun comingSoonDateLabel(entry: CalendarEntryDto): String {
     }
 }
 
-private fun comingSoonKindLabel(entry: CalendarEntryDto): String =
-    if (entry.Kind == "episode") {
-        if (!entry.Detail.isNullOrEmpty()) entry.Detail else "New episode"
+private fun comingSoonKindLabel(entry: CalendarEntryDto): String {
+    val strings = com.jellio.tv.ui.i18n.Strings
+    return if (entry.Kind == "episode") {
+        val label = strings.get("calendar_new_episode")
+        if (!entry.Detail.isNullOrEmpty()) "$label \u00B7 ${entry.Detail}" else label
     } else {
-        "Digital release"
+        strings.get("calendar_digital_release")
     }
+}
 
 // Mirrors screens/home.js's own buildComingSoonRow()/buildComingSoonCard():
 // real GET Jellio/calendar answer, a handful of cards wide, right on

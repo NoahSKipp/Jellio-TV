@@ -84,7 +84,8 @@ data class HomeUiState(
     val loadingMore: Boolean = false,
 )
 
-private const val COMING_SOON_LIMIT = 12
+// Everything the web Calendar screen listed, as on the web row.
+private const val COMING_SOON_LIMIT = 60
 // Fetched deeper than shown: titles already in an earlier row are dropped,
 // which used to leave catalog and genre rows with only a few cards.
 private const val CATALOG_ROW_LIMIT = 60
