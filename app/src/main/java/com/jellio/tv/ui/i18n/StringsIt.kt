@@ -964,5 +964,10 @@ internal object StringsIt {
         m["settings_quick_hub_test"] = "Apri Hub Rapido"
         m["settings_quick_hub_test_desc"] = "Prova ad aprire subito il riquadro dell'Hub Rapido"
         m["settings_quick_hub_home_notice"] = "Avviso di sistema: I tasti fisici Home, Accensione e Assistente sono riservati a livello di sistema da Android TV / Google TV. Puoi usare Menu, Play/Pausa, Guida, Info, tasti colorati o registrare un tasto del telecomando."
+        m["player_skip_eyebrow_intro"] = "Intro"
+        m["player_skip_eyebrow_credits"] = "Titoli di coda"
+        m["player_skip_intro"] = "Salta intro"
+        m["player_skip_credits"] = "Salta titoli di coda"
+        m["player_skip"] = "Salta"
     }
 }

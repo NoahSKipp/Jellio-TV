@@ -156,6 +156,15 @@ interface JellyfinApi {
     @GET("Episode/{itemId}/Timestamps")
     suspend fun getIntroSkipperSegments(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
 
+    @GET("MediaSegments/{itemId}")
+    suspend fun getMediaSegments(@Path("itemId") itemId: String): com.jellio.tv.data.model.MediaSegmentsResultDto
+
+    @GET("Jellio/introcredits/community/{itemId}")
+    suspend fun getCommunityIntroCredits(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
+
+    @GET("Jellio/introcredits/{itemId}")
+    suspend fun getJellioIntroCredits(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
+
     @POST("Items/{itemId}/PlaybackInfo")
     suspend fun getPlaybackInfo(
         @Path("itemId") itemId: String,

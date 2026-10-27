@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.PlaybackTarget
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.streams.BadKind
@@ -18,7 +17,10 @@ import com.jellio.tv.data.streams.failoverOutcome
 import com.jellio.tv.data.streams.isSourceNotReady
 import com.jellio.tv.data.streams.outcomeLabel
 import com.jellio.tv.data.streams.planFailover
+import com.jellio.tv.data.playback.SkipSegments
 import com.jellio.tv.data.playback.TranscodeReason
+import com.jellio.tv.data.playback.mergeSkipSegments
+import com.jellio.tv.data.playback.skipSegmentsComplete
 import com.jellio.tv.data.playback.VideoTranscodePolicy
 import com.jellio.tv.data.playback.videoInfoOf
 import com.jellio.tv.data.model.SubtitleStyle
@@ -65,6 +67,8 @@ data class UpNextInfo(
     val title: String,
     val overview: String? = null,
     val seriesName: String? = null,
+    val episodeName: String = "",
+    val episodeCode: String? = null,
 )
 
 data class EpisodePanelEntry(
@@ -82,20 +86,25 @@ data class AudioTrackUiState(
     val language: String? = null,
 )
 
-data class SkipSegment(
-    val label: String,
-    val targetSeconds: Double,
-)
+enum class SkipKind { INTRO, CREDITS }
 
-fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double): SkipSegment? {
+data class SkipSegment(
+    val kind: SkipKind,
+    val targetSeconds: Double,
+) {
+    val eyebrow: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_eyebrow_intro" else "player_skip_eyebrow_credits")
+    val label: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_intro" else "player_skip_credits")
+}
+
+fun activeSkipSegment(segments: SkipSegments?, currentSeconds: Double): SkipSegment? {
     segments ?: return null
-    val intro = segments.Introduction
-    if (intro != null && intro.End > 0 && currentSeconds >= intro.Start && currentSeconds < intro.End) {
-        return SkipSegment("Skip Intro", intro.End)
+    val intro = segments.intro
+    if (intro != null && intro.end > 0 && currentSeconds >= intro.start && currentSeconds < intro.end) {
+        return SkipSegment(SkipKind.INTRO, intro.end)
     }
-    val credits = segments.Credits
-    if (credits != null && credits.End > 0 && currentSeconds >= credits.Start && currentSeconds < credits.End) {
-        return SkipSegment("Skip Credits", credits.End)
+    val credits = segments.credits
+    if (credits != null && credits.end > 0 && currentSeconds >= credits.start && currentSeconds < credits.end) {
+        return SkipSegment(SkipKind.CREDITS, credits.end)
     }
     return null
 }
@@ -134,7 +143,10 @@ data class PlayerUiState(
     val reencodingVideo: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
-    val skipSegments: IntroSkipperSegmentsDto? = null,
+    val skipSegments: SkipSegments? = null,
+    // Every skip data source has answered; until then a missing credits
+    // range may still arrive.
+    val skipSegmentsResolved: Boolean = false,
     val sleepTimerEndTimeMs: Long? = null,
     val sourceOptions: List<MediaSourceDto> = emptyList(),
     val seriesId: String? = null,
@@ -658,17 +670,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                viewModelScope.launch {
-                    // Credits starting in the first half are bad data; they
-                    // would show Skip Credits and Up Next right at the start.
-                    val segments = repository.getIntroSkipperSegments(itemId)?.let { found ->
-                        val credits = found.Credits
-                        if (credits != null && expectedRuntimeMs > 0 && credits.Start * 1000 < expectedRuntimeMs / 2) found.copy(Credits = null) else found
-                    }
-                    if (segments != null && (segments.Introduction != null || segments.Credits != null)) {
-                        _uiState.value = _uiState.value.copy(skipSegments = segments)
-                    }
-                }
+                viewModelScope.launch { loadSkipSegments(session, itemId, item.RunTimeTicks) }
 
                 viewModelScope.launch {
                     val status = repository.getSleepTimerStatus()
@@ -727,6 +729,35 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    // screens/player.js order: community data, then Media Segments (or the
+    // Intro Skipper), then chapter names, then the plugin's own analysis.
+    // Each step only fills what is still missing. Credits in the first half
+    // of the runtime are dropped as bad data by the merge.
+    private suspend fun loadSkipSegments(session: Session, itemId: String, runTimeTicks: Long?) {
+        val runtimeSeconds = (runTimeTicks ?: 0L) / 10_000_000.0
+        var merged: SkipSegments? = null
+        // False once the title changed or nothing is missing any more.
+        suspend fun step(fetch: suspend () -> SkipSegments?): Boolean {
+            merged = mergeSkipSegments(merged, fetch(), runtimeSeconds)
+            if (this.itemId != itemId) return false
+            publishSkipSegments(merged, resolved = false)
+            return !skipSegmentsComplete(merged, runtimeSeconds)
+        }
+        if (step { repository.getCommunitySkipSegments(itemId) } &&
+            step { repository.getIntroSkipperSegments(itemId) } &&
+            step { repository.getChapterSkipSegments(session.userId, itemId, runTimeTicks) }
+        ) {
+            step { repository.getJellioIntroCredits(itemId) }
+        }
+        if (this.itemId != itemId) return
+        publishSkipSegments(merged, resolved = true)
+    }
+
+    private fun publishSkipSegments(segments: SkipSegments?, resolved: Boolean) {
+        val usable = segments?.takeIf { it.intro != null || it.credits != null }
+        _uiState.value = _uiState.value.copy(skipSegments = usable, skipSegmentsResolved = resolved)
+    }
+
     private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {
         val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
         val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken) }
@@ -741,6 +772,8 @@ class PlayerViewModel @Inject constructor(
             title = title,
             overview = episode.Overview?.takeIf { it.isNotBlank() },
             seriesName = episode.SeriesName,
+            episodeName = episode.Name.orEmpty(),
+            episodeCode = com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber).takeIf { it.isNotEmpty() },
         )
     }
 

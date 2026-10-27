@@ -964,5 +964,10 @@ internal object StringsFr {
         m["settings_quick_hub_test"] = "Ouvrir le Hub Rapide"
         m["settings_quick_hub_test_desc"] = "Testez l'ouverture du tiroir du Hub Rapide dès maintenant"
         m["settings_quick_hub_home_notice"] = "Avis système : Les touches physiques Accueil, Alimentation et Assistant sont réservées par le système. Vous pouvez utiliser Menu, Lecture/Pause, Guide, Info, touches de couleur ou enregistrer une touche de votre télécommande."
+        m["player_skip_eyebrow_intro"] = "Intro"
+        m["player_skip_eyebrow_credits"] = "Générique de fin"
+        m["player_skip_intro"] = "Passer l'intro"
+        m["player_skip_credits"] = "Passer le générique"
+        m["player_skip"] = "Passer"
     }
 }

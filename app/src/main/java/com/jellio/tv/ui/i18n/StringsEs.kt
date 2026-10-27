@@ -964,5 +964,10 @@ internal object StringsEs {
         m["settings_quick_hub_test"] = "Abrir Centro Rápido"
         m["settings_quick_hub_test_desc"] = "Prueba abrir el cajón del Centro Rápido ahora mismo"
         m["settings_quick_hub_home_notice"] = "Aviso del sistema: Los botones físicos Inicio, Encendido y Asistente están reservados a nivel de sistema por Android TV / Google TV. Puedes usar Menú, Play/Pausa, Guía, Info, botones de color o grabar cualquier botón de tu mando."
+        m["player_skip_eyebrow_intro"] = "Intro"
+        m["player_skip_eyebrow_credits"] = "Créditos"
+        m["player_skip_intro"] = "Omitir intro"
+        m["player_skip_credits"] = "Omitir créditos"
+        m["player_skip"] = "Omitir"
     }
 }

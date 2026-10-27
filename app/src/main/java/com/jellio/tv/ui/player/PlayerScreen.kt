@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -127,6 +128,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
+import com.jellio.tv.data.playback.SkipSegments
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
 import com.jellio.tv.data.model.SUBTITLE_SIZES
@@ -195,17 +197,6 @@ internal val EPISODE_SLEEP_TIMER_OPTIONS = listOf(1, 2, 3, 5)
 // outside the player screen because each next episode opens a fresh one.
 internal object EpisodeSleepTimer {
     var remaining by androidx.compose.runtime.mutableStateOf<Int?>(null)
-}
-
-internal fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSeconds: Double, durationSeconds: Double): Boolean {
-    if (durationSeconds <= 0) return false
-    val credits = segments?.Credits
-    if (credits != null && credits.End > 0 && credits.Start >= 0) {
-        return currentSeconds >= credits.Start
-    }
-    // Like the web player: no credits data, no card. The end screen
-    // takes over when the episode finishes instead.
-    return false
 }
 
 @Composable
@@ -287,6 +278,7 @@ fun PlayerScreen(
                 pauseInfo = uiState.pauseInfo,
                 upNextInfo = uiState.upNextInfo,
                 skipSegments = uiState.skipSegments,
+                skipSegmentsResolved = uiState.skipSegmentsResolved,
                 sleepTimerEndTimeMs = uiState.sleepTimerEndTimeMs,
                 onBack = onBack,
                 onReportStart = { viewModel.reportStart(it) },
@@ -418,7 +410,8 @@ internal fun PlayerSurface(
     onDismissToast: (Long) -> Unit,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
-    skipSegments: IntroSkipperSegmentsDto?,
+    skipSegments: SkipSegments?,
+    skipSegmentsResolved: Boolean = false,
     sleepTimerEndTimeMs: Long?,
     onBack: () -> Unit,
     onReportStart: (Long) -> Unit,
@@ -895,6 +888,11 @@ internal fun PlayerSurface(
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
     var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
+    // Per episode, not per stream: a seek that reloads a transcode must
+    // not bring a dismissed prompt back.
+    var dismissedSkipKind by remember(currentItemId) { mutableStateOf<SkipKind?>(null) }
+    var nearEndUpNextDismissed by remember(currentItemId) { mutableStateOf(false) }
+    var nearEndUpNextAnnounced by remember(currentItemId) { mutableStateOf(false) }
 
     LaunchedEffect(player, playbackSpeed) {
         player.setPlaybackSpeed(playbackSpeed)
@@ -1191,8 +1189,9 @@ internal fun PlayerSurface(
             return@LaunchedEffect
         }
         val next = upNextInfo ?: return@LaunchedEffect
-        // The card's countdown already runs on into the end screen.
-        if (upNextShown || upNextDismissed) return@LaunchedEffect
+        // The card's countdown already runs on into the end screen, and a
+        // dismissed card or near-end prompt means stay on this episode.
+        if (upNextShown || upNextDismissed || nearEndUpNextDismissed) return@LaunchedEffect
         onUpNextShown()
         endCountdown = UPNEXT_COUNTDOWN_SECONDS
         while ((endCountdown ?: 0) > 0) {
@@ -1238,6 +1237,42 @@ internal fun PlayerSurface(
         controlsVisible = false
     }
 
+    val activeSkipState by remember(skipSegments) { derivedStateOf { activeSkipSegment(skipSegments, positionMs / 1000.0) } }
+    val activeSkip = activeSkipState
+    // screens/player.js: a dismissed prompt stays away until a different
+    // kind of segment comes up.
+    LaunchedEffect(activeSkip?.kind) {
+        val kind = activeSkip?.kind
+        if (kind != null && kind != dismissedSkipKind) dismissedSkipKind = null
+    }
+    val nearEndReachedState by remember(skipSegments, skipSegmentsResolved) {
+        derivedStateOf { shouldShowNearEndUpNext(skipSegments, skipSegmentsResolved, positionMs / 1000.0, durationMs / 1000.0) }
+    }
+    // Anything that owns the screen or the remote keeps both prompts away.
+    val promptsBlocked = showEndScreen || upNextCardVisible || anyMenuOpen || bufferPromptVisible ||
+        showResumePrompt || catchUpOpen || exoError != null || pauseOverlayVisible
+    val skipPromptVisible = activeSkip != null && activeSkip.kind != dismissedSkipKind && !promptsBlocked &&
+        !(upNextInfo != null && upNextShown && !upNextDismissed)
+    // The last episode of an episode sleep timer ends playback, so no offer.
+    val nearEndUpNextVisible = upNextInfo != null && nearEndReachedState && !nearEndUpNextDismissed &&
+        !skipPromptVisible && !promptsBlocked && EpisodeSleepTimer.remaining != 1
+    val promptVisible = skipPromptVisible || nearEndUpNextVisible
+    // With the controls away a shown prompt has focus, so the remote's
+    // arrows move between its buttons and Back dismisses it.
+    val promptOwnsRemote = promptVisible && !controlsVisible
+    fun dismissPrompt() {
+        if (skipPromptVisible) dismissedSkipKind = activeSkip?.kind else if (nearEndUpNextVisible) nearEndUpNextDismissed = true
+    }
+    LaunchedEffect(nearEndUpNextVisible) {
+        if (nearEndUpNextVisible && !nearEndUpNextAnnounced) {
+            nearEndUpNextAnnounced = true
+            onUpNextShown()
+        }
+    }
+    LaunchedEffect(promptVisible) {
+        if (!promptVisible && !promptsBlocked && !controlsVisible) runCatching { focusRequester.requestFocus() }
+    }
+
     LaunchedEffect(controlsVisible) {
         if (!controlsVisible) {
             // The focused button just left; keep the remote on the player.
@@ -1272,7 +1307,8 @@ internal fun PlayerSurface(
 
                 if (event.type == KeyEventType.KeyDown) {
                     val noOverlayOpen = !showEndScreen && !upNextCardVisible && !anyMenuOpen &&
-                        !bufferPromptVisible && !showResumePrompt && !catchUpOpen && exoError == null
+                        !bufferPromptVisible && !showResumePrompt && !catchUpOpen && exoError == null &&
+                        (!promptOwnsRemote || isMedia)
                     if (isSeekKey && (!controlsVisible || isMedia) && noOverlayOpen) {
                         val repeatCount = event.nativeKeyEvent.repeatCount
                         val now = android.os.SystemClock.uptimeMillis()
@@ -1339,6 +1375,20 @@ internal fun PlayerSurface(
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
+                }
+                if (promptOwnsRemote) {
+                    when (event.key) {
+                        Key.Back -> {
+                            dismissPrompt()
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionUp, Key.DirectionDown -> {
+                            controlsVisible = true
+                            return@onKeyEvent true
+                        }
+                        Key.DirectionLeft, Key.DirectionRight, Key.DirectionCenter, Key.Enter -> return@onKeyEvent false
+                        else -> Unit
+                    }
                 }
                 if (showReactMenu) {
                     if (event.key == Key.Back) {
@@ -1700,22 +1750,49 @@ internal fun PlayerSurface(
             )
         }
 
-        val activeSkipState by remember(skipSegments) { derivedStateOf { activeSkipSegment(skipSegments, positionMs / 1000.0) } }
-        val activeSkip = activeSkipState
         // Auto-skip intros (Settings > Playback): once per intro, the same
         // as screens/player.js does when it's switched on.
         LaunchedEffect(activeSkip?.targetSeconds, PlayerPrefs.autoSkipIntro) {
             val segment = activeSkip ?: return@LaunchedEffect
-            if (PlayerPrefs.autoSkipIntro && segment.label == "Skip Intro" && autoSkippedTo != segment.targetSeconds) {
+            if (PlayerPrefs.autoSkipIntro && segment.kind == SkipKind.INTRO && autoSkippedTo != segment.targetSeconds) {
                 autoSkippedTo = segment.targetSeconds
+                dismissedSkipKind = SkipKind.INTRO
                 userSeek((segment.targetSeconds * 1000).toLong())
                 onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_skipped_intro"))
             }
         }
-        if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
-            SkipSegmentButton(
-                label = activeSkip.label,
-                onClick = { userSeek((activeSkip.targetSeconds * 1000).toLong()) },
+        if (skipPromptVisible && activeSkip != null) {
+            PlayerPrompt(
+                eyebrow = activeSkip.eyebrow,
+                title = activeSkip.label,
+                actionLabel = com.jellio.tv.ui.i18n.Strings.get("player_skip"),
+                actionIcon = Icons.Filled.SkipNext,
+                onAction = { userSeek((activeSkip.targetSeconds * 1000).toLong()) },
+                onDismiss = { dismissPrompt() },
+                takeFocus = !controlsVisible,
+                focusKey = activeSkip.kind,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
+            )
+        }
+        if (nearEndUpNextVisible && upNextInfo != null) {
+            PlayerPrompt(
+                eyebrow = com.jellio.tv.ui.i18n.Strings.get("player_up_next"),
+                title = upNextInfo.episodeName.ifBlank { upNextInfo.title },
+                detail = listOfNotNull(upNextInfo.episodeCode, upNextInfo.seriesName).joinToString("  ·  "),
+                thumbnailUrl = upNextInfo.thumbnailUrl,
+                actionLabel = com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
+                actionIcon = Icons.Filled.PlayArrow,
+                onAction = {
+                    // This episode counts toward an episode sleep timer as
+                    // if it had played to the end.
+                    EpisodeSleepTimer.remaining?.let { left ->
+                        EpisodeSleepTimer.remaining = if (left <= 1) null else left - 1
+                    }
+                    onPlayNext(upNextInfo.itemId)
+                },
+                onDismiss = { dismissPrompt() },
+                takeFocus = !controlsVisible,
+                focusKey = upNextInfo.itemId,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
             )
         }

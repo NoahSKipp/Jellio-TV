@@ -964,5 +964,10 @@ internal object StringsPl {
         m["settings_quick_hub_test"] = "Otwórz Szybkie Centrum"
         m["settings_quick_hub_test_desc"] = "Przetestuj otwarcie Szybkiego Centrum już teraz"
         m["settings_quick_hub_home_notice"] = "Informacja systemowa: Fizyczne przyciski Home, Zasilanie i Asystent są zarezerwowane na poziomie systemu przez Android TV / Google TV. Możesz używać Menu, Odtwórz/Pauza, Guide, Info, kolorowych przycisków lub zarejestrować przycisk z pilota."
+        m["player_skip_eyebrow_intro"] = "Czołówka"
+        m["player_skip_eyebrow_credits"] = "Napisy końcowe"
+        m["player_skip_intro"] = "Pomiń czołówkę"
+        m["player_skip_credits"] = "Pomiń napisy końcowe"
+        m["player_skip"] = "Pomiń"
     }
 }

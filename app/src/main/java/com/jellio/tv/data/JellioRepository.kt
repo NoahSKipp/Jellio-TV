@@ -9,7 +9,10 @@ import com.jellio.tv.data.model.ClientConfigDto
 import com.jellio.tv.data.model.FeedEntryDto
 import com.jellio.tv.data.model.ForgotPasswordPinRequest
 import com.jellio.tv.data.model.ForgotPasswordRequest
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
+import com.jellio.tv.data.playback.SkipSegments
+import com.jellio.tv.data.playback.chapterSkipSegments
+import com.jellio.tv.data.playback.nativeSkipSegments
+import com.jellio.tv.data.playback.toSkipSegments
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.ProfileDto
 import com.jellio.tv.data.model.RealWatchRequest
@@ -1046,8 +1049,25 @@ class JellioRepository @Inject constructor(
         return if (isUnreleasedItem(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
     }
 
-    suspend fun getIntroSkipperSegments(itemId: String): IntroSkipperSegmentsDto? =
-        runCatching { api.getIntroSkipperSegments(itemId) }.getOrNull()
+    suspend fun getCommunitySkipSegments(itemId: String): SkipSegments? =
+        runCatching { api.getCommunityIntroCredits(itemId).toSkipSegments() }.getOrNull()
+
+    // Jellyfin's own Media Segments first, the Intro Skipper's older
+    // Timestamps endpoint only when those have neither intro nor credits.
+    suspend fun getIntroSkipperSegments(itemId: String): SkipSegments? {
+        val native = runCatching { nativeSkipSegments(api.getMediaSegments(itemId).Items) }.getOrNull()
+        if (native != null) return native
+        return runCatching { api.getIntroSkipperSegments(itemId).toSkipSegments() }.getOrNull()
+    }
+
+    suspend fun getChapterSkipSegments(userId: String, itemId: String, runTimeTicks: Long?): SkipSegments? =
+        runCatching {
+            val item = api.getItemsByIds(userId, itemId, "Chapters").Items.firstOrNull()
+            chapterSkipSegments(item?.Chapters, runTimeTicks ?: item?.RunTimeTicks)
+        }.getOrNull()
+
+    suspend fun getJellioIntroCredits(itemId: String): SkipSegments? =
+        runCatching { api.getJellioIntroCredits(itemId).toSkipSegments() }.getOrNull()
 
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
         val continueWatchingEp = runCatching {

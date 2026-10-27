@@ -964,5 +964,10 @@ internal object StringsPt {
         m["settings_quick_hub_test"] = "Abrir Hub Rápido"
         m["settings_quick_hub_test_desc"] = "Teste a abertura da gaveta do Hub Rápido agora mesmo"
         m["settings_quick_hub_home_notice"] = "Aviso do sistema: Os botões físicos Início, Energia e Assistente são reservados pelo sistema no Android TV e Google TV. Você pode usar Menu, Reproduzir/Pausar, Guia, Info, botões coloridos ou gravar qualquer botão do seu controle."
+        m["player_skip_eyebrow_intro"] = "Abertura"
+        m["player_skip_eyebrow_credits"] = "Créditos"
+        m["player_skip_intro"] = "Pular abertura"
+        m["player_skip_credits"] = "Pular créditos"
+        m["player_skip"] = "Pular"
     }
 }

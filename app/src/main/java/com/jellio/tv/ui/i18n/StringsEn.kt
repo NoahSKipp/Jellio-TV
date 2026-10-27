@@ -964,5 +964,10 @@ internal object StringsEn {
         m["settings_quick_hub_test"] = "Open Quick Hub"
         m["settings_quick_hub_test_desc"] = "Test opening your Quick Hub drawer right now"
         m["settings_quick_hub_home_notice"] = "System Notice: The physical Home, Power, and Assistant buttons are reserved by Android TV and Google TV at the system level and cannot be captured by apps. You can use Menu, Play/Pause, Guide, Info, Color buttons, or record any button on your remote."
+        m["player_skip_eyebrow_intro"] = "Intro"
+        m["player_skip_eyebrow_credits"] = "Credits"
+        m["player_skip_intro"] = "Skip Intro"
+        m["player_skip_credits"] = "Skip Credits"
+        m["player_skip"] = "Skip"
     }
 }

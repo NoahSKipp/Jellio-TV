@@ -512,26 +512,80 @@ internal fun EndScreenButton(
     }
 }
 
+// The skip intro/credits prompt (screens/player.js buildSkipOverlay) and the
+// near-end Up Next prompt share this card: a small label, a title, then the
+// action and Dismiss. The action takes focus whenever the controls are away.
 @Composable
-internal fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color.White.copy(alpha = 0.12f),
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.32f),
-            focusedContentColor = JellioText,
-        ),
-        border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(
-                border = BorderStroke(2.5.dp, Color.White),
-                shape = RoundedCornerShape(999.dp),
-            )
-        ),
-        modifier = modifier,
+internal fun PlayerPrompt(
+    eyebrow: String,
+    title: String,
+    actionLabel: String,
+    actionIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    onAction: () -> Unit,
+    onDismiss: () -> Unit,
+    takeFocus: Boolean,
+    modifier: Modifier = Modifier,
+    thumbnailUrl: String? = null,
+    detail: String? = null,
+    focusKey: Any? = null,
+) {
+    val actionFocus = remember { FocusRequester() }
+    LaunchedEffect(takeFocus, focusKey) {
+        if (!takeFocus) return@LaunchedEffect
+        delay(150)
+        runCatching { actionFocus.requestFocus() }
+    }
+    Row(
+        modifier = modifier
+            .widthIn(max = 560.dp)
+            .background(JellioBgElevated.copy(alpha = 0.94f), RoundedCornerShape(16.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+        if (thumbnailUrl != null) {
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.width(160.dp).height(90.dp).clip(RoundedCornerShape(10.dp)),
+            )
+        }
+        Column(modifier = Modifier.padding(start = if (thumbnailUrl != null) 16.dp else 4.dp, end = 4.dp)) {
+            Text(
+                text = eyebrow.uppercase(),
+                color = JellioSecondary,
+                style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.5.sp,
+            )
+            Text(
+                text = title,
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            if (!detail.isNullOrEmpty()) {
+                Text(
+                    text = detail,
+                    color = JellioTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 12.dp)) {
+                EndScreenButton(
+                    label = actionLabel,
+                    onClick = onAction,
+                    primary = true,
+                    icon = actionIcon,
+                    modifier = Modifier.focusRequester(actionFocus),
+                )
+                EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("action_dismiss"), onClick = onDismiss)
+            }
+        }
     }
 }
 

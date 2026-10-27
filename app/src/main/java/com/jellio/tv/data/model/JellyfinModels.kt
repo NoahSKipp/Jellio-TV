@@ -171,6 +171,7 @@ data class BaseItemDto(
     val MediaStreams: List<MediaStreamDto>? = null,
     val ChildCount: Int? = null,
     val Watchers: List<CommunityWatcherDto>? = null,
+    val Chapters: List<ChapterInfoDto>? = null,
 )
 
 @Immutable
@@ -534,10 +535,33 @@ data class SkipSegmentDto(
     val End: Double = 0.0,
 )
 
+// Shared by the Intro Skipper's /Episode/{id}/Timestamps and the plugin's
+// /Jellio/introcredits endpoints (IntroCreditsController.SegmentsResponse).
 @JsonClass(generateAdapter = true)
 data class IntroSkipperSegmentsDto(
     val Introduction: SkipSegmentDto? = null,
     val Credits: SkipSegmentDto? = null,
+)
+
+// Jellyfin's native /MediaSegments/{itemId}; Type is Intro, Outro, Recap,
+// Preview, Commercial or Unknown.
+@JsonClass(generateAdapter = true)
+data class MediaSegmentDto(
+    val Type: String? = null,
+    val StartTicks: Long = 0,
+    val EndTicks: Long = 0,
+)
+
+@JsonClass(generateAdapter = true)
+data class MediaSegmentsResultDto(
+    val Items: List<MediaSegmentDto> = emptyList(),
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class ChapterInfoDto(
+    val Name: String? = null,
+    val StartPositionTicks: Long = 0,
 )
 
 @JsonClass(generateAdapter = true)

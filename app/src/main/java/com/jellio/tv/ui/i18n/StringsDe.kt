@@ -964,5 +964,10 @@ internal object StringsDe {
         m["settings_quick_hub_test"] = "Quick-Hub öffnen"
         m["settings_quick_hub_test_desc"] = "Testen Sie das Öffnen des Quick-Hubs jetzt"
         m["settings_quick_hub_home_notice"] = "Systemhinweis: Die physischen Home-, Power- und Sprachassistent-Tasten sind vom Betriebssystem reserviert und können nicht abgefangen werden. Nutze Menü, Play/Pause, Guide, Info, Farbtasten oder lerne eine Taste an."
+        m["player_skip_eyebrow_intro"] = "Intro"
+        m["player_skip_eyebrow_credits"] = "Abspann"
+        m["player_skip_intro"] = "Intro überspringen"
+        m["player_skip_credits"] = "Abspann überspringen"
+        m["player_skip"] = "Überspringen"
     }
 }
