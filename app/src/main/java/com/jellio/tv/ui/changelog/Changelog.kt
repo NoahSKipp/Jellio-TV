@@ -99,6 +99,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.62.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.62.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.LiveTv, "Not Working Channels", "A Live TV channel that fails to start for anyone on the server is marked Not working and folded away at the end of the list, and changing channel skips it. One good start brings it back; busy tuners never count against a channel."),
+            ChangelogFeature(Icons.Filled.Sync, "Faster Dead-Link Marks", "A stream in My streams that fails when you play it is marked straight away. Links that have not worked for two weeks are removed, with a notification."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.61.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.61.0",
