@@ -245,6 +245,9 @@ interface JellyfinApi {
     @DELETE("Jellio/StreamLinks/{id}")
     suspend fun removeStreamLink(@Path("id") id: String): retrofit2.Response<Unit>
 
+    @DELETE("Jellio/StreamLinks/{id}/entries/{index}")
+    suspend fun removeStreamLinkEntry(@Path("id") id: String, @Path("index") index: Int): retrofit2.Response<Unit>
+
     @POST("Jellio/StreamLinks/{id}/refresh")
     suspend fun refreshStreamLink(@Path("id") id: String): com.jellio.tv.data.model.StreamLinkDto
 

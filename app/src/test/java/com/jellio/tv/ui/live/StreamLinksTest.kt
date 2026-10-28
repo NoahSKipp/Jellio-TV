@@ -10,7 +10,17 @@ import org.junit.Test
 
 class StreamLinksTest {
     private val links = listOf(
-        StreamLinkDto(Id = "a1", Name = "Red Bull TV", SourceUrl = "https://rb.example/live", Kind = "stream"),
+        StreamLinkDto(
+            Id = "a1",
+            Name = "Red Bull TV",
+            SourceUrl = "https://rb.example/live",
+            Kind = "stream",
+            Description = "Extreme sports",
+            ImageUrl = "https://rb.example/i.png",
+            SiteName = "Red Bull",
+            Quality = "1080p",
+            Health = "failing",
+        ),
         StreamLinkDto(
             Id = "p1",
             Name = "Free channels",
@@ -39,7 +49,14 @@ class StreamLinksTest {
     fun flatteningExpandsPlaylistsAndClassifies() {
         val flat = flattenStreamLinks(links)
         assertEquals(listOf("link:a1", "link:p1:0", "link:p1:1"), flat.map { it.id })
-        assertEquals("rb.example", flat[0].group)
+        assertEquals("Red Bull", flat[0].group)
+        assertEquals("Extreme sports", flat[0].description)
+        assertEquals("1080p", flat[0].quality)
+        assertEquals("https://rb.example/i.png", flat[0].logoUrl)
+        assertTrue(flat[0].failing)
+        assertNull(flat[0].entryIndex)
+        assertEquals(1, flat[2].entryIndex)
+        assertTrue(!flat[1].failing)
         assertEquals(LiveKind.SPORTS, flat[1].kind)
         assertEquals("German", flat[1].language)
         assertEquals("https://a/1.png", flat[1].logoUrl)

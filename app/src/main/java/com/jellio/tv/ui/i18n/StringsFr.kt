@@ -1208,6 +1208,11 @@ internal object StringsFr {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["live_link_failing"] = "Ne fonctionne pas"
+        m["live_link_check"] = "Vérifier à nouveau"
+        m["live_link_remove_channel"] = "Supprimer la chaîne"
+        m["live_link_dead_notice"] = "{name} ne fonctionne plus"
+        m["live_link_dead_sub"] = "Mes flux · remplacez le lien"
         m["live_link_section"] = "Mes flux"
         m["live_link_add_title"] = "Ajouter un flux"
         m["live_link_remove"] = "Supprimer"

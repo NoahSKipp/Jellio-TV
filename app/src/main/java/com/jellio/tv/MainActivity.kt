@@ -713,6 +713,7 @@ private fun JellioTvApp(
                         runCatching { sidebarFocusRequester.requestFocus() }
                     },
                     onOpenItem = { itemId -> onNavigateToDetail(itemId.replace("-", "")) },
+                    onOpenLiveTv = { switchTab(JellioRoute.LiveTv) },
                 )
             }
             if (showLibraryPicker) {

@@ -51,12 +51,14 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
 
 // The same lines components/notifications.js's messageFor/subtitleFor show.
 private fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
+    "streamlink" -> com.jellio.tv.ui.i18n.Strings.format("live_link_dead_notice", n.Name.orEmpty())
     "announcement" -> n.Name.orEmpty()
     "episode" -> n.Name.orEmpty() + (n.Detail?.let { " $it" } ?: "") + " is out now"
     else -> n.Name.orEmpty() + " is available to watch"
 }
 
 private fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
+    "streamlink" -> com.jellio.tv.ui.i18n.Strings.get("live_link_dead_sub")
     "announcement" -> "From the server"
     "episode" -> "New episode"
     else -> "Now streaming"
@@ -68,6 +70,7 @@ private fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
 fun NotificationsOverlay(
     onDismiss: () -> Unit,
     onOpenItem: (String) -> Unit,
+    onOpenLiveTv: () -> Unit = {},
     viewModel: NotificationsViewModel = hiltViewModel(),
     groupWatch: GroupWatchViewModel = hiltViewModel(),
 ) {
@@ -94,7 +97,10 @@ fun NotificationsOverlay(
                     val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
                     Surface(
                         onClick = {
-                            if (itemId != null) {
+                            if (n.Kind == "streamlink") {
+                                onDismiss()
+                                onOpenLiveTv()
+                            } else if (itemId != null) {
                                 onDismiss()
                                 onOpenItem(itemId)
                             }

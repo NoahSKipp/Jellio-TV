@@ -89,6 +89,13 @@ class LiveTvViewModel @Inject constructor(
         }
     }
 
+    fun removeEntry(linkId: String, index: Int) {
+        viewModelScope.launch {
+            runCatching { repository.removeStreamLinkEntry(linkId, index) }
+            reloadLinks()
+        }
+    }
+
     fun refreshLink(linkId: String) {
         viewModelScope.launch {
             runCatching { repository.refreshStreamLink(linkId) }

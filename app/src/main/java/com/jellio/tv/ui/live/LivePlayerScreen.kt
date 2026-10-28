@@ -322,8 +322,17 @@ private fun InfoBar(
                     )
                     Text(text = channel.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                if (channel.userStream && !channel.description.isNullOrBlank()) {
+                    Text(text = channel.description, color = JellioText, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                }
                 if (channel.userStream && !channel.group.isNullOrBlank()) {
-                    Text(text = channel.group, color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                    Text(
+                        text = channel.group + (channel.quality?.let { " · $it" } ?: ""),
+                        color = JellioTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
                 if (now != null) {
                     Text(

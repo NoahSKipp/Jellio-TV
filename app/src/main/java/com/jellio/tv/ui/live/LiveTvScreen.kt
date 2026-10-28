@@ -174,7 +174,27 @@ private fun ChannelRow(
 }
 
 @Composable
-private fun UserStreamRow(channel: LiveChannel, imageUrl: (String, String?) -> String, onPlay: () -> Unit, onRemove: (() -> Unit)?) {
+private fun Badge(text: String, failing: Boolean = false) {
+    Text(
+        text = text,
+        color = if (failing) Color(0xFFEF5350) else JellioTextSecondary,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (failing) Color(0xFFEF5350).copy(alpha = 0.18f) else Color.White.copy(alpha = 0.12f))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    )
+}
+
+@Composable
+private fun UserStreamRow(
+    channel: LiveChannel,
+    imageUrl: (String, String?) -> String,
+    onPlay: () -> Unit,
+    onRemove: (() -> Unit)?,
+    onCheck: (() -> Unit)? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Surface(
             onClick = onPlay,
@@ -191,13 +211,21 @@ private fun UserStreamRow(channel: LiveChannel, imageUrl: (String, String?) -> S
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
                 ChannelLogo(channel, imageUrl)
                 Column(modifier = Modifier.padding(start = 14.dp).weight(1f)) {
-                    Text(text = channel.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = channel.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        channel.quality?.let { Badge(it) }
+                        if (channel.failing && channel.entryIndex == null) Badge(Strings.get("live_link_failing"), failing = true)
+                    }
+                    if (!channel.description.isNullOrBlank()) {
+                        Text(text = channel.description, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    }
                     if (!channel.group.isNullOrBlank()) {
                         Text(text = channel.group, color = JellioTextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
         }
+        if (onCheck != null) IconAction(Icons.Filled.Refresh, JellioTextSecondary, onCheck)
         if (onRemove != null) ConfirmRemove(onRemove)
     }
 }
@@ -223,9 +251,10 @@ private fun ConfirmRemove(onRemove: () -> Unit) {
 }
 
 @Composable
-private fun PlaylistHeader(name: String, count: Int, onRefresh: () -> Unit, onRemove: () -> Unit) {
+private fun PlaylistHeader(name: String, count: Int, failing: Boolean, onRefresh: () -> Unit, onRemove: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
         Text(text = name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (failing) Badge(Strings.get("live_link_failing"), failing = true)
         Text(text = Strings.format("live_channel_count", count), color = JellioTextTertiary)
         IconAction(Icons.Filled.Refresh, JellioTextSecondary, onRefresh)
         ConfirmRemove(onRemove)
@@ -335,10 +364,10 @@ fun LiveTvScreen(
                             linkGroups.forEach { (link, streams) ->
                                 if (link.Kind == "playlist") {
                                     item(key = "p-" + link.Id) {
-                                        PlaylistHeader(link.Name.orEmpty(), streams.size, { viewModel.refreshLink(link.Id) }, { viewModel.removeLink(link.Id) })
+                                        PlaylistHeader(link.Name.orEmpty(), streams.size, link.Health == "failing", { viewModel.refreshLink(link.Id) }, { viewModel.removeLink(link.Id) })
                                     }
                                     items(streams.take(PLAYLIST_PREVIEW), key = { "u-" + it.id }) { channel ->
-                                        UserStreamRow(channel, imageUrl, { onPlay(channel.id) }, null)
+                                        UserStreamRow(channel, imageUrl, { onPlay(channel.id) }, channel.entryIndex?.let { index -> { viewModel.removeEntry(link.Id, index) } })
                                     }
                                     if (streams.size > PLAYLIST_PREVIEW) {
                                         item(key = "more-" + link.Id) {
@@ -348,7 +377,13 @@ fun LiveTvScreen(
                                 } else {
                                     val channel = streams.first()
                                     item(key = "u-" + channel.id) {
-                                        UserStreamRow(channel, imageUrl, { onPlay(channel.id) }, { viewModel.removeLink(link.Id) })
+                                        UserStreamRow(
+                                            channel,
+                                            imageUrl,
+                                            { onPlay(channel.id) },
+                                            { viewModel.removeLink(link.Id) },
+                                            if (channel.failing) ({ viewModel.refreshLink(link.Id) }) else null,
+                                        )
                                     }
                                 }
                             }

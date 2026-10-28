@@ -1208,6 +1208,11 @@ internal object StringsPt {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["live_link_failing"] = "Não funciona"
+        m["live_link_check"] = "Verificar de novo"
+        m["live_link_remove_channel"] = "Remover canal"
+        m["live_link_dead_notice"] = "{name} parou de funcionar"
+        m["live_link_dead_sub"] = "Meus streams · troque o link"
         m["live_link_section"] = "Meus streams"
         m["live_link_add_title"] = "Adicionar stream"
         m["live_link_remove"] = "Remover"

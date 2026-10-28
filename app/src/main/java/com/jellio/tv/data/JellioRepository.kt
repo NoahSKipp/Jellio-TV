@@ -1431,6 +1431,10 @@ class JellioRepository @Inject constructor(
         streamLinkCall { api.removeStreamLink(id) }
     }
 
+    suspend fun removeStreamLinkEntry(id: String, index: Int) {
+        streamLinkCall { api.removeStreamLinkEntry(id, index) }
+    }
+
     suspend fun refreshStreamLink(id: String) {
         streamLinkCall { api.refreshStreamLink(id) }
     }

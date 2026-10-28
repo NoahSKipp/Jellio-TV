@@ -94,6 +94,11 @@ data class StreamLinkDto(
     val SourceUrl: String? = null,
     val Kind: String? = null,
     val Entries: List<StreamLinkEntryDto> = emptyList(),
+    val Description: String? = null,
+    val ImageUrl: String? = null,
+    val SiteName: String? = null,
+    val Quality: String? = null,
+    val Health: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

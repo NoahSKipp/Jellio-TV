@@ -1208,6 +1208,11 @@ internal object StringsPl {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["live_link_failing"] = "Nie działa"
+        m["live_link_check"] = "Sprawdź ponownie"
+        m["live_link_remove_channel"] = "Usuń kanał"
+        m["live_link_dead_notice"] = "{name} przestał działać"
+        m["live_link_dead_sub"] = "Moje streamy · wymień link"
         m["live_link_section"] = "Moje streamy"
         m["live_link_add_title"] = "Dodaj stream"
         m["live_link_remove"] = "Usuń"

@@ -35,6 +35,10 @@ data class LiveChannel(
     val logoUrl: String? = null,
     val group: String? = null,
     val userStream: Boolean = false,
+    val description: String? = null,
+    val quality: String? = null,
+    val failing: Boolean = false,
+    val entryIndex: Int? = null,
 )
 
 // Same rules as Jellio web (runtime/liveTv.js): the channel name is the
@@ -236,6 +240,8 @@ fun flattenStreamLinks(links: List<com.jellio.tv.data.model.StreamLinkDto>): Lis
                 logoUrl = entry.Logo?.takeIf { it.startsWith("https://") },
                 group = entry.Group?.takeIf { it.isNotBlank() } ?: linkName,
                 userStream = true,
+                failing = link.Health == "failing",
+                entryIndex = index,
             )
         }
     } else {
@@ -250,8 +256,12 @@ fun flattenStreamLinks(links: List<com.jellio.tv.data.model.StreamLinkDto>): Lis
                 now = null,
                 kind = kind,
                 language = language,
-                group = hostOf(link.SourceUrl),
+                logoUrl = link.ImageUrl?.takeIf { it.startsWith("https://") },
+                group = link.SiteName?.takeIf { it.isNotBlank() } ?: hostOf(link.SourceUrl),
                 userStream = true,
+                description = link.Description,
+                quality = link.Quality,
+                failing = link.Health == "failing",
             ),
         )
     }
