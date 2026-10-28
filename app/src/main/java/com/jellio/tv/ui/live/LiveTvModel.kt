@@ -31,6 +31,10 @@ data class LiveChannel(
     val now: LiveProgramme?,
     val kind: LiveKind = classifyChannel(name).first,
     val language: String? = classifyChannel(name).second,
+    // Streams the user added by link (Jellio/StreamLinks).
+    val logoUrl: String? = null,
+    val group: String? = null,
+    val userStream: Boolean = false,
 )
 
 // Same rules as Jellio web (runtime/liveTv.js): the channel name is the
@@ -100,7 +104,7 @@ fun filterChannels(channels: List<LiveChannel>, query: String, filters: LiveFilt
         if (filters.kind != null && channel.kind != filters.kind) return@filter false
         if (filters.language != null && channel.language != filters.language) return@filter false
         if (words.isEmpty()) return@filter true
-        val haystack = normalize(channel.name + " " + (channel.now?.name ?: ""))
+        val haystack = normalize(channel.name + " " + (channel.group ?: "") + " " + (channel.now?.name ?: ""))
         words.all { haystack.contains(it) }
     }
 }
@@ -195,4 +199,70 @@ fun describeOpenFailure(message: String?): String {
             com.jellio.tv.ui.i18n.Strings.get("live_open_timeout")
         else -> com.jellio.tv.ui.i18n.Strings.get("live_open_failed")
     }
+}
+
+const val LINK_PREFIX = "link:"
+
+data class LinkChannelRef(val linkId: String, val entry: Int?)
+
+fun linkChannelId(linkId: String, entry: Int?): String = LINK_PREFIX + linkId + (entry?.let { ":$it" } ?: "")
+
+fun parseLinkChannelId(id: String?): LinkChannelRef? {
+    if (id == null || !id.startsWith(LINK_PREFIX)) return null
+    val parts = id.removePrefix(LINK_PREFIX).split(":")
+    if (parts[0].isEmpty()) return null
+    return LinkChannelRef(parts[0], parts.getOrNull(1)?.toIntOrNull()?.takeIf { it >= 0 })
+}
+
+private fun hostOf(url: String?): String = runCatching { java.net.URI(url ?: "").host }.getOrNull().orEmpty()
+
+// One channel per playable stream, playlists expanded in their own order,
+// classified by name and group like web (runtime/streamLinks.js).
+fun flattenStreamLinks(links: List<com.jellio.tv.data.model.StreamLinkDto>): List<LiveChannel> = links.flatMap { link ->
+    val linkName = link.Name.orEmpty().ifBlank { hostOf(link.SourceUrl) }
+    if (link.Kind == "playlist") {
+        link.Entries.mapIndexed { index, entry ->
+            val name = entry.Name.orEmpty().ifBlank { linkName }
+            val (kind, language) = classifyChannel(name + " " + entry.Group.orEmpty())
+            LiveChannel(
+                id = linkChannelId(link.Id, index),
+                name = name,
+                number = "",
+                imageTag = null,
+                favorite = false,
+                now = null,
+                kind = kind,
+                language = language,
+                logoUrl = entry.Logo?.takeIf { it.startsWith("https://") },
+                group = entry.Group?.takeIf { it.isNotBlank() } ?: linkName,
+                userStream = true,
+            )
+        }
+    } else {
+        val (kind, language) = classifyChannel(linkName)
+        listOf(
+            LiveChannel(
+                id = linkChannelId(link.Id, null),
+                name = linkName,
+                number = "",
+                imageTag = null,
+                favorite = false,
+                now = null,
+                kind = kind,
+                language = language,
+                group = hostOf(link.SourceUrl),
+                userStream = true,
+            ),
+        )
+    }
+}
+
+fun streamLinkErrorKey(code: String?): String = when (code) {
+    "invalid_url" -> "live_link_error_invalid"
+    "blocked_address" -> "live_link_error_blocked"
+    "unreachable" -> "live_link_error_unreachable"
+    "timeout" -> "live_link_error_timeout"
+    "no_stream_found" -> "live_link_error_none"
+    "too_many_links" -> "live_link_error_too_many"
+    else -> "live_link_error_failed"
 }

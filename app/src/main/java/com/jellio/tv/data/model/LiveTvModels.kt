@@ -77,3 +77,46 @@ data class LivePlaybackInfoResponse(
     val PlaySessionId: String? = null,
     val ErrorCode: String? = null,
 )
+
+// Jellio/StreamLinks: streams a user added by link.
+@JsonClass(generateAdapter = true)
+data class StreamLinkEntryDto(
+    val Name: String? = null,
+    val Url: String? = null,
+    val Logo: String? = null,
+    val Group: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class StreamLinkDto(
+    val Id: String,
+    val Name: String? = null,
+    val SourceUrl: String? = null,
+    val Kind: String? = null,
+    val Entries: List<StreamLinkEntryDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class StreamLinkPlayDto(
+    val Name: String? = null,
+    val Format: String? = null,
+    val Mime: String? = null,
+    val DirectUrl: String? = null,
+    val Referer: String? = null,
+    val UserAgent: String? = null,
+    val ProxyPath: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class StreamPairingDto(
+    val Code: String,
+    val ExpiresAt: String? = null,
+    val Path: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class StreamPairingStatusDto(
+    val Status: String? = null,
+    val LinkId: String? = null,
+    val LinkName: String? = null,
+)

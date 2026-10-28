@@ -21,12 +21,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.AddLink
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +67,9 @@ import java.util.Locale
 
 private val accent = Color(0xFFFF9800)
 
+// A big channel list shows this many rows until a search narrows it.
+private const val PLAYLIST_PREVIEW = 120
+
 internal fun formatClock(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
 
 internal fun languageLabel(language: String): String {
@@ -83,9 +92,14 @@ internal fun ChannelLogo(channel: LiveChannel, imageUrl: (String, String?) -> St
             color = JellioTextSecondary,
             fontWeight = FontWeight.Bold,
         )
-        if (channel.imageTag != null) {
+        val logo = when {
+            channel.imageTag != null -> imageUrl(channel.id, channel.imageTag)
+            channel.logoUrl != null -> channel.logoUrl
+            else -> null
+        }
+        if (logo != null) {
             AsyncImage(
-                model = imageUrl(channel.id, channel.imageTag),
+                model = logo,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize().padding(4.dp),
@@ -160,6 +174,65 @@ private fun ChannelRow(
 }
 
 @Composable
+private fun UserStreamRow(channel: LiveChannel, imageUrl: (String, String?) -> String, onPlay: () -> Unit, onRemove: (() -> Unit)?) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            onClick = onPlay,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(14.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = JellioBgElevated,
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.18f),
+                focusedContentColor = JellioText,
+            ),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+            modifier = Modifier.weight(1f),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
+                ChannelLogo(channel, imageUrl)
+                Column(modifier = Modifier.padding(start = 14.dp).weight(1f)) {
+                    Text(text = channel.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!channel.group.isNullOrBlank()) {
+                        Text(text = channel.group, color = JellioTextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+        if (onRemove != null) ConfirmRemove(onRemove)
+    }
+}
+
+// Removing takes a second press within a few seconds.
+@Composable
+private fun ConfirmRemove(onRemove: () -> Unit) {
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) {
+        if (armed) {
+            delay(4_000)
+            armed = false
+        }
+    }
+    IconAction(if (armed) Icons.Filled.DeleteForever else Icons.Filled.Delete, if (armed) Color(0xFFEF5350) else JellioTextSecondary) {
+        if (armed) {
+            armed = false
+            onRemove()
+        } else {
+            armed = true
+        }
+    }
+}
+
+@Composable
+private fun PlaylistHeader(name: String, count: Int, onRefresh: () -> Unit, onRemove: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Text(text = name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Text(text = Strings.format("live_channel_count", count), color = JellioTextTertiary)
+        IconAction(Icons.Filled.Refresh, JellioTextSecondary, onRefresh)
+        ConfirmRemove(onRemove)
+    }
+}
+
+@Composable
 private fun IconAction(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
@@ -191,13 +264,35 @@ fun LiveTvScreen(
         }
     }
     val nowMs = remember(uiState.channels) { System.currentTimeMillis() }
+    // A single stream sent from the phone starts right away.
+    LaunchedEffect(uiState.pendingPlay) {
+        val id = uiState.pendingPlay ?: return@LaunchedEffect
+        viewModel.consumePendingPlay()
+        viewModel.closePairing()
+        onPlay(id)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(text = Strings.get("nav_live_tv"), style = MaterialTheme.typography.titleLarge)
-                if (uiState.channels.isNotEmpty()) {
-                    Text(text = Strings.format("live_channel_count", uiState.arranged.all.size), color = JellioTextTertiary)
+                if (uiState.channels.isNotEmpty() || uiState.links.isNotEmpty()) {
+                    Text(text = Strings.format("live_channel_count", uiState.arranged.all.size + uiState.myStreams.size), color = JellioTextTertiary)
+                }
+                Surface(
+                    onClick = { viewModel.openPairing(session) },
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = JellioBgElevated,
+                        contentColor = JellioText,
+                        focusedContainerColor = JellioSecondary,
+                        focusedContentColor = JellioBg,
+                    ),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Icon(imageVector = Icons.Filled.AddLink, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Text(text = Strings.get("live_link_add_title"), modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
             }
             JellioTextField(
@@ -223,15 +318,41 @@ fun LiveTvScreen(
             when {
                 uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ScreenSpinner() }
                 uiState.error != null -> Text(text = uiState.error.orEmpty(), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
-                uiState.channels.isEmpty() -> Text(text = Strings.get("live_no_channels"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
-                uiState.arranged.all.isEmpty() -> Text(text = Strings.get("live_no_results"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
+                uiState.channels.isEmpty() && uiState.links.isEmpty() -> Text(text = Strings.get("live_no_channels"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
+                uiState.arranged.all.isEmpty() && uiState.myStreams.isEmpty() -> Text(text = Strings.get("live_no_results"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 else -> {
                     val arranged = uiState.arranged
+                    val visibleIds = uiState.myStreams.map { it.id }.toSet()
+                    val linkGroups = uiState.links.map { link -> link to flattenStreamLinks(listOf(link)).filter { it.id in visibleIds } }
+                        .filter { it.second.isNotEmpty() }
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 48.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
+                        if (linkGroups.isNotEmpty()) {
+                            item(key = "h-mine") { SectionTitle(Strings.get("live_link_section")) }
+                            linkGroups.forEach { (link, streams) ->
+                                if (link.Kind == "playlist") {
+                                    item(key = "p-" + link.Id) {
+                                        PlaylistHeader(link.Name.orEmpty(), streams.size, { viewModel.refreshLink(link.Id) }, { viewModel.removeLink(link.Id) })
+                                    }
+                                    items(streams.take(PLAYLIST_PREVIEW), key = { "u-" + it.id }) { channel ->
+                                        UserStreamRow(channel, imageUrl, { onPlay(channel.id) }, null)
+                                    }
+                                    if (streams.size > PLAYLIST_PREVIEW) {
+                                        item(key = "more-" + link.Id) {
+                                            Text(text = Strings.format("live_link_more", streams.size - PLAYLIST_PREVIEW), color = JellioTextTertiary)
+                                        }
+                                    }
+                                } else {
+                                    val channel = streams.first()
+                                    item(key = "u-" + channel.id) {
+                                        UserStreamRow(channel, imageUrl, { onPlay(channel.id) }, { viewModel.removeLink(link.Id) })
+                                    }
+                                }
+                            }
+                        }
                         if (arranged.favorites.isNotEmpty()) {
                             item(key = "h-fav") { SectionTitle(Strings.get("live_favorites")) }
                             items(arranged.favorites, key = { "f-" + it.id }) { channel ->
@@ -247,6 +368,10 @@ fun LiveTvScreen(
                     }
                 }
             }
+        }
+        val pairing = uiState.pairing
+        if (pairing != null) {
+            PairingOverlay(pairing, onNewCode = { viewModel.openPairing(session) }, onClose = viewModel::closePairing)
         }
         val guideChannel = uiState.guideChannel
         if (guideChannel != null) {

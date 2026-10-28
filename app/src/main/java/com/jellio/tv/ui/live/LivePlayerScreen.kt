@@ -87,19 +87,23 @@ fun LivePlayerScreen(
 
     LaunchedEffect(channelId) { viewModel.start(session, channelId) }
 
-    val player = remember {
-        val dataSource = DefaultHttpDataSource.Factory()
+    val serverHeaders = remember(session.accessToken) {
+        mapOf(
+            "X-Emby-Token" to session.accessToken,
+            "Authorization" to buildEmbyAuthorizationHeader(viewModel.deviceId, APP_VERSION, session.accessToken),
+        )
+    }
+    val dataSource = remember {
+        DefaultHttpDataSource.Factory()
             .setUserAgent("Jellio-TV/$APP_VERSION")
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             // Tuners can go quiet for several seconds; let the read wait it out.
             .setReadTimeoutMs(30_000)
-            .setDefaultRequestProperties(
-                mapOf(
-                    "X-Emby-Token" to session.accessToken,
-                    "Authorization" to buildEmbyAuthorizationHeader(viewModel.deviceId, APP_VERSION, session.accessToken),
-                )
-            )
+            .setDefaultRequestProperties(serverHeaders)
+    }
+
+    val player = remember {
         // Start on a small buffer, keep a deeper one to ride out stalls.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(15_000, 60_000, 1_500, 3_000)
@@ -155,7 +159,12 @@ fun LivePlayerScreen(
             player.stop()
             player.clearMediaItems()
         } else {
-            player.setMediaItem(MediaItem.Builder().setUri(url).setMimeType(MimeTypes.VIDEO_MP2T).build())
+            // Headers are chosen per stream: the token only ever goes to the server.
+            val headers = uiState.requestHeaders
+            dataSource.setDefaultRequestProperties(headers ?: serverHeaders)
+            dataSource.setUserAgent(headers?.get("User-Agent") ?: "Jellio-TV/$APP_VERSION")
+            val mime = if (headers == null) MimeTypes.VIDEO_MP2T else uiState.mimeType
+            player.setMediaItem(MediaItem.Builder().setUri(url).apply { if (mime != null) setMimeType(mime) }.build())
             player.prepare()
             player.play()
         }
@@ -216,7 +225,7 @@ fun LivePlayerScreen(
                     }
                     Key.Guide, Key.Menu -> {
                         val channel = uiState.channel
-                        if (channel != null) {
+                        if (channel != null && !channel.userStream) {
                             guide = null
                             guideOpen = true
                         }
@@ -312,6 +321,9 @@ private fun InfoBar(
                         modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFE53935)).padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                     Text(text = channel.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (channel.userStream && !channel.group.isNullOrBlank()) {
+                    Text(text = channel.group, color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                 }
                 if (now != null) {
                     Text(

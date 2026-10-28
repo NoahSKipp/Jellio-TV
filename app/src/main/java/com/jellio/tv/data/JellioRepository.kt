@@ -107,7 +107,19 @@ data class SeriesPlayTarget(val episode: BaseItemDto, val resume: Boolean)
 // (PlaySessionId) a fresh PlaybackInfo negotiation hands back, both a
 // player screen needs to build a real stream URL and report real
 // progress against.
-data class OpenedLiveStream(val channelId: String, val liveStreamId: String, val streamUrl: String)
+// liveStreamId is null for a stream added by link: no tuner to close.
+// requestHeaders null means the server's own auth headers; a link to
+// another site gets its own instead, never the Jellyfin token.
+data class OpenedLiveStream(
+    val channelId: String,
+    val liveStreamId: String?,
+    val streamUrl: String,
+    val mimeType: String? = null,
+    val requestHeaders: Map<String, String>? = null,
+    val fallbackUrl: String? = null,
+)
+
+class StreamLinkException(val code: String) : Exception(code)
 
 data class PlaybackTarget(
     val streamUrl: String,
@@ -1385,6 +1397,59 @@ class JellioRepository @Inject constructor(
 
     suspend fun closeLiveStream(liveStreamId: String) {
         runCatching { api.closeLiveStream(liveStreamId) }
+    }
+
+    suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto> = streamLinkCall { api.getStreamLinks() }
+
+    // Plays the link itself first (lighter on the server); the signed
+    // proxy address is the fallback when the TV can't reach it directly.
+    suspend fun playStreamLink(channelId: String, linkId: String, entry: Int?): OpenedLiveStream {
+        val info = streamLinkCall { api.playStreamLink(linkId, entry) }
+        val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
+        val proxy = info.ProxyPath?.let { "$server/$it" }
+        val mime = when (info.Format) {
+            "hls" -> androidx.media3.common.MimeTypes.APPLICATION_M3U8
+            "ts" -> androidx.media3.common.MimeTypes.VIDEO_MP2T
+            "mp4" -> androidx.media3.common.MimeTypes.VIDEO_MP4
+            else -> null
+        }
+        val direct = info.DirectUrl
+        if (direct.isNullOrBlank()) {
+            return OpenedLiveStream(channelId, null, proxy ?: throw StreamLinkException("no_stream_found"), mime, emptyMap())
+        }
+        val headers = buildMap {
+            info.UserAgent?.let { put("User-Agent", it) }
+            info.Referer?.let {
+                put("Referer", it)
+                runCatching { java.net.URI(it) }.getOrNull()?.let { uri -> put("Origin", uri.scheme + "://" + uri.authority) }
+            }
+        }
+        return OpenedLiveStream(channelId, null, direct, mime, headers, proxy)
+    }
+
+    suspend fun removeStreamLink(id: String) {
+        streamLinkCall { api.removeStreamLink(id) }
+    }
+
+    suspend fun refreshStreamLink(id: String) {
+        streamLinkCall { api.refreshStreamLink(id) }
+    }
+
+    suspend fun createStreamPairing(): com.jellio.tv.data.model.StreamPairingDto = streamLinkCall { api.createStreamPairing() }
+
+    // Null once the code has expired.
+    suspend fun streamPairingStatus(code: String): com.jellio.tv.data.model.StreamPairingStatusDto? {
+        val response = api.streamPairingStatus(code)
+        if (response.code() == 404) return null
+        return response.body()
+    }
+
+    private suspend fun <T> streamLinkCall(block: suspend () -> T): T = try {
+        block()
+    } catch (err: retrofit2.HttpException) {
+        val body = runCatching { err.response()?.errorBody()?.string() }.getOrNull().orEmpty()
+        val code = Regex("\"[Ee]rror\"\\s*:\\s*\"([a-z_]+)\"").find(body)?.groupValues?.get(1)
+        throw StreamLinkException(code ?: if (err.code() == 404) "not_found" else "failed")
     }
 
     suspend fun setChannelFavorite(userId: String, channelId: String, favorite: Boolean): Boolean {

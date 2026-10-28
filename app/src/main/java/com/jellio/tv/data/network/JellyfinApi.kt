@@ -236,6 +236,24 @@ interface JellyfinApi {
     @POST("LiveStreams/Close")
     suspend fun closeLiveStream(@Query("liveStreamId") liveStreamId: String): retrofit2.Response<Unit>
 
+    @GET("Jellio/StreamLinks")
+    suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto>
+
+    @POST("Jellio/StreamLinks/{id}/play")
+    suspend fun playStreamLink(@Path("id") id: String, @Query("entry") entry: Int?): com.jellio.tv.data.model.StreamLinkPlayDto
+
+    @DELETE("Jellio/StreamLinks/{id}")
+    suspend fun removeStreamLink(@Path("id") id: String): retrofit2.Response<Unit>
+
+    @POST("Jellio/StreamLinks/{id}/refresh")
+    suspend fun refreshStreamLink(@Path("id") id: String): com.jellio.tv.data.model.StreamLinkDto
+
+    @POST("Jellio/StreamLinks/pair")
+    suspend fun createStreamPairing(): com.jellio.tv.data.model.StreamPairingDto
+
+    @GET("Jellio/StreamLinks/pair/{code}")
+    suspend fun streamPairingStatus(@Path("code") code: String): retrofit2.Response<com.jellio.tv.data.model.StreamPairingStatusDto>
+
     @POST("Users/{userId}/FavoriteItems/{itemId}")
     suspend fun addFavorite(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 

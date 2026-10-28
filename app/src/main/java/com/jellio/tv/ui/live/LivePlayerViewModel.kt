@@ -37,6 +37,10 @@ data class LivePlayerUiState(
     val channel: LiveChannel? = null,
     val status: LiveStatus = LiveStatus.Starting,
     val streamUrl: String? = null,
+    val mimeType: String? = null,
+    // Null: the server's own auth headers. A link to another site never
+    // gets the Jellyfin token.
+    val requestHeaders: Map<String, String>? = null,
     val now: LiveProgramme? = null,
     val next: LiveProgramme? = null,
     val infoVersion: Int = 0,
@@ -56,9 +60,16 @@ class LivePlayerViewModel @Inject constructor(
     private val lifecycle = LiveLifecycle<OpenedLiveStream>(
         open = { channelId ->
             val session = this.session ?: throw IllegalStateException("Not signed in")
-            withTimeout(OPEN_TIMEOUT_MS) { repository.openLiveChannel(session.userId, channelId) }
+            val link = parseLinkChannelId(channelId)
+            withTimeout(OPEN_TIMEOUT_MS) {
+                if (link != null) {
+                    repository.playStreamLink(channelId, link.linkId, link.entry)
+                } else {
+                    repository.openLiveChannel(session.userId, channelId)
+                }
+            }
         },
-        close = { stream -> repository.closeLiveStream(stream.liveStreamId) },
+        close = { stream -> stream.liveStreamId?.let { repository.closeLiveStream(it) } },
     )
 
     private var session: Session? = null
@@ -71,15 +82,23 @@ class LivePlayerViewModel @Inject constructor(
     private var openedAt = 0L
     private var bufferingSince = 0L
     private var stopped = false
+    private var onFallback = false
 
     fun start(session: Session, channelId: String) {
         this.session = session
         if (_uiState.value.channel?.id == channelId && !stopped) return
         stopped = false
         viewModelScope.launch {
-            channels = runCatching { arrangeChannels(filterChannels(mapChannels(repository.getLiveChannels(session.userId), System.currentTimeMillis()), LiveTvMemory.query, LiveTvMemory.filters)).all }
-                .getOrDefault(emptyList())
-            val channel = channels.firstOrNull { it.id == channelId } ?: LiveChannel(channelId, "", "", null, false, null)
+            val fromLink = parseLinkChannelId(channelId) != null
+            channels = runCatching {
+                if (fromLink) {
+                    // My streams keep their own order.
+                    filterChannels(flattenStreamLinks(repository.getStreamLinks()), LiveTvMemory.query, LiveTvMemory.filters)
+                } else {
+                    arrangeChannels(filterChannels(mapChannels(repository.getLiveChannels(session.userId), System.currentTimeMillis()), LiveTvMemory.query, LiveTvMemory.filters)).all
+                }
+            }.getOrDefault(emptyList())
+            val channel = channels.firstOrNull { it.id == channelId } ?: LiveChannel(channelId, "", "", null, false, null, userStream = fromLink)
             play(channel)
         }
     }
@@ -87,6 +106,7 @@ class LivePlayerViewModel @Inject constructor(
     private fun play(channel: LiveChannel) {
         LiveTvMemory.lastChannelId = channel.id
         bufferingSince = 0
+        onFallback = false
         _uiState.value = _uiState.value.copy(channel = channel, status = LiveStatus.Starting, streamUrl = null, now = channel.now, next = null, infoVersion = _uiState.value.infoVersion + 1)
         loadNowNext(channel)
         // Not cancelled midway: a request cut off after the server opened
@@ -98,6 +118,10 @@ class LivePlayerViewModel @Inject constructor(
                 lifecycle.start(channel.id)
             } catch (err: kotlinx.coroutines.CancellationException) {
                 throw err
+            } catch (err: com.jellio.tv.data.StreamLinkException) {
+                Log.w(TAG, "link ${channel.id} failed: ${err.code}")
+                _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(com.jellio.tv.ui.i18n.Strings.get(streamLinkErrorKey(err.code))))
+                return@launch
             } catch (err: Exception) {
                 Log.w(TAG, "open ${channel.id} failed: ${err.javaClass.simpleName}")
                 _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(describeOpenFailure(err.message)))
@@ -106,11 +130,12 @@ class LivePlayerViewModel @Inject constructor(
             openedAt = System.currentTimeMillis()
             Log.i(TAG, "opened ${channel.id} in ${openedAt - openStartedAt} ms")
             if (stopped || _uiState.value.channel?.id != channel.id) return@launch
-            _uiState.value = _uiState.value.copy(streamUrl = stream.streamUrl)
+            _uiState.value = _uiState.value.copy(streamUrl = stream.streamUrl, mimeType = stream.mimeType, requestHeaders = stream.requestHeaders)
         }
     }
 
     private fun loadNowNext(channel: LiveChannel) {
+        if (channel.userStream) return
         val session = session ?: return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -179,6 +204,14 @@ class LivePlayerViewModel @Inject constructor(
     }
 
     fun onPlayerError(message: String?) {
+        // A link the TV can't reach itself goes through the server instead.
+        val fallback = lifecycle.currentStream?.fallbackUrl
+        if (fallback != null && !onFallback && !stopped) {
+            onFallback = true
+            Log.w(TAG, "direct link failed (${message.orEmpty()}), using the server")
+            _uiState.value = _uiState.value.copy(streamUrl = fallback, requestHeaders = emptyMap())
+            return
+        }
         restart("player error ${message.orEmpty()}")
     }
 
