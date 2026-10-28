@@ -1208,6 +1208,9 @@ internal object StringsDe {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["live_link_removed_notice"] = "{name} wurde nach {days} Tagen ohne Funktion entfernt"
+        m["live_broken_section"] = "Funktioniert nicht ({count})"
+        m["live_broken_hint"] = "Diese Sender ließen sich zuletzt nicht starten. Beim Umschalten werden sie übersprungen; ein Sender, der wieder läuft, rückt zurück nach oben."
         m["live_link_failing"] = "Funktioniert nicht"
         m["live_link_check"] = "Erneut prüfen"
         m["live_link_remove_channel"] = "Sender entfernen"

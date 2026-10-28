@@ -1208,6 +1208,9 @@ internal object StringsIt {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["live_link_removed_notice"] = "{name} è stato rimosso dopo {days} giorni senza funzionare"
+        m["live_broken_section"] = "Non funzionano ({count})"
+        m["live_broken_hint"] = "Questi canali non sono partiti di recente. Cambiando canale vengono saltati, e uno che torna a funzionare risale."
         m["live_link_failing"] = "Non funziona"
         m["live_link_check"] = "Controlla di nuovo"
         m["live_link_remove_channel"] = "Rimuovi canale"

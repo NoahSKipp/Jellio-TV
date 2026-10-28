@@ -78,6 +78,15 @@ data class LivePlaybackInfoResponse(
     val ErrorCode: String? = null,
 )
 
+@JsonClass(generateAdapter = true)
+data class LiveChannelStatusDto(val Status: String? = null, val Since: String? = null, val LastError: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class LiveChannelReportDto(val Ok: Boolean, val Error: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class StreamLinkPlayReportDto(val Ok: Boolean)
+
 // Jellio/StreamLinks: streams a user added by link.
 @JsonClass(generateAdapter = true)
 data class StreamLinkEntryDto(

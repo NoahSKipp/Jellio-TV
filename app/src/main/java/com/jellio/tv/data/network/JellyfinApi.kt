@@ -236,6 +236,15 @@ interface JellyfinApi {
     @POST("LiveStreams/Close")
     suspend fun closeLiveStream(@Query("liveStreamId") liveStreamId: String): retrofit2.Response<Unit>
 
+    @GET("Jellio/LiveHealth")
+    suspend fun getLiveHealth(): Map<String, com.jellio.tv.data.model.LiveChannelStatusDto>
+
+    @POST("Jellio/LiveHealth/{channelId}")
+    suspend fun reportLiveChannel(@Path("channelId") channelId: String, @Body body: com.jellio.tv.data.model.LiveChannelReportDto): retrofit2.Response<Unit>
+
+    @POST("Jellio/StreamLinks/{id}/report")
+    suspend fun reportStreamLinkPlay(@Path("id") id: String, @Body body: com.jellio.tv.data.model.StreamLinkPlayReportDto): retrofit2.Response<Unit>
+
     @GET("Jellio/StreamLinks")
     suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto>
 

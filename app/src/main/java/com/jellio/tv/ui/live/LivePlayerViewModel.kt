@@ -95,7 +95,8 @@ class LivePlayerViewModel @Inject constructor(
                     // My streams keep their own order.
                     filterChannels(flattenStreamLinks(repository.getStreamLinks()), LiveTvMemory.query, LiveTvMemory.filters)
                 } else {
-                    arrangeChannels(filterChannels(mapChannels(repository.getLiveChannels(session.userId), System.currentTimeMillis()), LiveTvMemory.query, LiveTvMemory.filters)).all
+                    val marked = applyHealth(mapChannels(repository.getLiveChannels(session.userId), System.currentTimeMillis()), repository.getBrokenLiveChannels())
+                    arrangeChannels(filterChannels(marked, LiveTvMemory.query, LiveTvMemory.filters)).let { it.all + it.broken }
                 }
             }.getOrDefault(emptyList())
             val channel = channels.firstOrNull { it.id == channelId } ?: LiveChannel(channelId, "", "", null, false, null, userStream = fromLink)
@@ -120,10 +121,12 @@ class LivePlayerViewModel @Inject constructor(
                 throw err
             } catch (err: com.jellio.tv.data.StreamLinkException) {
                 Log.w(TAG, "link ${channel.id} failed: ${err.code}")
+                report(channel, ok = false, reason = err.code)
                 _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(com.jellio.tv.ui.i18n.Strings.get(streamLinkErrorKey(err.code))))
                 return@launch
             } catch (err: Exception) {
                 Log.w(TAG, "open ${channel.id} failed: ${err.javaClass.simpleName}")
+                if (countsAsChannelFailure(err.message)) report(channel, ok = false, reason = err.message ?: err.javaClass.simpleName)
                 _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(describeOpenFailure(err.message)))
                 return@launch
             } ?: return@launch
@@ -148,7 +151,7 @@ class LivePlayerViewModel @Inject constructor(
 
     fun zap(delta: Int) {
         val current = _uiState.value.channel ?: return
-        val next = neighbourChannel(channels, current.id, delta) ?: return
+        val next = playableNeighbour(channels, current.id, delta) ?: return
         if (next.id == current.id) return
         restarts = 0
         _uiState.value = _uiState.value.copy(channel = next, status = LiveStatus.Starting, streamUrl = null, now = next.now, next = null, infoVersion = _uiState.value.infoVersion + 1)
@@ -166,6 +169,18 @@ class LivePlayerViewModel @Inject constructor(
         return guideWindow(programs, nowMs)
     }
 
+    // Tells the server how the channel did, so it can be marked for everyone.
+    private fun report(channel: LiveChannel, ok: Boolean, reason: String?) {
+        closer.launch {
+            val link = parseLinkChannelId(channel.id)
+            if (link != null) {
+                repository.reportStreamLinkPlay(link.linkId, ok)
+            } else {
+                repository.reportLiveChannel(channel.id, ok, reason)
+            }
+        }
+    }
+
     fun showInfo() {
         _uiState.value = _uiState.value.copy(infoVersion = _uiState.value.infoVersion + 1)
     }
@@ -179,6 +194,7 @@ class LivePlayerViewModel @Inject constructor(
         val channel = _uiState.value.channel ?: return
         val firstFrame = System.currentTimeMillis()
         Log.i(TAG, "first frame ${channel.id}: open ${openedAt - openStartedAt} ms, first frame ${firstFrame - openStartedAt} ms, restarts $restarts")
+        report(channel, ok = true, reason = null)
         _uiState.value = _uiState.value.copy(status = LiveStatus.Playing)
     }
 
@@ -218,6 +234,7 @@ class LivePlayerViewModel @Inject constructor(
     private fun restart(reason: String) {
         val channel = _uiState.value.channel ?: return
         if (restarts >= MAX_RESTARTS) {
+            report(channel, ok = false, reason = "stalled")
             _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(describeOpenFailure(reason)))
             return
         }

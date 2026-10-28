@@ -1361,6 +1361,20 @@ class JellioRepository @Inject constructor(
 
     fun invalidateLiveChannels(userId: String) = cache.invalidatePrefix("live:channels:$userId")
 
+    // Ids of channels that failed to start for anyone recently; empty when
+    // the server can't say.
+    suspend fun getBrokenLiveChannels(): Set<String> =
+        runCatching { cache.get("live:health", 60_000L) { api.getLiveHealth().keys } }.getOrDefault(emptySet())
+
+    suspend fun reportLiveChannel(channelId: String, ok: Boolean, error: String?) {
+        cache.invalidatePrefix("live:health")
+        runCatching { api.reportLiveChannel(channelId, com.jellio.tv.data.model.LiveChannelReportDto(ok, error?.take(60))) }
+    }
+
+    suspend fun reportStreamLinkPlay(linkId: String, ok: Boolean) {
+        runCatching { api.reportStreamLinkPlay(linkId, com.jellio.tv.data.model.StreamLinkPlayReportDto(ok)) }
+    }
+
     suspend fun getLivePrograms(userId: String, channelId: String, fromMs: Long, untilMs: Long): List<com.jellio.tv.data.model.LiveProgramDto> =
         api.getLivePrograms(
             com.jellio.tv.data.model.LiveProgramsRequest(

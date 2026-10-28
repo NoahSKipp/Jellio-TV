@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.runtime.Composable
@@ -156,7 +158,10 @@ private fun ChannelRow(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
                 ChannelLogo(channel, imageUrl)
                 Column(modifier = Modifier.padding(start = 14.dp).weight(1f)) {
-                    Text(text = channel.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(text = channel.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        if (channel.failing) Badge(Strings.get("live_link_failing"), failing = true)
+                    }
                     val now = channel.now
                     if (now != null) {
                         Text(text = now.name.ifBlank { Strings.get("live_nothing_listed") }, color = JellioTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -251,6 +256,26 @@ private fun ConfirmRemove(onRemove: () -> Unit) {
 }
 
 @Composable
+private fun BrokenToggle(count: Int, open: Boolean, onToggle: () -> Unit) {
+    Surface(
+        onClick = onToggle,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            contentColor = JellioTextSecondary,
+            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            focusedContentColor = JellioText,
+        ),
+        modifier = Modifier.padding(top = 16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+            Icon(imageVector = if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(text = Strings.format("live_broken_section", count), modifier = Modifier.padding(start = 6.dp))
+        }
+    }
+}
+
+@Composable
 private fun PlaylistHeader(name: String, count: Int, failing: Boolean, onRefresh: () -> Unit, onRemove: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
         Text(text = name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
@@ -293,6 +318,7 @@ fun LiveTvScreen(
         }
     }
     val nowMs = remember(uiState.channels) { System.currentTimeMillis() }
+    var brokenOpen by remember { mutableStateOf(false) }
     // A single stream sent from the phone starts right away.
     LaunchedEffect(uiState.pendingPlay) {
         val id = uiState.pendingPlay ?: return@LaunchedEffect
@@ -306,7 +332,7 @@ fun LiveTvScreen(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(text = Strings.get("nav_live_tv"), style = MaterialTheme.typography.titleLarge)
                 if (uiState.channels.isNotEmpty() || uiState.links.isNotEmpty()) {
-                    Text(text = Strings.format("live_channel_count", uiState.arranged.all.size + uiState.myStreams.size), color = JellioTextTertiary)
+                    Text(text = Strings.format("live_channel_count", uiState.arranged.all.size + uiState.arranged.broken.size + uiState.myStreams.size), color = JellioTextTertiary)
                 }
                 Surface(
                     onClick = { viewModel.openPairing(session) },
@@ -348,7 +374,7 @@ fun LiveTvScreen(
                 uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ScreenSpinner() }
                 uiState.error != null -> Text(text = uiState.error.orEmpty(), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 uiState.channels.isEmpty() && uiState.links.isEmpty() -> Text(text = Strings.get("live_no_channels"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
-                uiState.arranged.all.isEmpty() && uiState.myStreams.isEmpty() -> Text(text = Strings.get("live_no_results"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
+                uiState.arranged.all.isEmpty() && uiState.arranged.broken.isEmpty() && uiState.myStreams.isEmpty() -> Text(text = Strings.get("live_no_results"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 else -> {
                     val arranged = uiState.arranged
                     val visibleIds = uiState.myStreams.map { it.id }.toSet()
@@ -398,6 +424,20 @@ fun LiveTvScreen(
                             item(key = "h-all") { SectionTitle(Strings.get("live_all")) }
                             items(arranged.others, key = { "a-" + it.id }) { channel ->
                                 ChannelRow(channel, nowMs, imageUrl, { onPlay(channel.id) }, { viewModel.toggleFavorite(session, channel) }, { viewModel.openGuide(session, channel) })
+                            }
+                        }
+                        // Channels that failed to start recently, folded away at the end.
+                        if (arranged.broken.isNotEmpty()) {
+                            item(key = "h-broken") {
+                                BrokenToggle(arranged.broken.size, brokenOpen) { brokenOpen = !brokenOpen }
+                            }
+                            if (brokenOpen) {
+                                item(key = "h-broken-hint") {
+                                    Text(text = Strings.get("live_broken_hint"), color = JellioTextTertiary, style = MaterialTheme.typography.bodySmall)
+                                }
+                                items(arranged.broken, key = { "b-" + it.id }) { channel ->
+                                    ChannelRow(channel, nowMs, imageUrl, { onPlay(channel.id) }, { viewModel.toggleFavorite(session, channel) }, { viewModel.openGuide(session, channel) })
+                                }
                             }
                         }
                     }

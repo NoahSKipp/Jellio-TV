@@ -113,17 +113,32 @@ fun filterChannels(channels: List<LiveChannel>, query: String, filters: LiveFilt
     }
 }
 
-data class ArrangedChannels(val favorites: List<LiveChannel>, val others: List<LiveChannel>) {
+// broken: channels marked not working, kept apart at the end.
+data class ArrangedChannels(val favorites: List<LiveChannel>, val others: List<LiveChannel>, val broken: List<LiveChannel> = emptyList()) {
     val all: List<LiveChannel> get() = favorites + others
 }
 
 // Favourites first, then channels with something on now, then the rest.
 fun arrangeChannels(channels: List<LiveChannel>): ArrangedChannels {
     val byName = compareBy<LiveChannel, String>(String.CASE_INSENSITIVE_ORDER) { it.name }
-    val (favorites, rest) = channels.partition { it.favorite }
+    val (broken, working) = channels.partition { it.failing }
+    val (favorites, rest) = working.partition { it.favorite }
     val (live, idle) = rest.partition { it.now != null }
-    return ArrangedChannels(favorites.sortedWith(byName), live.sortedWith(byName) + idle.sortedWith(byName))
+    return ArrangedChannels(favorites.sortedWith(byName), live.sortedWith(byName) + idle.sortedWith(byName), broken.sortedWith(byName))
 }
+
+// Marks the channels Jellio/LiveHealth reports as failing to start.
+fun applyHealth(channels: List<LiveChannel>, broken: Set<String>): List<LiveChannel> =
+    channels.map { channel -> (channel.id in broken).let { if (it == channel.failing) channel else channel.copy(failing = it) } }
+
+// Changing channel steps over ones marked not working, unless it is the
+// one already on.
+fun playableNeighbour(list: List<LiveChannel>, currentId: String?, delta: Int): LiveChannel? =
+    neighbourChannel(list.filter { !it.failing || it.id == currentId }, currentId, delta)
+
+// Busy tuners say nothing about the channel itself.
+fun countsAsChannelFailure(message: String?): Boolean =
+    !Regex("tuner|no available|too many|limit").containsMatchIn(message.orEmpty().lowercase())
 
 fun guideWindow(programs: List<LiveProgramDto>, nowMs: Long, hours: Int = GUIDE_HOURS): List<LiveProgramme> {
     val until = nowMs + hours * HOUR_MS

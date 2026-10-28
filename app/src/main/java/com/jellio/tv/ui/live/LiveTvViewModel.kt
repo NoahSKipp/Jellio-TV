@@ -63,10 +63,11 @@ class LiveTvViewModel @Inject constructor(
             // My streams failing never hides the server's channels, and the
             // other way round.
             val links = async { runCatching { repository.getStreamLinks() } }
+            val broken = async { repository.getBrokenLiveChannels() }
             val result = runCatching { repository.getLiveChannels(session.userId) }
             links.await().onSuccess { _uiState.value = _uiState.value.copy(links = it) }
             result.onSuccess { items ->
-                _uiState.value = _uiState.value.copy(isLoading = false, error = null, channels = mapChannels(items, System.currentTimeMillis()))
+                _uiState.value = _uiState.value.copy(isLoading = false, error = null, channels = applyHealth(mapChannels(items, System.currentTimeMillis()), broken.await()))
             }.onFailure { err ->
                 android.util.Log.w("JellioLive", "channels failed: ${err.message}")
                 if (_uiState.value.channels.isEmpty() && _uiState.value.links.isEmpty()) {
