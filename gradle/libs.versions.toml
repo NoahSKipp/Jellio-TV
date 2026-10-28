@@ -18,6 +18,7 @@ coroutines = "1.8.1"
 coil = "3.3.0"
 datastore = "1.1.1"
 media3 = "1.8.0"
+zxing = "3.5.3"
 tvProvider = "1.0.0"
 
 [libraries]
@@ -59,6 +60,8 @@ media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "medi
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
 media3-datasource-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
+media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
