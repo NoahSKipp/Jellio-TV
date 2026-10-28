@@ -1371,6 +1371,14 @@ class JellioRepository @Inject constructor(
         runCatching { api.reportLiveChannel(channelId, com.jellio.tv.data.model.LiveChannelReportDto(ok, error?.take(60))) }
     }
 
+    suspend fun reportLiveWatching(body: com.jellio.tv.data.model.LiveWatchingDto) {
+        runCatching { api.reportLiveWatching(body) }
+    }
+
+    suspend fun stopLiveWatching() {
+        runCatching { api.stopLiveWatching() }
+    }
+
     suspend fun reportStreamLinkPlay(linkId: String, ok: Boolean) {
         runCatching { api.reportStreamLinkPlay(linkId, com.jellio.tv.data.model.StreamLinkPlayReportDto(ok)) }
     }

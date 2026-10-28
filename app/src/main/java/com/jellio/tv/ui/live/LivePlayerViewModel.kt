@@ -25,6 +25,7 @@ private const val STALL_NOTICE_MS = 15_000L
 private const val STALL_RESTART_MS = 30_000L
 private const val MAX_RESTARTS = 2
 private const val SWITCH_DELAY_MS = 600L
+private const val WATCH_REPORT_MS = 30_000L
 
 sealed interface LiveStatus {
     data object Starting : LiveStatus
@@ -77,6 +78,7 @@ class LivePlayerViewModel @Inject constructor(
     private var openJob: Job? = null
     private var switchJob: Job? = null
     private var watchdog: Job? = null
+    private var watchReports: Job? = null
     private var restarts = 0
     private var openStartedAt = 0L
     private var openedAt = 0L
@@ -181,6 +183,32 @@ class LivePlayerViewModel @Inject constructor(
         }
     }
 
+    // Now Playing and the live TV badges: every half minute while playing.
+    private fun startWatchReports() {
+        if (watchReports?.isActive == true) return
+        watchReports = viewModelScope.launch {
+            while (true) {
+                val state = _uiState.value
+                val channel = state.channel
+                if (channel != null && state.status == LiveStatus.Playing && !stopped) {
+                    repository.reportLiveWatching(
+                        com.jellio.tv.data.model.LiveWatchingDto(
+                            ChannelId = if (channel.userStream) null else channel.id,
+                            ChannelName = channel.name.ifBlank { com.jellio.tv.ui.i18n.Strings.get("nav_live_tv") },
+                            Programme = if (channel.userStream) channel.group else (state.now ?: channel.now)?.name,
+                            Source = if (channel.userStream) "link" else "tuner",
+                            LogoUrl = if (channel.userStream) channel.logoUrl else null,
+                            IsPaused = false,
+                            DeviceName = android.os.Build.MODEL,
+                            Client = "Jellio TV",
+                        ),
+                    )
+                }
+                delay(WATCH_REPORT_MS)
+            }
+        }
+    }
+
     fun showInfo() {
         _uiState.value = _uiState.value.copy(infoVersion = _uiState.value.infoVersion + 1)
     }
@@ -195,6 +223,7 @@ class LivePlayerViewModel @Inject constructor(
         val firstFrame = System.currentTimeMillis()
         Log.i(TAG, "first frame ${channel.id}: open ${openedAt - openStartedAt} ms, first frame ${firstFrame - openStartedAt} ms, restarts $restarts")
         report(channel, ok = true, reason = null)
+        startWatchReports()
         _uiState.value = _uiState.value.copy(status = LiveStatus.Playing)
     }
 
@@ -247,6 +276,9 @@ class LivePlayerViewModel @Inject constructor(
     // release the tuner slot.
     fun stop() {
         stopped = true
+        watchReports?.cancel()
+        watchReports = null
+        closer.launch { repository.stopLiveWatching() }
         switchJob?.cancel()
         watchdog?.cancel()
         _uiState.value = _uiState.value.copy(streamUrl = null)

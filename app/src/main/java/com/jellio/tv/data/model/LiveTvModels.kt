@@ -87,6 +87,19 @@ data class LiveChannelReportDto(val Ok: Boolean, val Error: String? = null)
 @JsonClass(generateAdapter = true)
 data class StreamLinkPlayReportDto(val Ok: Boolean)
 
+// Jellio/now-playing/live: what this TV is watching, every half minute.
+@JsonClass(generateAdapter = true)
+data class LiveWatchingDto(
+    val ChannelId: String?,
+    val ChannelName: String,
+    val Programme: String?,
+    val Source: String,
+    val LogoUrl: String?,
+    val IsPaused: Boolean,
+    val DeviceName: String?,
+    val Client: String,
+)
+
 // Jellio/StreamLinks: streams a user added by link.
 @JsonClass(generateAdapter = true)
 data class StreamLinkEntryDto(
