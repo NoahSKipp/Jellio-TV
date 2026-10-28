@@ -210,6 +210,32 @@ interface JellyfinApi {
     @POST("Sessions/Playing/Stopped")
     suspend fun reportPlaybackStopped(@Body body: PlaybackReportRequest)
 
+    @GET("LiveTv/Channels")
+    suspend fun getLiveChannels(
+        @Query("UserId") userId: String,
+        @Query("Limit") limit: Int = 1000,
+        @Query("SortBy") sortBy: String = "SortName",
+        @Query("AddCurrentProgram") addCurrentProgram: Boolean = true,
+        @Query("EnableUserData") enableUserData: Boolean = true,
+        @Query("EnableImageTypes") imageTypes: String = "Primary",
+        @Query("ImageTypeLimit") imageTypeLimit: Int = 1,
+    ): com.jellio.tv.data.model.LiveChannelsResponse
+
+    @POST("LiveTv/Programs")
+    suspend fun getLivePrograms(@Body body: com.jellio.tv.data.model.LiveProgramsRequest): com.jellio.tv.data.model.LiveProgramsResponse
+
+    // AutoOpenLiveStream opens the tuner (about 7 s the first time).
+    @POST("Items/{itemId}/PlaybackInfo")
+    suspend fun openLiveChannel(
+        @Path("itemId") channelId: String,
+        @Query("UserId") userId: String,
+        @Body body: com.jellio.tv.data.model.LivePlaybackInfoRequest,
+        @Query("AutoOpenLiveStream") autoOpen: Boolean = true,
+    ): com.jellio.tv.data.model.LivePlaybackInfoResponse
+
+    @POST("LiveStreams/Close")
+    suspend fun closeLiveStream(@Query("liveStreamId") liveStreamId: String): retrofit2.Response<Unit>
+
     @POST("Users/{userId}/FavoriteItems/{itemId}")
     suspend fun addFavorite(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 

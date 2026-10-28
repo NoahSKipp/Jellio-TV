@@ -107,6 +107,8 @@ data class SeriesPlayTarget(val episode: BaseItemDto, val resume: Boolean)
 // (PlaySessionId) a fresh PlaybackInfo negotiation hands back, both a
 // player screen needs to build a real stream URL and report real
 // progress against.
+data class OpenedLiveStream(val channelId: String, val liveStreamId: String, val streamUrl: String)
+
 data class PlaybackTarget(
     val streamUrl: String,
     val mediaSource: MediaSourceDto,
@@ -473,8 +475,9 @@ class JellioRepository @Inject constructor(
         // real anime catalogs still gets a real Anime entry, its own
         // screen's own empty state the one real place that check lives.
         val animeEntry = realAnimeView ?: tvView?.copy(Name = "Anime")
+        val liveTvView = views.firstOrNull { it.CollectionType == "livetv" }
 
-        return listOfNotNull(moviesView, tvView, animeEntry)
+        return listOfNotNull(moviesView, tvView, animeEntry, liveTvView)
     }
 
     // Real bug runtime/api.js's own getAllCollections() documents and
@@ -1338,6 +1341,57 @@ class JellioRepository @Inject constructor(
         return result
     }
 
+
+    // Live TV. Opening a channel holds one of the tuner slots until
+    // closeLiveStream; the player always closes what it opened.
+    suspend fun getLiveChannels(userId: String): List<com.jellio.tv.data.model.LiveChannelDto> =
+        cache.get("live:channels:$userId", 60_000L) { api.getLiveChannels(userId).Items }
+
+    fun invalidateLiveChannels(userId: String) = cache.invalidatePrefix("live:channels:$userId")
+
+    suspend fun getLivePrograms(userId: String, channelId: String, fromMs: Long, untilMs: Long): List<com.jellio.tv.data.model.LiveProgramDto> =
+        api.getLivePrograms(
+            com.jellio.tv.data.model.LiveProgramsRequest(
+                UserId = userId,
+                ChannelIds = listOf(channelId),
+                MinEndDate = java.time.Instant.ofEpochMilli(fromMs).toString(),
+                MaxStartDate = java.time.Instant.ofEpochMilli(untilMs).toString(),
+            ),
+        ).Items
+
+    // Media3 plays the source's MPEG-TS as is, so the profile asks for
+    // direct play and the stream is read from /Videos/{id}/stream?static=true.
+    suspend fun openLiveChannel(userId: String, channelId: String): OpenedLiveStream {
+        val profile = com.jellio.tv.data.model.LiveDeviceProfile(
+            DirectPlayProfiles = listOf(
+                com.jellio.tv.data.model.LiveDirectPlayProfile(
+                    Container = "ts,mpegts,m2ts",
+                    VideoCodec = "h264,hevc,mpeg2video",
+                    AudioCodec = "aac,ac3,eac3,mp2,mp3",
+                ),
+            ),
+        )
+        val response = api.openLiveChannel(channelId, userId, com.jellio.tv.data.model.LivePlaybackInfoRequest(userId, DeviceProfile = profile))
+        response.ErrorCode?.let { throw IllegalStateException(it) }
+        val source = response.MediaSources.firstOrNull() ?: throw IllegalStateException("No playable live stream")
+        val liveStreamId = source.LiveStreamId ?: throw IllegalStateException("No live stream was opened")
+        val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
+        val url = server + "/Videos/" + channelId + "/stream?static=true" +
+            "&mediaSourceId=" + java.net.URLEncoder.encode(source.Id ?: channelId, "UTF-8") +
+            "&liveStreamId=" + java.net.URLEncoder.encode(liveStreamId, "UTF-8") +
+            "&DeviceId=" + java.net.URLEncoder.encode(sessionManager.getCachedDeviceId(), "UTF-8")
+        return OpenedLiveStream(channelId, liveStreamId, url)
+    }
+
+    suspend fun closeLiveStream(liveStreamId: String) {
+        runCatching { api.closeLiveStream(liveStreamId) }
+    }
+
+    suspend fun setChannelFavorite(userId: String, channelId: String, favorite: Boolean): Boolean {
+        val result = if (favorite) api.addFavorite(userId, channelId) else api.removeFavorite(userId, channelId)
+        invalidateLiveChannels(userId)
+        return result.IsFavorite
+    }
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false

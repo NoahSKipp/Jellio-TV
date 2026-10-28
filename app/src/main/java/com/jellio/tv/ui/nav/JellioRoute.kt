@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -47,6 +48,8 @@ sealed interface JellioRoute {
     data class Person(val personId: String) : JellioRoute
     data class Service(val name: String) : JellioRoute
     data class Player(val itemId: String, val mediaSourceId: String?) : JellioRoute
+    data object LiveTv : JellioRoute
+    data class LivePlayer(val channelId: String) : JellioRoute
 }
 
 // Real css/persistent-sidebar.css's own mobile breakpoint (its own
@@ -78,7 +81,8 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
     add(JellioRoute.Home)
     add(JellioRoute.Search)
     libraries.forEach { library ->
-        add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
+        if (library.CollectionType == "livetv") add(JellioRoute.LiveTv)
+        else add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
     }
     add(JellioRoute.Feed)
 }
@@ -107,7 +111,8 @@ fun JellioRoute.icon(): ImageVector = when (this) {
         else -> LibraryIconVector
     }
     JellioRoute.Settings -> Icons.Filled.Settings
-    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> Icons.Filled.Home
+    JellioRoute.LiveTv -> Icons.Filled.LiveTv
+    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> Icons.Filled.Home
 }
 
 // Material's own filled Settings glyph carries noticeably more
@@ -154,7 +159,8 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Feed -> com.jellio.tv.ui.i18n.Strings.get("nav_feed")
     is JellioRoute.LibraryTab -> name
     JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
-    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player -> ""
+    JellioRoute.LiveTv -> com.jellio.tv.ui.i18n.Strings.get("nav_live_tv")
+    is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""
 }
 
 // Real app.js's own FULLSCREEN_ROUTES: only the player route
@@ -164,7 +170,7 @@ fun JellioRoute.label(): String = when (this) {
 // here before, which read as "the nav bar disappears on movie/series
 // pages" - it should only ever go away for the actual playback
 // surface.
-fun JellioRoute.isImmersive(): Boolean = this is JellioRoute.Player
+fun JellioRoute.isImmersive(): Boolean = this is JellioRoute.Player || this is JellioRoute.LivePlayer
 
 // A pushed real other-user Profile (Feed row click) still reserves
 // this pill's own real space and stays reachable, same as any other

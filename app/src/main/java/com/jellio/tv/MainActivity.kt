@@ -288,7 +288,7 @@ private fun JellioTvApp(
     val route = routeStack.last()
     LaunchedEffect(route) {
         com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen")
-        onPlayerActiveChanged(route is JellioRoute.Player)
+        onPlayerActiveChanged(route is JellioRoute.Player || route is JellioRoute.LivePlayer)
     }
     var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
     var showLibraryPicker by remember { mutableStateOf(false) }
@@ -582,6 +582,20 @@ private fun JellioTvApp(
                 onPlayNext = { nextItemId -> onPlayId(nextItemId, true) },
                 modifier = Modifier.fillMaxSize(),
             )
+            JellioRoute.LiveTv -> com.jellio.tv.ui.live.LiveTvScreen(
+                session = session,
+                imageUrl = { itemId, tag -> memoizedRawImageUrl(itemId, tag, "Primary", 240) },
+                onPlay = { channelId -> push(JellioRoute.LivePlayer(channelId)) },
+                modifier = Modifier.fillMaxSize(),
+            )
+            is JellioRoute.LivePlayer -> androidx.compose.runtime.key(current.channelId) {
+                com.jellio.tv.ui.live.LivePlayerScreen(
+                    session = session,
+                    channelId = current.channelId,
+                    imageUrl = { itemId, tag -> memoizedRawImageUrl(itemId, tag, "Primary", 240) },
+                    onBack = { routeStack = routeStack.dropLast(1) },
+                )
+            }
         }
         }
 
@@ -660,8 +674,12 @@ private fun JellioTvApp(
                 onFocusChange = { sidebarHasRealFocus = it },
                 libraries = libraries,
                 onLibrarySelect = { library ->
-                    selectedLibrary = library
-                    switchTab(JellioRoute.Library)
+                    if (library.CollectionType == "livetv") {
+                        switchTab(JellioRoute.LiveTv)
+                    } else {
+                        selectedLibrary = library
+                        switchTab(JellioRoute.Library)
+                    }
                 },
             )
             if (showAccountSwitcher) {
@@ -705,9 +723,13 @@ private fun JellioTvApp(
                         showLibraryPicker = false
                     },
                     onSelect = { library ->
-                        selectedLibrary = library
                         showLibraryPicker = false
-                        switchTab(JellioRoute.Library)
+                        if (library.CollectionType == "livetv") {
+                            switchTab(JellioRoute.LiveTv)
+                        } else {
+                            selectedLibrary = library
+                            switchTab(JellioRoute.Library)
+                        }
                     },
                 )
             }

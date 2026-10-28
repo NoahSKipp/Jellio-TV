@@ -8,6 +8,7 @@ internal object StringsFr {
         fill2(m)
         fill3(m)
         fill4(m)
+        fillLive(m)
         m
     }
 
@@ -1206,4 +1207,30 @@ internal object StringsFr {
         m["word_of"] = "de"
     }
 
+    private fun fillLive(m: HashMap<String, String>) {
+        m["nav_live_tv"] = "TV en direct"
+        m["live_search"] = "Rechercher une chaîne ou un programme"
+        m["live_favorites"] = "Favoris"
+        m["live_all"] = "Toutes les chaînes"
+        m["live_nothing_listed"] = "Aucun programme indiqué"
+        m["live_reconnecting"] = "Reconnexion…"
+        m["live_guide"] = "Guide"
+        m["live_no_channels"] = "Aucune chaîne en direct n'est configurée sur ce serveur."
+        m["live_no_results"] = "Aucune chaîne ne correspond."
+        m["live_guide_empty"] = "Aucun programme pour les prochaines 24 heures."
+        m["live_channel_count"] = "{count} chaînes"
+        m["live_type_all"] = "Tout"
+        m["live_type_sports"] = "Sport"
+        m["live_type_tv"] = "TV"
+        m["live_language_all"] = "Toutes les langues"
+        m["live_next"] = "Ensuite"
+        m["live_badge"] = "DIRECT"
+        m["live_retry"] = "Réessayer"
+        m["live_tuning"] = "Réglage en cours…"
+        m["live_load_error"] = "Impossible de charger les chaînes."
+        m["live_tuners_busy"] = "Tous les tuners sont occupés. Fermez un autre flux en direct et réessayez."
+        m["live_open_timeout"] = "La chaîne a mis trop de temps à démarrer."
+        m["live_open_failed"] = "Impossible de démarrer cette chaîne."
+        m["live_player_hint"] = "▲ ▼ changer de chaîne · OK infos · Menu guide · Retour quitter"
+    }
 }

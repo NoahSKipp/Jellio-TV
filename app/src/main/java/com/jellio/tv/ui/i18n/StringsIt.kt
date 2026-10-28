@@ -8,6 +8,7 @@ internal object StringsIt {
         fill2(m)
         fill3(m)
         fill4(m)
+        fillLive(m)
         m
     }
 
@@ -1206,4 +1207,30 @@ internal object StringsIt {
         m["word_of"] = "di"
     }
 
+    private fun fillLive(m: HashMap<String, String>) {
+        m["nav_live_tv"] = "TV in diretta"
+        m["live_search"] = "Cerca canali o programmi"
+        m["live_favorites"] = "Preferiti"
+        m["live_all"] = "Tutti i canali"
+        m["live_nothing_listed"] = "Nessun programma indicato"
+        m["live_reconnecting"] = "Riconnessione…"
+        m["live_guide"] = "Guida"
+        m["live_no_channels"] = "Su questo server non ci sono canali in diretta."
+        m["live_no_results"] = "Nessun canale corrisponde."
+        m["live_guide_empty"] = "Nessun dato di guida per le prossime 24 ore."
+        m["live_channel_count"] = "{count} canali"
+        m["live_type_all"] = "Tutto"
+        m["live_type_sports"] = "Sport"
+        m["live_type_tv"] = "TV"
+        m["live_language_all"] = "Tutte le lingue"
+        m["live_next"] = "A seguire"
+        m["live_badge"] = "LIVE"
+        m["live_retry"] = "Riprova"
+        m["live_tuning"] = "Sintonizzazione…"
+        m["live_load_error"] = "Impossibile caricare i canali."
+        m["live_tuners_busy"] = "Tutti i sintonizzatori sono occupati. Chiudi un'altra diretta e riprova."
+        m["live_open_timeout"] = "Il canale ha impiegato troppo tempo ad avviarsi."
+        m["live_open_failed"] = "Impossibile avviare questo canale."
+        m["live_player_hint"] = "▲ ▼ cambia canale · OK info · Menu guida · Indietro esci"
+    }
 }

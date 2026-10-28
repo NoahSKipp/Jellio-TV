@@ -8,6 +8,7 @@ internal object StringsDe {
         fill2(m)
         fill3(m)
         fill4(m)
+        fillLive(m)
         m
     }
 
@@ -1206,4 +1207,30 @@ internal object StringsDe {
         m["word_of"] = "von"
     }
 
+    private fun fillLive(m: HashMap<String, String>) {
+        m["nav_live_tv"] = "Live-TV"
+        m["live_search"] = "Sender oder Sendungen suchen"
+        m["live_favorites"] = "Favoriten"
+        m["live_all"] = "Alle Sender"
+        m["live_nothing_listed"] = "Keine Sendung eingetragen"
+        m["live_reconnecting"] = "Verbindung wird wiederhergestellt…"
+        m["live_guide"] = "Programm"
+        m["live_no_channels"] = "Auf diesem Server sind keine Live-Sender eingerichtet."
+        m["live_no_results"] = "Keine passenden Sender."
+        m["live_guide_empty"] = "Keine Programmdaten für die nächsten 24 Stunden."
+        m["live_channel_count"] = "{count} Sender"
+        m["live_type_all"] = "Alle"
+        m["live_type_sports"] = "Sport"
+        m["live_type_tv"] = "TV"
+        m["live_language_all"] = "Alle Sprachen"
+        m["live_next"] = "Danach"
+        m["live_badge"] = "LIVE"
+        m["live_retry"] = "Erneut versuchen"
+        m["live_tuning"] = "Sender wird eingeschaltet…"
+        m["live_load_error"] = "Sender konnten nicht geladen werden."
+        m["live_tuners_busy"] = "Alle Tuner sind belegt. Beende einen anderen Live-Stream und versuche es erneut."
+        m["live_open_timeout"] = "Der Sender hat zu lange zum Starten gebraucht."
+        m["live_open_failed"] = "Dieser Sender konnte nicht gestartet werden."
+        m["live_player_hint"] = "▲ ▼ Sender wechseln · OK Info · Menü Programm · Zurück beenden"
+    }
 }

@@ -8,6 +8,7 @@ internal object StringsPl {
         fill2(m)
         fill3(m)
         fill4(m)
+        fillLive(m)
         m
     }
 
@@ -1206,4 +1207,30 @@ internal object StringsPl {
         m["word_of"] = "z"
     }
 
+    private fun fillLive(m: HashMap<String, String>) {
+        m["nav_live_tv"] = "Telewizja na żywo"
+        m["live_search"] = "Szukaj kanałów lub programów"
+        m["live_favorites"] = "Ulubione"
+        m["live_all"] = "Wszystkie kanały"
+        m["live_nothing_listed"] = "Brak programu"
+        m["live_reconnecting"] = "Ponowne łączenie…"
+        m["live_guide"] = "Program"
+        m["live_no_channels"] = "Na tym serwerze nie ma kanałów na żywo."
+        m["live_no_results"] = "Brak pasujących kanałów."
+        m["live_guide_empty"] = "Brak programu na najbliższe 24 godziny."
+        m["live_channel_count"] = "Kanały: {count}"
+        m["live_type_all"] = "Wszystko"
+        m["live_type_sports"] = "Sport"
+        m["live_type_tv"] = "TV"
+        m["live_language_all"] = "Wszystkie języki"
+        m["live_next"] = "Następnie"
+        m["live_badge"] = "NA ŻYWO"
+        m["live_retry"] = "Spróbuj ponownie"
+        m["live_tuning"] = "Dostrajanie…"
+        m["live_load_error"] = "Nie udało się wczytać kanałów."
+        m["live_tuners_busy"] = "Wszystkie tunery są zajęte. Zamknij inną transmisję na żywo i spróbuj ponownie."
+        m["live_open_timeout"] = "Uruchamianie kanału trwało zbyt długo."
+        m["live_open_failed"] = "Nie udało się uruchomić tego kanału."
+        m["live_player_hint"] = "▲ ▼ zmiana kanału · OK info · Menu przewodnik · Wstecz wyjście"
+    }
 }
