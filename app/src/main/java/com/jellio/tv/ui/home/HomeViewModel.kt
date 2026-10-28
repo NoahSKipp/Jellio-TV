@@ -298,7 +298,8 @@ class HomeViewModel @Inject constructor(
                             loadingMore = true,
                         )
                     }
-                    val comingSoon = comingSoonDeferred.await().filterNot { normalizeId(it.ItemId) in animeIds }
+                    // The reader's own Watchlist: anime they follow stays in.
+                    val comingSoon = comingSoonDeferred.await()
                     val comingSoonItems = runCatching { repository.getItemsInfo(session.userId, comingSoon.map { it.ItemId }) }
                         .getOrDefault(emptyMap())
                         .mapKeys { normalizeId(it.key) }
