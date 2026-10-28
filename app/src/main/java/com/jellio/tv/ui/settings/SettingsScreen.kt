@@ -172,11 +172,14 @@ fun SettingsScreen(
     var showRecordKeyDialog by remember { mutableStateOf(false) }
     val currentActivity = androidx.compose.ui.platform.LocalContext.current as? com.jellio.tv.MainActivity
     androidx.compose.runtime.DisposableEffect(showRecordKeyDialog) {
+        // The whole capture dialog, not just its listening step, keeps the hub shortcut quiet.
+        currentActivity?.isQuickHubSuppressed = showRecordKeyDialog
         if (!showRecordKeyDialog) {
             currentActivity?.isRecordingShortcut = false
             currentActivity?.onShortcutKeyRecorded = null
         }
         onDispose {
+            currentActivity?.isQuickHubSuppressed = false
             currentActivity?.isRecordingShortcut = false
             currentActivity?.onShortcutKeyRecorded = null
         }
@@ -1264,18 +1267,16 @@ private fun RecordRemoteButtonDialog(
                     if (code == android.view.KeyEvent.KEYCODE_BACK) {
                         onDismiss()
                         true
+                    } else if (code == android.view.KeyEvent.KEYCODE_UNKNOWN) {
+                        // No usable key code to match later; keep listening.
+                        true
                     } else {
                         val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
                         val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                         recordedCode = code
                         recordedLabel = name
                         isRestricted = restricted
-                        if (
-                            code == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
-                            code == android.view.KeyEvent.KEYCODE_ENTER ||
-                            code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER ||
-                            code == android.view.KeyEvent.KEYCODE_BACK
-                        ) {
+                        if (com.jellio.tv.data.prefs.QuickHubKeys.requiresLongPress(code)) {
                             selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
                         }
                         true
@@ -1323,17 +1324,13 @@ private fun RecordRemoteButtonDialog(
                                     onDismiss()
                                     return@onPreviewKeyEvent true
                                 }
+                                if (code == android.view.KeyEvent.KEYCODE_UNKNOWN) return@onPreviewKeyEvent true
                                 val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
                                 val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                                 recordedCode = code
                                 recordedLabel = name
                                 isRestricted = restricted
-                                if (
-                                    code == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
-                                    code == android.view.KeyEvent.KEYCODE_ENTER ||
-                                    code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER ||
-                                    code == android.view.KeyEvent.KEYCODE_BACK
-                                ) {
+                                if (com.jellio.tv.data.prefs.QuickHubKeys.requiresLongPress(code)) {
                                     selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
                                 }
                                 return@onPreviewKeyEvent true
@@ -1526,7 +1523,7 @@ private fun RecordRemoteButtonDialog(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                val isNavKey = code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_BACK
+                val isNavKey = com.jellio.tv.data.prefs.QuickHubKeys.requiresLongPress(code)
                 if (isNavKey) {
                     Text(
                         text = string("settings_quick_hub_dialog_nav_note"),

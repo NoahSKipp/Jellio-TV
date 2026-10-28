@@ -90,20 +90,7 @@ object QuickHubPreferences {
             .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 
-    fun isSystemRestrictedKey(keyCode: Int): Boolean = when (keyCode) {
-        android.view.KeyEvent.KEYCODE_HOME,
-        android.view.KeyEvent.KEYCODE_APP_SWITCH,
-        android.view.KeyEvent.KEYCODE_POWER,
-        android.view.KeyEvent.KEYCODE_VOLUME_UP,
-        android.view.KeyEvent.KEYCODE_VOLUME_DOWN,
-        android.view.KeyEvent.KEYCODE_VOLUME_MUTE,
-        android.view.KeyEvent.KEYCODE_VOICE_ASSIST,
-        android.view.KeyEvent.KEYCODE_DPAD_UP,
-        android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-        android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-        android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> true
-        else -> false
-    }
+    fun isSystemRestrictedKey(keyCode: Int): Boolean = QuickHubKeys.isSystemRestrictedKey(keyCode)
 
     fun init(context: Context) {
         val app = context.applicationContext
@@ -130,15 +117,21 @@ object QuickHubPreferences {
             else -> if (isAmazon) QuickHubButton.PLAY_PAUSE else QuickHubButton.BACK
         }
 
+        // A custom mapping without a usable key code would leave the shortcut silently dead.
+        if (button == QuickHubButton.CUSTOM && !QuickHubKeys.isValidCustomKey(customKeyCode)) {
+            button = if (isAmazon) QuickHubButton.PLAY_PAUSE else QuickHubButton.BACK
+        }
+
         trigger = QuickHubTrigger.fromId(savedTrigger)
-        if (button == QuickHubButton.CENTER || button == QuickHubButton.BACK) {
+        if (QuickHubKeys.forcesLongPress(button, customKeyCode)) {
             trigger = QuickHubTrigger.LONG_PRESS
         }
     }
 
     fun setButton(context: Context, newButton: QuickHubButton) {
+        if (newButton == QuickHubButton.CUSTOM && !QuickHubKeys.isValidCustomKey(customKeyCode)) return
         button = newButton
-        if (newButton == QuickHubButton.CENTER || newButton == QuickHubButton.BACK) {
+        if (QuickHubKeys.forcesLongPress(newButton, customKeyCode)) {
             trigger = QuickHubTrigger.LONG_PRESS
         }
         val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -149,14 +142,11 @@ object QuickHubPreferences {
     }
 
     fun setCustomButton(context: Context, keyCode: Int, label: String, triggerType: QuickHubTrigger) {
+        if (!QuickHubKeys.isValidCustomKey(keyCode)) return
         button = QuickHubButton.CUSTOM
         customKeyCode = keyCode
         customKeyLabel = label
-        trigger = if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || keyCode == android.view.KeyEvent.KEYCODE_BACK) {
-            QuickHubTrigger.LONG_PRESS
-        } else {
-            triggerType
-        }
+        trigger = if (QuickHubKeys.requiresLongPress(keyCode)) QuickHubTrigger.LONG_PRESS else triggerType
         val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         sp.edit()
             .putString(KEY_BUTTON, QuickHubButton.CUSTOM.id)
@@ -167,9 +157,7 @@ object QuickHubPreferences {
     }
 
     fun setTrigger(context: Context, newTrigger: QuickHubTrigger) {
-        if (newTrigger == QuickHubTrigger.SHORT_PRESS && (button == QuickHubButton.CENTER || button == QuickHubButton.BACK || customKeyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER || customKeyCode == android.view.KeyEvent.KEYCODE_BACK)) {
-            return
-        }
+        if (newTrigger == QuickHubTrigger.SHORT_PRESS && QuickHubKeys.forcesLongPress(button, customKeyCode)) return
         trigger = newTrigger
         val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         sp.edit().putString(KEY_TRIGGER, newTrigger.id).apply()
