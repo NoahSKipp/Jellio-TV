@@ -105,6 +105,7 @@ val CHANGELOG_RELEASES = listOf(
         features = listOf(
             ChangelogFeature(Icons.Filled.LiveTv, "Live TV", "Watch your server's live channels from the new Live TV button: search, filter by Sports or TV and by language, star favourites and see what's on now."),
             ChangelogFeature(Icons.Filled.Tv, "Channel Surfing", "Up and Down or the remote's channel keys change channel, OK shows what's on now and next, and Menu opens the guide for the next 24 hours."),
+            ChangelogFeature(Icons.Filled.LiveTv, "My Streams", "Add stream in Live TV shows a code to scan: paste a link to a stream, an M3U channel list or a page with a live player on your phone, and it shows up on the TV straight away."),
             ChangelogFeature(Icons.Filled.Sync, "Steady Live Streams", "Short gaps from the channel ride out quietly, longer ones reconnect on their own, and leaving or pausing always frees the tuner."),
             ChangelogFeature(Icons.Filled.Tv, "Fuller Coming Soon", "Coming Soon shows everything coming up on your Watchlist, anime included, with episodes labelled New episode and films Digital release."),
         ),
