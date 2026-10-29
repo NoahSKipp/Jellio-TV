@@ -572,12 +572,18 @@ fun CardOptionsMenu(
     onRemoveShowFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
+    comingSoon: Boolean = false,
+    onRemoveFromComingSoon: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val isWatchlisted = item.UserData?.IsFavorite == true
     val isPlayed = item.UserData?.Played == true
     val actions = buildList {
         when {
+            comingSoon -> {
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
+                onRemoveFromComingSoon?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_upcoming"), it, danger = true)) }
+            }
             continueWatching -> {
                 onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
                 onPlayManually?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_play_manually"), it)) }

@@ -531,6 +531,26 @@ class HomeViewModel @Inject constructor(
 
     private val removedFromWatchlist = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
+    // Gone from the row at once; back if the server says no.
+    fun removeFromComingSoon(itemId: String) {
+        val before = _uiState.value.rows
+        _uiState.value = _uiState.value.copy(
+            rows = before.mapNotNull { row ->
+                if (row is ComingSoonHomeRow) {
+                    val left = row.entries.filterNot { it.ItemId == itemId }
+                    if (left.isEmpty()) null else row.copy(entries = left)
+                } else {
+                    row
+                }
+            },
+        )
+        viewModelScope.launch {
+            if (!repository.hideFromComingSoon(itemId)) {
+                _uiState.value = _uiState.value.copy(rows = before)
+            }
+        }
+    }
+
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
             val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch

@@ -100,6 +100,8 @@ fun ComingSoonRow(
     items: Map<String, com.jellio.tv.data.model.BaseItemDto> = emptyMap(),
     itemImageUrl: ((com.jellio.tv.data.model.BaseItemDto, String, Int) -> String)? = null,
     onItemFocus: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
+    // A long press: Go to details or Remove from Coming Soon.
+    onItemOptions: ((CalendarEntryDto) -> Unit)? = null,
 ) {
     if (entries.isEmpty()) return
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
@@ -122,9 +124,15 @@ fun ComingSoonRow(
                                 onClick = { onItemClick(entry.ItemId) },
                                 onFocus = onItemFocus,
                                 badge = comingSoonDateLabel(entry),
+                                onOptionsClick = onItemOptions?.let { { it(entry) } },
                             )
                         } else {
-                            ComingSoonCard(entry = entry, imageUrl = imageUrl, onClick = { onItemClick(entry.ItemId) })
+                            ComingSoonCard(
+                                entry = entry,
+                                imageUrl = imageUrl,
+                                onClick = { onItemClick(entry.ItemId) },
+                                onLongClick = onItemOptions?.let { { it(entry) } },
+                            )
                         }
                     }
                 }
@@ -138,11 +146,13 @@ private fun ComingSoonCard(
     entry: CalendarEntryDto,
     imageUrl: (String, String?, String, Int) -> String,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     // Same size as the poster rows so the row lines up with the others.
     val cardWidth = PosterWidth.scaled()
     Surface(
         onClick = onClick,
+        onLongClick = onLongClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),

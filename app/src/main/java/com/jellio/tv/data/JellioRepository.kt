@@ -1492,8 +1492,13 @@ class JellioRepository @Inject constructor(
             api.addFavorite(userId, item.Id).IsFavorite
         }
         cache.invalidatePrefix("watchlist:$userId:")
+        // Back on the Watchlist means back in Coming Soon if it was taken out.
+        if (result) runCatching { api.unhideFromComingSoon(item.Id) }
         return result
     }
+
+    suspend fun hideFromComingSoon(itemId: String): Boolean =
+        runCatching { api.hideFromComingSoon(itemId).isSuccessful }.getOrDefault(false)
 
     // Real bug found live: this app's own cache.get(key, ttl) wrapper
     // around getCollectionItems/getLibraryItems/getGenreItems/

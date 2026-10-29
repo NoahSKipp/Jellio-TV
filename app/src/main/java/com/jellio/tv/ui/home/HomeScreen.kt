@@ -135,6 +135,7 @@ fun HomeScreen(
     var restorePending by remember { mutableStateOf(true) }
     val rowFocus = remember { mutableMapOf<String, androidx.compose.ui.focus.FocusRequester>() }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
+    var comingSoonMenuTarget by remember { mutableStateOf<com.jellio.tv.data.model.CalendarEntryDto?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
     // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
     // "Remove" only ever starts the real shatter below, the real
@@ -323,6 +324,7 @@ fun HomeScreen(
                                         items = row.items,
                                         itemImageUrl = imageUrl,
                                         onItemFocus = { item -> highlightedItem.value = item },
+                                        onItemOptions = { entry -> comingSoonMenuTarget = entry },
                                     )
                                     is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                                 }
@@ -376,6 +378,16 @@ fun HomeScreen(
                 onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
                 onDismiss = { cardMenuTarget = null },
+            )
+        }
+
+        comingSoonMenuTarget?.let { entry ->
+            CardOptionsMenu(
+                item = BaseItemDto(Id = entry.ItemId, Name = entry.Name),
+                comingSoon = true,
+                onGoToDetails = { onComingSoonClick(entry.ItemId) },
+                onRemoveFromComingSoon = { viewModel.removeFromComingSoon(entry.ItemId) },
+                onDismiss = { comingSoonMenuTarget = null },
             )
         }
 

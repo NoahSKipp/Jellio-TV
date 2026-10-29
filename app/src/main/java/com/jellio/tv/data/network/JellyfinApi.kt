@@ -236,6 +236,13 @@ interface JellyfinApi {
     @POST("LiveStreams/Close")
     suspend fun closeLiveStream(@Query("liveStreamId") liveStreamId: String): retrofit2.Response<Unit>
 
+    // Remove from Coming Soon, and back.
+    @POST("Jellio/calendar/hidden/{itemId}")
+    suspend fun hideFromComingSoon(@Path("itemId") itemId: String): retrofit2.Response<Unit>
+
+    @DELETE("Jellio/calendar/hidden/{itemId}")
+    suspend fun unhideFromComingSoon(@Path("itemId") itemId: String): retrofit2.Response<Unit>
+
     @POST("Jellio/now-playing/live")
     suspend fun reportLiveWatching(@Body body: com.jellio.tv.data.model.LiveWatchingDto): retrofit2.Response<Unit>
 

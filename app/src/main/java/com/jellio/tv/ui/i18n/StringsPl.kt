@@ -1208,6 +1208,7 @@ internal object StringsPl {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["menu_remove_upcoming"] = "Usuń z Wkrótce"
         m["live_link_removed_notice"] = "Usunięto {name} po {days} dniach niedziałania"
         m["live_broken_section"] = "Nie działają ({count})"
         m["live_broken_hint"] = "Tych kanałów nie udało się ostatnio uruchomić. Przełączanie kanałów je pomija, a kanał, który znów działa, wraca wyżej."

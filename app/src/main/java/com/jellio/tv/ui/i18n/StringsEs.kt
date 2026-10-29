@@ -1208,6 +1208,7 @@ internal object StringsEs {
     }
 
     private fun fillLive(m: HashMap<String, String>) {
+        m["menu_remove_upcoming"] = "Quitar de Próximamente"
         m["live_link_removed_notice"] = "{name} se quitó tras {days} días sin funcionar"
         m["live_broken_section"] = "No funcionan ({count})"
         m["live_broken_hint"] = "Estos canales no se pudieron iniciar hace poco. Al cambiar de canal se saltan, y uno que vuelva a funcionar sube de nuevo."
