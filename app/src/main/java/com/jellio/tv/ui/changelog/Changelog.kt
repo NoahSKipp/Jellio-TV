@@ -105,6 +105,7 @@ val CHANGELOG_RELEASES = listOf(
         features = listOf(
             ChangelogFeature(Icons.Filled.LiveTv, "Live TV in Now Playing", "Watching a channel or one of your streams shows up in Jellio's Now Playing for everyone on the server, with what is on."),
             ChangelogFeature(Icons.Filled.AutoAwesome, "Live TV Badges", "Hours of Live TV now count toward four new badges: Tuned In, Live Regular, Front Row Seat and Always On Air."),
+            ChangelogFeature(Icons.Filled.Tv, "Remove from Coming Soon", "Hold OK on a Coming Soon card to take it out, handy for shows you tried once that would otherwise keep appearing while they air. It stays gone on all your devices; adding the title to your Watchlist brings it back."),
         ),
     ),
     ChangelogRelease(
