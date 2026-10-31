@@ -99,6 +99,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.63.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.63.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.LiveTv, "Sound on More Channels", "Live channels whose audio your TV cannot play (AC3 or MP2, common on provider channels) now start with the audio converted, so they are no longer silent."),
+            ChangelogFeature(Icons.Filled.Tv, "Better Sports and Language Filters", "Sports channels like ESPN2 or TSN now land under Sports, and German stations such as RTL or ProSieben show up under German."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Quicker Channel Changes", "Leaving a channel now stops it on the server straight away, so the next one starts without waiting."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.63.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.63.0",
