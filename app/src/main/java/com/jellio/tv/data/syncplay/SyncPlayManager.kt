@@ -38,7 +38,13 @@ data class SyncGroup(val groupId: String, val groupName: String, val participant
 data class SyncTarget(val itemId: String, val playlistItemId: String, val startPositionTicks: Long, val isPlaying: Boolean)
 
 // A SyncPlayCommand: Unpause, Pause, Seek or Stop, to apply at whenRemoteMs (server clock).
-data class SyncCommand(val command: String, val whenRemoteMs: Long, val positionTicks: Long?, val playlistItemId: String?)
+data class SyncCommand(
+    val command: String,
+    val whenRemoteMs: Long,
+    val positionTicks: Long?,
+    val playlistItemId: String?,
+    val receivedAtMs: Long = System.currentTimeMillis(),
+)
 
 sealed interface GroupEvent {
     data class Presence(val name: String, val joined: Boolean) : GroupEvent
@@ -71,7 +77,9 @@ class SyncPlayManager @Inject constructor(
     private val _target = MutableStateFlow<SyncTarget?>(null)
     val target: StateFlow<SyncTarget?> = _target.asStateFlow()
 
-    private val _commands = MutableSharedFlow<SyncCommand>(extraBufferCapacity = 16)
+    // The latest command is replayed to a player that starts listening late
+    // (its queue item only became known after the command arrived).
+    private val _commands = MutableSharedFlow<SyncCommand>(replay = 1, extraBufferCapacity = 16)
     val commands: SharedFlow<SyncCommand> = _commands.asSharedFlow()
 
     private val _events = MutableSharedFlow<GroupEvent>(extraBufferCapacity = 16)
@@ -83,6 +91,13 @@ class SyncPlayManager @Inject constructor(
     private val measurements = ArrayDeque<Pair<Double, Long>>() // offset ms, delay ms
     private var lastNotifiedPlaylistItemId: String? = null
     private var explicitLeaveUntil = 0L
+
+    // The group THIS TV joined. The group list only names accounts, so a
+    // group listing this account may hold another of its devices; only
+    // this one is ever restored.
+    @Volatile private var myGroupId: String? = null
+    @Volatile private var pendingCreateName: String? = null
+    @Volatile private var pendingCreateUntil = 0L
 
     // Runs while the app is in front: keeps the socket open (reopening it
     // when it drops), the clock in sync and group membership honest.
@@ -172,6 +187,8 @@ class SyncPlayManager @Inject constructor(
         when (update.optString("Type")) {
             "GroupJoined" -> update.optJSONObject("Data")?.let { data ->
                 _group.value = parseGroup(data)
+                myGroupId = _group.value?.groupId
+                pendingCreateName = null
                 _target.value = null
                 lastNotifiedPlaylistItemId = null
             }
@@ -199,6 +216,7 @@ class SyncPlayManager @Inject constructor(
     }
 
     private fun resetGroup() {
+        myGroupId = null
         _group.value = null
         _target.value = null
         lastNotifiedPlaylistItemId = null
@@ -228,16 +246,24 @@ class SyncPlayManager @Inject constructor(
     // socket was down, still settles within one interval.
     private suspend fun reconcile() {
         val groups = runCatching { api.getSyncPlayGroups() }.getOrNull() ?: return
-        val mine = groups.firstOrNull { myUserName in it.Participants }
+        val stored = myGroupId
+        var mine = stored?.let { id -> groups.firstOrNull { sameId(it.GroupId, id) } }
+        // A group this TV just created whose GroupJoined push went missing.
+        if (mine == null && pendingCreateName != null && System.currentTimeMillis() < pendingCreateUntil) {
+            mine = groups.firstOrNull { it.GroupName == pendingCreateName && myUserName in it.Participants }
+        }
+        if (stored != null && mine == null) myGroupId = null
         val current = _group.value
         if (mine != null && System.currentTimeMillis() < explicitLeaveUntil) return
         if (mine != null && (current == null || !sameId(current.groupId, mine.GroupId))) {
-            runCatching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }
+            if (runCatching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }.isFailure) return
+            myGroupId = mine.GroupId
             delay(3_000)
             if (_group.value == null) {
                 _group.value = SyncGroup(mine.GroupId, mine.GroupName ?: "Group Watch", mine.Participants)
             }
-        } else if (mine == null && current != null) {
+        } else if (current != null && groups.none { sameId(it.GroupId, current.groupId) }) {
+            // The group itself is gone and the push saying so never arrived.
             resetGroup()
         }
     }
@@ -247,10 +273,20 @@ class SyncPlayManager @Inject constructor(
     suspend fun join(groupId: String) {
         explicitLeaveUntil = 0L
         api.syncPlayJoin(SyncPlayJoinBody(groupId))
+        myGroupId = groupId
     }
+
+    // Lets reconcile adopt a group this TV creates if its push is lost.
+    fun noteCreating(name: String) {
+        pendingCreateName = name
+        pendingCreateUntil = System.currentTimeMillis() + 15_000L
+    }
+
+    fun isMine(groupId: String?): Boolean = sameId(groupId, _group.value?.groupId ?: myGroupId)
 
     suspend fun leave() {
         explicitLeaveUntil = System.currentTimeMillis() + EXPLICIT_LEAVE_GRACE_MS
+        myGroupId = null
         runCatching { api.syncPlayLeave() }
         resetGroup()
     }

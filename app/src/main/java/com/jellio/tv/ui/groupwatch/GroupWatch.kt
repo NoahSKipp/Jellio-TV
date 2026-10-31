@@ -227,6 +227,7 @@ class GroupWatchViewModel @Inject constructor(
     }
 
     fun create(name: String) {
+        syncPlay.noteCreating(name)
         viewModelScope.launch { runCatching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) } }
     }
 
