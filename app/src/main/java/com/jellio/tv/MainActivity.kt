@@ -364,7 +364,6 @@ private fun JellioTvApp(
     var showAccountSwitcher by remember { mutableStateOf(false) }
     // A profile switch swaps the session under the open switcher: close it.
     LaunchedEffect(session.userId) { showAccountSwitcher = false }
-    var showGroupWatch by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var showNowPlayingDrawer by remember { mutableStateOf(false) }
     var quickHubInitialTab by remember { mutableStateOf(com.jellio.tv.ui.nowplaying.QuickHubTab.NOW_PLAYING) }
@@ -412,7 +411,7 @@ private fun JellioTvApp(
     val quickHubShortcutAllowed = !route.isImmersive() && (
         showNowPlayingDrawer || (
             !homeEditMode && streamPickerItem == null &&
-                !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding)
+                !(showAccountSwitcher || showNotifications || showLibraryPicker || showChangelog || showOnboarding)
             )
         )
     androidx.compose.runtime.DisposableEffect(route, showNowPlayingDrawer, quickHubShortcutAllowed) {
@@ -710,7 +709,7 @@ private fun JellioTvApp(
                 items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
-                focusable = !homeEditMode && !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding || showNowPlayingDrawer),
+                focusable = !homeEditMode && !(showAccountSwitcher || showNotifications || showLibraryPicker || showChangelog || showOnboarding || showNowPlayingDrawer),
                 nowPlayingCount = nowPlayingActiveCount,
                 onSelect = { clicked ->
                     if (clicked is JellioRoute.NowPlaying) {
@@ -759,16 +758,6 @@ private fun JellioTvApp(
                         showNowPlayingDrawer = true
                     },
                     modifier = Modifier.fillMaxSize(),
-                )
-            }
-            if (showGroupWatch) {
-                com.jellio.tv.ui.groupwatch.GroupWatchOverlay(
-                    userName = session.userName,
-                    session = session,
-                    onDismiss = {
-                        showGroupWatch = false
-                        runCatching { sidebarFocusRequester.requestFocus() }
-                    },
                 )
             }
             if (showNotifications) {

@@ -440,7 +440,7 @@ data class PartiesDto(
 data class PartyReadyDto(val UserId: String? = null, val Name: String? = null, val PlaylistItemId: String? = null)
 
 @JsonClass(generateAdapter = true)
-data class PartyRequestDto(val Id: Long = 0, val UserId: String? = null, val UserName: String? = null, val Kind: String = "", val PositionTicks: Long? = null)
+data class PartyRequestDto(val Id: Long = 0, val UserId: String? = null, val UserName: String? = null, val Kind: String = "", val PositionTicks: Long? = null, val At: String? = null)
 
 @JsonClass(generateAdapter = true)
 data class PartyStateDto(

@@ -49,6 +49,11 @@ data class SyncCommand(
 sealed interface GroupEvent {
     data class Presence(val name: String, val joined: Boolean) : GroupEvent
     data class Started(val target: SyncTarget) : GroupEvent
+
+    // The server refused: JoinGroupDenied, CreateGroupDenied,
+    // LibraryAccessDenied or GroupDoesNotExist. inGroup tells a refused
+    // queue from a refused join.
+    data class Denied(val reason: String, val inGroup: Boolean) : GroupEvent
 }
 
 const val SYNC_TICKS_PER_MS = 10_000L
@@ -87,6 +92,8 @@ class SyncPlayManager @Inject constructor(
     private val measurements = ArrayDeque<Pair<Double, Long>>() // offset ms, delay ms
     private var lastNotifiedPlaylistItemId: String? = null
     private var explicitLeaveUntil = 0L
+    @Volatile private var lastDeniedAtMs = 0L
+    @Volatile private var activeUserId: String? = null
 
     @Volatile private var myGroupId: String? = null
     @Volatile private var pendingCreateName: String? = null
@@ -95,6 +102,17 @@ class SyncPlayManager @Inject constructor(
     // Runs while the app is in front: keeps the socket open (reopening it
     // when it drops), the clock in sync and group membership honest.
     suspend fun runWhileStarted(session: Session) = coroutineScope {
+        val previousUserId = activeUserId
+        activeUserId = session.userId
+        if (previousUserId != null && !sameId(previousUserId, session.userId)) {
+            // Another account on this TV. The server keeps one session per
+            // device, so the group the last account was in is left now.
+            if (_group.value != null || myGroupId != null) runCatching { api.syncPlayLeave() }
+            resetGroup()
+            pendingCreateName = null
+            explicitLeaveUntil = 0L
+            synchronized(measurements) { measurements.clear() }
+        }
         myUserName = session.userName
         launch {
             while (isActive) {
@@ -210,7 +228,22 @@ class SyncPlayManager @Inject constructor(
                     _events.tryEmit(GroupEvent.Started(target))
                 }
             }
-            "NotInGroup", "GroupLeft", "GroupDoesNotExist" -> resetGroup()
+            "NotInGroup", "GroupLeft" -> resetGroup()
+            // Only ever the answer to a join: the group (an old invite's) has ended.
+            "GroupDoesNotExist" -> {
+                resetGroup()
+                _events.tryEmit(GroupEvent.Denied("GroupDoesNotExist", inGroup = false))
+            }
+            "JoinGroupDenied", "CreateGroupDenied", "LibraryAccessDenied" -> {
+                val inGroup = _group.value != null
+                if (!inGroup) {
+                    // A refused join or create: stop reconcile retrying it.
+                    lastDeniedAtMs = System.currentTimeMillis()
+                    myGroupId = null
+                    pendingCreateName = null
+                }
+                _events.tryEmit(GroupEvent.Denied(update.optString("Type"), inGroup))
+            }
         }
     }
 
@@ -241,26 +274,40 @@ class SyncPlayManager @Inject constructor(
     }
 
     private suspend fun reconcile() {
+        val before = _group.value?.groupId
         val groups = runCatching { api.getSyncPlayGroups() }.getOrNull() ?: return
+        // A join or leave landed while the list was on its way: it is stale.
+        if (_group.value?.groupId != before) return
         val stored = myGroupId
-        var mine = stored?.let { id -> groups.firstOrNull { sameId(it.GroupId, id) } }
-        // A group this TV just created whose GroupJoined push went missing.
-        if (mine == null && pendingCreateName != null && System.currentTimeMillis() < pendingCreateUntil) {
-            mine = groups.firstOrNull { it.GroupName == pendingCreateName && myUserName in it.Participants }
-        }
-        if (stored != null && mine == null) myGroupId = null
-        val current = _group.value
-        if (mine != null && System.currentTimeMillis() < explicitLeaveUntil) return
-        if (mine != null && (current == null || !sameId(current.groupId, mine.GroupId))) {
-            if (runCatching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }.isFailure) return
-            myGroupId = mine.GroupId
-            delay(3_000)
-            if (_group.value == null) {
-                _group.value = SyncGroup(mine.GroupId, mine.GroupName ?: "Group Watch", mine.Participants)
+        if (stored != null && groups.none { sameId(it.GroupId, stored) }) myGroupId = null
+        val now = System.currentTimeMillis()
+        val action = decideReconcile(
+            groups = groups,
+            storedGroupId = stored,
+            current = _group.value,
+            myUserName = myUserName,
+            pendingCreateName = pendingCreateName?.takeIf { now < pendingCreateUntil },
+            leaveGraceActive = now < explicitLeaveUntil,
+        )
+        when (action) {
+            ReconcileAction.None -> Unit
+            ReconcileAction.Reset -> resetGroup()
+            is ReconcileAction.Join -> {
+                val mine = action.group
+                val startedAt = System.currentTimeMillis()
+                val failure = runCatching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }.exceptionOrNull()
+                if (failure != null) {
+                    // Refused (a private party): stop believing this TV is in it.
+                    if (failure is retrofit2.HttpException && sameId(_group.value?.groupId, mine.GroupId)) resetGroup()
+                    return
+                }
+                if (lastDeniedAtMs >= startedAt) return
+                myGroupId = mine.GroupId
+                delay(3_000)
+                if (_group.value == null && sameId(myGroupId, mine.GroupId)) {
+                    _group.value = SyncGroup(mine.GroupId, mine.GroupName ?: "Group Watch", mine.Participants)
+                }
             }
-        } else if (current != null && groups.none { sameId(it.GroupId, current.groupId) }) {
-            // The group itself is gone and the push saying so never arrived.
-            resetGroup()
         }
     }
 
@@ -268,8 +315,10 @@ class SyncPlayManager @Inject constructor(
 
     suspend fun join(groupId: String) {
         explicitLeaveUntil = 0L
+        val startedAt = System.currentTimeMillis()
         api.syncPlayJoin(SyncPlayJoinBody(groupId))
-        myGroupId = groupId
+        // The refusal comes over the socket while the request still runs.
+        if (lastDeniedAtMs < startedAt) myGroupId = groupId
     }
 
     // Starts a group and waits until this TV is in it: the socket's
@@ -283,6 +332,8 @@ class SyncPlayManager @Inject constructor(
         }
         repeat(32) { attempt ->
             _group.value?.let { return it }
+            // Cleared by GroupJoined (handled above) or by CreateGroupDenied.
+            if (pendingCreateName == null) return _group.value
             if (attempt % 4 == 3) {
                 val found = runCatching { api.getSyncPlayGroups() }.getOrNull()
                     ?.firstOrNull { it.GroupName == name && (myUserName.isEmpty() || myUserName in it.Participants) }

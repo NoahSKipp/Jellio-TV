@@ -113,7 +113,9 @@ class PartyManager @Inject constructor(
         fresh.Requests.forEach { request ->
             if (request.Id > lastRequestId) {
                 lastRequestId = request.Id
-                if (fresh.IsHost && !SyncPlayManager.sameId(request.UserId, userId)) _events.tryEmit(PartyEvent.HostRequest(request))
+                if (fresh.IsHost && !SyncPlayManager.sameId(request.UserId, userId) && isFreshPartyRequest(request.At, fresh.ServerNow)) {
+                    _events.tryEmit(PartyEvent.HostRequest(request))
+                }
             }
         }
         maybeStartGroup()

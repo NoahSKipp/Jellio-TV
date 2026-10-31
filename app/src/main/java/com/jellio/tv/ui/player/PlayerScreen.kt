@@ -808,7 +808,12 @@ internal fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(syncPlaylistItemId) { groupWatch.party.setPlaylistItem(syncPlaylistItemId) }
+    // Cleared when the player closes, so a party's countdown and ready
+    // check don't carry over to other screens.
+    DisposableEffect(syncPlaylistItemId) {
+        groupWatch.party.setPlaylistItem(syncPlaylistItemId)
+        onDispose { groupWatch.party.setPlaylistItem(null) }
+    }
 
     // Joining a group well into its title: follow it, or start from the
     // beginning alone. Picks the group after a few seconds by itself.
@@ -853,11 +858,15 @@ internal fun PlayerSurface(
         if (publishedQueue || syncPlaylistItemId != null) return@LaunchedEffect
         val target = syncPlay.target.value
         if (target != null && com.jellio.tv.data.syncplay.SyncPlayManager.sameId(target.itemId, currentItemId)) return@LaunchedEffect
+        // In a host-only party a guest asks the host instead of changing the queue.
+        if (groupWatch.party.shouldAsk()) return@LaunchedEffect
         publishedQueue = true
         if (syncPlay.publishQueue(currentItemId, startPositionTicks).isSuccess) {
             // A party waits for everyone, counts down, then starts the group.
             if (!groupWatch.party.published(currentItemId)) unpauseAfterPublish = true
             groupWatch.announceStarted(currentItemId, title.ifBlank { "something" })
+        } else {
+            publishedQueue = false
         }
     }
     // Bumped on every key press, so the controls stay up while the remote
@@ -1129,7 +1138,8 @@ internal fun PlayerSurface(
             delay(1000)
             upNextCountdown -= 1
         }
-        upNextInfo?.let { onPlayNext(it.itemId) }
+        // A host-only party's guests follow the host to the next episode.
+        if (!groupWatch.party.shouldAsk()) upNextInfo?.let { onPlayNext(it.itemId) }
     }
 
     LaunchedEffect(player) {
@@ -1198,7 +1208,7 @@ internal fun PlayerSurface(
             delay(1000)
             endCountdown = (endCountdown ?: 1) - 1
         }
-        onPlayNext(next.itemId)
+        if (!groupWatch.party.shouldAsk()) onPlayNext(next.itemId)
     }
     val upNextCardVisible = upNextInfo != null && upNextShown && !upNextDismissed && !showEndScreen
     // Both sit over the player's own controls and take the remote, so the
