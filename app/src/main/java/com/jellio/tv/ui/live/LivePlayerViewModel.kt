@@ -70,7 +70,7 @@ class LivePlayerViewModel @Inject constructor(
                 }
             }
         },
-        close = { stream -> stream.liveStreamId?.let { repository.closeLiveStream(it) } },
+        close = { stream -> stream.liveStreamId?.let { repository.closeLiveStream(it, stream.playSessionId) } },
     )
 
     private var session: Session? = null

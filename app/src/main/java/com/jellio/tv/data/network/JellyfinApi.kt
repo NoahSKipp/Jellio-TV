@@ -243,6 +243,10 @@ interface JellyfinApi {
     @DELETE("Jellio/calendar/hidden/{itemId}")
     suspend fun unhideFromComingSoon(@Path("itemId") itemId: String): retrofit2.Response<Unit>
 
+    // Closing the live stream does not stop a transcode reading the channel.
+    @DELETE("Videos/ActiveEncodings")
+    suspend fun stopEncoding(@Query("deviceId") deviceId: String, @Query("playSessionId") playSessionId: String): retrofit2.Response<Unit>
+
     @POST("Jellio/now-playing/live")
     suspend fun reportLiveWatching(@Body body: com.jellio.tv.data.model.LiveWatchingDto): retrofit2.Response<Unit>
 

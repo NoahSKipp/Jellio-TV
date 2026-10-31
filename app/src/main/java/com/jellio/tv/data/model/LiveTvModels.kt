@@ -48,12 +48,27 @@ data class LiveDirectPlayProfile(
     val AudioCodec: String? = null,
 )
 
+// What Jellyfin may turn a channel into when the TV cannot play it as is,
+// e.g. AC3 or MP2 audio rewritten as AAC.
+@JsonClass(generateAdapter = true)
+data class LiveTranscodingProfile(
+    val Container: String,
+    val Type: String = "Video",
+    val VideoCodec: String? = null,
+    val AudioCodec: String? = null,
+    val Protocol: String = "hls",
+    val Context: String = "Streaming",
+    val MaxAudioChannels: String? = null,
+    val MinSegments: Int? = null,
+    val BreakOnNonKeyFrames: Boolean? = null,
+)
+
 @JsonClass(generateAdapter = true)
 data class LiveDeviceProfile(
     val MaxStreamingBitrate: Long = 40_000_000,
     val MaxStaticBitrate: Long = 40_000_000,
     val DirectPlayProfiles: List<LiveDirectPlayProfile> = emptyList(),
-    val TranscodingProfiles: List<LiveDirectPlayProfile> = emptyList(),
+    val TranscodingProfiles: List<LiveTranscodingProfile> = emptyList(),
 )
 
 @JsonClass(generateAdapter = true)
@@ -69,6 +84,7 @@ data class LiveMediaSourceDto(
     val LiveStreamId: String? = null,
     val Container: String? = null,
     val TranscodingUrl: String? = null,
+    val SupportsDirectPlay: Boolean? = null,
 )
 
 @JsonClass(generateAdapter = true)

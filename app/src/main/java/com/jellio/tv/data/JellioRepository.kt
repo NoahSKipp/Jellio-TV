@@ -117,6 +117,8 @@ data class OpenedLiveStream(
     val mimeType: String? = null,
     val requestHeaders: Map<String, String>? = null,
     val fallbackUrl: String? = null,
+    // Set when Jellyfin transcodes the channel, so it can be stopped on leaving.
+    val playSessionId: String? = null,
 )
 
 class StreamLinkException(val code: String) : Exception(code)
@@ -1393,15 +1395,27 @@ class JellioRepository @Inject constructor(
             ),
         ).Items
 
-    // Media3 plays the source's MPEG-TS as is, so the profile asks for
-    // direct play and the stream is read from /Videos/{id}/stream?static=true.
+    // Media3 plays the source's MPEG-TS as is when the audio is AAC, which
+    // every TV decodes. AC3 and MP2 (common on provider channels) are not
+    // decoded on many devices and come out silent, so for those Jellyfin
+    // hands back an HLS address with the audio rewritten as AAC.
     suspend fun openLiveChannel(userId: String, channelId: String): OpenedLiveStream {
         val profile = com.jellio.tv.data.model.LiveDeviceProfile(
             DirectPlayProfiles = listOf(
                 com.jellio.tv.data.model.LiveDirectPlayProfile(
                     Container = "ts,mpegts,m2ts",
                     VideoCodec = "h264,hevc,mpeg2video",
-                    AudioCodec = "aac,ac3,eac3,mp2,mp3",
+                    AudioCodec = "aac",
+                ),
+            ),
+            TranscodingProfiles = listOf(
+                com.jellio.tv.data.model.LiveTranscodingProfile(
+                    Container = "ts",
+                    VideoCodec = "h264",
+                    AudioCodec = "aac",
+                    MaxAudioChannels = "6",
+                    MinSegments = 1,
+                    BreakOnNonKeyFrames = true,
                 ),
             ),
         )
@@ -1410,6 +1424,14 @@ class JellioRepository @Inject constructor(
         val source = response.MediaSources.firstOrNull() ?: throw IllegalStateException("No playable live stream")
         val liveStreamId = source.LiveStreamId ?: throw IllegalStateException("No live stream was opened")
         val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
+        val transcoding = source.TranscodingUrl
+        if (!transcoding.isNullOrBlank() && source.SupportsDirectPlay != true) {
+            val path = if (transcoding.startsWith("/")) transcoding else "/$transcoding"
+            return OpenedLiveStream(
+                channelId, liveStreamId, server + path,
+                androidx.media3.common.MimeTypes.APPLICATION_M3U8, null, null, response.PlaySessionId,
+            )
+        }
         val url = server + "/Videos/" + channelId + "/stream?static=true" +
             "&mediaSourceId=" + java.net.URLEncoder.encode(source.Id ?: channelId, "UTF-8") +
             "&liveStreamId=" + java.net.URLEncoder.encode(liveStreamId, "UTF-8") +
@@ -1417,8 +1439,13 @@ class JellioRepository @Inject constructor(
         return OpenedLiveStream(channelId, liveStreamId, url)
     }
 
-    suspend fun closeLiveStream(liveStreamId: String) {
+    suspend fun closeLiveStream(liveStreamId: String, playSessionId: String? = null) {
         runCatching { api.closeLiveStream(liveStreamId) }
+        // A transcode keeps reading the channel after the live stream closes, and a
+        // provider that allows one connection would refuse the next channel meanwhile.
+        if (!playSessionId.isNullOrBlank()) {
+            runCatching { api.stopEncoding(sessionManager.getCachedDeviceId(), playSessionId) }
+        }
     }
 
     suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto> = streamLinkCall { api.getStreamLinks() }
