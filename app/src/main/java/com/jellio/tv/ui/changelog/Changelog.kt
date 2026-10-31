@@ -24,6 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.ChevronRight
@@ -98,6 +102,18 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "0.64.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.64.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Groups, "Watch Parties", "Group Watch now shows each party's title, how far in it is, who is there and who hosts. Hosts can make a party private, let only themselves control playback and hand hosting to someone else; the party code is shown for friends on Jellio."),
+            ChangelogFeature(Icons.Filled.EmojiEmotions, "Answer With an Emoji", "React in the player has a new roster: heart, thumbs up, thumbs down, laughing and more. Each one answers the latest chat message, so everyone sees who you're replying to."),
+            ChangelogFeature(Icons.Filled.Timer, "Start Together", "A new title waits until everyone is ready, then counts down 3, 2, 1 on every screen. Joining late, you can follow the group or start from the beginning on your own."),
+            ChangelogFeature(Icons.Filled.Event, "Planned Parties", "Parties scheduled on Jellio appear under Upcoming with I'm in and Start, and their invites and reminders arrive in Notifications. Finished parties show up in the Feed."),
+            ChangelogFeature(Icons.Filled.Sync, "Steadier Sync", "The TV no longer plays ahead of the group, pulls in your other devices or stalls in a pause loop, and it can share a group with Jellio on the web under the same account."),
+        ),
+    ),
     ChangelogRelease(
         version = "0.63.1",
         title = "What's New in Jellio TV",
