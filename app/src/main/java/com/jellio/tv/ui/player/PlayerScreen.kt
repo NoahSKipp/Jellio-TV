@@ -470,6 +470,12 @@ private fun PlayerSurface(
     // seek then go through the server so everyone moves together.
     val syncPlaylistItemId = syncTarget?.takeIf { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, currentItemId) }?.playlistItemId
     val syncScope = rememberCoroutineScope()
+    // Set while this TV reloads to catch up with the group: the reloaded
+    // player waits for the group's Unpause instead of starting itself.
+    var syncReloadPending by remember { mutableStateOf(false) }
+    // A seek the server is waiting on: Ready goes out once playable, even
+    // when the seek landed inside the buffer and never buffered.
+    var syncReadyNeeded by remember { mutableStateOf(false) }
 
     var resumePromptDismissed by remember { mutableStateOf(false) }
     // No resume question in a group: the group decides where playback is.
@@ -591,7 +597,13 @@ private fun PlayerSurface(
             setMediaSource(buildPlayerMediaSource(activeSideloadedTrack), resumeMs)
             // Keeps the device and its Wi-Fi awake while playing.
             setWakeMode(C.WAKE_MODE_NETWORK)
-            playWhenReady = !showResumePrompt
+            // In a group the server starts playback; only a TV following a
+            // group already playing this title starts on its own.
+            val followingPlayingGroup = syncPlay.target.value?.let {
+                com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, currentItemId) && it.isPlaying
+            } == true
+            val groupHolds = syncPlay.group.value != null && (!followingPlayingGroup || syncReloadPending)
+            playWhenReady = !showResumePrompt && !groupHolds
             prepare()
         }
     }
@@ -714,21 +726,45 @@ private fun PlayerSurface(
         val playlistItemId = syncPlaylistItemId ?: return@LaunchedEffect
         syncPlay.commands.collectLatest { command ->
             if (command.playlistItemId != null && command.playlistItemId != playlistItemId) return@collectLatest
+            // A replayed command from long before this player opened.
+            if (System.currentTimeMillis() - command.receivedAtMs > 60_000L) return@collectLatest
             val wait = syncPlay.remoteToLocalMs(command.whenRemoteMs) - System.currentTimeMillis()
             if (wait > 0) delay(wait)
             val reportedMs = (command.positionTicks ?: 0L) / TICKS_PER_MS
             when (command.command) {
                 "Unpause" -> {
                     val targetMs = syncPlay.estimateTicksNow(command.positionTicks ?: 0L, command.whenRemoteMs) / TICKS_PER_MS
-                    if (kotlin.math.abs(realPositionMs() - targetMs) > SYNC_DRIFT_MS) seekToReal(targetMs)
                     resumePromptDismissed = true
-                    player.play()
+                    syncReloadPending = false
+                    if (kotlin.math.abs(realPositionMs() - targetMs) <= SYNC_DRIFT_MS) {
+                        player.play()
+                    } else if (directPlay) {
+                        player.seekTo(targetMs.coerceAtLeast(0L))
+                        player.play()
+                    } else {
+                        // A reload to catch up: tell the group first so the
+                        // server holds everyone, then wait for its Unpause
+                        // once this TV reports Ready, instead of playing on
+                        // ahead after the reload.
+                        player.pause()
+                        syncPlay.notifyBuffering(realPositionMs() * TICKS_PER_MS, false, playlistItemId)
+                        syncReloadPending = true
+                        syncReadyNeeded = true
+                        seekToReal(targetMs)
+                    }
                 }
                 "Pause" -> {
                     player.pause()
                     if (command.positionTicks != null && kotlin.math.abs(realPositionMs() - reportedMs) > SYNC_DRIFT_MS) seekToReal(reportedMs)
                 }
-                "Seek" -> seekToReal(reportedMs)
+                "Seek" -> {
+                    // The server holds the group until every member reports
+                    // Ready at the new position.
+                    player.pause()
+                    if (!directPlay) syncReloadPending = true
+                    syncReadyNeeded = true
+                    seekToReal(reportedMs)
+                }
                 "Stop" -> player.pause()
             }
         }
@@ -738,12 +774,16 @@ private fun PlayerSurface(
     // the server holds everyone until the slowest member has caught up.
     var publishedQueue by remember(currentItemId) { mutableStateOf(false) }
     var unpauseAfterPublish by remember(currentItemId) { mutableStateOf(false) }
-    LaunchedEffect(isBuffering, syncPlaylistItemId) {
+    LaunchedEffect(isBuffering, syncPlaylistItemId, syncReadyNeeded, pendingReloadMs, player) {
         val playlistItemId = syncPlaylistItemId ?: return@LaunchedEffect
+        // A reload is on its way; the reloaded player reports for itself,
+        // not this one at the old position.
+        if (pendingReloadMs != null) return@LaunchedEffect
         val ticks = realPositionMs() * TICKS_PER_MS
         if (isBuffering) {
             syncPlay.notifyBuffering(ticks, player.playWhenReady, playlistItemId)
         } else if (player.playbackState == Player.STATE_READY) {
+            syncReadyNeeded = false
             syncPlay.notifyReady(ticks, player.playWhenReady, playlistItemId)
             if (unpauseAfterPublish) {
                 unpauseAfterPublish = false

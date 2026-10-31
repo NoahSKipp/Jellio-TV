@@ -568,7 +568,10 @@ class PlayerViewModel @Inject constructor(
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
-                val startTicks = item.UserData?.PlaybackPositionTicks ?: 0
+                // Following the group into its title starts where the group is,
+                // not at this account's own resume point.
+                val groupTarget = syncPlay.target.value?.takeIf { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, itemId) }
+                val startTicks = groupTarget?.startPositionTicks ?: item.UserData?.PlaybackPositionTicks ?: 0
                 val audioPreference = prewarmed?.audioPreference ?: earlyAudio?.await() ?: repository.getAudioLanguagePreference(session.userId)
                 audioLanguagePreference = audioPreference
                 var target = prewarmed?.target?.also { targetFrom = "prewarmed" }
