@@ -380,6 +380,36 @@ interface JellyfinApi {
     @POST("Jellio/groupwatch/{groupId}/messages")
     suspend fun sendGroupWatchMessage(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.GroupWatchSendBody)
 
+    @GET("Jellio/parties")
+    suspend fun getParties(): com.jellio.tv.data.model.PartiesDto
+
+    @GET("Jellio/parties/{groupId}/state")
+    suspend fun getPartyState(@Path("groupId") groupId: String, @Query("after") after: Long): com.jellio.tv.data.model.PartyStateDto
+
+    @POST("Jellio/parties/{groupId}/setup")
+    suspend fun setupParty(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartySetupBody)
+
+    @POST("Jellio/parties/{groupId}/item")
+    suspend fun setPartyItem(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyItemBody)
+
+    @POST("Jellio/parties/{groupId}/host")
+    suspend fun transferPartyHost(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyHostBody)
+
+    @POST("Jellio/parties/{groupId}/request")
+    suspend fun requestPartyControl(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyControlBody)
+
+    @POST("Jellio/parties/{groupId}/ready")
+    suspend fun setPartyReady(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyReadyBody)
+
+    @POST("Jellio/parties/{groupId}/countdown")
+    suspend fun startPartyCountdown(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyCountdownBody): com.jellio.tv.data.model.PartyCountdownDto
+
+    @POST("Jellio/parties/schedule/{id}/rsvp")
+    suspend fun rsvpParty(@Path("id") id: String, @Body body: com.jellio.tv.data.model.PartyRsvpBody)
+
+    @POST("Jellio/parties/schedule/{id}/started")
+    suspend fun markScheduledPartyStarted(@Path("id") id: String, @Body body: com.jellio.tv.data.model.PartyStartedBody)
+
     @GET("Jellio/overlays/pending")
     suspend fun getPendingOverlays(@Query("after") after: Long): com.jellio.tv.data.model.PendingOverlaysDto
 

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -302,6 +303,8 @@ private fun FeedListItem(
 
 private fun activityText(entry: FeedEntryDto) = if (entry.Kind == "Badge") {
     badgeActivityText(entry.BadgeName, entry.BadgeRarity)
+} else if (entry.Kind == "Party") {
+    partyActivityText(entry)
 } else {
     watchActivityText(
         itemType = entry.ItemType,
@@ -441,6 +444,16 @@ private fun FeedSpotlight(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (shown.Kind == "Party" && partyDetail(shown).isNotEmpty()) {
+                        Text(
+                            text = partyDetail(shown),
+                            color = JellioTextSecondary,
+                            fontSize = 15.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                     if (shown.Kind == "Badge" && !shown.BadgeDescription.isNullOrEmpty()) {
                         Text(
                             text = shown.BadgeDescription,
@@ -468,10 +481,12 @@ private val FEED_TYPES = listOf(
     FeedType("manga", "Manga"),
     FeedType("audiobooks", "Audiobooks"),
     FeedType("badges", "Badges"),
+    FeedType("parties", "Watch parties"),
 )
 
 private fun feedType(entry: FeedEntryDto): String = when {
     entry.Kind == "Badge" -> "badges"
+    entry.Kind == "Party" -> "parties"
     entry.ItemType == "Episode" || entry.ItemType == "Series" || entry.ItemType == "Season" -> "shows"
     entry.ItemType == "Book" -> "books"
     entry.ItemType == "Manga" -> "manga"
@@ -530,4 +545,24 @@ private fun FeedFilterChip(label: String, count: Int, off: Boolean, onClick: () 
             )
         }
     }
+}
+
+// "hosted Movie night · Arrival and 2 more", as the web Feed writes it.
+private fun partyActivityText(entry: FeedEntryDto) = androidx.compose.ui.text.buildAnnotatedString {
+    append(com.jellio.tv.ui.i18n.Strings.get("feed_party_lead") + " ")
+    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(entry.PartyName ?: "Group Watch") }
+    val title = if (entry.ItemType == "Episode" && entry.SeriesName != null) entry.SeriesName else entry.ItemName
+    if (title != null) {
+        append(" · ")
+        withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(title) }
+        if (entry.PartyTitleCount > 1) append(" " + com.jellio.tv.ui.i18n.Strings.format("feed_party_more", entry.PartyTitleCount - 1))
+    }
+}
+
+private fun partyDetail(entry: FeedEntryDto): String {
+    val others = entry.PartyMembers.orEmpty().filter { it != entry.UserName }
+    return listOfNotNull(
+        others.takeIf { it.isNotEmpty() }?.let { com.jellio.tv.ui.i18n.Strings.format("feed_party_with", it.joinToString(", ")) },
+        entry.PartyReactions?.takeIf { it.isNotEmpty() }?.joinToString(" "),
+    ).joinToString(" · ")
 }

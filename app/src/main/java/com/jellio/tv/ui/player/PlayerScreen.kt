@@ -701,7 +701,9 @@ private fun PlayerSurface(
     var controlsVisible by remember { mutableStateOf(true) }
 
     fun togglePlay() {
-        if (syncPlaylistItemId != null) {
+        if (syncPlaylistItemId != null && groupWatch.party.shouldAsk()) {
+            groupWatch.party.ask(if (player.isPlaying) "pause" else "play")
+        } else if (syncPlaylistItemId != null) {
             val wasPlaying = player.isPlaying
             syncScope.launch { if (wasPlaying) syncPlay.requestPause() else syncPlay.requestUnpause() }
         } else if (player.isPlaying) {
@@ -712,7 +714,9 @@ private fun PlayerSurface(
     }
 
     fun userSeek(targetMs: Long) {
-        if (syncPlaylistItemId != null) {
+        if (syncPlaylistItemId != null && groupWatch.party.shouldAsk()) {
+            groupWatch.party.ask("seek", targetMs.coerceAtLeast(0L) * TICKS_PER_MS)
+        } else if (syncPlaylistItemId != null) {
             positionMs = targetMs.coerceAtLeast(0L)
             syncScope.launch { syncPlay.requestSeek(targetMs.coerceAtLeast(0L) * TICKS_PER_MS) }
         } else {
@@ -770,6 +774,23 @@ private fun PlayerSurface(
         }
     }
 
+    LaunchedEffect(syncPlaylistItemId) { groupWatch.party.setPlaylistItem(syncPlaylistItemId) }
+
+    // Joining a group well into its title: follow it, or start from the
+    // beginning alone. Picks the group after a few seconds by itself.
+    var catchUpOpen by remember(currentItemId) {
+        mutableStateOf(
+            inGroupAtOpen && startPositionTicks > 120_000L * TICKS_PER_MS &&
+                syncPlay.target.value?.let { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, currentItemId) } == true,
+        )
+    }
+    LaunchedEffect(catchUpOpen) {
+        if (catchUpOpen) {
+            delay(10_000)
+            catchUpOpen = false
+        }
+    }
+
     // Tells the group when this TV is loading and when it's ready, so
     // the server holds everyone until the slowest member has caught up.
     var publishedQueue by remember(currentItemId) { mutableStateOf(false) }
@@ -785,6 +806,7 @@ private fun PlayerSurface(
         } else if (player.playbackState == Player.STATE_READY) {
             syncReadyNeeded = false
             syncPlay.notifyReady(ticks, player.playWhenReady, playlistItemId)
+            groupWatch.party.markReady(playlistItemId)
             if (unpauseAfterPublish) {
                 unpauseAfterPublish = false
                 syncPlay.requestUnpause()
@@ -802,7 +824,8 @@ private fun PlayerSurface(
         if (target != null && com.jellio.tv.data.syncplay.SyncPlayManager.sameId(target.itemId, currentItemId)) return@LaunchedEffect
         publishedQueue = true
         if (syncPlay.publishQueue(currentItemId, startPositionTicks).isSuccess) {
-            unpauseAfterPublish = true
+            // A party waits for everyone, counts down, then starts the group.
+            if (!groupWatch.party.published(currentItemId)) unpauseAfterPublish = true
             groupWatch.announceStarted(currentItemId, title.ifBlank { "something" })
         }
     }
@@ -1261,7 +1284,7 @@ private fun PlayerSurface(
                 // blocks them behind its own popover; Resume/Start Over
                 // themselves are plain focusable Surfaces below, reached
                 // through the TV focus system rather than a key here.
-                if (showResumePrompt) {
+                if (showResumePrompt || catchUpOpen) {
                     if (event.key == Key.Back) {
                         onBack()
                         return@onKeyEvent true
@@ -1620,7 +1643,9 @@ private fun PlayerSurface(
         }
 
         if (showReactMenu) {
+            val replyTo = remember { groupWatch.party.replyTarget() }
             ReactMenu(
+                replyTo = replyTo,
                 onReact = { emoji ->
                     showReactMenu = false
                     groupWatch.react(emoji)
@@ -1645,6 +1670,20 @@ private fun PlayerSurface(
                 onSubtitleOffset = { ms -> setSubtitleOffset(ms) },
                 canSyncSubtitles = selectedSubtitleIndex != null && subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.isTextBased == true,
                 onDismiss = { showSubtitleMenu = false },
+            )
+        }
+
+        if (catchUpOpen) {
+            CatchUpPrompt(
+                groupAtTicks = startPositionTicks,
+                onFollow = { catchUpOpen = false },
+                onSolo = {
+                    catchUpOpen = false
+                    syncScope.launch {
+                        syncPlay.leave()
+                        onRestart()
+                    }
+                },
             )
         }
 
@@ -2596,7 +2635,7 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
 // Group Watch reactions: a row of preset emoji sent to the group's chat,
 // in place of typing on a remote.
 @Composable
-private fun ReactMenu(onReact: (String) -> Unit, onDismiss: () -> Unit) {
+private fun ReactMenu(replyTo: com.jellio.tv.data.model.GroupWatchMessageDto?, onReact: (String) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -2607,10 +2646,19 @@ private fun ReactMenu(onReact: (String) -> Unit, onDismiss: () -> Unit) {
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
         contentAlignment = Alignment.BottomCenter,
     ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 140.dp)) {
+        if (replyTo != null) {
+            Text(
+                text = com.jellio.tv.ui.i18n.Strings.format("party_replying_to", replyTo.UserName ?: "Someone", replyTo.Text),
+                color = JellioTextSecondary,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 560.dp).padding(bottom = 10.dp),
+            )
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
-                .padding(bottom = 140.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(JellioBgElevated.copy(alpha = 0.95f))
                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -2628,6 +2676,43 @@ private fun ReactMenu(onReact: (String) -> Unit, onDismiss: () -> Unit) {
                 ) {
                     Text(text = emoji, fontSize = 30.sp, modifier = Modifier.padding(10.dp))
                 }
+            }
+        }
+        }
+    }
+}
+
+// Joining a group well into its title: follow the group or start over alone.
+@Composable
+private fun CatchUpPrompt(groupAtTicks: Long, onFollow: () -> Unit, onSolo: () -> Unit) {
+    BackHandler(onBack = onFollow)
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(60)
+        runCatching { first.requestFocus() }
+    }
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(JellioBgElevated.copy(alpha = 0.97f))
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+        ) {
+            Text(
+                text = com.jellio.tv.ui.i18n.Strings.format("party_catchup_title", com.jellio.tv.ui.groupwatch.partyClock(groupAtTicks / (1000L * TICKS_PER_MS))),
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.jellio.tv.ui.groupwatch.GroupButton(
+                    label = com.jellio.tv.ui.i18n.Strings.get("party_catchup_join"),
+                    primary = true,
+                    onClick = onFollow,
+                    modifier = Modifier.focusRequester(first),
+                )
+                com.jellio.tv.ui.groupwatch.GroupButton(label = com.jellio.tv.ui.i18n.Strings.get("party_catchup_solo"), onClick = onSolo)
             }
         }
     }

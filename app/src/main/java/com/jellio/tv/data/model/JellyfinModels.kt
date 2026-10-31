@@ -344,6 +344,7 @@ data class JellioNotificationDto(
     val ItemId: String? = null,
     val Detail: String? = null,
     val Read: Boolean = false,
+    val Date: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -387,10 +388,119 @@ data class GroupWatchMessageDto(
     val UserName: String? = null,
     val Text: String = "",
     val ItemId: String? = null,
+    val ReplyToId: Long? = null,
+    val ReplyToName: String? = null,
+    val ReplyToText: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
-data class GroupWatchSendBody(val Text: String, val ItemId: String? = null)
+data class GroupWatchSendBody(val Text: String, val ItemId: String? = null, val ReplyToId: Long? = null)
+
+// Watch parties (Controllers/PartiesController.cs).
+@JsonClass(generateAdapter = true)
+data class PartyItemDto(
+    val Id: String = "",
+    val Name: String? = null,
+    val Type: String? = null,
+    val SeriesName: String? = null,
+    val ImageItemId: String? = null,
+    val SeasonNumber: Int? = null,
+    val EpisodeNumber: Int? = null,
+    val RunTimeTicks: Long? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class PartyPersonDto(val Name: String = "", val UserId: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class LivePartyDto(
+    val GroupId: String = "",
+    val GroupName: String? = null,
+    val State: String? = null,
+    val Participants: List<PartyPersonDto> = emptyList(),
+    val HostName: String? = null,
+    val HostUserId: String? = null,
+    val Private: Boolean = false,
+    val HostOnly: Boolean = false,
+    val Code: String? = null,
+    val Item: PartyItemDto? = null,
+    val PositionTicks: Long? = null,
+    val IsPlaying: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class ScheduledPartyDto(
+    val Id: String = "",
+    val Name: String? = null,
+    val HostName: String? = null,
+    val HostUserId: String? = null,
+    val StartsAt: String? = null,
+    val Private: Boolean = false,
+    val HostOnly: Boolean = false,
+    val Item: PartyItemDto? = null,
+    val Going: List<String> = emptyList(),
+    val IsGoing: Boolean = false,
+    val IsHost: Boolean = false,
+    val GroupId: String? = null,
+    val CanStart: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class PartiesDto(
+    val Live: List<LivePartyDto> = emptyList(),
+    val Scheduled: List<ScheduledPartyDto> = emptyList(),
+    val ServerNow: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class PartyReadyDto(val UserId: String? = null, val Name: String? = null, val PlaylistItemId: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class PartyRequestDto(val Id: Long = 0, val UserId: String? = null, val UserName: String? = null, val Kind: String = "", val PositionTicks: Long? = null)
+
+@JsonClass(generateAdapter = true)
+data class PartyStateDto(
+    val GroupId: String = "",
+    val HostUserId: String? = null,
+    val HostName: String? = null,
+    val IsHost: Boolean = false,
+    val Private: Boolean = false,
+    val HostOnly: Boolean = false,
+    val Code: String? = null,
+    val ItemId: String? = null,
+    val CountdownEndsAt: String? = null,
+    val CountdownPlaylistItemId: String? = null,
+    val Ready: List<PartyReadyDto> = emptyList(),
+    val Requests: List<PartyRequestDto> = emptyList(),
+    val ServerNow: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class PartySetupBody(val Private: Boolean? = null, val HostOnly: Boolean? = null, val ScheduleId: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class PartyItemBody(val ItemId: String)
+
+@JsonClass(generateAdapter = true)
+data class PartyHostBody(val UserId: String)
+
+@JsonClass(generateAdapter = true)
+data class PartyControlBody(val Kind: String, val PositionTicks: Long? = null)
+
+@JsonClass(generateAdapter = true)
+data class PartyReadyBody(val PlaylistItemId: String, val Ready: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class PartyCountdownBody(val PlaylistItemId: String, val Seconds: Int)
+
+@JsonClass(generateAdapter = true)
+data class PartyCountdownDto(val EndsAt: String? = null, val ServerNow: String? = null)
+
+@JsonClass(generateAdapter = true)
+data class PartyRsvpBody(val Going: Boolean)
+
+@JsonClass(generateAdapter = true)
+data class PartyStartedBody(val GroupId: String)
 
 @JsonClass(generateAdapter = true)
 data class PendingOverlayDto(
@@ -604,6 +714,11 @@ data class FeedEntryDto(
     val BadgeRarity: String? = null,
     // Already finished before: shown as "Rewatched".
     val Rewatch: Boolean = false,
+    // Kind == "Party": a finished watch party, posted under its host.
+    val PartyName: String? = null,
+    val PartyMembers: List<String>? = null,
+    val PartyReactions: List<String>? = null,
+    val PartyTitleCount: Int = 0,
 )
 
 @com.squareup.moshi.JsonClass(generateAdapter = true)

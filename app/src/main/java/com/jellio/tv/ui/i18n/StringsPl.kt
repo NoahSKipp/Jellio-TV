@@ -9,6 +9,7 @@ internal object StringsPl {
         fill3(m)
         fill4(m)
         fillLive(m)
+        fillParty(m)
         m
     }
 
@@ -1259,5 +1260,52 @@ internal object StringsPl {
         m["live_open_timeout"] = "Uruchamianie kanału trwało zbyt długo."
         m["live_open_failed"] = "Nie udało się uruchomić tego kanału."
         m["live_player_hint"] = "▲ ▼ zmiana kanału · OK info · Menu przewodnik · Wstecz wyjście"
+    }
+
+    private fun fillParty(m: HashMap<String, String>) {
+        m["party_title"] = "Wspólny seans"
+        m["party_host"] = "gospodarza"
+        m["party_you"] = "Ty"
+        m["party_asked_host"] = "Poproszono {0}"
+        m["party_asks_seek"] = "{0} chce przejść do {1}"
+        m["party_asks_pause"] = "{0} chce wstrzymać"
+        m["party_asks_play"] = "{0} chce wznowić"
+        m["party_do_it"] = "Zrób to"
+        m["party_go"] = "Start!"
+        m["party_ready_check"] = "Gotowi: {0} z {1}"
+        m["party_state_playing"] = "Odtwarzanie"
+        m["party_state_waiting"] = "Przygotowuje się"
+        m["party_state_paused"] = "Wstrzymane"
+        m["party_state_idle"] = "Wybiera coś"
+        m["party_due_now"] = "teraz"
+        m["party_in_minutes"] = "za {0} min"
+        m["party_in_hours"] = "za {0} godz."
+        m["party_hosted_by"] = "Gospodarz: {0}"
+        m["party_private"] = "Prywatna"
+        m["party_host_only_short"] = "Steruje gospodarz"
+        m["party_on"] = "Wł."
+        m["party_off"] = "Wył."
+        m["party_code"] = "Kod imprezy: {0}"
+        m["party_code_hint"] = "Znajomi mogą dołączyć tym kodem w Jellio."
+        m["party_private_toggle"] = "Prywatna: {0}"
+        m["party_host_only_toggle"] = "Steruje tylko gospodarz: {0}"
+        m["party_make_host_name"] = "Zrób {0} gospodarzem"
+        m["party_tv_hint"] = "To, co włączy grupa, otworzy się też tutaj. Naciśnij Reaguj w odtwarzaczu, by odpowiedzieć na czacie emoji."
+        m["party_live_now"] = "Trwają"
+        m["party_upcoming"] = "Zaplanowane"
+        m["party_going_count"] = "{0} idzie"
+        m["party_start_now"] = "Zacznij teraz"
+        m["party_going"] = "Idę ✓"
+        m["party_im_in"] = "Wchodzę"
+        m["party_replying_to"] = "Odpowiedź do {0}: {1}"
+        m["party_catchup_title"] = "Grupa jest na {0}"
+        m["party_catchup_join"] = "Dołącz do grupy"
+        m["party_catchup_solo"] = "Od początku, sam"
+        m["feed_party_lead"] = "zorganizował(a)"
+        m["feed_party_more"] = "i {0} więcej"
+        m["feed_party_with"] = "z {0}"
+        m["party_notice_scheduled"] = "{0} zaprasza cię na {1} · {2}"
+        m["party_notice_starting"] = "{0} się zaczyna"
+        m["party_notice_sub"] = "Wspólny seans"
     }
 }

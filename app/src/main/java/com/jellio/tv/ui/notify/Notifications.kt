@@ -54,14 +54,22 @@ private fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.format("live_link_dead_notice", n.Name.orEmpty())
     "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.get("live_link_removed_notice").replace("{name}", n.Name.orEmpty()).replace("{days}", n.Detail.orEmpty())
     "announcement" -> n.Name.orEmpty()
+    "party_scheduled" -> com.jellio.tv.ui.i18n.Strings.format("party_notice_scheduled", n.Detail ?: "Someone", n.Name.orEmpty(), partyNoticeWhen(n.Date))
+    "party_starting" -> com.jellio.tv.ui.i18n.Strings.format("party_notice_starting", n.Name.orEmpty())
     "episode" -> n.Name.orEmpty() + (n.Detail?.let { " $it" } ?: "") + " is out now"
     else -> n.Name.orEmpty() + " is available to watch"
+}
+
+private fun partyNoticeWhen(date: String?): String {
+    val at = com.jellio.tv.data.syncplay.PartyManager.parseTime(date) ?: return ""
+    return java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(at))
 }
 
 private fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.get("live_link_dead_sub")
     "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.get("live_link_section")
     "announcement" -> "From the server"
+    "party_scheduled", "party_starting" -> com.jellio.tv.ui.i18n.Strings.get("party_notice_sub")
     "episode" -> "New episode"
     else -> "Now streaming"
 }
@@ -73,6 +81,7 @@ fun NotificationsOverlay(
     onDismiss: () -> Unit,
     onOpenItem: (String) -> Unit,
     onOpenLiveTv: () -> Unit = {},
+    onOpenGroupWatch: () -> Unit = {},
     viewModel: NotificationsViewModel = hiltViewModel(),
     groupWatch: GroupWatchViewModel = hiltViewModel(),
 ) {
@@ -102,6 +111,9 @@ fun NotificationsOverlay(
                             if (n.Kind == "streamlink" || n.Kind == "streamlink_removed") {
                                 onDismiss()
                                 onOpenLiveTv()
+                            } else if (n.Kind == "party_scheduled" || n.Kind == "party_starting") {
+                                onDismiss()
+                                onOpenGroupWatch()
                             } else if (itemId != null) {
                                 onDismiss()
                                 onOpenItem(itemId)

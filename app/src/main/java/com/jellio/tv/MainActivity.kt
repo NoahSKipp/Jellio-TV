@@ -700,6 +700,7 @@ private fun JellioTvApp(
             if (showGroupWatch) {
                 com.jellio.tv.ui.groupwatch.GroupWatchOverlay(
                     userName = session.userName,
+                    session = session,
                     onDismiss = {
                         showGroupWatch = false
                         runCatching { sidebarFocusRequester.requestFocus() }
@@ -714,6 +715,7 @@ private fun JellioTvApp(
                     },
                     onOpenItem = { itemId -> onNavigateToDetail(itemId.replace("-", "")) },
                     onOpenLiveTv = { switchTab(JellioRoute.LiveTv) },
+                    onOpenGroupWatch = { showGroupWatch = true },
                 )
             }
             if (showLibraryPicker) {
