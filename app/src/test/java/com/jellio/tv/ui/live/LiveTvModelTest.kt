@@ -124,6 +124,20 @@ class LiveTvModelTest {
     }
 
     @Test
+    fun germanStationsAndSportsStemsWithoutACountryAreRecognised() {
+        assertEquals(LiveKind.TV to "German", classifyChannel("RTL"))
+        assertEquals(LiveKind.TV to "German", classifyChannel("ProSieben MAXX"))
+        assertEquals(LiveKind.TV to "German", classifyChannel("ARD One"))
+        assertEquals(LiveKind.SPORTS to "German", classifyChannel("SPORT1"))
+        assertEquals(LiveKind.SPORTS to "English", classifyChannel("ESPN2 USA"))
+        assertEquals(LiveKind.SPORTS to null, classifyChannel("TSN3"))
+        assertEquals(LiveKind.SPORTS to "Polish", classifyChannel("Canal+ Extra 3 Poland"))
+        // a stated country wins over a station name
+        assertEquals(LiveKind.TV to "Balkan", classifyChannel("RTL Croatia"))
+        assertEquals(LiveKind.TV to "English", classifyChannel("Sky Cinema Premiere UK"))
+    }
+
+    @Test
     fun filtersCombineWithSearchAndFacetsCount() {
         val list = mapChannels(
             listOf("Sky Sports UK", "BBC One UK", "RTL Germany", "DAZN 1 Germany").mapIndexed { i, n -> LiveChannelDto(Id = "c$i", Name = n) },

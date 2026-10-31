@@ -44,7 +44,7 @@ data class LiveChannel(
 // Same rules as Jellio web (runtime/liveTv.js): the channel name is the
 // only signal for type and language; unknown stays unknown.
 private val SPORTS = Regex(
-    "\\b(sports?|deportes?|desporto|esporte|espn|bein|dazn|eurosport|f1|formula ?1|nba|nfl|nhl|mlb|golf|tennis|cricket|rugby|boxing|ufc|wwe|racing|motogp|supersport|tsn|sportsnet|premier league|laliga|ligue ?1|bundesliga|serie a|eleven|setanta|willow|polsat sport|movistar|match!?|nova sport|digi sport|sportklub|viaplay|ziggo|arena|sky sport|tnt sport|fox sport|cbs sports|nbc sports|astro|ptv sports|stars? sports|sportv|claro sports|tudn|nfl network|redzone|racing tv|sky racing)\\b",
+    "\\b(sports?|deportes?|desporto|esporte|espn|bein|dazn|eurosport|f1|formula ?1|nba|nfl|nhl|mlb|golf|tennis|cricket|rugby|boxing|ufc|wwe|racing|motogp|supersport|tsn|sportsnet|premier league|laliga|ligue ?1|bundesliga|serie a|eleven|setanta|willow|polsat sport|movistar|match!?|nova sport|digi sport|sportklub|viaplay|ziggo|arena|sky sport|tnt sport|fox sport|cbs sports|nbc sports|astro|ptv sports|stars? sports|sportv|claro sports|tudn|nfl network|redzone|racing tv|sky racing)\\b|sport|espn|\\btsn\\d|laliga|soccer|\\bfoot\\b|fight network|canal\\+ extra|premier brasil",
     RegexOption.IGNORE_CASE,
 )
 
@@ -63,9 +63,17 @@ private val LANGUAGES = listOf(
     "Balkan" to "serbia|srbija|croatia|hrvatska|bosnia|slovenia|arena sport|sportklub",
 ).map { (label, words) -> label to Regex("\\b($words)\\b", RegexOption.IGNORE_CASE) }
 
+// German stations carry no country in their name ("RTL", "ProSieben"), so
+// they are told by name, but only when nothing else said a language.
+private val GERMAN_STATIONS = Regex(
+    "\\b(ard|arte|zdf|zdfneo|zdfinfo|das erste|rtl|rtl zwei|rtl nitro|rtlup|vox|sat\\.?1|pro ?sieben( maxx)?|kabel ?eins|sixx|dmax|nitro|super rtl|tele ?5|ntv|n-tv|welt|phoenix|3sat|tagesschau24|servus tv|sport1|sportdigital)\\b",
+    RegexOption.IGNORE_CASE,
+)
+
 fun classifyChannel(name: String): Pair<LiveKind, String?> {
     val kind = if (SPORTS.containsMatchIn(name)) LiveKind.SPORTS else LiveKind.TV
     val language = LANGUAGES.firstOrNull { it.second.containsMatchIn(name) }?.first
+        ?: if (GERMAN_STATIONS.containsMatchIn(name)) "German" else null
     return kind to language
 }
 
