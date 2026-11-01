@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Event
@@ -104,6 +105,16 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "0.64.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.64.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Groups, "Start a Group Works", "Start a group now waits until the TV is in the new group, shows Starting… meanwhile and says so if the server turns it down, instead of seeming to do nothing."),
+            ChangelogFeature(Icons.Filled.AccountCircle, "Every Profile in Switch Account", "Switch Account lists every user from the login screen again, not just one, and marks the profiles saved on this TV with Quick sign-in."),
+            ChangelogFeature(Icons.Filled.Tv, "Focus Stays in Open Panels", "Pressing Left in Switch Account, Group Watch or Notifications no longer moves the selection onto the side menu behind them."),
+        ),
+    ),
     ChangelogRelease(
         version = "0.64.0",
         title = "What's New in Jellio TV",
