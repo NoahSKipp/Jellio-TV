@@ -140,9 +140,6 @@ fun SidebarNav(
     // focus actually arrives, clearing out once focus actually leaves
     // somewhere else.
     forceCollapsed: Boolean = false,
-    // False while a panel is open over the screen, so Left from inside
-    // it can't land on the rail behind it.
-    focusable: Boolean = true,
     onFocusChange: (Boolean) -> Unit = {},
     libraries: List<com.jellio.tv.data.model.BaseItemDto>? = null,
     onLibrarySelect: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
@@ -185,14 +182,6 @@ fun SidebarNav(
     // own persistent Box, same as the pill it replaces), claiming
     // initial focus onto whichever entry is already selected.
     LaunchedEffect(Unit) { restoreFocusRequester?.requestFocus() }
-
-    // A closing panel hands focus back here before the rail is focusable
-    // again; take it once it is.
-    var wasBlocked by remember { mutableStateOf(!focusable) }
-    LaunchedEffect(focusable) {
-        if (focusable && wasBlocked) runCatching { restoreFocusRequester?.requestFocus() }
-        wasBlocked = !focusable
-    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -270,7 +259,6 @@ fun SidebarNav(
                 focusRequester = if (route == selected) restoreFocusRequester else null,
                 homeFocusRequester = if (route == entryRoute) homeFocusRequester else null,
                 height = itemHeight,
-                focusable = focusable,
             )
 
         }
@@ -301,7 +289,6 @@ private fun SidebarItem(
     // it isn't.
     avatarUrl: String? = null,
     height: androidx.compose.ui.unit.Dp = SidebarItemHeight,
-    focusable: Boolean = true,
 ) {
     val labelWidth by animateDpAsState(
         targetValue = if (expanded) SidebarLabelMaxWidth.scaled() else 0.dp,
@@ -344,7 +331,7 @@ private fun SidebarItem(
                 shape = RoundedCornerShape(14.dp),
             ),
         ),
-        modifier = Modifier.focusProperties { canFocus = focusable }.fillMaxWidth().height(height).let {
+        modifier = Modifier.fillMaxWidth().height(height).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it
         }.let {
             if (homeFocusRequester != null) it.focusRequester(homeFocusRequester) else it

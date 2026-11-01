@@ -648,7 +648,6 @@ private fun JellioTvApp(
                 items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
-                focusable = !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding),
                 onSelect = { clicked ->
                     // Mirrors components/mobileNav.js's own single Library
                     // button: a tap opens the picker rather than
