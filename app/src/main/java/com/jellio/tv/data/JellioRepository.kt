@@ -347,7 +347,9 @@ class JellioRepository @Inject constructor(
     suspend fun getPublicUsers(serverAddress: String): List<UserDto> {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         sessionManager.saveServerAddress(normalized)
-        return api.getPublicUsers()
+        return api.getPublicUsers(
+            com.jellio.tv.data.network.buildEmbyAuthorizationHeader(sessionManager.getCachedDeviceId(), com.jellio.tv.data.network.APP_VERSION),
+        )
     }
 
     // Real port of runtime/auth.js's own quickSignIn(): spends one real

@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
@@ -245,6 +246,7 @@ fun AccountSwitcherOverlay(
                             imageUrl = viewModel.avatarUrl(session, profile.userId, profile.primaryImageTag),
                             busy = uiState.busyUserId == profile.userId,
                             onClick = { viewModel.quickSignIn(session, profile.userId) },
+                            quick = true,
                         )
                     }
                     items(uiState.publicOnly, key = { "p:" + it.Id }) { user ->
@@ -272,6 +274,8 @@ private fun SwitcherTile(
     busy: Boolean,
     onClick: () -> Unit,
     isAddTile: Boolean = false,
+    // Saved on this TV: signs straight in, no password.
+    quick: Boolean = false,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Surface(
@@ -313,6 +317,24 @@ private fun SwitcherTile(
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.Center) {
                     com.jellio.tv.ui.common.ScreenSpinner(size = 40.dp)
                 }
+            }
+        }
+        if (quick) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(JellioSecondary.copy(alpha = 0.18f))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            ) {
+                Icon(imageVector = Icons.Filled.Bolt, contentDescription = null, tint = JellioSecondary, modifier = Modifier.size(14.dp))
+                Text(
+                    text = com.jellio.tv.ui.i18n.string("auth_quick_signin"),
+                    color = JellioSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
             }
         }
         Text(

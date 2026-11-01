@@ -64,8 +64,10 @@ interface JellyfinApi {
     // getPublicUsers() before porting this: unauthenticated, a real
     // admin's own per-user "Display this user on the login screen"
     // toggle already enforced server side.
+    // Sent without a token, as the login screen and the web do, so a
+    // signed-in caller gets the same login screen users.
     @GET("Users/Public")
-    suspend fun getPublicUsers(): List<UserDto>
+    suspend fun getPublicUsers(@retrofit2.http.Header("Authorization") authorization: String): List<UserDto>
 
     // Same real GET /Users/{userId} getUser() above already calls, a
     // second real Retrofit method only because this one carries an
