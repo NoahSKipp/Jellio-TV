@@ -105,14 +105,6 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
-        version = "0.64.2",
-        title = "What's New in Jellio TV",
-        subtitle = "Version 0.64.2",
-        features = listOf(
-            ChangelogFeature(Icons.Filled.Tv, "Switch Account Works Again", "Opening Switch Account no longer sends the selection to the screen behind it, so its buttons and profiles can be picked again. If a press does slip out of Switch Account, Group Watch or Notifications, the selection comes straight back."),
-        ),
-    ),
-    ChangelogRelease(
         version = "0.64.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.64.1",
