@@ -598,6 +598,23 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
     var codeError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var codeBusy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var creating by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    // Joining or leaving swaps the panel's buttons out from under the
+    // selection; it moves onto the new view's first button instead of
+    // falling through to the screen behind.
+    val inGroupFocus = remember { FocusRequester() }
+    val outOfGroupFocus = remember { FocusRequester() }
+    var wasInGroup by remember { androidx.compose.runtime.mutableStateOf(group != null) }
+    LaunchedEffect(group != null) {
+        val inGroup = group != null
+        if (inGroup != wasInGroup) {
+            wasInGroup = inGroup
+            repeat(10) {
+                delay(50)
+                val target = if (inGroup) inGroupFocus else outOfGroupFocus
+                if (runCatching { target.requestFocus() }.isSuccess) return@LaunchedEffect
+            }
+        }
+    }
     var createError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     LaunchedEffect(group?.groupId, refreshKey) {
         while (isActive) {
@@ -632,6 +649,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                     GroupButton(
                         label = com.jellio.tv.ui.i18n.Strings.format("party_private_toggle", onOff(state.Private)),
                         onClick = { viewModel.setupParty(private = !state.Private) },
+                        modifier = Modifier.focusRequester(inGroupFocus),
                     )
                     GroupButton(
                         label = com.jellio.tv.ui.i18n.Strings.format("party_host_only_toggle", onOff(state.HostOnly)),
@@ -657,7 +675,12 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                 )
             }
             Text(text = com.jellio.tv.ui.i18n.Strings.get("party_tv_hint"), color = JellioTextSecondary)
-            GroupButton(label = com.jellio.tv.ui.i18n.string("gw_leave_group"), onClick = { viewModel.leave() })
+            GroupButton(
+                label = com.jellio.tv.ui.i18n.string("gw_leave_group"),
+                onClick = { viewModel.leave() },
+                // The host's first button is Private; everyone else's is Leave.
+                modifier = if (state?.IsHost == true) Modifier else Modifier.focusRequester(inGroupFocus),
+            )
         } else {
             Text(
                 text = "Watch in sync with others on Jellio, Jellio TV or Jellyfin. Invites from other users pop up here too.",
@@ -731,6 +754,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GroupButton(
+                    modifier = Modifier.focusRequester(outOfGroupFocus),
                     label = com.jellio.tv.ui.i18n.Strings.get(if (creating) "party_creating" else "gw_start_group"),
                     onClick = {
                         if (!creating) {
