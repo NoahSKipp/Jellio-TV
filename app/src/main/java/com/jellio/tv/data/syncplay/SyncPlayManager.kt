@@ -276,6 +276,33 @@ class SyncPlayManager @Inject constructor(
         myGroupId = groupId
     }
 
+    // Starts a group and waits until this TV is in it: the socket's
+    // GroupJoined usually says so, otherwise the group list does.
+    suspend fun create(name: String): SyncGroup? {
+        explicitLeaveUntil = 0L
+        noteCreating(name)
+        if (runCatching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) }.isFailure) {
+            pendingCreateName = null
+            return null
+        }
+        repeat(32) { attempt ->
+            _group.value?.let { return it }
+            if (attempt % 4 == 3) {
+                val found = runCatching { api.getSyncPlayGroups() }.getOrNull()
+                    ?.firstOrNull { it.GroupName == name && (myUserName.isEmpty() || myUserName in it.Participants) }
+                if (found != null) {
+                    myGroupId = found.GroupId
+                    pendingCreateName = null
+                    val joined = SyncGroup(found.GroupId, found.GroupName ?: name, found.Participants)
+                    if (_group.value == null) _group.value = joined
+                    return _group.value
+                }
+            }
+            delay(250)
+        }
+        return _group.value
+    }
+
     // Lets reconcile adopt a group this TV creates if its push is lost.
     fun noteCreating(name: String) {
         pendingCreateName = name

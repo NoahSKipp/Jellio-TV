@@ -1263,6 +1263,8 @@ internal object StringsPl {
     }
 
     private fun fillParty(m: HashMap<String, String>) {
+        m["party_creating"] = "Uruchamianie…"
+        m["party_create_failed"] = "Nie udało się utworzyć grupy. Spróbuj ponownie."
         m["party_invite_toast"] = "{0} zaprasza cię do {1}. Dołącz w Group Watch lub Powiadomieniach."
         m["party_join_private"] = "Ta impreza jest prywatna. Poproś o zaproszenie lub kod."
         m["party_code_placeholder"] = "Kod imprezy"

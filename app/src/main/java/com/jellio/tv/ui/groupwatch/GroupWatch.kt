@@ -271,17 +271,11 @@ class GroupWatchViewModel @Inject constructor(
     fun startScheduled(scheduled: com.jellio.tv.data.model.ScheduledPartyDto, fallbackName: String) {
         val name = scheduled.Name?.takeIf { it.isNotBlank() } ?: fallbackName
         viewModelScope.launch {
-            if (syncPlay.group.value == null) {
-                syncPlay.noteCreating(name)
-                runCatching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) }
+            val joined = syncPlay.group.value ?: syncPlay.create(name)
+            if (joined == null) {
+                notify(com.jellio.tv.ui.i18n.Strings.get("party_title"), com.jellio.tv.ui.i18n.Strings.get("party_create_failed"))
+                return@launch
             }
-            var group = syncPlay.group.value
-            repeat(40) {
-                if (group != null) return@repeat
-                delay(250)
-                group = syncPlay.group.value
-            }
-            val joined = group ?: return@launch
             runCatching { api.getPartyState(joined.groupId, 0) }
             runCatching {
                 api.setupParty(joined.groupId, com.jellio.tv.data.model.PartySetupBody(scheduled.Private, scheduled.HostOnly, scheduled.Id))
@@ -347,10 +341,9 @@ class GroupWatchViewModel @Inject constructor(
         viewModelScope.launch { syncPlay.leave() }
     }
 
-    fun create(name: String) {
-        syncPlay.noteCreating(name)
-        viewModelScope.launch { runCatching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) } }
-    }
+    // Null once the TV is in its new group, otherwise why not.
+    suspend fun create(name: String): String? =
+        if (syncPlay.create(name) != null) null else com.jellio.tv.ui.i18n.Strings.get("party_create_failed")
 
     suspend fun listGroups() = syncPlay.listGroups()
 }
@@ -604,6 +597,8 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
     var code by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var codeError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var codeBusy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var creating by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var createError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     LaunchedEffect(group?.groupId, refreshKey) {
         while (isActive) {
             val fresh = viewModel.loadParties()
@@ -736,14 +731,22 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GroupButton(
-                    label = com.jellio.tv.ui.i18n.Strings.get("gw_start_group"),
+                    label = com.jellio.tv.ui.i18n.Strings.get(if (creating) "party_creating" else "gw_start_group"),
                     onClick = {
-                        viewModel.create("$userName's group")
-                        refreshKey++
+                        if (!creating) {
+                            creating = true
+                            createError = null
+                            scope.launch {
+                                createError = viewModel.create("$userName's group")
+                                creating = false
+                                refreshKey++
+                            }
+                        }
                     },
                 )
                 GroupButton(label = com.jellio.tv.ui.i18n.string("gw_refresh"), onClick = { refreshKey++ })
             }
+            createError?.let { Text(text = it, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall) }
             // A private party's code, typed with the TV's keyboard.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 com.jellio.tv.ui.common.JellioTextField(
