@@ -67,6 +67,7 @@ import javax.inject.Inject
 private const val INVITE_POLL_MS = 5_000L
 private const val CHAT_POLL_MS = 3_000L
 private const val NOTICE_MS = 6_000L
+private const val INVITE_NOTICE_MS = 12_000L
 
 // The quick replies the TV can send: no keyboard, no chat window. Each
 // one answers the latest message from someone else.
@@ -158,11 +159,12 @@ class GroupWatchViewModel @Inject constructor(
         invites.forEach { invite ->
             lastInviteId = maxOf(lastInviteId, invite.Id)
             _invites.update { list -> (listOf(invite) + list.filterNot { it.GroupId == invite.GroupId }).take(10) }
-            _prompt.value = GroupPrompt(
-                title = com.jellio.tv.ui.i18n.Strings.get("groupwatch_invite_title"),
-                text = (invite.FromUserName ?: "Someone") + " invited you to join " + (invite.GroupName ?: "Group Watch"),
-                actionLabel = "Join",
-                onAction = { acceptInvite(invite) },
+            // A toast, as on the web, that doesn't take the remote away from
+            // whatever is on screen; Join waits in Group Watch and Notifications.
+            notify(
+                com.jellio.tv.ui.i18n.Strings.get("groupwatch_invite_title"),
+                com.jellio.tv.ui.i18n.Strings.format("party_invite_toast", invite.FromUserName ?: "Someone", invite.GroupName ?: "Group Watch"),
+                INVITE_NOTICE_MS,
             )
         }
     }
@@ -203,11 +205,11 @@ class GroupWatchViewModel @Inject constructor(
         if (item.Type == "Episode" && item.SeriesName != null) item.SeriesName else item.Name
     }.getOrNull()
 
-    private fun notify(title: String, text: String) {
+    private fun notify(title: String, text: String, durationMs: Long = NOTICE_MS) {
         val id = ++noticeId
         _notices.update { (it + GroupNotice(id, title, text)).takeLast(4) }
         viewModelScope.launch {
-            delay(NOTICE_MS)
+            delay(durationMs)
             _notices.update { list -> list.filterNot { it.id == id } }
         }
     }
@@ -305,7 +307,7 @@ class GroupWatchViewModel @Inject constructor(
 
     suspend fun acceptInvite(invite: com.jellio.tv.data.model.GroupWatchInviteDto) {
         _invites.update { list -> list.filterNot { it.Id == invite.Id } }
-        runCatching { syncPlay.join(invite.GroupId) }
+        joinOrExplain(invite.GroupId)
     }
 
     fun joinInvite(invite: com.jellio.tv.data.model.GroupWatchInviteDto) {
@@ -317,7 +319,28 @@ class GroupWatchViewModel @Inject constructor(
     }
 
     fun join(groupId: String) {
-        viewModelScope.launch { runCatching { syncPlay.join(groupId) } }
+        viewModelScope.launch { joinOrExplain(groupId) }
+    }
+
+    // A private party refuses anyone without its code or an invite.
+    private suspend fun joinOrExplain(groupId: String): Boolean {
+        val result = runCatching { syncPlay.join(groupId) }
+        val error = result.exceptionOrNull()
+        if (error is retrofit2.HttpException && error.code() == 403) {
+            notify(com.jellio.tv.ui.i18n.Strings.get("party_title"), com.jellio.tv.ui.i18n.Strings.get("party_join_private"))
+        }
+        return result.isSuccess
+    }
+
+    // Joins the party with this code; returns why not, or null once in.
+    suspend fun joinByCode(code: String): String? {
+        val clean = code.filter { it.isLetterOrDigit() }.uppercase()
+        if (clean.isEmpty()) return com.jellio.tv.ui.i18n.Strings.get("party_code_unknown")
+        val resolved = runCatching { api.resolvePartyCode(com.jellio.tv.data.model.PartyCodeBody(clean)) }
+        val error = resolved.exceptionOrNull()
+        if (error is retrofit2.HttpException && error.code() == 429) return com.jellio.tv.ui.i18n.Strings.get("party_code_throttled")
+        val groupId = resolved.getOrNull()?.GroupId?.takeIf { it.isNotEmpty() } ?: return com.jellio.tv.ui.i18n.Strings.get("party_code_unknown")
+        return if (joinOrExplain(groupId)) null else com.jellio.tv.ui.i18n.Strings.get("party_code_unknown")
     }
 
     fun leave() {
@@ -578,6 +601,9 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
     var parties by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.jellio.tv.data.model.PartiesDto?>(null) }
     var refreshKey by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var code by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var codeError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var codeBusy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     LaunchedEffect(group?.groupId, refreshKey) {
         while (isActive) {
             val fresh = viewModel.loadParties()
@@ -718,6 +744,32 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                 )
                 GroupButton(label = com.jellio.tv.ui.i18n.string("gw_refresh"), onClick = { refreshKey++ })
             }
+            // A private party's code, typed with the TV's keyboard.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.jellio.tv.ui.common.JellioTextField(
+                    value = code,
+                    onValueChange = { value ->
+                        code = value.filter { it.isLetterOrDigit() }.uppercase().take(6)
+                        codeError = null
+                    },
+                    label = com.jellio.tv.ui.i18n.Strings.get("party_code_placeholder"),
+                    modifier = Modifier.widthIn(min = 180.dp, max = 220.dp),
+                )
+                GroupButton(
+                    label = com.jellio.tv.ui.i18n.Strings.get("party_join_code"),
+                    onClick = {
+                        if (!codeBusy) {
+                            codeBusy = true
+                            scope.launch {
+                                codeError = viewModel.joinByCode(code)
+                                if (codeError == null) code = ""
+                                codeBusy = false
+                            }
+                        }
+                    },
+                )
+            }
+            codeError?.let { Text(text = it, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }

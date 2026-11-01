@@ -404,6 +404,9 @@ interface JellyfinApi {
     @POST("Jellio/parties/{groupId}/countdown")
     suspend fun startPartyCountdown(@Path("groupId") groupId: String, @Body body: com.jellio.tv.data.model.PartyCountdownBody): com.jellio.tv.data.model.PartyCountdownDto
 
+    @POST("Jellio/parties/code")
+    suspend fun resolvePartyCode(@Body body: com.jellio.tv.data.model.PartyCodeBody): com.jellio.tv.data.model.PartyCodeDto
+
     @POST("Jellio/parties/schedule/{id}/rsvp")
     suspend fun rsvpParty(@Path("id") id: String, @Body body: com.jellio.tv.data.model.PartyRsvpBody)
 

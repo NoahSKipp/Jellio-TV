@@ -500,6 +500,12 @@ data class PartyCountdownDto(val EndsAt: String? = null, val ServerNow: String? 
 data class PartyRsvpBody(val Going: Boolean)
 
 @JsonClass(generateAdapter = true)
+data class PartyCodeBody(val Code: String)
+
+@JsonClass(generateAdapter = true)
+data class PartyCodeDto(val GroupId: String = "")
+
+@JsonClass(generateAdapter = true)
 data class PartyStartedBody(val GroupId: String)
 
 @JsonClass(generateAdapter = true)

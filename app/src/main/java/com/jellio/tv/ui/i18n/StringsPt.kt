@@ -1263,6 +1263,12 @@ internal object StringsPt {
     }
 
     private fun fillParty(m: HashMap<String, String>) {
+        m["party_invite_toast"] = "{0} convidou você para {1}. Entre pelo Group Watch ou pelas Notificações."
+        m["party_join_private"] = "Esta festa é privada. Peça um convite ou o código."
+        m["party_code_placeholder"] = "Código da festa"
+        m["party_join_code"] = "Entrar com código"
+        m["party_code_unknown"] = "Nenhuma festa com esse código."
+        m["party_code_throttled"] = "Códigos errados demais. Tente de novo em alguns minutos."
         m["party_title"] = "Festa para assistir juntos"
         m["party_host"] = "o anfitrião"
         m["party_you"] = "Você"
