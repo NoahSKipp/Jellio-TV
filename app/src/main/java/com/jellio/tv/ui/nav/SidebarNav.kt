@@ -10,6 +10,9 @@ import androidx.compose.foundation.border
 import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -68,6 +71,7 @@ import com.jellio.tv.ui.theme.scaled
 private val SidebarCollapsedWidth = 88.dp
 private val SidebarExpandedWidth = 260.dp
 private val SidebarItemHeight = 64.dp
+private val SidebarMinItemHeight = 44.dp
 // Real feedback live, round two: even after Settings' own iconScale()
 // bump, it still read smaller than its siblings side by side. Rather
 // than pushing that one glyph even further past its own siblings'
@@ -179,7 +183,7 @@ fun SidebarNav(
     // initial focus onto whichever entry is already selected.
     LaunchedEffect(Unit) { restoreFocusRequester?.requestFocus() }
 
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxHeight()
             .width(width)
@@ -208,7 +212,16 @@ fun SidebarNav(
                 }
             }
             .focusGroup(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        // Rows shrink so every entry fits the screen; past a readable
+        // minimum the rail scrolls instead of hiding entries off screen.
+        val gap = 4.dp
+        val count = items.size.coerceAtLeast(1)
+        val fit = (maxHeight - gap * (count - 1)) / count
+        val itemHeight = minOf(SidebarItemHeight.scaled(), fit).coerceAtLeast(SidebarMinItemHeight)
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         items.forEach { route ->
             val isSelfProfile = route is JellioRoute.Profile && route.userId == null
@@ -245,9 +258,11 @@ fun SidebarNav(
                 },
                 focusRequester = if (route == selected) restoreFocusRequester else null,
                 homeFocusRequester = if (route == entryRoute) homeFocusRequester else null,
+                height = itemHeight,
             )
 
         }
+    }
     }
 }
 
@@ -273,6 +288,7 @@ private fun SidebarItem(
     // AsyncImage circle instead of the plain Icon slot below whenever
     // it isn't.
     avatarUrl: String? = null,
+    height: androidx.compose.ui.unit.Dp = SidebarItemHeight,
 ) {
     val labelWidth by animateDpAsState(
         targetValue = if (expanded) SidebarLabelMaxWidth.scaled() else 0.dp,
@@ -315,7 +331,7 @@ private fun SidebarItem(
                 shape = RoundedCornerShape(14.dp),
             ),
         ),
-        modifier = Modifier.fillMaxWidth().height(SidebarItemHeight.scaled()).let {
+        modifier = Modifier.fillMaxWidth().height(height).let {
             if (focusRequester != null) it.focusRequester(focusRequester) else it
         }.let {
             if (homeFocusRequester != null) it.focusRequester(homeFocusRequester) else it
@@ -331,7 +347,7 @@ private fun SidebarItem(
                         model = avatarUrl,
                         contentDescription = if (!expanded) label else null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size((SidebarIconSize.scaled() * 1.35f)).clip(CircleShape),
+                        modifier = Modifier.size(minOf(SidebarIconSize.scaled() * 1.35f, height - 8.dp)).clip(CircleShape),
                     )
                 } else {
                     Icon(
