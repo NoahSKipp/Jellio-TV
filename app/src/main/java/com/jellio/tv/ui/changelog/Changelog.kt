@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Timer
@@ -114,6 +115,7 @@ val CHANGELOG_RELEASES = listOf(
             ChangelogFeature(Icons.Filled.Timer, "Start Together", "A new title waits until everyone is ready, then counts down 3, 2, 1 on every screen. Joining late, you can follow the group or start from the beginning on your own."),
             ChangelogFeature(Icons.Filled.Event, "Planned Parties", "Parties scheduled on Jellio appear under Upcoming with I'm in and Start, and their invites and reminders arrive in Notifications. Finished parties show up in the Feed."),
             ChangelogFeature(Icons.Filled.Sync, "Steadier Sync", "The TV no longer plays ahead of the group, pulls in your other devices or stalls in a pause loop, and it can share a group with Jellio on the web under the same account."),
+            ChangelogFeature(Icons.Filled.DynamicFeed, "Feed Back in the Menu", "With several libraries the side menu ran past the bottom of the screen and hid Feed. Its entries now shrink to fit, and the menu scrolls if it ever has to."),
         ),
     ),
     ChangelogRelease(
