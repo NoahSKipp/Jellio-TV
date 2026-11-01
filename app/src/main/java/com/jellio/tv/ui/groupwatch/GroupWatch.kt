@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -794,8 +796,15 @@ fun InviteRow(invite: com.jellio.tv.data.model.GroupWatchInviteDto, onJoin: () -
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    BackHandler(onBack = onDismiss)
+    var closing by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val close: () -> Unit = {
+        closing = true
+        onDismiss()
+    }
+    BackHandler(onBack = close)
+    var hadFocus by remember { androidx.compose.runtime.mutableStateOf(false) }
     val panelFocus = remember { FocusRequester() }
+    val reclaimScope = androidx.compose.runtime.rememberCoroutineScope()
     LaunchedEffect(Unit) {
         repeat(10) {
             delay(50)
@@ -806,6 +815,19 @@ fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable 
         modifier = Modifier
             .fillMaxSize()
             .focusProperties { onExit = { FocusRequester.Cancel } }
+            // Should a D-pad move still get out onto the side menu, bring
+            // focus straight back to where it was in the panel.
+            .onFocusChanged { state ->
+                if (state.hasFocus) hadFocus = true
+                // Two frames later, and only while the panel is still up: a
+                // panel closing hands focus on and must keep it there.
+                else if (hadFocus && !closing) reclaimScope.launch {
+                    androidx.compose.runtime.withFrameNanos { }
+                    // Two frames: the first runs before a closing panel is removed.
+                    androidx.compose.runtime.withFrameNanos { }
+                    runCatching { panelFocus.requestFocus() }
+                }
+            }
             .background(Color.Black.copy(alpha = 0.7f)),
         contentAlignment = Alignment.Center,
     ) {
@@ -817,6 +839,7 @@ fun SidePanelOverlay(title: String, onDismiss: () -> Unit, content: @Composable 
                 .background(JellioBgElevated)
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .focusRequester(panelFocus)
+                .focusRestorer()
                 .focusGroup()
                 .verticalScroll(rememberScrollState())
                 // Room for a focused button to grow without being cut off.

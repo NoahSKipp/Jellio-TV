@@ -36,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -43,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,26 +92,52 @@ fun AccountSwitcherOverlay(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     LaunchedEffect(session.userId) { viewModel.load(session) }
-    BackHandler(onBack = onDismiss)
+    // Set on the way out, so focus handed back to the screen isn't
+    // pulled into the closing panel again.
+    var closing by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val close: () -> Unit = {
+        closing = true
+        onDismiss()
+    }
+    BackHandler(onBack = close)
 
     // Real bug every other real overlay in this app already had to fix
     // the same real way: claim initial D-pad focus on open, and trap
     // exit so it cannot wander back out into whatever real screen sits
     // behind this scrim.
     val viewProfileFocusRequester = remember { FocusRequester() }
+    val panelFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { viewProfileFocusRequester.requestFocus() }
+    var hadFocus by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val reclaimScope = androidx.compose.runtime.rememberCoroutineScope()
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .dismissOnBack(onDismiss)
+            .dismissOnBack(close)
             .background(Color.Black.copy(alpha = 0.7f))
             // A tap outside closes it; not clickable, which would make the
             // scrim itself a focus stop.
-            .pointerInput(Unit) { detectTapGestures { onDismiss() } }
+            .pointerInput(Unit) { detectTapGestures { close() } }
             // onExit only traps focus on a focus group; without it D-pad
             // moves walked out onto the screen underneath.
             .focusProperties { onExit = { FocusRequester.Cancel } }
+            // Should a D-pad move still get out onto the side menu, bring
+            // focus straight back to where it was in the panel.
+            .onFocusChanged { state ->
+                if (state.hasFocus) {
+                    hadFocus = true
+                } else if (hadFocus && !closing) {
+                    // Two frames later, and only while the panel is still up.
+                    reclaimScope.launch {
+                        androidx.compose.runtime.withFrameNanos { }
+                        // Two frames: the first runs before a closing panel is removed.
+                        androidx.compose.runtime.withFrameNanos { }
+                        runCatching { panelFocusRequester.requestFocus() }
+                            .onFailure { runCatching { viewProfileFocusRequester.requestFocus() } }
+                    }
+                }
+            }
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
@@ -117,7 +147,10 @@ fun AccountSwitcherOverlay(
                 .wrapContentHeight()
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(32.dp)
-                .pointerInput(Unit) { detectTapGestures { } },
+                .pointerInput(Unit) { detectTapGestures { } }
+                .focusRequester(panelFocusRequester)
+                .focusRestorer()
+                .focusGroup(),
         ) {
             // Real components/accountSwitcher.js's own header: the
             // signed in reader's own avatar/name plus View Profile/
@@ -141,7 +174,7 @@ fun AccountSwitcherOverlay(
                         modifier = Modifier.padding(top = 8.dp),
                     ) {
                         Surface(
-                            onClick = { onDismiss(); onViewProfile() },
+                            onClick = { close(); onViewProfile() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(
                                 containerColor = JellioBg,
@@ -154,7 +187,7 @@ fun AccountSwitcherOverlay(
                             Text(text = com.jellio.tv.ui.i18n.string("settings_view_profile"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
-                            onClick = { onDismiss(); onOpenSettings() },
+                            onClick = { close(); onOpenSettings() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(
                                 containerColor = JellioBg,
@@ -166,7 +199,7 @@ fun AccountSwitcherOverlay(
                             Text(text = com.jellio.tv.ui.i18n.string("nav_settings"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
-                            onClick = { onDismiss(); onOpenGroupWatch() },
+                            onClick = { close(); onOpenGroupWatch() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(
                                 containerColor = JellioBg,
@@ -178,7 +211,7 @@ fun AccountSwitcherOverlay(
                             Text(text = com.jellio.tv.ui.i18n.string("nav_group_watch"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                         }
                         Surface(
-                            onClick = { onDismiss(); onOpenNotifications() },
+                            onClick = { close(); onOpenNotifications() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = ClickableSurfaceDefaults.colors(
                                 containerColor = JellioBg,
@@ -194,7 +227,7 @@ fun AccountSwitcherOverlay(
                             )
                         }
                         Surface(
-                            onClick = onSignOut,
+                            onClick = { closing = true; onSignOut() },
                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                             colors = com.jellio.tv.ui.common.dangerButtonColors(),
                         ) {
@@ -252,11 +285,11 @@ fun AccountSwitcherOverlay(
                             name = user.Name.orEmpty(),
                             imageUrl = user.Id?.let { viewModel.avatarUrl(session, it, user.PrimaryImageTag) },
                             busy = uiState.busyUserId == user.Id,
-                            onClick = { viewModel.selectPublicUser(session, user, onNeedsPassword = onSignOut) },
+                            onClick = { viewModel.selectPublicUser(session, user, onNeedsPassword = { closing = true; onSignOut() }) },
                         )
                     }
                     item(key = "add") {
-                        SwitcherTile(name = com.jellio.tv.ui.i18n.string("auth_other_user"), imageUrl = null, busy = false, onClick = onSignOut, isAddTile = true)
+                        SwitcherTile(name = com.jellio.tv.ui.i18n.string("auth_other_user"), imageUrl = null, busy = false, onClick = { closing = true; onSignOut() }, isAddTile = true)
                     }
                 }
             }
