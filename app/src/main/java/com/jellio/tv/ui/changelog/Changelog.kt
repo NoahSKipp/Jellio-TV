@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Event
@@ -104,6 +105,17 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "0.64.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.64.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Smoother Playback Screen", "The player no longer redraws all of its controls twice a second while a title plays, so the remote stays responsive on slower TVs and sticks."),
+            ChangelogFeature(Icons.Filled.Translate, "More of the App Translated", "Player menus and messages, Calendar, Feed, your profile, the overscan setup and update notices now follow your language instead of always showing English."),
+            ChangelogFeature(Icons.Filled.Tune, "Simpler Seek Bar", "The thumbnail preview while scrubbing has been removed."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Lighter App", "Unused code, translations and libraries are gone and network connections are shared, so the app is smaller and uses less memory."),
+        ),
+    ),
     ChangelogRelease(
         version = "0.64.2",
         title = "What's New in Jellio TV",
