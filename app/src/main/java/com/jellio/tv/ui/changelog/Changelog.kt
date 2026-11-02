@@ -1952,10 +1952,6 @@ object ChangelogPrefs {
         prefs.edit().putString(KEY_LAST_SEEN, version).apply()
     }
 
-    fun clearPreviousChangelogs(context: Context) {
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit().remove(KEY_LAST_SEEN).apply()
-    }
 }
 
 // Centered modal popup shown on initial open following a major update,

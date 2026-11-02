@@ -33,11 +33,6 @@ object OnboardingPrefs {
         }
     }
 
-    fun isInitialInstall(context: Context): Boolean {
-        val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return sp.getBoolean(KEY_INITIAL_INSTALL, false)
-    }
-
     fun shouldShowOnboarding(context: Context, userId: String?): Boolean {
         if (userId.isNullOrBlank()) return false
         val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -61,9 +56,4 @@ object OnboardingPrefs {
             .apply()
     }
 
-    fun resetOnboarding(context: Context, userId: String?) {
-        if (userId.isNullOrBlank()) return
-        val sp = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        sp.edit().remove("$KEY_DONE_PREFIX$userId").apply()
-    }
 }

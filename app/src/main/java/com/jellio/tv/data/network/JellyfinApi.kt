@@ -590,15 +590,6 @@ interface JellyfinApi {
     @GET("Jellio/achievements/{userId}")
     suspend fun getAchievements(@Path("userId") userId: String): AchievementsDto
 
-    // Real Controllers/ProfileBannerController.cs endpoints: upload
-    // mirrors uploadUserAvatar above exactly (same real base64 body/
-    // Content-Type convention, that controller's own header confirms
-    // runtime/api.js's own uploadUserAvatarBlob already works
-    // unchanged against it), no native Jellyfin image slot exists for
-    // a banner at all.
-    @POST("Jellio/profile/banner")
-    suspend fun uploadProfileBanner(@Body body: RequestBody)
-
     @DELETE("Jellio/profile/banner")
     suspend fun deleteProfileBanner()
 

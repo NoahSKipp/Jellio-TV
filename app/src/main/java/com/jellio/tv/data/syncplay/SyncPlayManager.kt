@@ -309,8 +309,6 @@ class SyncPlayManager @Inject constructor(
         pendingCreateUntil = System.currentTimeMillis() + 15_000L
     }
 
-    fun isMine(groupId: String?): Boolean = sameId(groupId, _group.value?.groupId ?: myGroupId)
-
     suspend fun leave() {
         explicitLeaveUntil = System.currentTimeMillis() + EXPLICIT_LEAVE_GRACE_MS
         myGroupId = null

@@ -109,10 +109,4 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun uploadBanner(bytes: ByteArray, contentType: String) {
-        viewModelScope.launch {
-            runCatching { repository.setProfileBannerFromBytes(bytes, contentType) }
-                .onSuccess { _uiState.value = _uiState.value.copy(bannerBustToken = System.currentTimeMillis()) }
-        }
-    }
 }

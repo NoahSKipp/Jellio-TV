@@ -27,8 +27,6 @@ sealed interface PlayAction {
     data class ShowPicker(val item: BaseItemDto) : PlayAction
 }
 
-data class SeasonUiState(val season: BaseItemDto, val episodes: List<BaseItemDto> = emptyList())
-
 data class DetailUiState(
     val isLoading: Boolean = true,
     val item: BaseItemDto? = null,

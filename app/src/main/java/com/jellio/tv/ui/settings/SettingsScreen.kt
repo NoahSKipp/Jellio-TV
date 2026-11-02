@@ -1010,14 +1010,6 @@ private fun SettingsActionRow(
     }
 }
 
-@Composable
-private fun SettingsRow(label: String, value: String) {
-    Column(modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp)) {
-        Text(text = label, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
-        Text(text = value, color = JellioText, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
 // The web settings' toggle: a pill track with a sliding thumb.
 @Composable
 private fun SettingsSwitch(checked: Boolean) {

@@ -18,7 +18,6 @@ import com.jellio.tv.data.model.SetBioRequest
 import com.jellio.tv.data.model.SetPrivacyRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
-import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
@@ -77,14 +76,11 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags,Overview"
 
 // Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
-// real metadata a plain row/grid fetch never asks for. Trickplay only for
-// the player: the server looks it up per stream version, which for a
-// Gelato title made opening its page far slower than on web.
+// real metadata a plain row/grid fetch never asks for.
 internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
 private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks,PremiereDate,CommunityRating,BackdropImageTags," +
     "ParentBackdropItemId,ParentBackdropImageTags"
-internal const val PLAYER_DETAIL_FIELDS = "$DETAIL_FIELDS,Trickplay"
 
 // Two distinct real patterns, same distinction navShared.js's own
 // getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
@@ -978,11 +974,6 @@ class JellioRepository @Inject constructor(
             preloaded[itemId] = System.currentTimeMillis() to it
         }
 
-    suspend fun getTrickplayInfo(userId: String, itemId: String, mediaSourceId: String?): TrickplayInfoDto? =
-        cache.get("trickplay:$itemId", CACHE_TTL_MS) {
-            fetchItemInfo(userId, itemId, "Trickplay")
-        }.let { pickTrickplayInfo(it, mediaSourceId) }
-
     // Full details fetched while the viewer rests on a card, so the title
     // page can open complete; fresh for a minute, the page still refreshes.
     private val preloaded = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
@@ -1355,7 +1346,6 @@ class JellioRepository @Inject constructor(
         return result
     }
 
-
     // Live TV. Opening a channel holds one of the tuner slots until
     // closeLiveStream; the player always closes what it opened.
     suspend fun getLiveChannels(userId: String): List<com.jellio.tv.data.model.LiveChannelDto> =
@@ -1667,17 +1657,6 @@ class JellioRepository @Inject constructor(
     suspend fun reportRealDuration(itemId: String, durationTicks: Long) =
         api.reportRealDuration(ReportDurationRequest(itemId, durationTicks))
 
-    // Real port of the same real uploadUserAvatarBlob() shape
-    // setUserAvatarFromBytes() above already uses, pointed at
-    // ProfileBannerController.cs's own upload route instead.
-    suspend fun setProfileBannerFromBytes(bytes: ByteArray, contentType: String) {
-        val body = withContext(Dispatchers.Default) {
-            val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-            base64.toRequestBody(contentType.toMediaTypeOrNull())
-        }
-        api.uploadProfileBanner(body)
-    }
-
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
     suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
@@ -1797,22 +1776,12 @@ class JellioRepository @Inject constructor(
         id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
 
     // Token goes on as an ApiKey query param, same real reason
-    // getStreamUrl/getTrickplayUrl already do this: AvatarsController's
+    // getStreamUrl already does this: AvatarsController's
     // [Authorize] gate has nothing to check on a plain Coil AsyncImage
     // request, which never carries this app's own X-Emby-Authorization
     // header the way a Retrofit call does.
     fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
         "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?ApiKey=$accessToken&api_key=$accessToken"
-
-    // Real screens/settings.js's own navigateTo('#/dashboard'): that
-    // file's own real hash just moves an already loaded jellyfin-web
-    // page onto its own real dashboard route rather than fetching a
-    // real new page, nothing this app has a WebView open for. Same
-    // real hash, handed to a device browser instead, the same real
-    // fallback discipline every other unmigrated route already gets
-    // (this app's own version of it: launched fresh rather than
-    // showing through underneath, since there is no underneath here).
-    fun adminDashboardUrl(serverAddress: String): String = "$serverAddress/web/index.html#/dashboard"
 
     // Real port of runtime/api.js's own setUserAvatar(presetId): fetch
     // that preset's own real bytes off Jellio's own AvatarsController,
@@ -1999,29 +1968,6 @@ class JellioRepository @Inject constructor(
     // Real port of runtime/api.js's own getAudioStreams().
     fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =
         mediaSource.MediaStreams?.filter { it.Type == "Audio" } ?: emptyList()
-
-    // Real port of runtime/api.js's own pickTrickplayInfo(): the
-    // smallest real generated width for this MediaSourceId, same real
-    // reasoning that function's own comment documents (a scrub preview
-    // reads at a glance, not full detail, and a small real sheet is the
-    // cheaper real download on every seek). Width folded into the
-    // returned value the same way that function's own
-    // Object.assign({ Width: widths[0] }, ...) does, real key taking
-    // priority over whatever that sheet's own value already carried.
-    fun pickTrickplayInfo(item: BaseItemDto, mediaSourceId: String?): TrickplayInfoDto? {
-        val bySource = item.Trickplay?.get(mediaSourceId) ?: return null
-        val width = bySource.keys.mapNotNull { it.toIntOrNull() }.minOrNull() ?: return null
-        val info = bySource[width.toString()] ?: return null
-        return info.copy(Width = width)
-    }
-
-    // Real endpoint, GET /Videos/{itemId}/Trickplay/{width}/{index}.jpg
-    // (TrickplayController.cs's own GetTrickplayTileImage), confirmed
-    // against runtime/api.js's own getTrickplayTileUrl(): index is a
-    // real tile sheet's own position, several real thumbnails packed
-    // into one sheet, not a single thumbnail's own index.
-    fun trickplayTileUrl(serverAddress: String, accessToken: String, itemId: String, mediaSourceId: String?, width: Int, tileIndex: Int): String =
-        "$serverAddress/Videos/$itemId/Trickplay/$width/$tileIndex.jpg?ApiKey=$accessToken&api_key=$accessToken&mediaSourceId=${mediaSourceId ?: itemId}"
 
     private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
         val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
