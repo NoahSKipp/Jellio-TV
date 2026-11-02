@@ -12,10 +12,6 @@ fun greetingFor(hour: Int): String = when {
 fun greetingText(hour: Int, name: String?): String {
     val greeting = greetingFor(hour)
     if (name.isNullOrEmpty()) return greeting
-    val night = Strings.get("home_greeting_night")
-    return if (greeting == night) {
-        if (greeting.endsWith("?")) "$name, $greeting" else "$greeting, $name?"
-    } else {
-        "$greeting, $name"
-    }
+    val question = Regex("\\s?\\?$").find(greeting) ?: return "$greeting, $name"
+    return greeting.substring(0, question.range.first) + ", " + name + question.value
 }
