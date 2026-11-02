@@ -122,7 +122,7 @@ private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 // cast neighbours barely change, so Home refreshes reuse them.
 private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
 
-private class TtlCache {
+internal class TtlCache {
     private data class Entry(val value: Any?, val expiresAt: Long)
     private val entries = ConcurrentHashMap<String, Entry>()
     private val locks = ConcurrentHashMap<String, Mutex>()
@@ -154,15 +154,15 @@ private class TtlCache {
 
 @Singleton
 class JellioRepository @Inject constructor(
-    private val api: JellyfinApi,
-    private val sessionManager: SessionManager,
+    internal val api: JellyfinApi,
+    internal val sessionManager: SessionManager,
     private val rememberedUsersStore: RememberedUsersStore,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
 
     // One device id on every request, so Jellyfin lists a single device and session per TV.
     val deviceId: String get() = sessionManager.getCachedDeviceId()
-    private val cache = TtlCache()
+    internal val cache = TtlCache()
 
     private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -1034,157 +1034,6 @@ class JellioRepository @Inject constructor(
             }
         }
         return result
-    }
-
-    // Live TV. Opening a channel holds one of the tuner slots until
-    // closeLiveStream; the player always closes what it opened.
-    suspend fun getLiveChannels(userId: String): List<com.jellio.tv.data.model.LiveChannelDto> =
-        cache.get("live:channels:$userId", 60_000L) { api.getLiveChannels(userId).Items }
-
-    fun invalidateLiveChannels(userId: String) = cache.invalidatePrefix("live:channels:$userId")
-
-    // Ids of channels that failed to start for anyone recently; empty when
-    // the server can't say.
-    suspend fun getBrokenLiveChannels(): Set<String> =
-        runCatching { cache.get("live:health", 60_000L) { api.getLiveHealth().keys } }.getOrDefault(emptySet())
-
-    suspend fun reportLiveChannel(channelId: String, ok: Boolean, error: String?) {
-        cache.invalidatePrefix("live:health")
-        runCatching { api.reportLiveChannel(channelId, com.jellio.tv.data.model.LiveChannelReportDto(ok, error?.take(60))) }
-    }
-
-    suspend fun reportLiveWatching(body: com.jellio.tv.data.model.LiveWatchingDto) {
-        runCatching { api.reportLiveWatching(body) }
-    }
-
-    suspend fun stopLiveWatching() {
-        runCatching { api.stopLiveWatching() }
-    }
-
-    suspend fun reportStreamLinkPlay(linkId: String, ok: Boolean) {
-        runCatching { api.reportStreamLinkPlay(linkId, com.jellio.tv.data.model.StreamLinkPlayReportDto(ok)) }
-    }
-
-    suspend fun getLivePrograms(userId: String, channelId: String, fromMs: Long, untilMs: Long): List<com.jellio.tv.data.model.LiveProgramDto> =
-        api.getLivePrograms(
-            com.jellio.tv.data.model.LiveProgramsRequest(
-                UserId = userId,
-                ChannelIds = listOf(channelId),
-                MinEndDate = java.time.Instant.ofEpochMilli(fromMs).toString(),
-                MaxStartDate = java.time.Instant.ofEpochMilli(untilMs).toString(),
-            ),
-        ).Items
-
-    suspend fun openLiveChannel(userId: String, channelId: String): OpenedLiveStream {
-        val profile = com.jellio.tv.data.model.LiveDeviceProfile(
-            DirectPlayProfiles = listOf(
-                com.jellio.tv.data.model.LiveDirectPlayProfile(
-                    Container = "ts,mpegts,m2ts",
-                    VideoCodec = "h264,hevc,mpeg2video",
-                    AudioCodec = "aac",
-                ),
-            ),
-            TranscodingProfiles = listOf(
-                com.jellio.tv.data.model.LiveTranscodingProfile(
-                    Container = "ts",
-                    VideoCodec = "h264",
-                    AudioCodec = "aac",
-                    MaxAudioChannels = "6",
-                    MinSegments = 1,
-                    BreakOnNonKeyFrames = true,
-                ),
-            ),
-        )
-        val response = api.openLiveChannel(channelId, userId, com.jellio.tv.data.model.LivePlaybackInfoRequest(userId, DeviceProfile = profile))
-        response.ErrorCode?.let { throw IllegalStateException(it) }
-        val source = response.MediaSources.firstOrNull() ?: throw IllegalStateException("No playable live stream")
-        val liveStreamId = source.LiveStreamId ?: throw IllegalStateException("No live stream was opened")
-        val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
-        val transcoding = source.TranscodingUrl
-        if (!transcoding.isNullOrBlank() && source.SupportsDirectPlay != true) {
-            val path = if (transcoding.startsWith("/")) transcoding else "/$transcoding"
-            return OpenedLiveStream(
-                channelId, liveStreamId, server + path,
-                androidx.media3.common.MimeTypes.APPLICATION_M3U8, null, null, response.PlaySessionId,
-            )
-        }
-        val url = server + "/Videos/" + channelId + "/stream?static=true" +
-            "&mediaSourceId=" + java.net.URLEncoder.encode(source.Id ?: channelId, "UTF-8") +
-            "&liveStreamId=" + java.net.URLEncoder.encode(liveStreamId, "UTF-8") +
-            "&DeviceId=" + java.net.URLEncoder.encode(sessionManager.getCachedDeviceId(), "UTF-8")
-        return OpenedLiveStream(channelId, liveStreamId, url)
-    }
-
-    suspend fun closeLiveStream(liveStreamId: String, playSessionId: String? = null) {
-        runCatching { api.closeLiveStream(liveStreamId) }
-        // A transcode keeps reading the channel after the live stream closes, and a
-        // provider that allows one connection would refuse the next channel meanwhile.
-        if (!playSessionId.isNullOrBlank()) {
-            runCatching { api.stopEncoding(sessionManager.getCachedDeviceId(), playSessionId) }
-        }
-    }
-
-    suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto> = streamLinkCall { api.getStreamLinks() }
-
-    // Plays the link itself first (lighter on the server); the signed
-    // proxy address is the fallback when the TV can't reach it directly.
-    suspend fun playStreamLink(channelId: String, linkId: String, entry: Int?): OpenedLiveStream {
-        val info = streamLinkCall { api.playStreamLink(linkId, entry) }
-        val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
-        val proxy = info.ProxyPath?.let { "$server/$it" }
-        val mime = when (info.Format) {
-            "hls" -> androidx.media3.common.MimeTypes.APPLICATION_M3U8
-            "ts" -> androidx.media3.common.MimeTypes.VIDEO_MP2T
-            "mp4" -> androidx.media3.common.MimeTypes.VIDEO_MP4
-            else -> null
-        }
-        val direct = info.DirectUrl
-        if (direct.isNullOrBlank()) {
-            return OpenedLiveStream(channelId, null, proxy ?: throw StreamLinkException("no_stream_found"), mime, emptyMap())
-        }
-        val headers = buildMap {
-            info.UserAgent?.let { put("User-Agent", it) }
-            info.Referer?.let {
-                put("Referer", it)
-                runCatching { java.net.URI(it) }.getOrNull()?.let { uri -> put("Origin", uri.scheme + "://" + uri.authority) }
-            }
-        }
-        return OpenedLiveStream(channelId, null, direct, mime, headers, proxy)
-    }
-
-    suspend fun removeStreamLink(id: String) {
-        streamLinkCall { api.removeStreamLink(id) }
-    }
-
-    suspend fun removeStreamLinkEntry(id: String, index: Int) {
-        streamLinkCall { api.removeStreamLinkEntry(id, index) }
-    }
-
-    suspend fun refreshStreamLink(id: String) {
-        streamLinkCall { api.refreshStreamLink(id) }
-    }
-
-    suspend fun createStreamPairing(): com.jellio.tv.data.model.StreamPairingDto = streamLinkCall { api.createStreamPairing() }
-
-    // Null once the code has expired.
-    suspend fun streamPairingStatus(code: String): com.jellio.tv.data.model.StreamPairingStatusDto? {
-        val response = api.streamPairingStatus(code)
-        if (response.code() == 404) return null
-        return response.body()
-    }
-
-    private suspend fun <T> streamLinkCall(block: suspend () -> T): T = try {
-        block()
-    } catch (err: retrofit2.HttpException) {
-        val body = runCatching { err.response()?.errorBody()?.string() }.getOrNull().orEmpty()
-        val code = Regex("\"[Ee]rror\"\\s*:\\s*\"([a-z_]+)\"").find(body)?.groupValues?.get(1)
-        throw StreamLinkException(code ?: if (err.code() == 404) "not_found" else "failed")
-    }
-
-    suspend fun setChannelFavorite(userId: String, channelId: String, favorite: Boolean): Boolean {
-        val result = if (favorite) api.addFavorite(userId, channelId) else api.removeFavorite(userId, channelId)
-        invalidateLiveChannels(userId)
-        return result.IsFavorite
     }
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
