@@ -12,7 +12,6 @@ import com.jellio.tv.data.playback.TranscodeReason
 import com.jellio.tv.data.playback.VideoTranscodePolicy
 import com.jellio.tv.data.playback.videoInfoOf
 import com.jellio.tv.data.model.SubtitleStyle
-import com.jellio.tv.data.model.TrickplayInfoDto
 import com.jellio.tv.data.prefs.SubtitleStylePreferences
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -86,22 +85,6 @@ data class EpisodePanelEntry(
     val episodeCode: String?,
     val rating: String?,
     val overview: String?,
-)
-
-// Real port of screens/player.js's own showScrubPreview(): tileUrl one
-// real sheet, col/row that sheet's own cell this exact millisecond
-// falls in, frameWidth/frameHeight one real cell's own pixel size,
-// sheetWidth/sheetHeight the whole real sheet's own pixel size, same
-// real values that function's own backgroundSize/backgroundPosition
-// CSS math already needs.
-data class TrickplayFrame(
-    val tileUrl: String,
-    val col: Int,
-    val row: Int,
-    val frameWidth: Int,
-    val frameHeight: Int,
-    val sheetWidth: Int,
-    val sheetHeight: Int,
 )
 
 // Real port of screens/player.js's own audioStreamLabel(): a real
@@ -204,11 +187,6 @@ data class PlayerUiState(
     val selectedSeasonId: String? = null,
     val episodes: List<EpisodePanelEntry> = emptyList(),
     val isLoadingEpisodes: Boolean = false,
-    // True only when this MediaSource actually carries a real
-    // generated Trickplay sheet, same real gate screens/player.js's
-    // own pickTrickplayInfo() != null already checks before that
-    // file's own scrub preview ever gets built at all.
-    val hasTrickplay: Boolean = false,
     // Real port of screens/player.js's own showPlayerToast(): a short
     // lived status/error line surfacing failures the four re-
     // negotiating actions below already had no visible feedback for.
@@ -443,15 +421,7 @@ class PlayerViewModel @Inject constructor(
     private var loadedItemId: String? = null
     private var itemId: String? = null
     private var mediaSourceIdParam: String? = null
-    // Picked once here, same real reasoning switchSource() above never
-    // rebuilds its own scrub preview handlers either (screens/player.js
-    // has no equivalent recompute step for a source that switches out
-    // from under an already built one), not kept in sync with a later
-    // source switch.
-    private var trickplaySession: Session? = null
-    private var trickplayInfo: TrickplayInfoDto? = null
-    private var trickplayMediaSourceId: String? = null
-    private var trickplayRequestedForSourceId: String? = null
+    private var playbackSession: Session? = null
     private var toastSeq = 0L
 
     fun showToast(message: String) {
@@ -645,10 +615,7 @@ class PlayerViewModel @Inject constructor(
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 val resumePercent = item.UserData?.PlayedPercentage?.takeIf { startTicks > 0 && !fromFailover }?.roundToInt()
 
-                trickplaySession = session
-                trickplayInfo = null
-                trickplayMediaSourceId = target.mediaSource.Id
-                trickplayRequestedForSourceId = null
+                playbackSession = session
 
                 _uiState.value = PlayerUiState(
                     expectedRuntimeMs = expectedRuntimeMs,
@@ -656,7 +623,6 @@ class PlayerViewModel @Inject constructor(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
-                    hasTrickplay = false,
                     resumePercent = resumePercent,
                     title = if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty(),
                     subtitle = if (isEpisode) episodeCode + item.Name.orEmpty() else "",
@@ -1265,54 +1231,10 @@ class PlayerViewModel @Inject constructor(
         )
     }
 
-    // Real port of screens/player.js's own showScrubPreview(): the same
-    // real thumbnailIndex/tileIndex/col/row math that function's own
-    // CSS backgroundSize/backgroundPosition needs, called here on
-    // demand (a plain synchronous computation, no real network call of
-    // its own beyond the tile image URL PlayerScreen's own AsyncImage
-    // then fetches) rather than on a real mousemove listener this
-    // Android TV remote has no equivalent input for; PlayerScreen calls
-    // this after every D-pad seek instead, the closest real TV native
-    // reading of "show a preview of where this seek is about to land."
-    fun trickplayFrame(positionMs: Long): TrickplayFrame? {
-        val info = trickplayInfo ?: return null
-        val session = trickplaySession ?: return null
-        val id = itemId ?: return null
-        val hoveredMs = positionMs.toDouble()
-        val thumbsPerTile = maxOf(1, info.TileWidth * info.TileHeight)
-        val thumbnailIndex = maxOf(0, (hoveredMs / info.Interval).toInt())
-        val tileIndex = thumbnailIndex / thumbsPerTile
-        val indexInTile = thumbnailIndex % thumbsPerTile
-        val col = indexInTile % info.TileWidth
-        val row = indexInTile / info.TileWidth
-        val tileUrl = repository.trickplayTileUrl(
-            session.serverAddress,
-            session.accessToken,
-            id,
-            trickplayMediaSourceId,
-            info.Width,
-            tileIndex,
-        )
-        return TrickplayFrame(
-            tileUrl = tileUrl,
-            col = col,
-            row = row,
-            frameWidth = info.Width,
-            frameHeight = info.Height,
-            sheetWidth = info.TileWidth * info.Width,
-            sheetHeight = info.TileHeight * info.Height,
-        )
-    }
-
     fun reportStart(positionTicks: Long) {
         val id = itemId ?: return
         currentSource?.let { BadStreams.unmark(id, it) }
         val sourceId = uiState.value.mediaSourceId
-        val session = trickplaySession
-        if (session != null && trickplayRequestedForSourceId != sourceId) {
-            trickplayRequestedForSourceId = sourceId
-            loadTrickplayDuringPlayback(session, id, sourceId)
-        }
         viewModelScope.launch { repository.reportPlaybackStart(id, sourceId, positionTicks) }
     }
 
@@ -1361,18 +1283,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun loadTrickplayDuringPlayback(session: Session, itemId: String, mediaSourceId: String?) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val info = runCatching { repository.getTrickplayInfo(session.userId, itemId, mediaSourceId) }.getOrNull()
-            if (info != null && this@PlayerViewModel.itemId == itemId) {
-                trickplaySession = session
-                trickplayInfo = info
-                trickplayMediaSourceId = mediaSourceId
-                _uiState.value = _uiState.value.copy(hasTrickplay = true)
-            }
-        }
-    }
-
     // The next episode's stream list and playback targets, pre-warmed once when
     // its Up Next card appears so autoplay starts instantaneously without delay.
     fun preloadUpNextSources(session: Session) {
@@ -1410,7 +1320,7 @@ class PlayerViewModel @Inject constructor(
         if (hasCreditedRealWatch) return
         hasCreditedRealWatch = true
         val id = itemId ?: return
-        val userId = trickplaySession?.userId ?: return
+        val userId = playbackSession?.userId ?: return
         viewModelScope.launch { runCatching { repository.creditRealWatch(id) } }
         viewModelScope.launch { runCatching { repository.setPlayed(userId, id, true) } }
     }

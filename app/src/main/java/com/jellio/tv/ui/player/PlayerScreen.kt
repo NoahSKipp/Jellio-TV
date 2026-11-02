@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -298,8 +297,6 @@ fun PlayerScreen(
                 seasons = uiState.seasons,
                 selectedSeasonId = uiState.selectedSeasonId,
                 episodes = uiState.episodes,
-                hasTrickplay = uiState.hasTrickplay,
-                onComputeTrickplayFrame = { positionMs -> viewModel.trickplayFrame(positionMs) },
                 toastMessage = uiState.toastMessage,
                 toastId = uiState.toastId,
                 onDismissToast = { id -> viewModel.clearToast(id) },
@@ -423,8 +420,6 @@ private fun PlayerSurface(
     seasons: List<BaseItemDto>,
     selectedSeasonId: String?,
     episodes: List<EpisodePanelEntry>,
-    hasTrickplay: Boolean,
-    onComputeTrickplayFrame: (Long) -> TrickplayFrame?,
     toastMessage: String?,
     toastId: Long,
     onDismissToast: (Long) -> Unit,
@@ -847,8 +842,6 @@ private fun PlayerSurface(
     var showSourcePanel by remember { mutableStateOf(false) }
     var showEpisodesPanel by remember { mutableStateOf(false) }
     var showReactMenu by remember { mutableStateOf(false) }
-    var scrubFrame by remember { mutableStateOf<TrickplayFrame?>(null) }
-    var scrubPositionMs by remember { mutableStateOf<Long?>(null) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
     var seekedToResume by remember(player) { mutableStateOf(directPlay && startPositionTicks > 0) }
     var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
@@ -1180,8 +1173,6 @@ private fun PlayerSurface(
     // equivalent to a mouse actually leaving the seek bar.
     LaunchedEffect(controlsVisible) {
         if (!controlsVisible) {
-            scrubFrame = null
-            scrubPositionMs = null
             // The focused button just left; keep the remote on the player.
             focusRequester.requestFocus()
         }
@@ -1322,8 +1313,6 @@ private fun PlayerSurface(
                         if (controlsVisible) return@onKeyEvent false
                         togglePlay()
                         controlsVisible = true
-                        scrubFrame = null
-                        scrubPositionMs = null
                         true
                     }
                     Key.DirectionUp, Key.DirectionDown -> {
@@ -1445,22 +1434,14 @@ private fun PlayerSurface(
                 hasAudioTracks = true,
                 hasSourceOptions = sourceOptions.size > 1,
                 hasEpisodes = seasons.isNotEmpty(),
-                scrubFrame = scrubFrame,
-                scrubPositionMs = scrubPositionMs,
                 speedLabel = formatSpeed(playbackSpeed),
                 sleepTimerActive = sleepTimerEndTimeMs != null || EpisodeSleepTimer.remaining != null,
                 onPlayPause = { togglePlay() },
                 onSkip = { deltaMs ->
                     userSeek(seekTarget(positionMs, deltaMs, shownDurationMs))
                 },
-                onScrub = { target ->
-                    scrubPositionMs = target
-                    scrubFrame = if (hasTrickplay) onComputeTrickplayFrame(target) else null
-                },
                 onScrubEnd = { target ->
                     if (target != null) userSeek(target)
-                    scrubFrame = null
-                    scrubPositionMs = null
                 },
                 onOpenSubtitleMenu = { showSubtitleMenu = true },
                 onOpenSpeedMenu = { showSpeedMenu = true },
@@ -1728,14 +1709,11 @@ private fun PlayerControls(
     hasAudioTracks: Boolean,
     hasSourceOptions: Boolean,
     hasEpisodes: Boolean,
-    scrubFrame: TrickplayFrame?,
-    scrubPositionMs: Long?,
     speedLabel: String,
     sleepTimerActive: Boolean,
     enabled: Boolean = true,
     onPlayPause: () -> Unit,
     onSkip: (Long) -> Unit,
-    onScrub: (Long) -> Unit,
     onScrubEnd: (Long?) -> Unit,
     onOpenSubtitleMenu: () -> Unit,
     onOpenSpeedMenu: () -> Unit,
@@ -1797,27 +1775,9 @@ private fun PlayerControls(
                 )
             }
             Spacer(modifier = Modifier.height(14.dp))
-            // Real port of screens/player.js's own scrubPreview: this
-            // Android TV remote has no real mousemove to hover the bar
-            // with, so the preview tracks the seek's own real landing
-            // spot instead (scrubPositionMs, set right after every
-            // D-pad seek above), positioned the same real way that
-            // file's own ratio * rect.width math does, just against
-            // this fraction-of-width trick instead of a pixel rect.
-            if (scrubFrame != null && scrubPositionMs != null && durationMs > 0) {
-                val scrubProgress = (scrubPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                Box(modifier = Modifier.fillMaxWidth(scrubProgress), contentAlignment = Alignment.CenterEnd) {
-                    TrickplayPreview(
-                        frame = scrubFrame,
-                        timeLabel = formatMs(scrubPositionMs),
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                }
-            }
             SeekBar(
                 positionMs = positionMs,
                 durationMs = durationMs,
-                onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 onPlayPause = onPlayPause,
             )
@@ -1936,7 +1896,6 @@ private fun TransportButton(
 private fun SeekBar(
     positionMs: () -> Long,
     durationMs: Long,
-    onScrub: (Long) -> Unit,
     onScrubEnd: (Long?) -> Unit,
     onPlayPause: () -> Unit,
 ) {
@@ -1968,7 +1927,6 @@ private fun SeekBar(
                             }
                             val next = ((target ?: positionMs()) + if (event.key == Key.DirectionRight) step else -step).coerceIn(0L, durationMs)
                             target = next
-                            onScrub(next)
                         } else if (event.type == KeyEventType.KeyUp) {
                             val landing = target
                             target = null
@@ -2056,49 +2014,6 @@ private fun PlayerPillButton(icon: androidx.compose.ui.graphics.vector.ImageVect
             Icon(imageVector = icon, contentDescription = label)
             Text(text = label, style = androidx.tv.material3.MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 2.dp))
         }
-    }
-}
-
-// Real port of screens/player.js's own scrub preview image: one real
-// cell of the tile sheet cropped out via an oversized AsyncImage offset
-// against a clipped frame-sized Box, the same real crop
-// backgroundSize/backgroundPosition does in CSS, raw Trickplay pixel
-// counts read directly as dp the same real way that file's own CSS
-// reads them as px, no per-device density lookup either side bothers
-// with for a scrub thumbnail this rough.
-private const val TRICKPLAY_DISPLAY_WIDTH_DP = 180f
-
-@Composable
-private fun TrickplayPreview(frame: TrickplayFrame, timeLabel: String, modifier: Modifier = Modifier) {
-    if (frame.frameWidth <= 0 || frame.frameHeight <= 0) return
-    val scale = TRICKPLAY_DISPLAY_WIDTH_DP / frame.frameWidth
-    val frameHeightDp = frame.frameHeight * scale
-    val sheetWidthDp = frame.sheetWidth * scale
-    val sheetHeightDp = frame.sheetHeight * scale
-    val offsetXDp = -(frame.col * frame.frameWidth * scale)
-    val offsetYDp = -(frame.row * frame.frameHeight * scale)
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .size(TRICKPLAY_DISPLAY_WIDTH_DP.dp, frameHeightDp.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.Black),
-        ) {
-            AsyncImage(
-                model = frame.tileUrl,
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier
-                    .size(sheetWidthDp.dp, sheetHeightDp.dp)
-                    .offset(offsetXDp.dp, offsetYDp.dp),
-            )
-        }
-        Text(
-            text = timeLabel,
-            color = JellioText,
-            modifier = Modifier.padding(top = 4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-        )
     }
 }
 
