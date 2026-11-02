@@ -171,8 +171,8 @@ class PlayerViewModel @Inject constructor(
     private fun sourceLabel(source: com.jellio.tv.data.model.MediaSourceDto): String =
         source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: "another stream"
 
-    private fun hasAudioLanguage(source: com.jellio.tv.data.model.MediaSourceDto, language: String): Boolean =
-        source.MediaStreams.orEmpty().any { it.Type == "Audio" && sameLanguage(it.Language, language) }
+    private fun streamLanguage(): String? =
+        preferredStreamLanguage(audioLanguagePreference, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code)
 
     fun streamFailed(session: Session, reason: String) {
         if (failingOver || syncPlay.group.value != null) return
@@ -255,18 +255,11 @@ class PlayerViewModel @Inject constructor(
             BadStreams.mark(id, source)
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-            val language = failoverLanguage
-                ?: state.audioTracks.firstOrNull { it.streamIndex == (state.selectedAudioStreamIndex ?: state.defaultAudioStreamIndex) }?.language
-                ?: source.MediaStreams.orEmpty().firstOrNull { it.Type == "Audio" }?.Language
-                ?: audioLanguagePreference
+            val language = failoverLanguage ?: streamLanguage()
             failoverLanguage = language
             val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "failover") }.getOrDefault(emptyList())
             val candidates = sources.filter { it.Id != null && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
-            fun pick(list: List<com.jellio.tv.data.model.MediaSourceDto>) = if (language != null) {
-                list.firstOrNull { hasAudioLanguage(it, language) } ?: list.firstOrNull()
-            } else {
-                list.firstOrNull()
-            }
+            fun pick(list: List<com.jellio.tv.data.model.MediaSourceDto>) = orderByLanguage(list, language).firstOrNull()
             // Avoid and Block try streams whose video can be copied first;
             // Block never falls back to one the server would re-encode.
             val policy = VideoTranscodePolicy
@@ -501,7 +494,6 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                currentSource = target.mediaSource
                 PlayStartTrace.mark(itemId, "stream url ready")
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
@@ -941,6 +933,7 @@ class PlayerViewModel @Inject constructor(
                     currentPositionTicks,
                 )
                 mediaSourceIdParam = target.mediaSource.Id
+                currentSource = target.mediaSource
                 val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 _uiState.value = _uiState.value.copy(
