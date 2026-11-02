@@ -73,15 +73,6 @@ private const val INVITE_NOTICE_MS = 12_000L
 // one answers the latest message from someone else.
 val GROUP_REACTIONS = com.jellio.tv.data.syncplay.PARTY_REACTIONS
 
-// 41:40, or 1:02:05 past an hour.
-fun partyClock(totalSeconds: Long): String {
-    val seconds = totalSeconds.coerceAtLeast(0L)
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    val sec = seconds % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
-}
-
 // A passing pop-up (a chat message, someone joining): never takes focus.
 data class GroupNotice(val id: Long, val title: String, val text: String)
 
@@ -131,13 +122,13 @@ class GroupWatchViewModel @Inject constructor(
             launch {
                 syncPlay.events.collect { event ->
                     when (event) {
-                        is GroupEvent.Presence -> notify("Group Watch", event.name + if (event.joined) " joined the group" else " left the group")
+                        is GroupEvent.Presence -> notify(com.jellio.tv.ui.i18n.Strings.get("nav_group_watch"), com.jellio.tv.ui.i18n.Strings.format(if (event.joined) "tv_group_joined" else "tv_group_left", event.name))
                         is GroupEvent.Started -> if (!isPlaying(event.target.itemId)) {
                             val name = itemName(session, event.target.itemId)
                             _prompt.value = GroupPrompt(
                                 title = com.jellio.tv.ui.i18n.Strings.get("nav_group_watch"),
-                                text = "The group started watching " + (name ?: "something"),
-                                actionLabel = "Join",
+                                text = com.jellio.tv.ui.i18n.Strings.format("tv_group_started", name ?: com.jellio.tv.ui.i18n.Strings.get("tv_something")),
+                                actionLabel = com.jellio.tv.ui.i18n.Strings.get("tv_join"),
                                 onAction = { openItem(event.target.itemId) },
                             )
                         }
@@ -163,7 +154,7 @@ class GroupWatchViewModel @Inject constructor(
             // whatever is on screen; Join waits in Group Watch and Notifications.
             notify(
                 com.jellio.tv.ui.i18n.Strings.get("groupwatch_invite_title"),
-                com.jellio.tv.ui.i18n.Strings.format("party_invite_toast", invite.FromUserName ?: "Someone", invite.GroupName ?: "Group Watch"),
+                com.jellio.tv.ui.i18n.Strings.format("party_invite_toast", invite.FromUserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), invite.GroupName ?: "Group Watch"),
                 INVITE_NOTICE_MS,
             )
         }
@@ -190,7 +181,7 @@ class GroupWatchViewModel @Inject constructor(
                         messages.filter { it.ItemId == null && !SyncPlayManager.sameId(it.UserId, session.userId) }
                             .forEach {
                                 party.noteIncoming(it)
-                                notify(it.UserName ?: "Someone", it.Text + replySuffix(it.ReplyToName))
+                                notify(it.UserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), it.Text + replySuffix(it.ReplyToName))
                             }
                     }
                     after = maxOf(after, messages.maxOfOrNull { it.Id } ?: 0L)
@@ -227,10 +218,10 @@ class GroupWatchViewModel @Inject constructor(
 
     // Host-only party: a guest asks the host, who gets Do it / Not now.
     private fun hostRequestPrompt(request: com.jellio.tv.data.model.PartyRequestDto) {
-        val name = request.UserName ?: "Someone"
+        val name = request.UserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone")
         val text = when {
             request.Kind == "seek" && request.PositionTicks != null ->
-                com.jellio.tv.ui.i18n.Strings.format("party_asks_seek", name, partyClock(request.PositionTicks / 10_000_000L))
+                com.jellio.tv.ui.i18n.Strings.format("party_asks_seek", name, com.jellio.tv.ui.common.formatPlaybackTime(request.PositionTicks / 10_000L))
             request.Kind == "pause" -> com.jellio.tv.ui.i18n.Strings.format("party_asks_pause", name)
             else -> com.jellio.tv.ui.i18n.Strings.format("party_asks_play", name)
         }
@@ -561,7 +552,7 @@ private fun PartyCard(
 
 private fun liveLines(party: com.jellio.tv.data.model.LivePartyDto): List<String> {
     val title = partyItemTitle(party.Item)
-    val position = party.PositionTicks?.let { partyClock(it / 10_000_000L) }
+    val position = party.PositionTicks?.let { com.jellio.tv.ui.common.formatPlaybackTime(it / 10_000L) }
     val status = listOfNotNull(title, partyStateLabel(party.State), position).joinToString(" · ")
     val people = party.Participants.joinToString(", ") { it.Name }
     val host = party.HostName?.let { com.jellio.tv.ui.i18n.Strings.format("party_hosted_by", it) }
@@ -637,7 +628,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
             if (mine != null) {
                 PartyCard(title = partyItemTitle(mine.Item) ?: mine.GroupName.orEmpty(), item = mine.Item, lines = liveLines(mine), session = session, progress = liveProgress(mine))
             } else {
-                Text(text = current.participants.joinToString(", ").ifEmpty { "Just you" }, color = JellioTextSecondary)
+                Text(text = current.participants.joinToString(", ").ifEmpty { com.jellio.tv.ui.i18n.Strings.get("tv_just_you") }, color = JellioTextSecondary)
             }
             val state = partyState
             state?.Code?.let {
@@ -683,7 +674,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
             )
         } else {
             Text(
-                text = "Watch in sync with others on Jellio, Jellio TV or Jellyfin. Invites from other users pop up here too.",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_groupwatch_intro"),
                 color = JellioTextSecondary,
             )
             val list = parties
@@ -805,7 +796,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
 fun InviteRow(invite: com.jellio.tv.data.model.GroupWatchInviteDto, onJoin: () -> Unit, onDismiss: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(modifier = Modifier.weight(1f, fill = false)) {
-            Text(text = (invite.FromUserName ?: "Someone") + " invited you", color = JellioText)
+            Text(text = com.jellio.tv.ui.i18n.Strings.format("tv_invited_you", invite.FromUserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone")), color = JellioText)
             Text(text = invite.GroupName ?: "Group Watch", color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
         }
         GroupButton(label = com.jellio.tv.ui.i18n.string("gw_join"), primary = true, onClick = onJoin)

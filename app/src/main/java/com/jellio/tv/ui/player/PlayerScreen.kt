@@ -386,7 +386,7 @@ private fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
                 modifier = Modifier.padding(top = 18.dp),
             )
             Text(
-                text = "Trying the next one (attempt ${notice.attempt}): ${notice.sourceLabel}",
+                text = com.jellio.tv.ui.i18n.Strings.format("tv_trying_next_source", notice.attempt, notice.sourceLabel),
                 color = JellioTextSecondary,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 maxLines = 3,
@@ -915,7 +915,7 @@ private fun PlayerSurface(
                     tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO || it.type == C.TRACK_TYPE_AUDIO }
                 ) {
                     subtitleMissingReported = true
-                    onShowToast("That subtitle track isn't in this stream")
+                    onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_subtitle_not_in_stream"))
                 }
                 if (directPlay) {
                     selectAudioTrack(player, currentAudioTracks, currentAudioIndex, defaultAudioStreamIndex)
@@ -1388,8 +1388,8 @@ private fun PlayerSurface(
             ) {
                 val seconds = flash.totalMs / 1000
                 Text(
-                    text = (if (seconds >= 0) "+${seconds}s" else "${seconds}s") + "  ·  " + formatMs(flash.target) +
-                        if (shownDurationMs > 0) " / " + formatMs(shownDurationMs) else "",
+                    text = (if (seconds >= 0) "+${seconds}s" else "${seconds}s") + "  ·  " + com.jellio.tv.ui.common.formatPlaybackTime(flash.target) +
+                        if (shownDurationMs > 0) " / " + com.jellio.tv.ui.common.formatPlaybackTime(shownDurationMs) else "",
                     color = JellioText,
                     style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
                 )
@@ -1413,7 +1413,7 @@ private fun PlayerSurface(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
                 Text(
-                    text = "Switching to $switchingTo…",
+                    text = com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", switchingTo),
                     color = JellioText,
                     style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
                     maxLines = 1,
@@ -1513,7 +1513,7 @@ private fun PlayerSurface(
                     showSourcePanel = false
                     onSelectSource(source, realPositionMs() * TICKS_PER_MS)
                 },
-                onBlocked = { onShowToast("This stream needs the server to re-encode the video, which is turned off on this server.") },
+                onBlocked = { onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_transcode_blocked")) },
                 onDismiss = { showSourcePanel = false },
             )
         }
@@ -1592,7 +1592,7 @@ private fun PlayerSurface(
             if (PlayerPrefs.autoSkipIntro && segment.label == "Skip Intro" && autoSkippedTo != segment.targetSeconds) {
                 autoSkippedTo = segment.targetSeconds
                 userSeek((segment.targetSeconds * 1000).toLong())
-                onShowToast("Skipped intro")
+                onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_skipped_intro"))
             }
         }
         if (activeSkip != null && !(upNextInfo != null && upNextShown && !upNextDismissed)) {
@@ -1975,8 +1975,8 @@ private fun SeekBar(
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text(text = formatMs(shown), color = if (target != null) JellioText else JellioTextSecondary)
-            Text(text = " / " + formatMs(durationMs), color = JellioTextSecondary)
+            Text(text = com.jellio.tv.ui.common.formatPlaybackTime(shown), color = if (target != null) JellioText else JellioTextSecondary)
+            Text(text = " / " + com.jellio.tv.ui.common.formatPlaybackTime(durationMs), color = JellioTextSecondary)
             if (focused && target == null) {
                 Text(
                     text = "   ◀ ▶ to scrub",
@@ -2528,7 +2528,7 @@ private fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismiss
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = "Playback Speed",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_playback_speed"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -2619,7 +2619,7 @@ private fun CatchUpPrompt(groupAtTicks: Long, onFollow: () -> Unit, onSolo: () -
                 .padding(horizontal = 28.dp, vertical = 22.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("party_catchup_title", com.jellio.tv.ui.groupwatch.partyClock(groupAtTicks / (1000L * TICKS_PER_MS))),
+                text = com.jellio.tv.ui.i18n.Strings.format("party_catchup_title", com.jellio.tv.ui.common.formatPlaybackTime(groupAtTicks / TICKS_PER_MS)),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 16.dp),
@@ -2681,7 +2681,7 @@ private fun SleepMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = "Sleep Timer",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_sleep_timer"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -2871,7 +2871,7 @@ private fun AudioMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = "Audio",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_audio"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -3231,7 +3231,7 @@ private fun SubtitleMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = "Subtitles",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_subtitles"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -3487,17 +3487,6 @@ private fun SubtitleMenuRow(label: String, isSelected: Boolean, onClick: () -> U
     }
 }
 
-private fun formatMs(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%d:%02d".format(minutes, seconds)
-    }
-}
 
 // Stands in for a title with no logo image: its name, pulsing slowly
 // the way the logo does.
