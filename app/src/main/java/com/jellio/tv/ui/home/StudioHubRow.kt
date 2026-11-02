@@ -35,12 +35,6 @@ import com.jellio.tv.ui.theme.scaled
 private val TileWidth = 200.dp
 private val TileHeight = 110.dp
 
-// Mirrors components/services.js's own buildHubStrip()/buildHubTile():
-// one real tile per real service groupByService(collections) actually
-// found, opening ServiceScreen. The web build's own logo-with-name-
-// fallback-on-error trick has no direct Compose equivalent worth the
-// extra state it would take here, so this always shows both, real
-// but simpler.
 @Composable
 fun StudioHubRow(
     services: List<String>,
@@ -72,12 +66,6 @@ fun StudioHubRow(
 private fun StudioHubTile(name: String, logoUrl: String, onClick: () -> Unit) {
     val tileWidth = TileWidth.scaled()
     val tileHeight = TileHeight.scaled()
-    // Real port of css/streaming-hub.css's own real
-    // .jellio-hub-tile:hover { transform: translateY(-2px); background:
-    // var(--jellio-card-bg); }: the lift itself is this Surface's own
-    // real default focus scale (already on, never overridden the way
-    // TopNavPill's own header explains that pill turning off), the
-    // background swap on focus was the one real piece missing.
     var hasError = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Surface(
         onClick = onClick,

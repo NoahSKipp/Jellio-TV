@@ -80,11 +80,6 @@ data class GroupNotice(val id: Long, val title: String, val text: String)
 // focus with Join and Not now, like the update prompt.
 data class GroupPrompt(val title: String, val text: String, val actionLabel: String, val onAction: suspend () -> Unit)
 
-// Group Watch on the TV, kept simple on purpose: it follows the group
-// (SyncPlay does the syncing, ui/player/PlayerScreen.kt applies it),
-// shows invites and the group's chat as pop-ups, and answers with the
-// preset reactions above. Typing, the full chat and the pick-a-title
-// vote stay on Jellio for desktop and the web.
 @HiltViewModel
 class GroupWatchViewModel @Inject constructor(
     val syncPlay: SyncPlayManager,
@@ -160,9 +155,6 @@ class GroupWatchViewModel @Inject constructor(
         }
     }
 
-    // Only messages that arrive while this TV is in the group; the history
-    // before it joined isn't replayed. Lines with an ItemId are the "started
-    // watching" announcements, already covered by the Join prompt.
     private suspend fun pollChat(session: Session) {
         var groupId: String? = null
         var after = -1L
@@ -572,10 +564,6 @@ private fun liveProgress(party: com.jellio.tv.data.model.LivePartyDto): Float? {
 
 private fun onOff(on: Boolean) = com.jellio.tv.ui.i18n.Strings.get(if (on) "party_on" else "party_off")
 
-// Settings' Group Watch section: the party this TV is in (its title,
-// people, code and, for the host, its settings), or the parties to join
-// and the ones planned. Typing, scheduling and the full chat stay on the
-// web; the TV answers with the emoji roster in the player.
 @Composable
 fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel: GroupWatchViewModel = hiltViewModel()) {
     val group by viewModel.syncPlay.group.collectAsState()
@@ -589,9 +577,6 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
     var codeError by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var codeBusy by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var creating by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    // Joining or leaving swaps the panel's buttons out from under the
-    // selection; it moves onto the new view's first button instead of
-    // falling through to the screen behind.
     val inGroupFocus = remember { FocusRequester() }
     val outOfGroupFocus = remember { FocusRequester() }
     var wasInGroup by remember { androidx.compose.runtime.mutableStateOf(group != null) }

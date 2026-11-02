@@ -31,9 +31,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.State
 import androidx.compose.ui.unit.dp
 
-// Grey placeholders for rows still on their way, like the web Home's
-// skeleton cards: a soft pulse, never focusable.
-// The pulse is read while drawing only, so it repaints without recomposing.
 @Composable
 private fun skeletonPulse(): State<Float> = rememberInfiniteTransition(label = "skeleton").animateFloat(
     initialValue = 0.05f,
@@ -53,8 +50,6 @@ fun SkeletonPoster(modifier: Modifier = Modifier) {
     Row(modifier = modifier.aspectRatio(2f / 3f).skeletonFill(pulse, 12.dp)) {}
 }
 
-// A row still loading, laid out exactly like a real one (title, spacing and
-// card sizes from PosterRow) so the real row replaces it without a jump.
 @Composable
 fun SkeletonRow(landscape: Boolean = false, modifier: Modifier = Modifier) {
     val pulse = skeletonPulse()

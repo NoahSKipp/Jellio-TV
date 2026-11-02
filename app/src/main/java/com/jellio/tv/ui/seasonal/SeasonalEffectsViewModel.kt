@@ -15,17 +15,10 @@ import javax.inject.Inject
 
 private const val REFRESH_INTERVAL_MS = 5 * 60 * 1000L
 
-// Real port of components/seasonalEffects.js's own refresh()/
-// mountSeasonalEffects(): a real config re-fetch every 5 minutes, the
-// same real reason that file's own header gives (a reader who leaves
-// this app open across midnight, or across whatever an admin just
-// changed server side, still gets the right real theme without a
-// restart).
 @HiltViewModel
 class SeasonalEffectsViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _activeTheme = MutableStateFlow<String?>(null)
     val activeTheme: StateFlow<String?> = _activeTheme.asStateFlow()
 

@@ -15,30 +15,13 @@ import javax.inject.Singleton
 
 private val Context.homeCustomizationDataStore: DataStore<Preferences> by preferencesDataStore(name = "jellio_home_customization")
 
-// Real components/homeCustomizer.js's own defaultCustomization()
-// shape, the same real { order, hidden } pair that file's own
-// STORAGE_KEY JSON blob holds.
 @JsonClass(generateAdapter = true)
 data class HomeCustomizationDto(
     val order: List<String> = emptyList(),
     val hidden: List<String> = emptyList(),
 )
 
-// Ported in spirit from Harbor's own real home row customization
-// (components/homeCustomizer.js's own header names the real upstream
-// source and settles the real scope: reorder, hide and reset a row's
-// own position, no per-row rename, no Top 10 numerals, nothing else
-// Harbor's own fuller feature carries that this runtime has no
-// equivalent concept to attach to). Pure functions here, no storage
-// side effects, mirroring that file's own effectiveOrder()/
-// moveRowKey()/toggleRowHiddenKey() exactly; HomeViewModel owns
-// actually persisting the result through HomeCustomizationStore below.
 object HomeCustomization {
-    // Real port of effectiveOrder(): whatever this session's own rows
-    // actually are right now, filtered through whatever order this
-    // reader saved last time (any stored key no longer live today
-    // silently dropped), any live key never seen before appended after
-    // it in its own natural order rather than lost.
     fun effectiveOrder(liveKeys: List<String>, customization: HomeCustomizationDto): List<String> {
         val liveSet = liveKeys.toSet()
         val ordered = customization.order.filter { liveSet.contains(it) }.toMutableList()
@@ -69,11 +52,6 @@ object HomeCustomization {
     }
 }
 
-// Real localStorage STORAGE_KEY equivalent: DataStore Preferences
-// instead of localStorage for the same real reason SessionManager's
-// own header already documents (no browser storage to reuse here),
-// same real single-JSON-blob shape kept rather than splitting order/
-// hidden into two separate keys.
 @Singleton
 class HomeCustomizationStore @Inject constructor(
     @ApplicationContext context: Context,

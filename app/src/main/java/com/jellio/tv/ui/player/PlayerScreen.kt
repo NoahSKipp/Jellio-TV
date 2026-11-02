@@ -157,8 +157,6 @@ private const val CONTROLS_HIDE_DELAY_MS = 4_000L
 // Paused this long with nothing open, the controls give way to the
 // "You're watching" screen (NuvioTV does the same).
 private const val PAUSE_OVERLAY_DELAY_MS = 5_000L
-// Real port of screens/player.js's own showPlayerToast() 4000ms
-// setTimeout.
 private const val TOAST_DURATION_MS = 4_000L
 private const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.
@@ -169,18 +167,8 @@ private const val REENCODE_START_TIMEOUT_MS = 12_000L
 // How long Play Next counts down on the Up Next card and end screen.
 private const val UPNEXT_COUNTDOWN_SECONDS = 15
 
-// Real screens/player.js's own PLAYBACK_SPEEDS: the exact same six
-// real options its own speed popover offers, not a guessed range.
 private val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
-// Real port of that file's own `speed + 'x'` label: JS number-to-
-// string already drops a whole speed's own trailing .0 for free
-// (1 + 'x' === '1x'), Kotlin's own Float.toString() does not (1f
-// stringifies as "1.0"), so a whole speed is special cased here to
-// match that exact same real label instead.
-// Where a relative seek lands. The player often doesn't know a stream's
-// length yet (C.TIME_UNSET, a transcode still starting), and clamping to
-// that sent every skip back to the start; only a known length caps it.
 private fun seekTarget(positionMs: Long, deltaMs: Long, durationMs: Long): Long {
     val target = (positionMs + deltaMs).coerceAtLeast(0L)
     return if (durationMs > 0) target.coerceAtMost(durationMs) else target
@@ -193,8 +181,6 @@ private fun formatSpeed(speed: Float): String {
     return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
 }
 
-// Real screens/player.js's own SLEEP_TIMER_OPTIONS: the same five real
-// durations its own sleep popover offers.
 private val SLEEP_TIMER_OPTIONS = listOf(15, 30, 45, 60, 90)
 
 // screens/player.js's EPISODE_SLEEP_TIMER_OPTIONS: stop after this many
@@ -207,11 +193,6 @@ private object EpisodeSleepTimer {
     var remaining by androidx.compose.runtime.mutableStateOf<Int?>(null)
 }
 
-// Real port of screens/player.js's own shouldShowUpNextNow(), ported
-// from NuvioWeb's own shouldShowNextEpisodeCard() in turn: a real
-// Credits segment starts the outro, so showing the card there reads as
-// timed to the episode rather than to an arbitrary count of seconds
-// left. Without a Credits segment the card never shows.
 private fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSeconds: Double, durationSeconds: Double): Boolean {
     if (durationSeconds <= 0) return false
     val credits = segments?.Credits
@@ -223,12 +204,6 @@ private fun shouldShowUpNextNow(segments: IntroSkipperSegmentsDto?, currentSecon
     return false
 }
 
-// No native jellyfin-web playbackManager to lean on here (screens/
-// player.js's own header explains why the web build needed none
-// either): a bare Media3 ExoPlayer opened straight against the real
-// negotiated stream URL, this screen's own custom Compose chrome over
-// it rather than PlayerView's own default controller, matching this
-// app's own real design instead of stock Android TV playback UI.
 @Composable
 fun PlayerScreen(
     session: Session,
@@ -264,9 +239,6 @@ fun PlayerScreen(
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         when {
-            // Same as the web player: the title's backdrop with its logo
-            // gently pulsing while the stream is prepared.
-            // Without the title's art yet, the pulsing logo on its own rather than black.
             uiState.isLoading -> uiState.pauseInfo?.let { BufferingOverlay(info = it) }
                 ?: com.jellio.tv.ui.common.TitleLoadingArt(emptyList(), null, "", Modifier)
             uiState.error != null -> Box(Modifier.fillMaxSize()) {
@@ -553,11 +525,6 @@ private fun PlayerSurface(
         )
     }
 
-    // Direct play uses the container's native embedded subtitle tracks with
-    // zero extra HTTP requests. Only external subtitles or transcoded streams
-    // sideload the single selected WebVTT track via SingleSampleMediaSource
-    // with treatLoadErrorsAsEndOfStream = true so a subtitle failure never
-    // aborts video playback.
     val player = remember(streamUrl) {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -637,9 +604,6 @@ private fun PlayerSurface(
 
     var isPlaying by remember(player) { mutableStateOf(false) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
-    // Keyed on the stream: when the next episode's stream swaps in without a
-    // loading frame, the last one's ended state must not carry over and
-    // bring the end screen straight back.
     var isEnded by remember(streamUrl) { mutableStateOf(false) }
     var endedAsPlaceholder by remember(streamUrl) { mutableStateOf(false) }
     var placeholderReported by remember(streamUrl) { mutableStateOf(false) }
@@ -657,9 +621,6 @@ private fun PlayerSurface(
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
 
-    // While something plays (or is loading to play), the screen stays on:
-    // the Fire TV and Google TV screensaver and inactivity timers watch
-    // this flag, since a remote isn't touched during a film.
     val hostView = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(isPlaying, isBuffering) {
         hostView.keepScreenOn = isPlaying || isBuffering
@@ -676,9 +637,6 @@ private fun PlayerSurface(
     val streamOffsetMs = if (directPlay) 0L else startPositionTicks / TICKS_PER_MS
     fun realPositionMs(): Long = streamOffsetMs + player.currentPosition
 
-    // A seek to a point in the title. Direct play just seeks; a transcode
-    // restarts from there, after a short pause so a run of skips becomes
-    // one reload.
     var pendingReloadMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
     fun seekToReal(targetMs: Long) {
         if (directPlay) {
@@ -742,10 +700,6 @@ private fun PlayerSurface(
                         player.seekTo(targetMs.coerceAtLeast(0L))
                         player.play()
                     } else {
-                        // A reload to catch up: tell the group first so the
-                        // server holds everyone, then wait for its Unpause
-                        // once this TV reports Ready, instead of playing on
-                        // ahead after the reload.
                         player.pause()
                         syncPlay.notifyBuffering(realPositionMs() * TICKS_PER_MS, false, playlistItemId)
                         syncReloadPending = true
@@ -810,9 +764,6 @@ private fun PlayerSurface(
         }
     }
 
-    // Starting a title while in a group starts it for the whole group,
-    // as on the web; a title opened by following the group is already
-    // the group's, so it isn't published again.
     LaunchedEffect(syncGroup?.groupId, currentItemId) {
         if (syncGroup == null) return@LaunchedEffect
         if (publishedQueue || syncPlaylistItemId != null) return@LaunchedEffect
@@ -829,12 +780,6 @@ private fun PlayerSurface(
     // is in use.
     var interaction by remember { mutableStateOf(0) }
     var showSubtitleMenu by remember { mutableStateOf(false) }
-    // Not keyed on streamUrl, unlike showResumePrompt/upNextShown
-    // above: a subtitle switch or Start Over rebuilds the real player
-    // (see the player remember(streamUrl) block above), but the reader's
-    // own chosen speed should carry over into it, same real persistence
-    // an HTML5 video element's own playbackRate already gets for free
-    // across a real src reassignment on the web side.
     var playbackSpeed by remember { mutableStateOf(1f) }
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showSleepMenu by remember { mutableStateOf(false) }
@@ -849,22 +794,10 @@ private fun PlayerSurface(
     var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
     var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
 
-    // Real port of that file's own persistence: applied to every real
-    // player instance this screen creates, not only the first, so a
-    // subtitle switch or Start Over rebuilding it (the player remember(
-    // streamUrl) block above) keeps the reader's own chosen speed
-    // instead of quietly resetting to 1x.
     LaunchedEffect(player, playbackSpeed) {
         player.setPlaybackSpeed(playbackSpeed)
     }
 
-    // Real local enforcement of the sleep timer (see
-    // SleepTimerStatusDto's own header comment for why this player
-    // cannot just trust the real server side
-    // SendPlaystateCommand(Stop) the way a real WebSocket-connected
-    // Jellyfin client could): waits out the exact same real remaining
-    // time PlayerViewModel already computed, then leaves the player the
-    // same real way that command's own target ends playback.
     LaunchedEffect(sleepTimerEndTimeMs) {
         val endTimeMs = sleepTimerEndTimeMs ?: return@LaunchedEffect
         val remaining = endTimeMs - System.currentTimeMillis()
@@ -895,13 +828,6 @@ private fun PlayerSurface(
             override fun onPlaybackStateChanged(state: Int) {
                 isEnded = state == Player.STATE_ENDED
                 isBuffering = state == Player.STATE_BUFFERING || (state == Player.STATE_IDLE && exoError == null)
-                // Real port of screens/player.js's own 'ended' listener:
-                // needs no known duration at all, the strongest of the
-                // three real signals since ExoPlayer only ever reaches
-                // STATE_ENDED once this real stream has genuinely run
-                // out of data to play.
-                // A placeholder clip ending isn't the title ending: it
-                // reports no duration and marks nothing watched.
                 if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs)) {
                     onReportRealDuration(realPositionMs() / 1000.0)
                     onMarkRealWatchComplete()
@@ -971,12 +897,6 @@ private fun PlayerSurface(
         while (isActive) {
             if (player.duration > 0 && player.playbackState != Player.STATE_IDLE) {
                 durationMs = streamOffsetMs + player.duration
-                // Real port of screens/player.js's own
-                // reconcileDuration(): ExoPlayer's own real duration,
-                // the strongest of the three real signals
-                // reportRealDurationIfUseful() takes since it is the
-                // real total, not a lower bound off wherever playback
-                // happens to be right now.
                 val placeholder = looksLikePlaceholder(durationMs, expectedRuntimeMs)
                 if (directPlay && placeholder && !placeholderReported && syncGroup == null) {
                     placeholderReported = true
@@ -987,12 +907,6 @@ private fun PlayerSurface(
                     seekedToResume = true
                     player.seekTo(startPositionTicks / TICKS_PER_MS)
                 }
-                // Gated on real playback actually running (matches
-                // screens/player.js's own timeupdate-driven trigger,
-                // never metadata alone), not just duration being known:
-                // a resume prompt still waiting on the reader's own
-                // choice has a real duration already but has not
-                // started playing yet.
                 if (!hasReportedStart && isPlaying && (realPositionMs() > 0 || player.currentPosition > 0)) {
                     hasReportedStart = true
                     onReportStart(realPositionMs() * TICKS_PER_MS)
@@ -1000,20 +914,9 @@ private fun PlayerSurface(
                 }
             }
             if (pendingReloadMs == null) positionMs = realPositionMs()
-            // Real port of screens/player.js's own timeupdate-driven
-            // REAL_WATCH_COMPLETION_THRESHOLD check: rides durationMs
-            // (only ever set once ExoPlayer's own real duration is
-            // actually known, see above), same real reason
-            // AchievementService's own item.RunTimeTicks based gate
-            // alone never reliably catches a genuine full watch of a
-            // title whose library metadata runtime is inflated.
             if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9 && !looksLikePlaceholder(durationMs, expectedRuntimeMs)) {
                 onMarkRealWatchComplete()
             }
-            // Real port of screens/player.js's own timeupdate-driven
-            // shouldShowUpNextNow() check, fired at most once per real
-            // title, same real showUpNext() guard that file's own
-            // upNextShown/upNextDismissed pair already enforces.
             if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
                 if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
@@ -1029,13 +932,6 @@ private fun PlayerSurface(
                             EpisodeSleepTimer.remaining = left - 1
                         }
                     }
-                    // Real port of screens/player.js's own showUpNext():
-                    // playNextEpisode()/the countdown below can navigate
-                    // straight to the next episode's own screen before
-                    // 'ended' ever gets a chance to fire on this one, so
-                    // this real signal (skipSegments' own Credits.Start,
-                    // or the fallback trigger) has to credit and report
-                    // right here too, not only from 'ended'.
                     onReportRealDuration(positionMs / 1000.0)
                     onMarkRealWatchComplete()
                 }
@@ -1044,12 +940,6 @@ private fun PlayerSurface(
         }
     }
 
-    // Real port of screens/player.js's own showUpNext()/
-    // updateUpNextCountdown(): a real 15 second countdown, playing the
-    // next real episode itself once it reaches zero, cancelled by this
-    // LaunchedEffect's own key changing (upNextShown flips back to
-    // false only via a fresh streamUrl, matching that file's own
-    // window.clearInterval calls on playNextEpisode/hideUpNext).
     LaunchedEffect(upNextShown, upNextDismissed) {
         // Dismissed means stay on this episode, so no countdown either.
         if (!upNextShown || upNextDismissed) return@LaunchedEffect
@@ -1061,10 +951,6 @@ private fun PlayerSurface(
         upNextInfo?.let { onPlayNext(it.itemId) }
     }
 
-    // The episode sleep timer ran out: leave the player once this one ends
-    // (a film, with no Up Next, counts as its one episode).
-    // The failover notice goes once the picture moves, even when the
-    // stream's length isn't known yet (a transcode still starting).
     LaunchedEffect(player) {
         while (true) {
             delay(500)
@@ -1168,9 +1054,6 @@ private fun PlayerSurface(
         controlsVisible = false
     }
 
-    // Real port of screens/player.js's own mouseleave handler clearing
-    // scrubPreview: controls hiding is this remote's own closest real
-    // equivalent to a mouse actually leaving the seek bar.
     LaunchedEffect(controlsVisible) {
         if (!controlsVisible) {
             // The focused button just left; keep the remote on the player.
@@ -1180,10 +1063,6 @@ private fun PlayerSurface(
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    // Real port of screens/player.js's own showPlayerToast(): that
-    // file's own clearTimeout + fresh setTimeout(4000) on every call,
-    // toastId as the key so a repeat of the exact same message still
-    // restarts this delay instead of being a no-op recomposition.
     LaunchedEffect(toastId) {
         if (toastMessage != null) {
             delay(TOAST_DURATION_MS)
@@ -1270,12 +1149,6 @@ private fun PlayerSurface(
                     }
                     return@onKeyEvent false
                 }
-                // Real port of screens/player.js's own hasResumePosition
-                // gate: seeking/play-pause stay inert behind this real
-                // choice, the same way showSubtitleMenu above already
-                // blocks them behind its own popover; Resume/Start Over
-                // themselves are plain focusable Surfaces below, reached
-                // through the TV focus system rather than a key here.
                 if (showResumePrompt || catchUpOpen) {
                     if (event.key == Key.Back) {
                         onBack()
@@ -1283,9 +1156,6 @@ private fun PlayerSurface(
                     }
                     return@onKeyEvent false
                 }
-                // With the controls up the D-pad moves between them (the seek
-                // bar scrubs on its own); hidden, Left/Right seek straight
-                // away and any other key brings them up.
                 when (event.key) {
                     Key.Back -> {
                         if (controlsVisible) controlsVisible = false else onBack()
@@ -1331,20 +1201,7 @@ private fun PlayerSurface(
                     useController = false
                 }
             },
-            // Real port of screens/player.js's own applySubtitleStyle():
-            // that function drives two ::cue custom properties a
-            // browser's own WebVTT renderer reads directly; Media3's own
-            // SubtitleView is this app's real equivalent renderer, its
-            // own setStyle()/setFractionalTextSize() the real settable
-            // surface for the same two style axes (subtitleCaptionStyle()/
-            // subtitleFractionalTextSize() below). update rather than
-            // factory alone so a style change already in flight applies
-            // without recreating the PlayerView mid playback.
             update = { view ->
-                // A stream switch, Start over or a transcode reload builds a
-                // new player; the view has to follow it, or the old,
-                // released one stays on screen frozen while the new one
-                // plays only sound.
                 if (view.player !== player) view.player = player
                 view.subtitleView?.let { subtitleView ->
                     subtitleView.setStyle(subtitleCaptionStyle(subtitleStyle))
@@ -1500,11 +1357,6 @@ private fun PlayerSurface(
             )
         }
 
-        // Real port of screens/player.js's own sourceButton gating:
-        // sourceButton.disabled stays true until getMediaSources(itemId)
-        // actually resolves more than one real option, same real
-        // condition sourceOptions.size > 1 already checks before this
-        // button even renders in PlayerControls above.
         if (showSourcePanel && sourceOptions.size > 1) {
             SourcePanel(
                 sources = sourceOptions,
@@ -1518,11 +1370,6 @@ private fun PlayerSurface(
             )
         }
 
-        // Real port of screens/player.js's own episodesButton gating:
-        // episodesButton.disabled stays true until getSeasons(item.
-        // SeriesId) actually resolves a real season, same real
-        // condition seasons.isNotEmpty() already checks before this
-        // button even renders in PlayerControls above.
         if (showEpisodesPanel && seasons.isNotEmpty()) {
             EpisodesPanel(
                 seasons = seasons,
@@ -1573,16 +1420,6 @@ private fun PlayerSurface(
             )
         }
 
-        // Real port of screens/player.js's own timeupdate-driven
-        // activeSkipSegment() check: a plain derived value off the same
-        // positionMs this screen already polls every 500ms, no separate
-        // effect needed. Suppressed while the Up Next card already
-        // occupies this same real bottom-right corner (real CSS puts
-        // both there too, but that file never actually has to render
-        // both onscreen at once the way this app's own fixed 120 second
-        // Up Next fallback now can against a real Credits segment).
-        // Derived, so the 500 ms position tick only recomposes this screen
-        // when the segment under the playhead changes.
         val activeSkipState by remember(skipSegments) { derivedStateOf { activeSkipSegment(skipSegments, positionMs / 1000.0) } }
         val activeSkip = activeSkipState
         // Auto-skip intros (Settings > Playback): once per intro, the same
@@ -1687,11 +1524,6 @@ private fun PlayerSurface(
             )
         }
 
-        // Real port of screens/player.js's own .jellio-player-toast:
-        // rendered above everything else, independent of
-        // controlsVisible, the same real way that file's own toast
-        // element is a direct child of root rather than something the
-        // pill's own show/hide logic ever touches.
         if (toastMessage != null) {
             PlayerToast(message = toastMessage, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 104.dp))
         }
@@ -1725,7 +1557,6 @@ private fun PlayerControls(
     onOpenReactMenu: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize().focusProperties { canFocus = enabled }) {
-
         val playPauseFocusRequester = remember { FocusRequester() }
         LaunchedEffect(enabled) {
             if (enabled) {
@@ -1733,8 +1564,6 @@ private fun PlayerControls(
             }
         }
 
-        // Real port of screens/player.js's own transport row: back 10
-        // seconds, play/pause, forward 10 seconds.
         Row(
             horizontalArrangement = Arrangement.spacedBy(36.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1782,16 +1611,6 @@ private fun PlayerControls(
                 onPlayPause = onPlayPause,
             )
 
-            // Real port of css/app.css's own .jellio-player-pill /
-            // screens/player.js's own buildPillButton(): real feedback
-            // live found this screen's own previous shape (a lone "1x"
-            // pill plus a separate row of bare icon circles, pinned to
-            // this screen's own top-right corner) didn't match the web
-            // build's own real player at all - one real pill-shaped bar
-            // instead, icon-over-label per button exactly like that
-            // file's own real speed/subtitle/audio/source/episodes/
-            // sleep buttons, docked under this real seek row the same
-            // way that file's own CSS margin already places it.
             Row(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
@@ -1811,37 +1630,15 @@ private fun PlayerControls(
                         if (hasSubtitleTracks) {
                             PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_track"), onClick = onOpenSubtitleMenu)
                         }
-                        // Real port of the pill's own audioButton: disabled
-                        // (rebuildAudioMenu()'s own early return) whenever this
-                        // source carries one real audio track or fewer, same real
-                        // condition hasAudioTracks already checks before this
-                        // button even renders.
                         if (hasAudioTracks) {
                             PlayerPillButton(icon = Icons.Filled.GraphicEq, label = com.jellio.tv.ui.i18n.Strings.get("player_audio_track"), onClick = onOpenAudioMenu)
                         }
-                        // Real port of the pill's own sourceButton: disabled
-                        // (sourceButton.disabled) until getMediaSources(itemId)
-                        // actually resolves more than one real option, same real
-                        // condition hasSourceOptions already checks before this
-                        // button even renders.
                         if (hasSourceOptions) {
                             PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = com.jellio.tv.ui.i18n.Strings.get("detail_streams"), onClick = onOpenSourceMenu)
                         }
-                        // Real port of the pill's own episodesButton: disabled
-                        // (episodesButton.disabled) until getSeasons(item.SeriesId)
-                        // actually resolves a real season, same real condition
-                        // hasEpisodes already checks before this button even
-                        // renders. A Movie never gets here at all, same real gate
-                        // this file's own isEpisodeItem && item.SeriesId check
-                        // applies before that fetch ever fires.
                         if (hasEpisodes) {
                             PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = com.jellio.tv.ui.i18n.Strings.get("detail_episodes"), onClick = onOpenEpisodesMenu)
                         }
-                        // Real port of the pill's own sleepButton: no live
-                        // countdown label the way that file's own button never
-                        // gets one either, just its own real
-                        // jellio-player-pill-btn-active class toggled on and
-                        // off, ported here as the same real active tint.
                         PlayerPillButton(
                             icon = Icons.Filled.Bedtime,
                             label = com.jellio.tv.ui.i18n.Strings.get("settings_sleep_timer"),
@@ -1889,9 +1686,6 @@ private fun TransportButton(
     }
 }
 
-// The seek bar as its own stop for the remote: Left/Right move a target
-// (further the longer they're held), the picture under it previews the
-// spot, and letting go jumps there. Up/Down leave it as usual.
 @Composable
 private fun SeekBar(
     positionMs: () -> Long,
@@ -2017,14 +1811,6 @@ private fun PlayerPillButton(icon: androidx.compose.ui.graphics.vector.ImageVect
     }
 }
 
-// Real port of screens/player.js's own buildPauseOverlay(): an eyebrow
-// naming what is playing, the series (or movie) own name and rating,
-// the exact episode this pause landed on and its own overview, not the
-// item alone (an Episode's own Overview is the episode's, its own Name
-// never was the series name). pauseInfo.art already carries
-// seriesAwareArtworkUrl()'s own real fallback chain, computed once in
-// PlayerViewModel rather than here.
-
 @Composable
 private fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
     com.jellio.tv.ui.common.TitleLoadingArt(info.art, info.logoUrl, info.title, modifier)
@@ -2121,11 +1907,6 @@ private fun PauseClock(modifier: Modifier = Modifier) {
     Text(text = formatter.format(java.util.Date(now)), color = JellioText, fontSize = 30.sp, modifier = modifier)
 }
 
-// Real port of screens/player.js's own buildUpNextOverlay(): a real
-// thumbnail and episode label over a real Play now/Dismiss pair, the
-// countdown baked directly into the Play now label the same way that
-// file's own updateUpNextCountdown() rewrites its button's own
-// textContent every second instead of a separate counter element.
 @Composable
 private fun UpNextOverlay(
     info: UpNextInfo,
@@ -2391,9 +2172,6 @@ private fun EndScreenButton(
     }
 }
 
-// Real port of screens/player.js's own skip button: label switches
-// between Skip Intro/Skip Credits off activeSkipSegment's own real
-// label, one real Surface either way rather than two separate buttons.
 @Composable
 private fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
@@ -2417,13 +2195,6 @@ private fun SkipSegmentButton(label: String, onClick: () -> Unit, modifier: Modi
     }
 }
 
-// Real port of screens/player.js's own buildResumePrompt(), ported
-// from Harbor's own player/resume-prompt.tsx idea in turn (that file's
-// own comment): a real choice instead of always just seeking straight
-// to the saved position, shown once over the paused frame already
-// sitting there (see PlayerSurface's own playWhenReady comment above),
-// Start Over a real choice this player did not offer before rather
-// than something to dig for elsewhere.
 @Composable
 private fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
     val resumeFocusRequester = remember { FocusRequester() }
@@ -2484,9 +2255,6 @@ private fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit,
     }
 }
 
-// Real port of screens/player.js's own .jellio-player-toast: bottom
-// center, elevated background, rounded, same real CSS treatment that
-// selector already carries.
 @Composable
 private fun PlayerToast(message: String, modifier: Modifier = Modifier) {
     Box(
@@ -2744,10 +2512,6 @@ private fun selectAudioTrack(
     }
     if (candidates.isEmpty()) return
 
-    // Jellyfin lists audio in file order and so does the player, so the
-    // position is the best guide; the language ("ger" on the server, "de"
-    // in the player, compared normalised) breaks ties and catches a
-    // reordered list.
     val wanted = normalizeLanguage(targetTrack.language)
     fun languageOf(pair: Pair<androidx.media3.common.Tracks.Group, Int>) = normalizeLanguage(pair.first.getTrackFormat(pair.second).language)
     val byPosition = candidates.getOrNull(ordinal)
@@ -2766,12 +2530,6 @@ private fun selectAudioTrack(
         .build()
 }
 
-// Off, or one text track. Our side-loaded tracks carry a prefixed id
-// (Media3 may add its own "1:" in front): a bare stream index also
-// matched the file's embedded tracks, numbered from 1 where Jellyfin
-// counts from 0, so English SDH could pick the German track before it.
-// Failing that, a text track in the same language. Returns whether the
-// chosen track was found (true when subtitles are off).
 private fun applySubtitleSelection(
     player: Player,
     subtitleTracks: List<SubtitleTrackUiState>,
@@ -3188,11 +2946,6 @@ private fun EpisodeRow(
     }
 }
 
-// Mirrors screens/player.js's own real subtitle popover: Off first,
-// then every real track this source carries, an image based one
-// (PGS, VobSub) labelled the same real "(image)" suffix that file's
-// own renderSubtitleTrackList() uses, selecting one of those a real
-// burned-in transcode rather than a plain track switch.
 @Composable
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 private fun SubtitleMenu(
@@ -3249,10 +3002,6 @@ private fun SubtitleMenu(
                 items(tracks) { track ->
                     SubtitleMenuRow(label = track.label, isSelected = selectedIndex == track.streamIndex, onClick = { onSelect(track) })
                 }
-                // Real port of screens/player.js's own styleSection,
-                // appended below that same real popover's own track
-                // list rather than a separate menu: that file's own
-                // buildStyleGroup() twice over, Size then Background.
                 item {
                     SubtitleStyleGroup(
                         label = com.jellio.tv.ui.i18n.string("player_subtitle_size"),
@@ -3346,13 +3095,6 @@ private fun SubtitleStyleGroup(label: String, options: List<Pair<String, String>
     }
 }
 
-// Real port of screens/player.js's own applySubtitleStyle(): that
-// function sets a real --jellio-subtitle-bg custom property, this
-// app's own CaptionStyleCompat.backgroundColor equivalent read by
-// Media3's own SubtitleView. Foreground stays plain white and edge
-// type stays NONE either way, the same two axes screens/player.js's
-// own real style leaves alone too (only size and background are real
-// reader controlled there).
 private fun subtitleCaptionStyle(style: SubtitleStyle): CaptionStyleCompat {
     val backgroundColor = when (subtitleBackgroundOption(style.background).value) {
         "none" -> Color.Transparent.toArgb()
@@ -3376,14 +3118,6 @@ private fun subtitleCaptionStyle(style: SubtitleStyle): CaptionStyleCompat {
     )
 }
 
-// Real port of screens/player.js's own --jellio-subtitle-size: that
-// property is a real rem value a browser's own font-size cascade
-// reads directly. SubtitleView has no rem equivalent, only a fraction
-// of the video view's own height (DEFAULT_TEXT_SIZE_FRACTION when
-// never set), so this scales that same real default by each real size
-// option's own rem relative to medium's own real 1.3rem baseline
-// rather than trying to reproduce an absolute rem value that has no
-// real meaning here.
 private fun subtitleFractionalTextSize(style: SubtitleStyle): Float {
     val option = subtitleSizeOption(style.size)
     val medium = SUBTITLE_SIZES.first { it.value == "medium" }
@@ -3486,7 +3220,6 @@ private fun SubtitleMenuRow(label: String, isSelected: Boolean, onClick: () -> U
         )
     }
 }
-
 
 // Stands in for a title with no logo image: its name, pulsing slowly
 // the way the logo does.

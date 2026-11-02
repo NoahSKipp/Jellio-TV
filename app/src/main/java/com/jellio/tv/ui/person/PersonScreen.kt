@@ -58,10 +58,6 @@ fun PersonScreen(
     viewModel: PersonViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    // Same real immersive-screen gap DetailScreen's own header comment
-    // documents: no SidebarNav mounts here for a D-pad press to search
-    // Down from, so nothing ever requests focus into this screen
-    // without this.
     val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(personId) { viewModel.load(session, personId) }
     LaunchedEffect(uiState.person) {

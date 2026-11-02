@@ -10,9 +10,6 @@ import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// A main action. At rest a faintly tinted pill, visible on any panel,
-// so it never reads as the focused button; the solid fill only comes
-// with focus.
 @Composable
 fun primaryButtonColors(): ClickableSurfaceColors = ClickableSurfaceDefaults.colors(
     containerColor = Color.White.copy(alpha = 0.1f),

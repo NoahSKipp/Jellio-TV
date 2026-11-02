@@ -7,9 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.jellio.tv.data.model.BaseItemDto
 
-// The card menu for every screen but Home (libraries, Watchlist, Search,
-// Studio Hubs): Watchlist and Watched through the screen's own handlers.
-// Call it once at the screen's root.
 @Composable
 fun rememberCardOptionsHost(
     onToggleWatchlist: (BaseItemDto) -> Unit,

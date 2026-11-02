@@ -75,9 +75,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-// Everyone's activity (screens/feed.js on the web): a list on the left,
-// grouped by day, and the focused entry shown large on the right. The
-// type chips along the top switch kinds of activity on and off.
 @Composable
 fun FeedScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,

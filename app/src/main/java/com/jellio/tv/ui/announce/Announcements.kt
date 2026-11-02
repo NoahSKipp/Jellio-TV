@@ -47,9 +47,6 @@ private const val SHOW_MS = 10_000L
 // An announcement sent while the TV was off still shows if it's this fresh.
 private const val MAX_AGE_MS = 24L * 60 * 60 * 1000
 
-// Announcements from the Jellio plugin settings (Send to every user), the
-// same ones components/notifications.js toasts on the web: polled while
-// signed in and shown once each, over whatever screen is open.
 @HiltViewModel
 class AnnouncementViewModel @Inject constructor(
     private val repository: JellioRepository,

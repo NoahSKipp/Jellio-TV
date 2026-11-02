@@ -123,9 +123,6 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
     )
 }
 
-// No buttons: they fought the player's own controls for the D-pad. The
-// panel keeps focus and swallows keys so the controls stay down, and Back
-// leaves the player.
 @Composable
 fun PlaybackErrorPanel(
     problem: PlaybackProblem,

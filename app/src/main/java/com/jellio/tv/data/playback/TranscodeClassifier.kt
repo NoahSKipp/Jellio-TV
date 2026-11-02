@@ -3,11 +3,6 @@ package com.jellio.tv.data.playback
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
 
-// Whether playing a source here makes the server re-encode its video, the
-// expensive part of a transcode on a server without hardware acceleration.
-// Same rules as the web player's runtime/transcodeClassifier.js. Pure, so
-// tests can pass any DecoderCaps.
-
 interface DecoderCaps {
     fun canDecode(codec: String, tenBit: Boolean): Boolean
     val dolbyVision: Boolean

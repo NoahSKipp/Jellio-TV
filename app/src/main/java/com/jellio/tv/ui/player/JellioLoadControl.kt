@@ -9,12 +9,6 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
 
 private const val MB = 1024 * 1024
 
-// Settings > Playback > Pre-buffer. Standard is Media3's own default.
-// More and Maximum hold off starting until a few seconds are in, load
-// further ahead while playing, wait for a proper stretch after running
-// dry instead of stuttering, and keep loading several minutes ahead while
-// paused. Byte budgets are capped by this app's heap so a Fire TV Stick
-// can't run out of memory on a 4K remux.
 @OptIn(UnstableApi::class)
 private class PrebufferLoadControl(
     minBufferMs: Int,

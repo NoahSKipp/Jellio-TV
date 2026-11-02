@@ -17,15 +17,10 @@ data class CalendarUiState(
     val entries: List<CalendarEntryDto> = emptyList(),
 )
 
-// Real endpoint, Jellio's own CalendarController (GET /Jellio/calendar):
-// upcoming episode air dates and movie digital release dates for
-// whatever is on the reader's own real Watchlist, same real source
-// screens/calendar.js already reads.
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CalendarUiState())
     val uiState: StateFlow<CalendarUiState> = _uiState.asStateFlow()
 

@@ -29,15 +29,10 @@ data class ProfileUiState(
     val bannerBustToken: Long = 0L,
 )
 
-// Real port of screens/profile.js's own renderProfile(): the same real
-// Promise.all([getUserById, getProfileForUser, getAchievementsForUser])
-// fan out, LibraryViewModel's own async {}/awaitAll() pattern for it
-// rather than a bare Promise.all equivalent.
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
@@ -86,9 +81,6 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun updateBioDraft(text: String) {
-        // Real ProfileController.cs's own real 240 char server side
-        // cap: clamped here too so the field itself never visibly
-        // overflows before a save round trip would have caught it.
         _uiState.value = _uiState.value.copy(bioDraft = text.take(240))
     }
 

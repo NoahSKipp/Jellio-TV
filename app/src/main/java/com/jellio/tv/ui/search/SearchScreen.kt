@@ -55,9 +55,6 @@ import androidx.compose.ui.graphics.Color
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 
-// Mirrors screens/search.js's own real live-search shape: a query box
-// over a results grid, Movie/Series only, the same real endpoint
-// runtime/api.js's own searchItems() calls.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchScreen(
@@ -131,9 +128,6 @@ fun SearchScreen(
         }
 
         when {
-            // Results show as each search answers (SearchViewModel), with
-            // placeholder cards after them while more are on the way, and
-            // a grid of placeholders before the first ones arrive.
             uiState.results.isNotEmpty() || uiState.isSearching -> {
                 val placeholders = when {
                     !uiState.isSearching -> 0
@@ -144,9 +138,6 @@ fun SearchScreen(
                     val scaledPosterWidth = PosterWidth.scaled()
                     val spacing = 16.dp
                     val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
-                    // One snapshot for the whole grid: reading uiState inside the
-                    // key lambda saw the next query's empty results while the grid
-                    // still had the old count, and crashed.
                     val results = remember(uiState.results) { uiState.results.distinctBy { it.Id } }
                     val totalCount = results.size
                     LazyVerticalGrid(

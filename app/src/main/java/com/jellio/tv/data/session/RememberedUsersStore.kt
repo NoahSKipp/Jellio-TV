@@ -17,8 +17,6 @@ import javax.inject.Singleton
 
 private val Context.rememberedUsersDataStore: DataStore<Preferences> by preferencesDataStore(name = "jellio_remembered_users")
 
-// Real port of runtime/auth.js's own {userId: {accessToken, name,
-// primaryImageTag, ts}} shape (rememberUser()/getRememberedUsers()).
 @JsonClass(generateAdapter = true)
 data class RememberedUserEntry(
     val accessToken: String,
@@ -27,13 +25,6 @@ data class RememberedUserEntry(
     val timestampMs: Long,
 )
 
-// Mirrors runtime/auth.js's own rememberedKey(): keyed per real server
-// address, the same real reason that file's own header gives (a
-// shared device signed into more than one real server keeps a
-// separate list for each rather than one list bleeding across
-// servers). DataStore instead of localStorage, the same real job
-// StreamPreferences/HomeCustomizationStore already give other client
-// only state in this codebase.
 @Singleton
 class RememberedUsersStore @Inject constructor(
     @ApplicationContext private val context: Context,

@@ -26,11 +26,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// TV Material 3 ships no TextField of its own (a real remote-driven
-// UI rarely needs free text entry); this is the one real place
-// Jellio TV does, so it is the one place worth a small custom field
-// rather than pulling in the whole phone-oriented compose.material3
-// TextField for a single screen's own sake.
 @Composable
 fun JellioTextField(
     value: String,

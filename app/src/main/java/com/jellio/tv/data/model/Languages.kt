@@ -1,8 +1,5 @@
 package com.jellio.tv.data.model
 
-// Real ISO 639-2/B codes, what MediaStream.Language actually carries
-// (confirmed against Jellyfin's own MediaStream DTO), ported from
-// runtime/languages.js verbatim rather than guessed at.
 private val LANGUAGE_KEY_MAP = mapOf(
     "eng" to "lang_english", "ger" to "lang_german", "deu" to "lang_german",
     "fre" to "lang_french", "fra" to "lang_french", "spa" to "lang_spanish",
@@ -29,9 +26,6 @@ fun languageName(code: String?): String {
 
 data class LanguageOption(val code: String, val name: String)
 
-// One real canonical code per real name (ger over deu, fre over fra,
-// dut over nld), mirrors runtime/languages.js's own LANGUAGE_OPTIONS,
-// screens/settings.js's own default audio/subtitle language pickers.
 val LANGUAGE_OPTIONS = listOf(
     LanguageOption("eng", "English"),
     LanguageOption("ger", "German"),
@@ -50,10 +44,6 @@ val LANGUAGE_OPTIONS = listOf(
     LanguageOption("tur", "Turkish"),
 )
 
-// A saved code might be the alternate ISO form this canonical option
-// list does not itself carry (deu rather than ger, from some other
-// real Jellyfin client): matched by real name, the one thing both
-// forms actually agree on, rather than left looking unset.
 fun matchLanguageOption(code: String?): LanguageOption? {
     if (code.isNullOrEmpty()) return null
     val lower = code.lowercase()

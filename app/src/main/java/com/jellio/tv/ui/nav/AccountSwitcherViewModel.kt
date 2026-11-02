@@ -22,19 +22,10 @@ data class AccountSwitcherUiState(
     val error: String? = null,
 )
 
-// Real components/accountSwitcher.js's own real job: the exact same
-// real remembered/public user split LoginViewModel.kt's own
-// PROFILE_PICKER already builds, just built while already signed in
-// instead of before, so this is its own real ViewModel rather than a
-// second real caller of that one (LoginViewModel's own real state
-// machine is built around exactly one login flow, gaining a second
-// caller of that scope invites disturbing the real screen this app
-// actually opens signed out).
 @HiltViewModel
 class AccountSwitcherViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(AccountSwitcherUiState())
     val uiState: StateFlow<AccountSwitcherUiState> = _uiState.asStateFlow()
 
@@ -65,12 +56,6 @@ class AccountSwitcherViewModel @Inject constructor(
         }
     }
 
-    // Real components/accountSwitcher.js's own switchToUser(): success
-    // needs no state change here at all, the exact same real reason
-    // LoginViewModel.kt's own quickSignIn() doesn't either.
-    // AppViewModel's own real sessionFlow collection is what actually
-    // swaps this whole app over to the newly signed in session, tearing
-    // this entire overlay (and the screen underneath it) down with it.
     fun quickSignIn(session: Session, userId: String) {
         if (_uiState.value.busyUserId != null) return
         viewModelScope.launch {
@@ -94,16 +79,6 @@ class AccountSwitcherViewModel @Inject constructor(
         }
     }
 
-    // Real components/accountSwitcher.js's own buildProfileTile() click
-    // handler for a passwordless public user: signs straight in the
-    // same real AuthenticateByName(Pw: '') LoginViewModel.kt's own
-    // selectPublicUser() already sends. A user that actually needs a
-    // password gets no credential form of its own in this overlay
-    // (same real reason that file signs the whole device out to the
-    // real login screen instead): onNeedsPassword signs this session
-    // out, same real effect, AppBootGate's own real LoggedOut branch
-    // then hands them the exact same manual/profile picker flow either
-    // way.
     fun selectPublicUser(session: Session, user: UserDto, onNeedsPassword: () -> Unit) {
         val hasPassword = user.HasPassword != false && user.HasConfiguredPassword != false
         if (hasPassword) {

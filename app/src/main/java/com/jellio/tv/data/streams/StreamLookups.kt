@@ -4,10 +4,6 @@ import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
-// Every stream list is a Gelato resolution on the server, which fans out
-// to the indexers. Results are reused across screens: a list with streams
-// for 8 minutes, an empty one for 2, so a title is not looked up again in
-// a short window.
 class SourceCache<T>(
     private val ttlMs: Long = 8 * 60_000L,
     private val emptyTtlMs: Long = 2 * 60_000L,

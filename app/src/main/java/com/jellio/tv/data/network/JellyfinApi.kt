@@ -39,46 +39,19 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
 
-// Every call here is a relative path against the Jellyfin server
-// NetworkModule's own base-url interceptor swaps in per request: the
-// same real REST surface frontend/runtime/api.js already calls from
-// the web build, called from Kotlin instead of JS.
 interface JellyfinApi {
     @GET("System/Info/Public")
     suspend fun getPublicSystemInfo(): PublicSystemInfoDto
 
-    // No explicit @Header here (a real prior version of this call sent
-    // its own X-Emby-Authorization, see the fix note lower in this file
-    // by buildEmbyAuthorizationHeader): NetworkModule.kt's own auth
-    // interceptor now attaches a real Authorization header to every
-    // outgoing request including this one, device metadata included
-    // even with no session token yet to fold in.
     @POST("Users/AuthenticateByName")
     suspend fun authenticateByName(@Body body: AuthenticateByNameRequest): AuthenticationResultDto
 
     @GET("Users/{userId}")
     suspend fun getUser(@Path("userId") userId: String): UserDto
 
-    // Real endpoint, GET /Users/Public (Jellyfin's own UserController.cs
-    // GetPublicUsers), confirmed against runtime/auth.js's own
-    // getPublicUsers() before porting this: unauthenticated, a real
-    // admin's own per-user "Display this user on the login screen"
-    // toggle already enforced server side.
     @GET("Users/Public")
     suspend fun getPublicUsers(): List<UserDto>
 
-    // Same real GET /Users/{userId} getUser() above already calls, a
-    // second real Retrofit method only because this one carries an
-    // explicit candidate token rather than trusting NetworkModule's own
-    // auth interceptor (which is still carrying whatever the outgoing
-    // session's own token is at this point, not this candidate one):
-    // the same real verification runtime/auth.js's own quickSignIn()
-    // does before trusting a remembered token at all. ApiKey query
-    // param, not a header: AuthorizationContext.cs's own
-    // GetAuthorizationInfoFromDictionary() only reads X-Emby-Token
-    // behind the same disabled EnableLegacyAuthorization flag
-    // buildEmbyAuthorizationHeader's own header explains, but always
-    // reads a real ApiKey query param regardless of it.
     @GET("Users/{userId}")
     suspend fun getUserWithToken(
         @Query("ApiKey") token: String,
@@ -88,9 +61,6 @@ interface JellyfinApi {
         @Header("Authorization") authorization: String,
     ): UserDto
 
-    // Real endpoint, POST /Users/{id}/Configuration (UserController.cs's
-    // own UpdateUserConfiguration): replaces the whole real
-    // UserConfiguration object, not a single field patch.
     @POST("Users/{userId}/Configuration")
     suspend fun updateUserConfiguration(
         @Path("userId") userId: String,
@@ -127,15 +97,6 @@ interface JellyfinApi {
         @Query("personIds") personIds: String? = null,
     ): ItemsResultDto
 
-    // Gelato's own endpoints (Controllers/GelatoApiController.cs), not
-    // Jellio ones: the native Users/{id}/Items search getItems() above
-    // uses, when Gelato intercepts it, waits on a combined movie+series
-    // search server side before answering at all. These resolve
-    // independently, plain JSON arrays (not ItemsResultDto's own
-    // {Items: [...]} wrapper - Gelato's controller returns Ok(dtos)
-    // directly), so SearchViewModel can paint whichever type's real
-    // addon round trip lands first instead of both waiting on the
-    // slower one.
     @GET("gelato/search/movie")
     suspend fun searchGelatoMovies(@Query("q") query: String): List<BaseItemDto>
 
@@ -188,10 +149,6 @@ interface JellyfinApi {
         @Query("Fields") fields: String? = null,
     ): ItemsResultDto
 
-    // Soft dependency on the community Intro Skipper plugin
-    // (github.com/intro-skipper/intro-skipper): real route confirmed
-    // against its own SkipIntroController.cs, works for both Episode
-    // and Movie items despite the route name.
     @GET("Episode/{itemId}/Timestamps")
     suspend fun getIntroSkipperSegments(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
 
@@ -314,12 +271,6 @@ interface JellyfinApi {
     @DELETE("Users/{userId}/Items/{itemId}/Rating")
     suspend fun clearRating(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
-    // Real ItemsController.cs own DeleteItem, the same one
-    // runtime/api.js's own deleteItem() calls: removes the item's own
-    // record outright, not a per-user hide, gated server side on the
-    // real signed in user's own Policy.IsAdministrator/
-    // EnableContentDeletion, not something this app duplicates client
-    // side beyond deciding whether to even show the option.
     @DELETE("Items/{itemId}")
     suspend fun deleteItem(@Path("itemId") itemId: String)
 
@@ -329,10 +280,6 @@ interface JellyfinApi {
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
 
-    // Real Controllers/FeedController.cs endpoint: server wide, every
-    // non-private user's own watch activity and badge unlocks merged
-    // and re-sorted by OccurredAtUtc, that controller's own header
-    // confirmed before porting this.
     @GET("Jellio/notifications")
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto>
 
@@ -428,21 +375,12 @@ interface JellyfinApi {
     @GET("Jellio/feed")
     suspend fun getFeed(): List<FeedEntryDto>
 
-    // Real Controllers/ConfigController.cs endpoint: one real server
-    // side, admin controlled source components/seasonalEffects.js's
-    // own real overlay reads, confirmed against that controller's own
-    // real ClientConfig shape before porting this.
     @GET("Jellio/config")
     suspend fun getJellioConfig(): ClientConfigDto
 
     @POST("Jellio/playback/decision")
     suspend fun logPlaybackDecision(@Body body: com.jellio.tv.data.model.PlaybackDecisionBody)
 
-    // Real Controllers/SleepTimerController.cs endpoints: server side
-    // duration timer, one per user/device. See SleepTimerStatusDto's
-    // own header comment for why this app's own player also has to
-    // enforce this locally rather than trusting the real
-    // SendPlaystateCommand(Stop) that timer expiring server side sends.
     @POST("Jellio/sleep-timer/start")
     suspend fun startSleepTimer(@Body body: SleepTimerStartRequest): SleepTimerStatusDto
 
@@ -452,22 +390,9 @@ interface JellyfinApi {
     @GET("Jellio/sleep-timer/status")
     suspend fun getSleepTimerStatus(): SleepTimerStatusDto
 
-    // Gelato's own endpoint (Controllers/GelatoApiController.cs), not a
-    // Jellio one: card-open blocks on GetStaticMediaSources syncing
-    // streams from the Stremio addon live the first time an item is
-    // opened, a real chunk of why opening a title feels slower than
-    // Nuvio's own speculative resolution. This fires that same sync
-    // ahead of time so a real open lands on an already-warm cache.
-    // Returns 202 with no body; Unit here matches cancelSleepTimer()
-    // above, which does the same for a different empty-body response.
     @POST("gelato/prefetch/{itemId}")
     suspend fun prefetchGelatoStreams(@Path("itemId") itemId: String)
 
-    // Real Controllers/NextUpHiddenController.cs endpoints: the real
-    // per user series id list Shows/NextUp's own results get filtered
-    // against, and the real call that adds one, see
-    // JellioRepository.getNextUp()'s own header for why this exists at
-    // all.
     @GET("Jellio/next-up-hidden")
     suspend fun getHiddenNextUpSeries(): List<String>
 
@@ -497,34 +422,18 @@ interface JellyfinApi {
         @Query("excludedUserIds") excludedUserIds: String? = null,
     ): com.jellio.tv.data.model.CommunityWatchingResponse
 
-    // Real endpoint, POST /Users/{id}/Password, body { CurrentPw, NewPw
-    // }, confirmed against jellyfin-apiclient-javascript's own
-    // updateUserPassword rather than guessed field names, the same
-    // call the stock profile page's own password form uses.
     @POST("Users/{userId}/Password")
     suspend fun updatePassword(@Path("userId") userId: String, @Body body: UpdatePasswordRequest)
 
-    // Real endpoint, POST /Users/ForgotPassword, confirmed against
-    // UserController.cs's own ForgotPassword action before porting
-    // this: the same real generic response every request gets back
-    // regardless of whether the username exists at all, nothing this
-    // app acts on, hence no meaningful return type.
     @POST("Users/ForgotPassword")
     suspend fun requestPasswordReset(@Body body: ForgotPasswordRequest)
 
     @POST("Users/ForgotPassword/Pin")
     suspend fun redeemPasswordResetPin(@Body body: ForgotPasswordPinRequest): PinRedeemResultDto
 
-    // Real endpoint, GET /QuickConnect/Enabled: a server admin can turn
-    // the whole real feature off, checked before this screen bothers
-    // offering a code field nobody could ever actually use.
     @GET("QuickConnect/Enabled")
     suspend fun isQuickConnectEnabled(): Boolean
 
-    // Real endpoint, POST /QuickConnect/Authorize?code=: the signed in
-    // session's own token approving a real pending request another
-    // device started, returns a real bool for whether the code
-    // actually matched a pending request.
     @POST("QuickConnect/Authorize")
     suspend fun authorizeQuickConnect(@Query("code") code: String): Boolean
 
@@ -537,40 +446,16 @@ interface JellyfinApi {
     @POST("Users/AuthenticateWithQuickConnect")
     suspend fun authenticateWithQuickConnect(@Body body: com.jellio.tv.data.model.QuickConnectAuthBody): AuthenticationResultDto
 
-    // Real Controllers/AvatarsController.cs endpoints: real preset
-    // images an admin dropped into Jellio's own plugin data directory,
-    // confirmed against components/avatarPicker.js's own real
-    // getAvatarPresets()/getAvatarPresetUrl() before porting this.
     @GET("Jellio/avatars")
     suspend fun getAvatarPresets(): List<AvatarPresetDto>
 
-    // encoded = true: id can carry a real "/" (a grouped preset's own
-    // subfolder), the caller (JellioRepository's own encodeAvatarId())
-    // already percent-encodes each real path segment on its own, this
-    // just stops Retrofit from also encoding the literal "/" itself
-    // into %2F, which AvatarsController.cs's own {**id} catch-all route
-    // reads as real path segments, not one.
     @Streaming
     @GET("Jellio/avatars/{id}")
     suspend fun getAvatarPresetImage(@Path(value = "id", encoded = true) id: String): ResponseBody
 
-    // Real endpoint, POST /Users/{id}/Images/Primary, confirmed against
-    // runtime/api.js's own uploadUserAvatarBlob(): body is the image's
-    // own real bytes base64 encoded as plain text, Content-Type set to
-    // the image's own real mime type rather than application/json, the
-    // same real shape jellyfin-apiclient-javascript's own
-    // uploadUserImage already sends. body is built as a raw RequestBody
-    // here specifically so Retrofit's own Moshi converter never touches
-    // it.
     @POST("Users/{userId}/Images/Primary")
     suspend fun uploadUserAvatar(@Path("userId") userId: String, @Body body: RequestBody)
 
-    // Real Controllers/ProfileController.cs endpoints, confirmed
-    // against that controller's own source before porting this: the
-    // {userId} route is the one public read (IsPrivate/Bio, real
-    // Steam-style split, badges/activity go dark separately via
-    // AchievementsController below, not this one), settings/bio are
-    // self only.
     @GET("Jellio/profile/{userId}")
     suspend fun getProfile(@Path("userId") userId: String): ProfileDto
 
@@ -583,32 +468,15 @@ interface JellyfinApi {
     @POST("Jellio/profile/privacy")
     suspend fun setProfilePrivacy(@Body body: SetPrivacyRequest)
 
-    // Real Controllers/AchievementsController.cs's own {userId} route:
-    // the caller's own stats/badges/activity when userId is their own,
-    // a locked {IsPrivate: true} shell for anyone else's private
-    // profile, confirmed against that controller's own source.
     @GET("Jellio/achievements/{userId}")
     suspend fun getAchievements(@Path("userId") userId: String): AchievementsDto
 
     @DELETE("Jellio/profile/banner")
     suspend fun deleteProfileBanner()
 
-    // Real Controllers/AchievementsController.cs's own real-watch
-    // endpoint: item.RunTimeTicks is the library's own metadata
-    // runtime, not whatever Gelato actually resolved and streamed, so
-    // ui/player's own real ExoPlayer duration/position is what decides
-    // when to call this, not this file, same real reason
-    // screens/player.js's own creditRealWatch() call site never trusts
-    // item.RunTimeTicks either.
     @POST("Jellio/achievements/real-watch")
     suspend fun creditRealWatch(@Body body: RealWatchRequest)
 
-    // Real Controllers/RealDurationController.cs endpoints: a title's
-    // own real observed duration, not per user, fed by ui/player's own
-    // real trustworthy signals (ExoPlayer's own real duration, or the
-    // real position 'ended'/Up Next confirm a genuine full watch at),
-    // same real three signals screens/player.js's own
-    // reportRealDurationIfUseful() already uses.
     @POST("Jellio/real-duration")
     suspend fun reportRealDuration(@Body body: ReportDurationRequest)
 }
@@ -617,18 +485,6 @@ interface JellyfinApi {
 // shows the installed release.
 val APP_VERSION: String = com.jellio.tv.BuildConfig.VERSION_NAME
 
-// Real Jellyfin auth convention every client sends, confirmed against
-// the same real shape jellyfin-apiclient-javascript's own boot line
-// already relies on (IndexHtmlPatchService.cs's own header explains
-// that real log line, this is the equally real request side of it).
-// Sent as the real "Authorization" header everywhere in this app now
-// (NetworkModule.kt's own auth interceptor, this file's own header
-// above authenticateByName explains why X-Emby-Authorization stopped
-// working): token folded into this same header's own Token="..." field
-// when one exists, rather than a separate X-Emby-Token header, the
-// real un-gated path AuthorizationContext.cs's own
-// GetAuthorizationInfoFromDictionary() always reads regardless of
-// EnableLegacyAuthorization.
 fun buildEmbyAuthorizationHeader(deviceId: String, appVersion: String, token: String? = null): String {
     val base = "MediaBrowser Client=\"Jellio TV\", Device=\"Android TV\", DeviceId=\"$deviceId\", Version=\"$appVersion\""
     return if (!token.isNullOrEmpty()) "$base, Token=\"$token\"" else base

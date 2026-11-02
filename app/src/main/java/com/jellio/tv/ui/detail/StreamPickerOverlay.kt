@@ -64,11 +64,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Ported from components/streamPicker.js's own real card shape
-// (resolution/bitrate/size/container/audio tags off the same real
-// MediaSourceInfo), skipping that file's own remember-my-stream/
-// language-filter chrome for now: a real but secondary layer over the
-// same real core job, picking one of Gelato's own resolved sources.
 internal val QUALITY_ORDER = listOf("4K", "QHD", "FHD", "HD", "SD")
 private val QUALITY_NAME_PATTERNS = listOf(
     // Names say "720p" or just "HD", "Full HD", "Ultra HD"; HDR and HDTV
@@ -87,9 +82,6 @@ private fun matchQuality(text: String): String? =
 internal fun labelQuality(source: MediaSourceDto): String? =
     source.Name?.substringBefore('\n')?.let { matchQuality(it) }
 
-// Same as streamPicker.js's sourceQuality(): the addon's label first (it's
-// parsed from the actual file, while probe details Gelato attaches can
-// belong to another version), then probed size, then the release name.
 internal fun sourceQuality(source: MediaSourceDto): String? {
     labelQuality(source)?.let { return it }
     val video = source.MediaStreams?.firstOrNull { it.Type == "Video" }
@@ -128,11 +120,6 @@ internal fun sourceAudioLabel(source: MediaSourceDto): String {
     return parts.joinToString(" ")
 }
 
-// Real MediaStream.BitRate, per stream video track, left blank rather
-// than estimated when a source carries none, same real reasoning
-// streamPicker.js's own sourceBitrateLabel() documents: an invented
-// figure here would read as more real data than Gelato actually
-// reported for this one source.
 private fun sourceBitrateLabel(source: MediaSourceDto): String {
     val bitRate = source.MediaStreams?.firstOrNull { it.Type == "Video" }?.BitRate ?: return ""
     return "%.1f Mbps".format(bitRate / 1_000_000.0)
@@ -143,9 +130,6 @@ internal fun sourceDescription(source: MediaSourceDto): String =
 
 private const val TICKS_PER_SECOND = 10_000_000L
 
-// mm:ss, or h:mm:ss past the first real hour, same real tick unit
-// (the .NET TimeSpan constant) streamPicker.js's own formatResumeLabel()
-// renders off of, not a second unit conversion invented here.
 private fun formatResumeLabel(ticks: Long): String {
     val totalSeconds = ticks / TICKS_PER_SECOND
     val hours = totalSeconds / 3600
@@ -157,10 +141,6 @@ private fun formatResumeLabel(ticks: Long): String {
 
 private const val REGIONAL_INDICATOR_BASE = 0x1F1E6
 
-// One flag per major real source country for each language
-// LANGUAGE_OPTIONS already covers, not every real ISO 3166 territory
-// that happens to speak it, ported verbatim from streamPicker.js's
-// own FLAG_COUNTRY_TO_LANGUAGE.
 private val FLAG_COUNTRY_TO_LANGUAGE = mapOf(
     "DE" to "ger", "AT" to "ger", "CH" to "ger",
     "GB" to "eng", "US" to "eng", "CA" to "eng", "AU" to "eng", "IE" to "eng",
@@ -179,13 +159,6 @@ private val FLAG_COUNTRY_TO_LANGUAGE = mapOf(
     "TR" to "tur",
 )
 
-// AIOStreams' own real stream titles carry a flag emoji per embedded
-// audio language right in source.Name, real signal every source
-// actually has unlike MediaStreams, which streamPicker.js's own real
-// bug report found only fully populated for whichever one source had
-// already been played before. Walks by real Unicode code point, not a
-// plain string index: a flag emoji is a surrogate pair per regional
-// indicator on the JVM same as in JS.
 private fun flagLanguages(text: String?): List<String> {
     if (text.isNullOrEmpty()) return emptyList()
     val codes = mutableListOf<String>()
@@ -210,12 +183,6 @@ private fun flagLanguages(text: String?): List<String> {
     return codes
 }
 
-// Reads both real MediaStreams.Language and the flag-emoji codes
-// above and keeps whichever either one finds, same real fix
-// streamPicker.js's own sourceAudioLanguages() documents: most of a
-// real 38+ result set from Gelato comes back with no MediaStreams
-// audio entries at all, only the flag emoji in source.Name still
-// tells the two languages apart.
 internal fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
     val codes = mutableListOf<String>()
     source.MediaStreams?.forEach { stream ->
@@ -228,11 +195,6 @@ internal fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
     return codes
 }
 
-// Mirrors components/streamPicker.js's own openStreamPicker(): a real
-// try/catch around getMediaSources, a failure rendered as its own
-// distinct real state rather than an unhandled throw out of this
-// screen's own LaunchedEffect (a real crash risk this used to carry,
-// nothing here caught it before).
 private sealed interface SourcesState {
     data object Loading : SourcesState
     data class Loaded(val sources: List<MediaSourceDto>) : SourcesState
@@ -255,53 +217,11 @@ fun StreamPickerOverlay(
     var remembered by remember { mutableStateOf<String?>(null) }
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
     var selectedQuality by remember { mutableStateOf<String?>(null) }
-    // Real bug found live testing on device, same real class every
-    // other overlay in this app already had to fix: nothing here ever
-    // requested initial D-pad focus, and nothing stopped focus
-    // wandering back out into DetailScreen underneath either. Real
-    // feedback live also removed this overlay's own visual Back button
-    // below (the remote's own real system Back, already wired via
-    // BackHandler, does the same real job everywhere in this app now),
-    // so this can no longer anchor to that always-present real target -
-    // reattached below to whichever real element is first in reading
-    // order for whatever SourcesState this overlay is actually in
-    // (Retry on Error/empty, Resume/the first language chip/the first
-    // source card on Loaded, exactly one of those at a time), refired
-    // once state actually leaves Loading rather than once on open,
-    // since neither of those real targets exists yet during it.
     val initialFocusRequester = remember { FocusRequester() }
     val resumeFocusRequester = remember { FocusRequester() }
-    // Still attached to the first card below (and still the initial-
-    // focus target when there's neither a Resume button nor more than
-    // one language) even though nothing calls requestFocus() on it for
-    // Down anymore - see the LazyColumn's own focusRestorer() comment
-    // for why Down doesn't need that here.
     val firstSourceCardFocusRequester = remember { FocusRequester() }
     var firstCardHasFocus by remember { mutableStateOf(false) }
-    // Hoisted so the pre-warm effect below can scrollToItem(0) on the
-    // exact same real list focusRestorer() further down still reads.
     val streamListState = rememberLazyListState()
-    // Real fix, confirmed against Nuvio's own StreamSourcesSidePanel.kt
-    // (a real shipped app solving this identical problem): its own
-    // LazyColumn's focusRestorer()-equivalent state only ever needs to
-    // work cold in ui/home/HomeScreen.kt, since that screen's LazyColumn
-    // is the very first thing ever focused there - nothing else
-    // competes for initial focus first. Here Resume/the first language
-    // chip take real initial focus instead, so this list's own
-    // focusRestorer() never once got a genuine successful focus landing
-    // inside it to remember before a later Down press ever needed to
-    // restore to one - confirmed live via Logcat across this file's
-    // entire debugging history: "first card focus=" never logged once,
-    // through every prior fix attempt. Nuvio's own real fix for the
-    // identical shape (a stream list sitting below a chip row that
-    // takes real initial focus first): explicitly pre-warm real focus
-    // onto the first item the moment data loads - scrollToItem(0) plus
-    // a real requestFocus() retried across real frames, runCatching
-    // wrapped since the target may not exist yet in every SourcesState -
-    // then move real focus on to wherever this overlay's own actual
-    // initial resting position is supposed to be, leaving
-    // focusRestorer() with a genuine remembered child instead of a cold
-    // one for the first time.
     LaunchedEffect(state) {
         val current = state
         if (current is SourcesState.Loaded && current.sources.isNotEmpty()) {
@@ -319,9 +239,6 @@ fun StreamPickerOverlay(
     LaunchedEffect(item.Id, reloadKey) {
         state = SourcesState.Loading
         state = try {
-            // Streams that recently failed to play go last, flagged. With
-            // the Video transcode policy on, ones the server would have to
-            // re-encode go after the rest, and Block leaves them out.
             val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
             val loaded = loadSources(reloadKey > 0)
             val kept = if (policy.blocking) loaded.filterNot { policy.needsReencode(it) } else loaded
@@ -484,22 +401,7 @@ fun StreamPickerOverlay(
                         }
                     }
                 } else {
-                    // Real Jellyfin field, the same one the player's own
-                    // resume logic already reads off item.UserData to
-                    // seek on real playback start: this is a fast path
-                    // onto that same real behaviour (streamPicker.js's
-                    // own resumeTicks button), not a second resume
-                    // mechanism, picking the remembered/first source and
-                    // letting the player itself do the actual seek.
                     val resumeTicks = item.UserData?.PlaybackPositionTicks ?: 0
-                    // Real port of streamPicker.js's own language filter
-                    // chip bar: only worth showing when there is a real
-                    // choice behind it, same real reasoning the whole
-                    // picker already skips itself for a single-source
-                    // title. Counted and ordered the same real way that
-                    // file's own languageCounts/languages sort does, led
-                    // by count then a real alphabetical languageName tie
-                    // break.
                     val languageCounts = linkedMapOf<String, Int>()
                     currentState.sources.forEach { source ->
                         sourceAudioLanguages(source).forEach { code -> languageCounts[code] = (languageCounts[code] ?: 0) + 1 }
@@ -536,36 +438,6 @@ fun StreamPickerOverlay(
                         "loaded sources=${currentState.sources.size} filtered=${filteredSources.size} " +
                             "resumeTicks=$resumeTicks languages=${languages.size}",
                     )
-                    // Real root cause, confirmed live over several
-                    // rounds of Logcat tracing spanning two separate
-                    // sessions: a direct firstSourceCardFocusRequester.
-                    // requestFocus() call - from dispatchKeyEvent, from a
-                    // real Compose LaunchedEffect, retried across ten
-                    // real frames, even paired with an explicit
-                    // scrollTo(0) on a plain verticalScroll() Column
-                    // standing in for this LazyColumn - never once
-                    // landed, no exception, no onFocusChanged. None of
-                    // those were ever the actual problem. The one thing
-                    // never tried across any of that: a real stable
-                    // key for each item below. Real gap ui/home/
-                    // HomeScreen.kt's own header already documents and
-                    // already fixes there the identical way: plain
-                    // Compose Foundation LazyColumn advertises no
-                    // default D-pad entry point of its own for a system
-                    // that has never focused anything inside it yet,
-                    // and without a real per-item key, its own item
-                    // recycling can silently break a remembered
-                    // FocusRequester's own association with whichever
-                    // node it was last attached to (the documented real
-                    // upstream class this file's own prior LazyColumn
-                    // attempt matched, JetBrains/compose-multiplatform
-                    // #3526) - the standard real fix for that is a
-                    // stable key, not abandoning LazyColumn outright.
-                    // focusRestorer() plus a real per-item key below
-                    // (source.Id, falling back to index for the one
-                    // pathological source with none) is the same
-                    // proven-working shape HomeScreen.kt already ships,
-                    // neither piece ever combined here before.
                     LazyColumn(
                         state = streamListState,
                         contentPadding = PaddingValues(bottom = 24.dp),
@@ -741,22 +613,9 @@ internal fun SourceCard(
     }
     val reencode = classification?.takeIf { transcodeMark && it.needsVideoTranscode }
     val blocked = reencode != null && policy.blocking
-    // Real .jellio-stream-picker-card-active treatment: a
-    // JellioSecondary border plus a slightly brighter fill, ported as a
-    // plain color swap here rather than a real border stroke, the same
-    // simplification the rest of this app's own selected-state cards
-    // (DetailScreen's own season tabs) already use.
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        // Real bug found live, on a real screenshot: this card set no
-        // real focusedContainerColor/focusedContentColor of its own, so
-        // TV Material3's own real default focused pair took over
-        // instead - a real bright near-white fill this app never
-        // designed its own explicit JellioTextSecondary tag/language
-        // text against, reading as low contrast once focused. The same
-        // real dark-fill/bright-text pair every other real selectable
-        // text row in this app already uses instead.
         colors = ClickableSurfaceDefaults.colors(
             containerColor = when {
                 isActive -> JellioSecondary.copy(alpha = 0.22f)
@@ -777,8 +636,6 @@ internal fun SourceCard(
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
         modifier = modifier.fillMaxWidth(),
     ) {
-        // Real feedback live: shrunk from 16dp/2dp/6dp/4dp so more of
-        // this real list fits on screen at once without scrolling.
         Column(modifier = Modifier.padding(12.dp)) {
             if (recentlyFailed) {
                 Text(text = com.jellio.tv.ui.i18n.string("stream_bad_flag"), color = Color(0xFFFFB74D), style = MaterialTheme.typography.labelSmall)
@@ -807,12 +664,6 @@ internal fun SourceCard(
             if (tags.isNotEmpty()) {
                 Text(text = tags.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
-            // Real bug streamPicker.js's own buildSourceCard() documents
-            // and fixes: an embedded MediaStreams Language ("de", ISO
-            // 639-1) and a flag-emoji-derived code ("ger", ISO 639-2/T)
-            // can name the exact same real language under two different
-            // strings, so this dedupes again against languageName()'s
-            // own resolved display name rather than the raw code.
             val languageNames = sourceAudioLanguages(source)
                 .mapNotNull { code -> languageName(code).takeIf { it != "Unknown" } }
                 .distinct()

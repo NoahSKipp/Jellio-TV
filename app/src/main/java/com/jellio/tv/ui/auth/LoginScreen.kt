@@ -78,26 +78,12 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real port of native jellyfin-web's own #/login flow, LoginViewModel.kt's
-// own header comment covers why this app themes rather than replaces
-// it: server address first on a true first run (SERVER_ENTRY), then
-// straight onto "Who's watching?" (PROFILE_PICKER) once that server
-// answers back with at least one real remembered or public profile,
-// a bare username/password form (MANUAL) only ever the real fallback.
-// LoginViewModel.kt's own header comment covers the real state
-// machine driving which composable below is on screen.
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.start() }
 
-    // Real feedback live: every one of this flow's own real steps drew
-    // its own visual "Back"/"Cancel" button, real duplicate real
-    // affordance for what the remote's own real system Back already
-    // does everywhere else in this app. Wired here instead (this
-    // screen's own only real BackHandler, nothing here had one before),
-    // each step's own real button removed below in favor of it.
     BackHandler(enabled = uiState.mode == LoginMode.MANUAL && uiState.canReturnToProfiles) {
         viewModel.backToProfiles()
     }
@@ -149,13 +135,6 @@ fun LoginScreen(modifier: Modifier = Modifier, viewModel: LoginViewModel = hiltV
     }
 }
 
-// Real port of native jellyfin-web's own #/login server-address step,
-// LoginViewModel.kt's own header comment covers why this app themes
-// rather than replaces it: split out from ManualLoginForm below so a
-// true first run only ever asks for the one thing it actually needs
-// before it can even know whether a profile picker is possible,
-// rather than username/password fields sitting there with no server
-// yet to check them against.
 @Composable
 private fun ServerAddressForm(
     uiState: LoginUiState,
@@ -591,12 +570,6 @@ private fun ManualLoginForm(
     }
 }
 
-// Real port of screens/login.js's own buildForgotUsernameForm(): step
-// 1 of 2, POSTed to /Users/ForgotPassword. real Jellyfin gives back
-// the exact same generic response whether or not that username
-// exists at all (JellioRepository.kt's own requestPasswordReset()
-// header comment covers why), so there is nothing more specific this
-// screen could show even on a real failure to reach the server.
 @Composable
 private fun ForgotUsernameForm(
     uiState: LoginUiState,
@@ -631,14 +604,6 @@ private fun ForgotUsernameForm(
     }
 }
 
-// Real port of screens/login.js's own buildForgotPinForm(): step 2 of
-// 2, the code the reader's own inbox just received plus a real new
-// password to end on. A real successful redeem clears the account's
-// own password server side rather than setting the one typed here
-// (JellioRepository.kt's own redeemPasswordReset() header comment
-// covers the two real follow up calls that makes necessary), this
-// form only ever shows a generic status either way, the same real
-// leak-prevention reasoning ForgotUsernameForm's own header documents.
 @Composable
 private fun ForgotPinForm(
     uiState: LoginUiState,

@@ -38,29 +38,6 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-// A row's "view all": every item the row loaded, as a full-screen poster
-// grid (it used to be a vertical list), rendered by the calling screen
-// at its own root the same way CardOptionsMenu/EpisodeOptionsMenu are.
-//
-// fetchAll mirrors that file's own options.fetchAll: a second,
-// unbounded real request for this exact same row, swapped in only once
-// it lands and only if it actually turned up more than the row's own
-// already-loaded depth, same real guard that file's own
-// `if (fullItems && fullItems.length > items.length) renderList(fullItems)`
-// applies. Real web's own stale-reopen guard (a bumped openToken) has
-// no Kotlin equivalent needed here: this composable's own
-// LaunchedEffect is keyed on items, so Compose's own structured
-// concurrency already cancels a still-resolving fetchAll from the
-// previous row the instant a different row's own items replace it.
-//
-// Real bug found live testing on device: nothing here ever requested
-// initial D-pad focus when this modal opened, and its own list had no
-// default D-pad entry point of its own either (the same real
-// lazy-layout gap the pill screens already hit), so a reader clicking
-// a row's own title into this modal had no way to navigate its own
-// list at all. Same real fix LibraryPickerOverlay already uses: claim
-// focus on open, trap exit, and focusRestorer() on the grid itself so
-// a directional search always finds something.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun RowListModal(

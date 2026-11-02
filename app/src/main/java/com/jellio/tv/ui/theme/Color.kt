@@ -2,15 +2,6 @@ package com.jellio.tv.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Mirrors css/app.css's own :root tokens in Jellio-Plugin (the web
-// frontend), so this app and the web client stay one real look
-// rather than two designs that happen to share a name. Keep in sync
-// by hand: bump one, bump the other. Cross-checked directly against
-// NuvioWeb's own css/base.css (the real source both files port these
-// from): its own palette is genuinely monochrome, near-black grounds
-// and #f5f5f5 as the one bright "secondary" tone, no separate accent
-// hue anywhere. No color here is invented past what either real
-// source actually defines.
 val JellioBg = Color(0xFF0D0D0D)
 val JellioBgElevated = Color(0xFF1A1A1A)
 val JellioSecondary = Color(0xFFF5F5F5)
@@ -22,9 +13,6 @@ val JellioBorder = Color(0xFF333333)
 // css/app.css's own .jellio-card-options-item-danger: #ff6b81.
 val JellioDanger = Color(0xFFFF6B81)
 
-// css/app.css's own --jellio-rarity-* tokens, badge rarity tiers:
-// Legendary reuses --jellio-trending-color (#ff9800) there too, same
-// real value kept here rather than a separate accidental duplicate.
 val JellioRarityCommon = Color(0xFF8A90A0)
 val JellioRarityRare = Color(0xFF5B9DF0)
 val JellioRarityEpic = Color(0xFFB57BF2)

@@ -2,15 +2,6 @@ package com.jellio.tv.data.model
 
 import java.util.Calendar
 
-// Time-of-day copy table for the Shows library's own coverflow header.
-// Ported faithfully from runtime/editorial.js's own showsEditorial()
-// (itself ported from Harbor's own src/views/shows/hero-curation.ts:
-// dayBucket(), the real BUCKET_VARIANTS copy table, and bucketCopy()'s
-// own day-of-year rotation formula), not a single-variant-per-bucket
-// simplification: real Harbor rotates through 7 real copy variants
-// per bucket, picking one by day of year rather than holding one line
-// fixed all bucket long.
-
 @androidx.compose.runtime.Immutable
 data class ShowsEditorial(val icon: String, val label: String, val tagline: String, val description: String)
 
@@ -89,9 +80,6 @@ fun showsEditorial(hour: Int): ShowsEditorial {
     )
 }
 
-// A themed row for the time of day: its title, the genres that fill it
-// and, for anime, words to look for in a title or overview (isekai is a
-// tag, not a genre, so "another world" and friends find it instead).
 @androidx.compose.runtime.Immutable
 data class TimeOfDayRow(val title: String, val genres: List<String>, val keywords: List<String> = emptyList())
 

@@ -61,84 +61,24 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-// Real port of Jellio-Plugin's own desktop css/app.css: .jellio-sidebar
-// (--jellio-sidebar-width-collapsed: 5em, --jellio-sidebar-width: 15em,
-// :hover/:focus-within expansion, position: fixed so widening it
-// overlays real content instead of reflowing every card grid
-// underneath). TopNavPill's own floating top pill is gone: this rail
-// replaces it as this app's own only nav chrome, real desktop parity
-// rather than the mobile pill shape this app shipped with first.
 private val SidebarCollapsedWidth = 88.dp
 private val SidebarExpandedWidth = 260.dp
 private val SidebarItemHeight = 64.dp
 private val SidebarMinItemHeight = 44.dp
-// Real feedback live, round two: even after Settings' own iconScale()
-// bump, it still read smaller than its siblings side by side. Rather
-// than pushing that one glyph even further past its own siblings'
-// real size, every icon steps down slightly here instead, freeing up
-// the same real headroom to grow Settings' own relative scale further
-// without it ever reading larger than the rest, just finally even
-// with them.
 private val SidebarIconSize = 26.dp
 private val SidebarLabelMaxWidth = 160.dp
 
-// Real MainActivity.kt's own contentPadding(start = ...) always
-// reserves exactly this much real space, collapsed or not: the same
-// real reason the web version's own .jellio-sidebar-mount only ever
-// flexes a fixed collapsed basis, the rail's own real position: fixed
-// self is what actually overlays past that on focus, not a reflow of
-// whatever real space content itself was given.
 val SidebarReservedWidth get() = SidebarCollapsedWidth
 
-// Real port of components/sidebar.js/persistentSidebar.js: icon-only
-// by default, real label text revealed once a reader's own D-pad
-// focus (real desktop's own :focus-within, no pointer on a real TV to
-// :hover with) actually lands somewhere inside this rail, collapsing
-// straight back the moment it leaves, same real reasoning that CSS
-// rule's own header gives.
-//
-// Always the real leftmost focusable thing on screen: this rail sits
-// at the screen's own real x = 0 with real reserved layout space
-// (never an overlay while collapsed, only while it already has real
-// focus, see SidebarReservedWidth's own header), so Compose's own
-// default spatial search finds it on a real Left press from any real
-// screen content the same reliable way it already finds Down out of
-// Search/Watchlist/Calendar/Settings, no explicit requestFocus()
-// bridge to fight the same way that mechanism kept breaking for
-// Home/Library's own Down navigation.
 @Composable
 fun SidebarNav(
     items: List<JellioRoute>,
     selected: JellioRoute,
     onSelect: (JellioRoute) -> Unit,
     enabled: Boolean = true,
-    // Real components/sidebar.js's own buildProfileButton(): the
-    // signed in reader's own real avatar and name, rendered on this
-    // rail's own Profile row (self, JellioRoute.Profile(userId = null))
-    // in place of a generic account icon.
     profileAvatarUrl: String? = null,
     profileName: String? = null,
-    // Real bug found live: MainActivity's own Library/Profile rows
-    // each open their own real popover rather than switching routes
-    // outright, and every one of those popovers' own real dismiss
-    // left this rail's own currently selected item
-    // gone - Compose had nothing real left to fall back to, reading
-    // live as "the remote stops selecting/navigating anything at
-    // all". Exposed here (defaulting to a real private one so every
-    // real caller that doesn't need this stays unaffected) so
-    // MainActivity can reclaim focus onto whichever of this rail's
-    // items actually opened the popover in the first place once
-    // the popover itself dies.
     restoreFocusRequester: FocusRequester? = null,
-    // Real fix for MainActivity's own SidebarNav mount logic:
-    // hover/focus-within expands this rail naturally on desktop, but
-    // a TV has no pointer to hover with and nothing real on this rail
-    // actually has focus yet the exact moment a reader backs out of a
-    // detail screen onto this one, so it flashes completely collapsed
-    // for a frame before focus moves in. This overrides the real
-    // internal focus-based state, forcing it expanded visually before
-    // focus actually arrives, clearing out once focus actually leaves
-    // somewhere else.
     forceCollapsed: Boolean = false,
     // False while a panel is open over the screen, so Left from inside
     // it can't land on the rail behind it.
@@ -150,10 +90,6 @@ fun SidebarNav(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val visuallyExpanded = expanded && !forceCollapsed
-    // Pressing Left into the rail always lands on Home, wherever on
-    // screen it was pressed from.
-    // Where focus lands when the remote moves left into the rail: the
-    // screen currently open, or Home when that screen isn't in the rail.
     val homeFocusRequester = remember { FocusRequester() }
     val entryRoute = if (items.contains(selected)) selected else JellioRoute.Home
 
@@ -162,9 +98,6 @@ fun SidebarNav(
         }
     }
 
-    // Real port of css/app.css's own transition: width 0.15s ease-in-out:
-    // spring() felt too rubbery/mobile for a TV nav rail, a snappy tween
-    // feels far more like a real cursor hover expansion.
     val width by animateDpAsState(
         targetValue = if (visuallyExpanded) SidebarExpandedWidth.scaled() else SidebarCollapsedWidth.scaled(),
         animationSpec = tween(180, easing = FastOutSlowInEasing),
@@ -176,14 +109,6 @@ fun SidebarNav(
         label = "sidebarShadowAlpha",
     )
 
-    // Real bug found live testing on device, on TopNavPill's own
-    // predecessor: cold app start left focus nowhere at all, the very
-    // first D-pad press falling through to Compose's own generic
-    // "pick something" default instead of the already-selected entry.
-    // Same real fix, ported: a plain LaunchedEffect(Unit) here fires
-    // exactly once for this rail's own real lifetime (MainActivity's
-    // own persistent Box, same as the pill it replaces), claiming
-    // initial focus onto whichever entry is already selected.
     LaunchedEffect(Unit) { restoreFocusRequester?.requestFocus() }
 
     // A closing panel hands focus back here before the rail is focusable
@@ -198,21 +123,11 @@ fun SidebarNav(
         modifier = modifier
             .fillMaxHeight()
             .width(width)
-            // Real port of css/app.css's own real box-shadow: 12px 0
-            // 32px rgb(0 0 0/0.5), :hover/:focus-within only: the same
-            // real visual separation from content this rail now
-            // overlays once expanded, absent while collapsed and
-            // sitting flush against real reserved layout space instead.
             .shadow(elevation = if (shadowAlpha > 0f) 24.dp else 0.dp, shape = RoundedCornerShape(0.dp))
             // Solid: library heroes run under it. Same colour as every
             // screen's background, so it still reads as one surface.
             .background(JellioBg)
             .padding(vertical = 20.dp, horizontal = 10.dp)
-            // Real port of .jellio-sidebar's own :focus-within: Compose's
-            // own FocusState.hasFocus already means exactly that (this
-            // node or any real descendant), so a plain onFocusChanged
-            // here is the whole real mechanism, nothing to hand-roll
-            // per item.
             .onFocusChanged { state ->
                 expanded = state.hasFocus
                 onFocusChange(state.hasFocus)
@@ -246,20 +161,6 @@ fun SidebarNav(
                 isSelected = route == selected,
                 expanded = visuallyExpanded,
                 enabled = enabled,
-                // Real feedback live: this rail's own expansion is
-                // driven entirely by onFocusChanged above, and a click
-                // never actually changes focus (the item clicked
-                // already had it, real D-pad Select), so a real Down/
-                // moveFocus redirect used to live here, deferred a real
-                // frame so the new screen had time to mount. Now just
-                // onSelect(route): MainActivity's own central
-                // LaunchedEffect(route) (its header on forceCollapsed
-                // above explains why) owns that redirect for every real
-                // navigation now, sidebar-initiated ones included, not
-                // only this one - a second real moveFocus(Right) firing
-                // here too, after that central one already landed focus
-                // somewhere real, risked shoving it somewhere neither
-                // one intended.
                 onClick = {
                     if (isLibrary && libraries?.isNotEmpty() == true) {
                         onSelect(route)
@@ -278,11 +179,6 @@ fun SidebarNav(
     }
 }
 
-// Mirrors css/app.css's own .jellio-sidebar-link: icon beside the
-// label (not stacked, that file's own header explains the truncated-label
-// bug a stacked layout forced), a fixed icon slot so the icon itself
-// never drifts off-center between collapsed and expanded, the label
-// fading in beside it rather than the row reflowing under it.
 @Composable
 private fun SidebarItem(
     icon: ImageVector,
@@ -294,11 +190,6 @@ private fun SidebarItem(
     focusRequester: FocusRequester? = null,
     homeFocusRequester: FocusRequester? = null,
     iconScale: Float = 1f,
-    // Real components/sidebar.js's own buildProfileButton(): the
-    // reader's own real avatar in place of a generic icon, for this
-    // rail's own Profile row only. Null for every other item, an
-    // AsyncImage circle instead of the plain Icon slot below whenever
-    // it isn't.
     avatarUrl: String? = null,
     height: androidx.compose.ui.unit.Dp = SidebarItemHeight,
     focusable: Boolean = true,

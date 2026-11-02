@@ -128,13 +128,6 @@ private enum class SettingsCategory(val labelKey: String, val icon: ImageVector)
         @Composable get() = string(labelKey)
 }
 
-// A real port of screens/settings.js: this app's own real
-// server/account facts, the same real remember-stream-choice
-// preference components/streamPicker.js's own picker reads, the real
-// default audio/subtitle language preference section, real password
-// change (POST Users/{id}/Password) and, only when the server admin
-// has not turned the whole real feature off, real Quick Connect
-// approval.
 @OptIn(ExperimentalComposeUiApi::class)
 
 private val LocalActiveCategoryFocus = compositionLocalOf<FocusRequester?> { null }
@@ -148,21 +141,12 @@ fun SettingsScreen(
     onLaunchOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
-    // AppBootGate's own hiltViewModel() call already checks once per
-    // real app open; this resolves to that exact same Activity-scoped
-    // instance for the manual "Check for Updates" button below.
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     val rememberStream by viewModel.rememberStream.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
-    // Real bug found live: AvatarPickerOverlay's own dismiss removed its
-    // whole real focused subtree with nothing requesting focus back
-    // onto this row first, the same real class of dead-remote bug -
-    // declared up here rather than inside the Column below since the
-    // overlay handling further down needs it too, outside that Column's
-    // own real scope.
     val changeAvatarFocusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -177,9 +161,6 @@ fun SettingsScreen(
     // focused one's settings on the right.
     var category by remember { mutableStateOf(SettingsCategory.ACCOUNT) }
     LaunchedEffect(category) { scrollState.scrollTo(0) }
-    // OK on a category moves into its settings; Back from the settings
-    // returns to the category they belong to, and only Back from the
-    // categories leaves the screen.
     val categoryFocus = remember { SettingsCategory.entries.associateWith { FocusRequester() } }
     val firstCategory = categoryFocus.getValue(SettingsCategory.ACCOUNT)
     val contentFocus = remember { FocusRequester() }
@@ -528,14 +509,6 @@ fun SettingsScreen(
     }
 
     val showAvatarPicker by viewModel.showAvatarPicker.collectAsState()
-    // Real bug found live: selecting a preset/finishing an upload
-    // closes this overlay from inside SettingsViewModel itself, once
-    // its own real network call settles - bypassing this composable's
-    // own onDismiss wrapper below entirely, the exact same real dead-
-    // remote class every other overlay in this app already had to fix.
-    // Watching the real flag itself instead answers every real path
-    // that can flip it false, not just the one this screen's own
-    // Surface directly calls.
     var wasShowingAvatarPicker by remember { mutableStateOf(false) }
     LaunchedEffect(showAvatarPicker) {
         if (wasShowingAvatarPicker && !showAvatarPicker) changeAvatarFocusRequester.requestFocus()
@@ -566,10 +539,6 @@ private fun SettingsPickerRow(label: String, value: String, onClick: () -> Unit)
     }
 }
 
-// Mirrors screens/settings.js's own real language pickers, docked
-// right the same way the player's own subtitle popover already is:
-// "No preference" first, then every real LANGUAGE_OPTIONS entry,
-// saving on selection rather than needing a separate confirm step.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun DisplayLanguagePickerOverlay(
@@ -629,14 +598,6 @@ private fun LanguagePickerOverlay(
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
-    // Real bug found live testing on device: nothing here ever claimed
-    // focus on open (this LazyColumn carried no focusRestorer() either,
-    // the same real gap HomeScreen's own header already documents for
-    // a plain Compose Foundation list), so the very first D-pad press
-    // after opening this had no defined target at all. Same real
-    // pattern LibraryPickerOverlay.kt's own firstEntryFocusRequester
-    // already uses: a requester on the first real row, claimed the
-    // moment this composes.
     val firstRowFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
     Box(
@@ -728,10 +689,6 @@ private fun LanguagePickerRow(
     }
 }
 
-// Mirrors screens/settings.js's own buildPasswordSection(): POST
-// Users/{id}/Password, same real CurrentPw/NewPw body shape, clearing
-// its own three fields only on a real successful update rather than
-// after every submit attempt.
 @Composable
 private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
     // Folded behind a button: open, the three fields each grabbed the
@@ -821,12 +778,6 @@ private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean 
     }
 }
 
-// Mirrors screens/settings.js's own buildSleepTimerSection(): real
-// cross-client status for a timer started from the player on this
-// same account/device pair, surfaced here for a reader not currently
-// on the player screen. Only the status line shows while no timer is
-// running; the Cancel timer button only ever renders alongside it,
-// same real condition that file's own real.Active check gates both on.
 @Composable
 private fun SleepTimerSection(viewModel: SettingsViewModel) {
     val active by viewModel.sleepTimerActive.collectAsState()
@@ -1031,11 +982,6 @@ private fun SettingsSwitch(checked: Boolean) {
     }
 }
 
-// AppUpdateViewModel's own manualCheckResult, real feedback asked for
-// alongside the unprompted UpdateToast that only ever appears on an
-// actual find: a real button here always answers back, up to date or
-// not, rather than leaving a reader who tapped it with no idea
-// whether the check even ran.
 @Composable
 private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
     val result by viewModel.manualCheckResult.collectAsState()
@@ -1140,11 +1086,6 @@ private fun MotionRow() {
     }
 }
 
-// tv-material3 ships no Switch component reliably verified in this
-// codebase's own pinned version (the same real lesson
-// CircularProgressIndicator's own real CI failure already taught this
-// session): a plain clickable row toggling an On/Off label needs no
-// such trust.
 @Composable
 private fun SettingsToggleRow(label: String, description: String, checked: Boolean, onToggle: () -> Unit) {
     SettingsRowSurface(onClick = onToggle) {

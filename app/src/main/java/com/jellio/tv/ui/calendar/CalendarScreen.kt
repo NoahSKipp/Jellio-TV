@@ -57,10 +57,6 @@ private fun parseEntryDate(raw: String?): Date? {
 
 private fun dayKey(calendar: Calendar) = calendar.get(Calendar.YEAR) * 1000 + calendar.get(Calendar.DAY_OF_YEAR)
 
-// "Today"/"Tomorrow" read at a glance, the real weekday for anything
-// within a week, a full date past that: mirrors screens/calendar.js's
-// own dateHeading() exactly, same real reasoning ("a bare 'March 5'
-// alone leaves a reader doing their own mental math").
 private fun dateHeading(date: Date): String {
     val today = Calendar.getInstance()
     val target = Calendar.getInstance().apply { time = date }

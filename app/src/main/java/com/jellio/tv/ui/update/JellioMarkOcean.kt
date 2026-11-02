@@ -37,41 +37,15 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import android.graphics.BlurMaskFilter
 import kotlinx.coroutines.launch
 
-// Real, full port of jellio-mark-animated.svg, not an approximation of
-// it: the same real triangle+gradient, the same real radial teal glow
-// clipped to it, the same real caustic ripples and wake-trail bubbles,
-// and critically the real bell/tentacle silhouette itself, morphing
-// through this exact file's own 11 keyframe path variants rather than
-// staying a single static silhouette that only ever drifts and rotates
-// as one rigid whole. Real feedback's own explicit ask: this should
-// look identical to the real one, not "close enough" - the previous
-// android-animated-vector port (ic_jellio_mark_animated.xml,
-// ic_jellio_mark.xml) could drift/rotate the whole jellyfish but had no
-// real way to morph a path's own d attribute at all, an AVD's own real
-// animator set only ever tweening plain numeric properties (translate,
-// rotate, scale), never a path's own control points. Compose's Canvas
-// needs no such real limit: JellioMarkData.kt's own 11 real keyframe
-// frames (parsed straight off this exact file's own <animate
-// attributeName="d"> values, not resampled or hand-perturbed) get
-// linearly interpolated here the same real way calcMode="linear"
-// already does on the web side.
 private const val ViewBoxSize = 400f
 private val TrianglePoints = listOf(98.1f to 89.2f, 303.5f to 200f, 98.1f to 318.6f)
 private const val TriangleStrokeWidth = 100.2f
 
-// Real jm-swim keyframes: a gentle drift+rotate loop on the jellyfish
-// silhouette alone (not the triangle it swims inside), 3.2s, infinite,
-// pivot (175,200) in the real 400x400 viewBox.
 private val SwimTranslateX = listOf(0f to 0f, 0.20f to 6.6f, 0.46f to 3.4f, 0.72f to -1.2f, 1f to 0f)
 private val SwimTranslateY = listOf(0f to 0f, 0.20f to -10f, 0.46f to -5.2f, 0.72f to 1.8f, 1f to 0f)
 private val SwimRotation = listOf(0f to 0f, 0.20f to 1.5f, 0.46f to 0.4f, 0.72f to -0.8f, 1f to 0f)
 private const val SwimDurationMs = 3200f
 
-// Real jm-caustic: opacity has its own real 0%/16%/74%/100% stops,
-// translate just the one real 0%-to-100% linear drift the whole way
-// (only those two real keyframes define it at all), same real
-// per-property independence JellioMarkOcean's own wake-dot keyframes
-// already lean on.
 private val CausticOpacity = listOf(0f to 0f, 0.16f to 0.17f, 0.74f to 0.13f, 1f to 0f)
 private const val CausticDurationMs = 7500f
 private const val CausticTranslateX = -231f
@@ -80,8 +54,6 @@ private const val CausticTranslateY = 353f
 private enum class WakeKind { S, M, L }
 private data class WakeDot(val cx: Float, val cy: Float, val r: Float, val kind: WakeKind, val durationMs: Float, val delayMs: Float)
 
-// Real cx/cy/r/duration/delay values, read straight off this exact
-// file's own <circle> elements, not resampled or approximated.
 private val wakeDots = listOf(
     WakeDot(220f, 164f, 2.6f, WakeKind.M, 7400f, 300f),
     WakeDot(200f, 204f, 3.4f, WakeKind.L, 9200f, 2200f),
@@ -103,9 +75,6 @@ private val wakeDots = listOf(
     WakeDot(184f, 262f, 2.3f, WakeKind.L, 10200f, 6900f),
 )
 
-// Real per-kind jm-wake-s/m/l keyframe stops: opacity and transform
-// (scale, translateX, translateY) each got their own real fraction
-// list on the CSS side, so each interpolates independently here too.
 private fun wakeOpacity(kind: WakeKind): List<Pair<Float, Float>> = when (kind) {
     WakeKind.S -> listOf(0f to 0f, 0.14f to 0.5f, 0.58f to 0.34f, 1f to 0f)
     WakeKind.M -> listOf(0f to 0f, 0.12f to 0.55f, 0.58f to 0.36f, 1f to 0f)
@@ -145,11 +114,6 @@ private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
 @Composable
 fun JellioMarkOcean(modifier: Modifier = Modifier) {
-    // Real jm-pop: a one-shot 0.85s pop-in (scale .66->1.03->1, opacity
-    // 0->1->1), cubic-bezier(.2,1.2,.35,1), not looping - the whole
-    // real mark's own entrance, triangle and jellyfish alike, so this
-    // wraps the entire real Canvas below rather than just one piece of
-    // it.
     val popScale = remember { Animatable(0.66f) }
     val popAlpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -179,15 +143,6 @@ fun JellioMarkOcean(modifier: Modifier = Modifier) {
     }
 
     val transition = rememberInfiniteTransition(label = "jellioMark")
-    // A plain real millisecond counter: every animation in this mark
-    // (swim, path morph, caustics, wake dots) needs its own real modulo
-    // against its own real duration off the same one real clock, not a
-    // shared 0..1 progress every one of them would otherwise have to
-    // rescale against its own real period anyway. 1,000,000ms (a bit
-    // over 16 real minutes) comfortably outlasts this splash's own real
-    // on-screen time and every one of their real durations (11.2s at
-    // most), a real wraparound glitch this splash will never actually
-    // stay open long enough to hit.
     val clockMs by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1_000_000f,
@@ -221,12 +176,6 @@ fun JellioMarkOcean(modifier: Modifier = Modifier) {
             start = Offset(48f * scale, 36f * scale),
             end = Offset(306f * scale, 264f * scale),
         )
-        // Real polygon's own fill AND stroke both the same real
-        // gradient, round join: the round join is what actually
-        // produces this shape's own rounded corners, not a separate
-        // corner radius anywhere, same real reason ic_jellio_mark.xml's
-        // own header already documented for the AVD version this
-        // replaces.
         drawPath(trianglePath, brush = linearBrush)
         drawPath(
             trianglePath,
@@ -292,12 +241,6 @@ private fun DrawScope.drawWakeDots(clockMs: Float, scale: Float) {
     }
 }
 
-// Real jm-swim wrapper (transform-origin 175,200) around the
-// jellyfish's own static translate(58,113.5) scale(0.31) position, and
-// the real path-morph itself: both driven off the same real 3.2s
-// period, same real reason both stayed in phase on the web build too
-// (neither ever declared its own begin offset, so both started
-// together at real document load and never drifted apart since).
 private fun DrawScope.drawJellyfish(clockMs: Float, scale: Float, path: Path) {
     val t = (clockMs % SwimDurationMs) / SwimDurationMs
     val swimX = lerpStops(SwimTranslateX, t)

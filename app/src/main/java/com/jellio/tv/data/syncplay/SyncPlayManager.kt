@@ -61,11 +61,6 @@ private const val RECONNECT_DELAY_MS = 5_000L
 private const val MAX_MEASUREMENTS = 6
 private const val EXPLICIT_LEAVE_GRACE_MS = 20_000L
 
-// Jellyfin SyncPlay for the TV, the same protocol runtime/syncPlay.js
-// drives on the web: the server's WebSocket pushes group updates and
-// timed playback commands, REST calls ask for pause/seek/unpause, and a
-// small NTP-style exchange against /GetUtcTime lines this clock up with
-// the server's so a command lands at the same moment everywhere.
 @Singleton
 class SyncPlayManager @Inject constructor(
     private val client: OkHttpClient,
@@ -92,9 +87,6 @@ class SyncPlayManager @Inject constructor(
     private var lastNotifiedPlaylistItemId: String? = null
     private var explicitLeaveUntil = 0L
 
-    // The group THIS TV joined. The group list only names accounts, so a
-    // group listing this account may hold another of its devices; only
-    // this one is ever restored.
     @Volatile private var myGroupId: String? = null
     @Volatile private var pendingCreateName: String? = null
     @Volatile private var pendingCreateUntil = 0L
@@ -241,9 +233,6 @@ class SyncPlayManager @Inject constructor(
         return SyncTarget(itemId, playlistItemId, queue.optLong("StartPositionTicks", 0L), queue.optBoolean("IsPlaying", false))
     }
 
-    // The same rejoin/cleanup runtime/syncPlay.js's reconcileGroupMembership
-    // does: a missed GroupJoined push, or a group that ended while the
-    // socket was down, still settles within one interval.
     private suspend fun reconcile() {
         val groups = runCatching { api.getSyncPlayGroups() }.getOrNull() ?: return
         val stored = myGroupId

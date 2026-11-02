@@ -46,9 +46,6 @@ object PlaybackDuck {
     var level by mutableFloatStateOf(1f)
 }
 
-// Sounds an admin sends from the Jellio dashboard: no toast, the clip
-// just plays over whatever screen is open, turning playback down to the
-// sound's DuckVolume until it ends.
 @HiltViewModel
 class SoundViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -121,9 +118,6 @@ fun SoundPlayerHost(viewModel: SoundViewModel = hiltViewModel()) {
     }
 }
 
-// Sends the clip to one side, or to the rear pair of a 5.1 layout (front
-// L, front R, center, LFE, rear L, rear R). A stereo TV folds the rear
-// pair back into its two speakers, so there it plays from both sides.
 @OptIn(UnstableApi::class)
 private class DirectionalRenderersFactory(context: Context, private val direction: String) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {

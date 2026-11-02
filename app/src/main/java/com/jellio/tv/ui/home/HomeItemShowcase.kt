@@ -68,9 +68,6 @@ fun HomeItemShowcase(
     imageUrl: (BaseItemDto, String, Int) -> String,
     modifier: Modifier = Modifier,
 ) {
-    // Solid at the top and see-through at the bottom, so the header melts into
-    // whatever is behind Home (the seasonal backdrop, or the plain background)
-    // instead of ending in a hard edge above the rows.
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth().background(
             Brush.verticalGradient(0f to JellioBg, 0.62f to JellioBg, 0.86f to JellioBg.copy(alpha = 0.45f), 1f to Color.Transparent),
@@ -356,9 +353,6 @@ fun ShowcaseHost(
     HomeItemShowcase(item = shownItem, info = showcaseInfo, imageUrl = imageUrl, modifier = modifier)
 }
 
-// What the showcase needs beyond a row item: its overview when the row came
-// without one, and an episode's show (logo, backdrop, airing status). Most
-// cards need nothing; otherwise one small cached request.
 suspend fun loadShowcaseInfo(repository: com.jellio.tv.data.JellioRepository, userId: String, item: BaseItemDto): ShowcaseInfo {
     val isEpisode = item.Type.equals("Episode", ignoreCase = true) || item.Type.equals("Season", ignoreCase = true)
     val seriesId = item.SeriesId?.takeIf { isEpisode }

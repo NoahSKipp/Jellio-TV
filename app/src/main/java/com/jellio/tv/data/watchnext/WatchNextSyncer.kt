@@ -23,23 +23,6 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Real gap Google TV's own launcher home leaves entirely to each app:
-// its own "Continue Watching" row (the one real feedback pointed at,
-// Netflix/Disney+ populate it the exact same way) is not this app's
-// own HomeScreen row at all, it is a system level shared "Watch Next"
-// channel every app on the device writes its own rows into
-// (TvContractCompat.WatchNextPrograms, androidx.tvprovider, stable
-// since API 26, confirmed against Android's own developer guide before
-// writing this rather than guessed). No special permission needed for
-// this channel specifically, unlike a real regular TvContractCompat
-// Channel/Program pair, which is gated behind a signature|system
-// android.permission.WRITE_EPG_DATA this app could never hold.
-//
-// Kept as its own class rather than folded into JellioRepository:
-// every other real repository call here is a plain network fetch, this
-// one is real local ContentResolver I/O against a system provider, a
-// different enough real concern (and real Context dependency) to earn
-// its own file.
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
 private fun parseInstant(raw: String): Long = java.time.Instant.parse(raw).toEpochMilli()
 
@@ -190,10 +173,6 @@ class WatchNextSyncer @Inject constructor(
         return builder.build()
     }
 
-    // Called on every Home load and after playback stops. Upserts by
-    // INTERNAL_PROVIDER_ID and removes rows Continue Watching no longer
-    // lists. A row the viewer removed from the launcher stays removed until
-    // they watch that title again.
     suspend fun sync(session: Session, continueWatching: List<BaseItemDto>, upNext: List<BaseItemDto> = emptyList()) {
         if (!supported()) {
             _status.value = WatchNextStatus(System.currentTimeMillis(), 0, continueWatching.size, 0, 0, "This device has no Continue Watching row")
@@ -202,11 +181,6 @@ class WatchNextSyncer @Inject constructor(
         locked {
             try {
                 val existing = queryExisting()
-                // One entry per series, the most recently played episode.
-                // Unfinished titles as CONTINUE, then the next episode of other
-                // shows being watched as NEXT; one entry per series.
-                // Google TV shows five cards per app: unfinished titles take
-                // them first, next episodes fill the rest and sort just after.
                 val continuing = continueWatching.distinctBy { it.SeriesId ?: it.Id }
                 val seen = continuing.map { it.SeriesId ?: it.Id }.toSet()
                 val nexts = upNext.filter { (it.SeriesId ?: it.Id) !in seen }.distinctBy { it.SeriesId ?: it.Id }
@@ -304,11 +278,6 @@ class WatchNextSyncer @Inject constructor(
             }
         }
     }
-
-    // ---- Home screen channels -------------------------------------------
-    // Launchers that show app channels (Projectivy, the Android TV home)
-    // get a row per list. Continue Watching and Next Up play straight
-    // away; Watchlist and Recently Added open the title page.
 
     private class ChannelSpec(val key: String, val name: String)
 
@@ -446,9 +415,6 @@ class WatchNextSyncer @Inject constructor(
 
     private class Row(val id: Long, val browsable: Boolean, val engagedAt: Long)
 
-    // A plain query against this shared table only returns this app's rows.
-    // Home loads and playback stops can sync at the same moment; both used
-    // to see no row yet and insert the same title twice.
     private val syncLock = kotlinx.coroutines.sync.Mutex()
 
     private suspend fun locked(block: suspend () -> Unit) {

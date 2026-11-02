@@ -39,7 +39,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-
 private val ISO_FORMATS = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
     "yyyy-MM-dd'T'HH:mm:ss'Z'",
@@ -57,9 +56,6 @@ private fun parseEntryDate(raw: String?): Date? {
     return null
 }
 
-// Mirrors screens/home.js's own comingSoonDateLabel() exactly:
-// Today/Tomorrow/In N days for anything close, a short real date past
-// that.
 private fun comingSoonDateLabel(entry: CalendarEntryDto): String {
     val date = parseEntryDate(entry.Date) ?: return ""
     val diffDays = ((date.time - System.currentTimeMillis()) / (24 * 60 * 60 * 1000)).toInt()
@@ -81,14 +77,6 @@ private fun comingSoonKindLabel(entry: CalendarEntryDto): String {
     }
 }
 
-// Mirrors screens/home.js's own buildComingSoonRow()/buildComingSoonCard():
-// real GET Jellio/calendar answer, a handful of cards wide, right on
-// the front page rather than behind Calendar's own full screen only.
-// A dedicated card rather than PosterCard: CalendarController's own
-// real response carries no playable MediaSource, progress or
-// watchlist state to show actions for, only Id/Name/Kind/Detail/Date,
-// every one of them wrong to fake off a real BaseItemDto shape this
-// never needed anyway.
 @Composable
 fun ComingSoonRow(
     entries: List<CalendarEntryDto>,

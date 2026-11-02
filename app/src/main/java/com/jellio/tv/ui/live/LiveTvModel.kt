@@ -173,9 +173,6 @@ fun neighbourChannel(list: List<LiveChannel>, currentId: String?, delta: Int): L
     return list[Math.floorMod(index + delta, list.size)]
 }
 
-// One live stream at a time: opening a channel closes the one before it,
-// and stop() always closes whatever is open, once. A stream that finishes
-// opening after it was superseded is closed straight away.
 class LiveLifecycle<T>(
     private val open: suspend (channelId: String) -> T,
     private val close: suspend (T) -> Unit,

@@ -24,12 +24,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
-// Real fields screens/player.js's own subtitle popover reads off each
-// real MediaStream (Index/DisplayTitle/Language/IsTextSubtitleStream),
-// url only ever populated for a real text based track this player can
-// side-load directly (buildSubtitleUrl's own real WebVTT endpoint); an
-// image based one (PGS, VobSub) has none, selecting it instead needs a
-// real burned-in transcode reload.
 data class SubtitleTrackUiState(
     val streamIndex: Int,
     val label: String,
@@ -40,10 +34,6 @@ data class SubtitleTrackUiState(
     val embeddedTextOrdinal: Int = -1,
 )
 
-// Real port of screens/player.js's own buildResumePrompt()/
-// buildPauseOverlay() data needs: a real choice offered once, over the
-// paused frame already sitting at the saved position, instead of just
-// always seeking straight there with no way back to the real start.
 data class PauseOverlayInfo(
     val art: List<com.jellio.tv.ui.common.ArtCandidate>,
     val logoUrl: String?,
@@ -59,12 +49,6 @@ data class PauseOverlayInfo(
     val backdropUrl: String? get() = art.firstOrNull { !it.blurred }?.url
 }
 
-// Real port of screens/player.js's own buildUpNextOverlay() data
-// needs. thumbnailUrl always requested as a real Primary image
-// (getImageUrl(episode.Id, 'Primary', ...) in that file, unconditional
-// even when the tag it carries actually came from ParentThumbImageTag
-// rather than the episode's own ImageTags.Primary), not "fixed" to
-// match the tag's own real source.
 data class UpNextInfo(
     val itemId: String,
     val thumbnailUrl: String?,
@@ -73,11 +57,6 @@ data class UpNextInfo(
     val seriesName: String? = null,
 )
 
-// Real port of screens/player.js's own buildEpisodeRow(): thumbnailUrl
-// always a real Primary image (ImageTags.Primary or, absent that, the
-// season/series own ParentThumbImageTag), same real fallback that
-// function's own thumbTag line documents; rating pre-formatted to one
-// decimal the same way that row's own CommunityRating.toFixed(1) is.
 data class EpisodePanelEntry(
     val itemId: String,
     val title: String,
@@ -87,30 +66,17 @@ data class EpisodePanelEntry(
     val overview: String?,
 )
 
-// Real port of screens/player.js's own audioStreamLabel(): a real
-// track's own Language (uppercased) or DisplayTitle when there is no
-// Language, Codec and ChannelLayout appended after a real "·" when
-// either one is actually present, same real fallback chain that
-// function's own comment documents.
 data class AudioTrackUiState(
     val streamIndex: Int,
     val label: String,
     val language: String? = null,
 )
 
-// Real port of screens/player.js's own activeSkipSegment() return
-// shape: targetSeconds is the segment's own End, seekToAbsoluteSeconds'
-// own real target once the reader presses the button this label is for.
 data class SkipSegment(
     val label: String,
     val targetSeconds: Double,
 )
 
-// Real port of screens/player.js's own activeSkipSegment(): Skip Intro
-// wins over Skip Credits at the same instant, same real order that
-// file's own if/else chain checks them in (a title's own Introduction
-// and Credits segments never actually overlap in practice, but this
-// keeps the exact same real precedence regardless).
 fun activeSkipSegment(segments: IntroSkipperSegmentsDto?, currentSeconds: Double): SkipSegment? {
     segments ?: return null
     val intro = segments.Introduction
@@ -148,18 +114,8 @@ data class PlayerUiState(
     val selectedSubtitleIndex: Int? = null,
     val isSwitchingSubtitle: Boolean = false,
     val audioTracks: List<AudioTrackUiState> = emptyList(),
-    // null means the real MediaSource's own DefaultAudioStreamIndex is
-    // active, same real meaning screens/player.js's own
-    // currentAudioStreamIndex == null carries before a reader ever
-    // actually picks a different one.
     val selectedAudioStreamIndex: Int? = null,
     val defaultAudioStreamIndex: Int? = null,
-    // Whether streamUrl is currently a Direct Play (Static=true) source
-    // rather than a transcode - switchAudioTrack() below reads this to
-    // decide whether a track change can happen as a plain local
-    // ExoPlayer track selection (PlayerScreen's own LaunchedEffect on
-    // selectedAudioStreamIndex/directPlay) or needs a real fresh
-    // PlaybackInfo negotiation the way a transcoded source always did.
     val directPlay: Boolean = false,
     // The server is re-encoding this stream's video (Video transcode
     // policy Avoid or Block): give up on it sooner when no picture comes.
@@ -167,33 +123,13 @@ data class PlayerUiState(
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
     val skipSegments: IntroSkipperSegmentsDto? = null,
-    // Device epoch millis, converted once here from the real server's
-    // own EndTimeUtc so PlayerSurface's own local enforcement (see
-    // SleepTimerStatusDto's own header comment for why that has to
-    // exist) never has to parse a timestamp itself.
     val sleepTimerEndTimeMs: Long? = null,
-    // Only ever populated with more than one entry, same real gating
-    // screens/player.js's own getMediaSources(itemId).then() applies to
-    // sourceButton.disabled: a single-source title has nothing to
-    // switch to, so the Sources button stays hidden rather than opening
-    // onto a list of one.
     val sourceOptions: List<MediaSourceDto> = emptyList(),
-    // Only ever populated for a real Episode with a real SeriesId, same
-    // real gating screens/player.js's own getSeasons(item.SeriesId)
-    // .then() applies to episodesButton.disabled: a Movie has nothing
-    // to browse to here.
     val seriesId: String? = null,
     val seasons: List<BaseItemDto> = emptyList(),
     val selectedSeasonId: String? = null,
     val episodes: List<EpisodePanelEntry> = emptyList(),
     val isLoadingEpisodes: Boolean = false,
-    // Real port of screens/player.js's own showPlayerToast(): a short
-    // lived status/error line surfacing failures the four re-
-    // negotiating actions below already had no visible feedback for.
-    // toastId bumps on every call so PlayerScreen's own auto-dismiss
-    // effect restarts even when the exact same message fires twice in
-    // a row, same real behaviour that file's own clearTimeout + fresh
-    // setTimeout on every call already gets for free.
     val toastMessage: String? = null,
     // Set while another stream is being fetched and started, so the screen
     // can say so until it actually plays.
@@ -201,12 +137,6 @@ data class PlayerUiState(
     val toastId: Long = 0L,
 )
 
-// The real mechanism runtime/api.js's own getPlaybackInfo()/
-// buildStreamUrl() already document: negotiate once here, hand the
-// player a plain stream URL it can just open, then report real
-// progress through the same three Sessions/Playing endpoints every
-// real Jellyfin client uses, not a second tracking scheme this app
-// invented.
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -214,14 +144,8 @@ class PlayerViewModel @Inject constructor(
     private val syncPlay: com.jellio.tv.data.syncplay.SyncPlayManager,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
-
     val deviceId: String get() = repository.deviceId
 
-    // ---- Stream failover -------------------------------------------------
-    // A stream that errors before its first frame, shows no picture, or
-    // turns out to be a placeholder clip is remembered as bad and the next
-    // one is loaded by itself: same language as this attempt first, else
-    // the reader's audio language. Not in a Group Watch.
     private val _failover = MutableStateFlow<FailoverNotice?>(null)
     val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()
     private val triedSourceIds = mutableListOf<String>()
@@ -256,11 +180,6 @@ class PlayerViewModel @Inject constructor(
         val source = currentSource ?: return
         val sourceId = source.Id
         val state = _uiState.value
-        // Previously played Gelato streams carry cached MediaStreams on
-        // subsequent plays and switch from server remux to Static=true
-        // direct play. If ExoPlayer fails before the first frame on direct
-        // play, retry the same source via server remux/transcode first
-        // before marking it bad and failing over.
         if (
             reason == "error before the first frame" &&
             state.directPlay &&
@@ -303,9 +222,6 @@ class PlayerViewModel @Inject constructor(
         }
         failingOver = true
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
-        // A server remux or transcode that never started (the server could not
-        // open the stream) is not the stream's fault: streams this TV plays as
-        // they are go first, then this same one played as it is.
         val remuxFailed = !state.directPlay && reason == "error before the first frame"
         viewModelScope.launch {
             if (remuxFailed && sourceId != null) {
@@ -392,11 +308,6 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    // Kept out of PlayerUiState on purpose: load() below fully replaces
-    // that state object on every real title change (a fresh
-    // PlayerUiState(...), not a .copy()), but this is a real persisted
-    // reader preference (SubtitleStylePreferences' own header comment),
-    // not per-title playback state, so it has to survive that reset.
     private val _subtitleStyle = MutableStateFlow(SubtitleStyle())
     val subtitleStyle: StateFlow<SubtitleStyle> = _subtitleStyle.asStateFlow()
 
@@ -429,10 +340,6 @@ class PlayerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(toastMessage = message, toastId = toastSeq)
     }
 
-    // Called by PlayerScreen's own auto-dismiss effect once its delay
-    // elapses; the id guard means a toast that already got replaced by
-    // a newer one in the meantime does not get incorrectly cleared out
-    // from under it.
     fun clearSwitching() {
         if (_uiState.value.switchingTo != null) _uiState.value = _uiState.value.copy(switchingTo = null)
     }
@@ -512,10 +419,6 @@ class PlayerViewModel @Inject constructor(
                         )
                     }
                 }
-                // With the title already known from its row, the stream lookup
-                // and the audio language start alongside the details instead
-                // of after them; the lookup is redone only if the resume
-                // point turns out different.
                 val preview = if (prewarmed == null) repository.previewItem(itemId) else null
                 val earlyTicks = preview?.UserData?.PlaybackPositionTicks
                 var targetFrom = "fresh"
@@ -601,10 +504,6 @@ class PlayerViewModel @Inject constructor(
                 currentSource = target.mediaSource
                 PlayStartTrace.mark(itemId, "stream url ready")
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
-                // Do not abort before playback starts based on cached
-                // target.mediaSource.RunTimeTicks: let ExoPlayer open the
-                // stream first and rely on actual playback duration once
-                // STATE_READY is reached.
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
                 subtitleSeriesId = if (isEpisode) item.SeriesId else null
                 val initialSubtitle = initialSubtitleIndex(
@@ -639,44 +538,16 @@ class PlayerViewModel @Inject constructor(
                     reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
                 )
 
-                // Real port of screens/player.js's own real fire-and-
-                // forget getNextEpisode(item).then(...): resolved
-                // alongside real playback rather than blocking it, the
-                // overlay itself only actually shown once
-                // shouldShowUpNextNow's own real timing condition is
-                // met, far later than this.
                 if (item.Type == "Episode") {
                     viewModelScope.launch {
                         val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
-                            // Real Nuvio-competitive gap, not a
-                            // hypothetical one: the up next card itself
-                            // doesn't show until shouldShowUpNextNow's
-                            // own real timing condition near the very
-                            // end of this episode, but the real id it
-                            // needs is already known right here, at the
-                            // very start of it. Firing this now hands it
-                            // this whole episode's own runtime as lead
-                            // time - far more than a poster's own
-                            // hover/focus debounce ever gets - so a real
-                            // binge watcher never sees a loading gap
-                            // between episodes at all, matching
-                            // AIOStreams' own precacheNextEpisode setting
-                            // doing the equivalent one layer further
-                            // upstream.
                             repository.prefetchStreams(next.Id)
                         }
                     }
                 }
 
-                // Real port of screens/player.js's own real fire-and-
-                // forget getIntroSkipperSegments(itemId).then(...): not
-                // gated on item.Type, that file's own real endpoint
-                // works for a Movie too despite its own "/Episode/"
-                // route name. Only assigned when at least one real
-                // segment key actually came back, same real truthy
-                // check that file's own .then() callback runs.
                 viewModelScope.launch {
                     // Credits starting in the first half are bad data; they
                     // would show Skip Credits and Up Next right at the start.
@@ -689,13 +560,6 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                // Real port of screens/player.js's own real fire-and-
-                // forget getSleepTimerStatus().then(...): a real timer
-                // started before this exact title was opened (still
-                // running server side against this same user/device
-                // pair) picks back up here rather than reading as
-                // cancelled just because a fresh PlayerViewModel state
-                // object was built for this real title.
                 viewModelScope.launch {
                     val status = repository.getSleepTimerStatus()
                     if (status?.Active == true) {
@@ -706,11 +570,6 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                // Real port of screens/player.js's own real fire-and-
-                // forget getMediaSources(itemId).then(...): only wired
-                // up once there is a genuine choice behind it, same real
-                // gating that file's own sources.length > 1 check
-                // applies before ever enabling sourceButton.
                 viewModelScope.launch {
                     val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "player") }.getOrNull()
                     if (sources != null && sources.size > 1) {
@@ -718,18 +577,6 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                // Real port of screens/player.js's own real fire-and-
-                // forget getSeasons(item.SeriesId).then(...): only wired
-                // up for a real Episode with a real SeriesId, same real
-                // gating that file's own isEpisodeItem && item.SeriesId
-                // check applies before ever enabling episodesButton.
-                // Specials sorted last, same real isSpecialsSeason()
-                // convention screens/detail.js's own season tabs already
-                // settled on, then that file's own default season picked
-                // (this Episode's own SeasonId, or the first real one)
-                // loaded immediately, same real behaviour that function's
-                // own trailing if (!episodeList.children.length) block
-                // guarantees.
                 val seriesId = item.SeriesId
                 if (isEpisode && seriesId != null) {
                     _uiState.value = _uiState.value.copy(seriesId = seriesId)
@@ -784,14 +631,6 @@ class PlayerViewModel @Inject constructor(
         )
     }
 
-    // Real port of screens/player.js's own seriesAwareArtworkUrl(): an
-    // Episode's own real BackdropImageTags/ImageTags.Primary are the
-    // episode's own thumbnail, not the show's own real artwork every
-    // other real pause screen shows here, so SeriesId/
-    // ParentBackdropImageTags/SeriesPrimaryImageTag are what this reads
-    // instead for one; a movie has no series to prefer over its own.
-    // The show's poster for an episode, the title's own otherwise. The token goes
-    // in the URL because the system loads it without our headers.
     private fun artworkUrl(session: Session, item: BaseItemDto, isEpisode: Boolean): String? {
         val (id, tag) = if (isEpisode && item.SeriesId != null) {
             item.SeriesId to item.SeriesPrimaryImageTag
@@ -831,23 +670,10 @@ class PlayerViewModel @Inject constructor(
         )
     }
 
-    // Real port of screens/player.js's own Start Over button: video.
-    // currentTime = 0 alone used to just resume anyway there, real
-    // feedback traced to a forced transcode only ever encoding forward
-    // from its own saved start position, nothing earlier ever existing
-    // in that stream at all. A fresh real PlaybackInfo negotiation at
-    // ticks 0 instead asks the server for a real stream that actually
-    // starts there, same real reason selectBurnedInSubtitle above needs
-    // one too.
     fun restart(session: Session) {
         val id = itemId ?: return
         viewModelScope.launch {
             try {
-                // Real screens/player.js's own Start Over handler still
-                // passes its own currentAudioStreamIndex into this same
-                // real negotiation: a reader's own chosen audio track
-                // survives a real restart, same real persistence that
-                // file's own comment already documents for a seek.
                 val target = repository.resolvePlayback(
                     session.userId,
                     id,
@@ -869,17 +695,6 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                 )
             } catch (err: Exception) {
-                // Real port of screens/player.js's own Start Over catch
-                // block: that file's own real negotiated == null check
-                // ('Could not start over, that stream is no longer
-                // available.') has no separate branch here since
-                // resolvePlayback() already throws for exactly that
-                // case, IllegalStateException specifically for it; any
-                // other exception type is the real network/server
-                // failure that function's own generic message covers.
-                // The existing stream just keeps playing either way,
-                // same real fallback that file's own early return leaves
-                // in place too.
                 showToast(
                     if (err is IllegalStateException) {
                         "Could not start over, that stream is no longer available."
@@ -948,10 +763,6 @@ class PlayerViewModel @Inject constructor(
         return if (parts.isNotEmpty()) "$language · ${parts.joinToString(" ")}" else language
     }
 
-    // Off, or a real text based track: no reload needed, ExoPlayer
-    // already has every text track declared as a real
-    // MediaItem.SubtitleConfiguration from the very first prepare(),
-    // this only changes which one the player currently selects.
     fun selectSubtitle(index: Int?) {
         _uiState.value = _uiState.value.copy(selectedSubtitleIndex = index)
         rememberSubtitleChoice(index)
@@ -971,9 +782,6 @@ class PlayerViewModel @Inject constructor(
         subtitleStylePreferences.setSubtitleChoice(seriesId, choice)
     }
 
-    // Which text track to start with: what was picked for this show last
-    // time, else the reader's default subtitle language, else none. Image
-    // tracks need a burned-in transcode, so they're never picked here.
     private fun initialSubtitleIndex(tracks: List<SubtitleTrackUiState>, seriesId: String?, defaultLanguage: String?): Int? {
         val remembered = seriesId?.let { subtitleStylePreferences.subtitleChoice(it) }
         if (remembered == "off") return null
@@ -1000,12 +808,6 @@ class PlayerViewModel @Inject constructor(
             runCatching { java.util.Locale(a).isO3Language.equals(java.util.Locale(b).isO3Language, ignoreCase = true) }.getOrDefault(false)
     }
 
-    // An image based subtitle (screens/player.js's own real
-    // selectBurnedInSubtitle()) has no WebVTT form to side-load,
-    // nothing this player can render as a real text track: the only
-    // way to show one at all is a fresh PlaybackInfo negotiation
-    // forcing a real transcode with that stream burned directly into
-    // the video, resuming from wherever real playback currently sits.
     fun selectBurnedInSubtitle(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val requestedLabel = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == streamIndex }
@@ -1047,16 +849,9 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Port of screens/player.js's switchAudioTrack(): triggers a fresh
-    // PlaybackInfo negotiation with Jellyfin for the requested AudioStreamIndex,
-    // reloading the stream at currentPositionTicks with the server transcoding/remuxing
-    // or direct-playing the selected audio track.
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
-        // Direct play carries every audio track already: the player swaps
-        // to it in place (PlayerScreen's selectAudioTrack effect), no
-        // reload, no restart, unless the picked track needs transcoding.
         if (_uiState.value.directPlay && currentSource?.let { repository.canDirectPlay(it, streamIndex) } != false) {
             _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
             showToast(com.jellio.tv.ui.i18n.Strings.format("tv_audio_label", label))
@@ -1105,11 +900,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Port of screens/player.js's switchSource(source): a fresh PlaybackInfo
-    // negotiation against the picked source's Id at currentPositionTicks.
-    // A transcoded stream can only start where the server begins encoding,
-    // so seeking in one restarts it from the new position, as
-    // screens/player.js does; same source, audio and burned-in subtitles.
     fun reloadAt(session: Session, positionTicks: Long) {
         val id = itemId ?: return
         viewModelScope.launch {
@@ -1168,11 +958,6 @@ class PlayerViewModel @Inject constructor(
                 )
             } catch (err: Exception) {
                 _uiState.value = _uiState.value.copy(switchingTo = null)
-                // Real port of that file's own switchSource() catch
-                // chain: no success toast there either, only these two
-                // real failure messages, the second one a fixed generic
-                // string rather than err.message (that function's own
-                // real text, not this file's own invention).
                 showToast(
                     if (err is IllegalStateException) {
                         "That stream is no longer available."
@@ -1184,25 +969,11 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/detail.js's own isSpecialsSeason(): real
-    // Jellyfin IndexNumber 0, or a name that just reads as Specials,
-    // the exact same real convention this app's own DetailScreen season
-    // tabs already use for that screen's own tab bar, duplicated here
-    // for this second, in-player one rather than shared, same real
-    // duplication screens/player.js's own copy of that function keeps
-    // against screens/detail.js's own original.
     private fun isSpecialsSeason(season: BaseItemDto): Boolean {
         if (season.IndexNumber == 0) return true
         return season.Name?.contains("special", ignoreCase = true) == true
     }
 
-    // Real port of screens/player.js's own loadSeasonEpisodes(): swaps
-    // in a new season's own episode list, called both for the real
-    // default season load()'s own real fire-and-forget above already
-    // triggers and for every later real season tab tap PlayerScreen
-    // sends here.
-    // Only the latest season asked for fills the panel; an earlier answer
-    // arriving late is dropped.
     private var episodeRequest = 0
 
     fun loadSeasonEpisodes(session: Session, seriesId: String, seasonId: String) {
@@ -1243,22 +1014,6 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { repository.reportPlaybackProgress(id, uiState.value.mediaSourceId, positionTicks, isPaused) }
     }
 
-    // Real bug, matches the exact same one screens/player.js's own
-    // cleanup() had to work around (real Jellio fix, confirmed against
-    // that file's own header before porting this here too): reporting
-    // the real current position here unconditionally used to undo
-    // markRealWatchComplete() below the moment this screen tore down.
-    // Native UserDataManager.UpdatePlayState still divides by the
-    // library's own inflated RunTimeTicks on every real stop report, so
-    // a real position sitting under its own 90% MaxResumePct there
-    // resurrects a real resume position (PlaybackPositionTicks set back
-    // to that real value) while never touching Played (stays true,
-    // setPlayed() below already set it) - watched correctly marked, but
-    // still stuck in Continue Watching with no time left. Reporting 0
-    // once markRealWatchComplete() already ran keeps native Jellyfin's
-    // own math in its own "ignore progress during the beginning" branch
-    // instead, which only ever touches positionTicks, never Played.
-    // Pre-warms the next episode stream, playback info, and network buffer
     fun prewarmNextEpisode(session: Session) {
         val nextId = _uiState.value.upNextInfo?.itemId ?: return
         if (prewarmedPlayback?.itemId == nextId) return
@@ -1303,17 +1058,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/player.js's own markRealWatchComplete():
-    // item.RunTimeTicks is the library's own metadata runtime, not
-    // whatever Gelato actually resolved and streamed, so a genuine full
-    // watch can land under AchievementService's own 90% metadata based
-    // gate and under native Jellyfin's own MaxResumePct gate alike.
-    // creditRealWatch feeds Jellio's own achievement/feed credit;
-    // setPlayed mirrors that same real completion into native
-    // Jellyfin's own Played flag too (Continue Watching, Up Next, the
-    // native watched checkmark all read that, not this plugin's own
-    // data), same real reason player.js's own markRealWatchComplete()
-    // calls both.
     private var hasCreditedRealWatch = false
 
     fun markRealWatchComplete() {
@@ -1325,17 +1069,6 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch { runCatching { repository.setPlayed(userId, id, true) } }
     }
 
-    // Real port of screens/player.js's own reportRealDurationIfUseful():
-    // monotonically increasing on purpose, not just deduped. Up Next's
-    // own real position (skipSegments' own Credits.Start, or the
-    // fallback trigger) is only ever a lower bound on this title's own
-    // real length (it always lands before the real end), so a later,
-    // smaller candidate is never actually better information and must
-    // not overwrite an already reported larger one; ExoPlayer's own
-    // real duration and the real position 'ended' fires at are both the
-    // true real total whenever they do fire, always >= any lower bound
-    // reported before them, so this same rule lets either of those
-    // through regardless of order.
     private var lastReportedDurationSeconds = 0.0
 
     fun reportRealDurationIfUseful(candidateSeconds: Double) {
@@ -1348,13 +1081,6 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/player.js's own startSleepTimer(minutes)
-    // handler: the real server call still fires (for real cross-client
-    // status parity, see SleepTimerStatusDto's own header comment), the
-    // real end time computed locally from `minutes` directly rather
-    // than round-tripping through the server's own response, so
-    // PlayerSurface's own local countdown can start immediately without
-    // waiting on that request.
     fun startSleepTimer(minutes: Int) {
         val endMs = System.currentTimeMillis() + minutes * 60_000L
         _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = endMs)
@@ -1367,12 +1093,6 @@ class PlayerViewModel @Inject constructor(
     }
 }
 
-// Real .NET DateTime "O"-style UTC timestamp (fractional seconds up to
-// 100ns ticks) EndTimeUtc always serializes as: Instant.parse() already
-// accepts that exact real ISO-8601 shape, no custom parsing needed. A
-// failure here (an unexpected real format) leaves the real timer
-// un-restored rather than crashing the whole screen over a best-effort
-// status refresh.
 private fun parseSleepTimerEndTimeMs(endTimeUtc: String?): Long? {
     endTimeUtc ?: return null
     return runCatching { java.time.Instant.parse(endTimeUtc).toEpochMilli() }.getOrNull()

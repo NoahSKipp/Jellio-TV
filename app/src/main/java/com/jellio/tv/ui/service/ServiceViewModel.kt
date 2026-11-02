@@ -34,22 +34,8 @@ private const val DUPLICATE_ROW_OVERLAP = 0.8
 private val TOP_ROW = Regex("top ?10|trending|popular", RegexOption.IGNORE_CASE)
 private val NEW_ROW = Regex("\\bnew\\b|latest|recent|just added", RegexOption.IGNORE_CASE)
 
-// Real screens/service.js's own ROW_LIST_LIMIT: components/
-// rowListModal.js's own "browse everything" cap, that file's own
-// independently redeclared constant (not shared with screens/home.js's
-// own copy of the same real value), kept the same way here rather
-// than reusing HomeViewModel's own private one.
 private const val ROW_LIST_LIMIT = 500
 
-// A row's own real kind (movies/tvshows) travels with it now, not
-// just its title/items: screens/service.js's own applyFilter() reads
-// a row's real kind to decide whether the Movies/TV Shows chip
-// matches it at all, real state HomeSection alone has no room for.
-// collectionId is this row's own real backing BoxSet, real
-// screens/service.js's own makeRowTitleClickable() fetchAll needs it
-// (getCollectionItems(row.collection.Id, row.kind, ROW_LIST_LIMIT)) to
-// browse this row's full real catalog past whatever SERVICE_ROW_LIMIT
-// already trimmed it to.
 data class ServiceRow(val title: String, val kind: String, val items: List<BaseItemDto>, val collectionId: String)
 
 // Genre rows built from the hub's own titles hold movies and shows alike
@@ -62,23 +48,15 @@ data class ServiceUiState(
     val serviceName: String = "",
     val heroItem: BaseItemDto? = null,
     val rows: List<ServiceRow> = emptyList(),
-    // Real screens/service.js's own topGenres(): every real genre
-    // count>=3 across every matched collection, led by real count,
-    // capped at ten, same real chip bar that file's own buildChips()
-    // renders after All/Movies/TV Shows.
     val topGenres: List<String> = emptyList(),
     val canDeleteItems: Boolean = false,
 )
 
-// Real port of screens/service.js: every real catalog collection
-// matched to this service, one row per collection, a real hero, and
-// the real genre/type filter chip bar.
 @HiltViewModel
 class ServiceViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(ServiceUiState())
     val uiState: StateFlow<ServiceUiState> = _uiState.asStateFlow()
 
@@ -95,9 +73,6 @@ class ServiceViewModel @Inject constructor(
         refresh(session, serviceName, retryRound = 0)
     }
 
-    // A timed out or failed collection is not an empty one: it is asked
-    // again with backoff, never cached as empty, and a page that lost rows
-    // to a busy server keeps what it showed before and tries again later.
     private fun refresh(session: Session, serviceName: String, retryRound: Int) {
         viewModelScope.launch {
             // The last visit's rows show at once; the refresh replaces them
@@ -215,7 +190,6 @@ class ServiceViewModel @Inject constructor(
         }
     }
 
-    // Null when every attempt failed or timed out; an empty list is a real answer.
     private suspend fun <T> withBackoff(block: suspend () -> T): T? {
         repeat(SERVICE_ROW_ATTEMPTS) { attempt ->
             val result = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { runCatching { block() } }
@@ -225,9 +199,6 @@ class ServiceViewModel @Inject constructor(
         return null
     }
 
-    // Real port of screens/service.js's own makeRowTitleClickable()
-    // fetchAll callback: this row's own full real collection, past
-    // whatever SERVICE_ROW_LIMIT already trimmed the row itself to.
     suspend fun fetchAllForRow(session: Session, row: ServiceRow): List<BaseItemDto> =
         if (row.collectionId.isEmpty()) row.items
         else repository.getCollectionItems(session.userId, row.collectionId, row.kind, ROW_LIST_LIMIT)

@@ -9,13 +9,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlin.math.abs
 import kotlin.math.min
 
-// "Because you watched X" recommendation rows, scored here rather than
-// asked of the server. Ported from runtime/recommend.js, real
-// reasoning preserved rather than re-derived: Jellyfin's own
-// similarity engine (GET /Items/{id}/Similar) 404s on a Gelato server,
-// because Gelato remaps item ids through its own action filter and
-// that route is not one of the ones it covers.
-
 private const val SEED_LIMIT = 4
 private const val HISTORY_SAMPLE_LIMIT = 60
 private const val NEXTUP_SEED_LIMIT = 2
@@ -28,17 +21,8 @@ private const val WEIGHT_ERA = 0.4
 private const val WEIGHT_RATING = 0.3
 private const val WEIGHT_RUNTIME = 0.3
 
-// A title the reader explicitly liked (real Jellyfin UserData.Likes)
-// should pull its own "because you watched" row (and the aggregate
-// genre signal below) harder toward the same genre, explicit signal
-// outweighing whatever a title's own community rating or recency
-// alone would have said.
 private const val LIKED_SEED_BOOST = 1.35
 
-// Diversity is enforced at selection, not by lowering the weights
-// above: one dominant signal still wins repeatedly otherwise, and a
-// row fills with titles sharing a lead actor that each scored fairly
-// on their own.
 private const val MAX_PER_PERSON = 2
 private const val MAX_PER_GENRE = 3
 
@@ -50,15 +34,9 @@ private const val TICKS_PER_HOUR = 10000000L * 3600L
 
 data class CandidateEntry(val item: BaseItemDto, val viaPerson: Boolean)
 
-// Title and year, not just id: the library really can carry a handful
-// of same name, same year titles that are different films, and Gelato
-// hands out an aliased id for the same item on some routes, so an
-// id-only exclude set can miss a duplicate a title/year one would not.
 fun titleKey(item: BaseItemDto): String =
     (item.Name ?: "").trim().lowercase() + "|" + (item.ProductionYear ?: "")
 
-// The network calls RecommendationEngine needs, passed in so tests can
-// mock them without a real repository.
 data class RecommendationDataSource(
     val getRecentlyCompleted: suspend (limit: Int) -> List<BaseItemDto>,
     val getNextUp: suspend (limit: Int) -> List<BaseItemDto>,
@@ -226,14 +204,6 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
 
 private fun notDisliked(seed: BaseItemDto): Boolean = seed.UserData?.Likes != false
 
-// Every personalized row this app builds without a second backend: one
-// row per recently completed title ("Because you watched X"), one per
-// series still in progress ("Because you're watching X"), plus the
-// two real aggregate rows. exclude is Home's own shared seen set,
-// added to here in the same real priority order real feedback
-// established: per title rows first, the two aggregate rows after.
-// Real feedback: the genre aggregate row ("Top Picks for You") sits
-// first in the returned list, ahead of every per-title row.
 suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: MutableSet<String>): List<HomeSection> = coroutineScope {
     val historyDeferred = async { runCatching { source.getRecentlyCompleted(HISTORY_SAMPLE_LIMIT) }.getOrDefault(emptyList()) }
     val nextUpDeferred = async { runCatching { source.getNextUp(NEXTUP_SEED_LIMIT) }.getOrDefault(emptyList()) }

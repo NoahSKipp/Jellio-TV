@@ -1,8 +1,5 @@
 package com.jellio.tv.ui.update
 
-// Generated from jellio-mark-animated.svg by a one-off script, not hand
-// transcribed: this file's own header on JellioMarkCanvas documents why,
-// and the exact source these numbers were pulled from.
 internal val JellioMarkCommandTypes: CharArray = charArrayOf(
     'M', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
     'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C',
@@ -30,8 +27,6 @@ internal val JellioMarkFrames: Array<FloatArray> = JellioMarkFrameCsv.map { csv 
     val parts = csv.split(",")
     FloatArray(parts.size) { i -> parts[i].toFloat() }
 }.toTypedArray()
-
-
 
 internal data class GradStop(val offset: Float, val color: Long)
 

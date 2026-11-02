@@ -7,14 +7,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-// The exact path data js/persistentSidebar.js's own SVG_ICONS.library
-// draws (a filing-box shape: lid, hinge strip, body with a handle
-// slot), not a Material equivalent guessed at: real feedback live
-// twice called out VideoLibrary and then PermMedia as visible
-// mismatches against this same icon, so this ports the real path
-// data itself rather than picking a third approximation. Built once
-// (by lazy), not per composition: this is a plain data structure, not
-// something Compose needs to remember across recompositions.
 val LibraryIconVector: ImageVector by lazy {
     ImageVector.Builder(
         name = "JellioLibrary",

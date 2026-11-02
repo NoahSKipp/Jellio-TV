@@ -23,8 +23,6 @@ import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Mirrors the real Watchlist split into Movies/Series sections, same
-// real content Jellyfin's own favorites already back.
 @Composable
 fun WatchlistScreen(
     session: Session,

@@ -6,9 +6,6 @@ import android.media.MediaCodecList
 import android.os.Build
 import com.jellio.tv.data.model.MediaSourceDto
 
-// The server's "Video transcode policy" (Jellio plugin settings): Allow
-// keeps the old behaviour; Avoid and Block keep the server from
-// re-encoding video.
 object VideoTranscodePolicy {
     @Volatile
     var policy: String = "Allow"

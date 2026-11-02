@@ -147,9 +147,6 @@ internal fun posterImageCandidates(
     return list.urls.toList()
 }
 
-// Wide art for the banner card and the Home showcase. An episode carries no
-// backdrop of its own, so its show's comes first unless episodeStill asks for
-// the episode's own picture (Continue Watching, Up Next).
 internal fun posterBackdropCandidates(
     item: BaseItemDto,
     imageUrl: (BaseItemDto, String, Int) -> String,
@@ -207,10 +204,6 @@ private fun remainingLabel(item: BaseItemDto): String {
     return if (minutes > 0) "${minutes}m left" else ""
 }
 
-// A 2:3 poster that widens into a 16:9 banner (backdrop plus logo) once it has
-// been focused for EXPAND_DELAY_MS, and narrows again as soon as focus leaves.
-// progress is the Continue Watching / Up Next look: the show's poster, then
-// the episode's own still when widened, with the time left and a progress bar.
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PosterCard(
@@ -490,9 +483,6 @@ fun PosterCard(
     }
 }
 
-// Card art at the card's own pixel size, keyed by that size so a prefetch and
-// the card read the same memory cache entry (same approach as NuvioTV's
-// ContentCard, GPL-3.0).
 internal fun sizedImageRequest(
     context: android.content.Context,
     url: String,
@@ -548,18 +538,6 @@ internal fun CardChip(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-// Real port of components/cardOptionsMenu.js's own real content
-// split: a Continue Watching card offers Go to details/Play manually/
-// Start from beginning/Remove, an Up Next card offers Go to details/
-// Remove from Up Next, every other card offers Watchlist/Mark Watched,
-// matched here rather than one generic list either real context has
-// to squint past. Reached through a card's own options button
-// (PosterCard/LandscapeCard's onOptionsClick) rather than that file's
-// own held-remote-button gesture, same real EpisodeOptionsMenu shape
-// DetailScreen already established for the exact same real D-pad
-// constraint. Rendered by the caller at its own screen root, not by
-// PosterCard/LandscapeCard themselves: see PosterCard's own header
-// comment for why.
 @Composable
 fun CardOptionsMenu(
     item: BaseItemDto,
@@ -638,10 +616,6 @@ fun CardOptionsMenu(
 
 private data class MenuAction(val label: String, val onClick: () -> Unit, val danger: Boolean = false)
 
-// A menu in its own window: always on top of the screen (it used to be laid
-// out inside whatever screen opened it, stretched or underneath), holding
-// focus until it closes. The key up that ends the long press which opened it
-// is swallowed, so it can't pick the first option by itself.
 @Composable
 private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequester) -> Unit) {
     val firstFocus = remember { FocusRequester() }

@@ -19,12 +19,6 @@ import androidx.media3.exoplayer.source.WrappingMediaSource
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection
 import androidx.media3.exoplayer.upstream.Allocator
 
-// Audio and subtitle sync, adapted from Nuvio's AudioDelayMediaSource: the
-// timestamps of samples are shifted as the player reads them, so a change
-// applies within moments without reloading the stream.
-// - Audio delay: audio is the playback clock, so the video is shifted the
-//   other way instead (positive = sound later than the picture).
-// - Subtitle delay: subtitle cues are shifted (positive = subtitles later).
 internal class SyncDelayMediaSource(
     mediaSource: MediaSource,
     private val audioDelayUs: () -> Long,

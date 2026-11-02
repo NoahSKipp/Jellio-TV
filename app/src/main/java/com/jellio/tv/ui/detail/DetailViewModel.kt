@@ -18,10 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// screens/detail.js's own Play button: a real picker with nothing to
-// pick between skips itself entirely, and a remembered choice
-// (components/streamPicker.js's own isRememberStreamEnabled()) skips
-// it too as long as that source is still actually offered.
 sealed interface PlayAction {
     data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
     data class ShowPicker(val item: BaseItemDto) : PlayAction
@@ -61,31 +57,16 @@ private const val DETAILS_ATTEMPT_TIMEOUT_MS = 9_000L
 
 private class DetailsTimeout : Exception("Timed out")
 
-// Real behavior ported from screens/detail.js: a series has no video
-// of its own, its own hero Play button lazily resolves which episode
-// (resolveSeriesPlayTarget, JellioRepository's own real port of it)
-// before ever opening a stream picker, everything else (Watchlist,
-// Mark Watched, thumbs) reads/writes the real item itself, or, for an
-// Episode, the series it belongs to (a personal rating is a whole
-// show's own opinion, not one episode's, same real feedback that file
-// ported from).
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
     private var loadedItemId: String? = null
     private var ratingTargetId: String? = null
-    // A series' own Play button (screens/detail.js's own real
-    // targetPromise) awaits this exact real deferred rather than
-    // reading a plain field synchronously: a tap that lands before
-    // resolveSeriesPlayTarget() has actually resolved yet still plays
-    // once it does, real behavior a synchronous null-if-not-ready-yet
-    // read silently dropped before.
     private var seriesPlayDeferred: Deferred<BaseItemDto?>? = null
 
     fun load(session: Session, itemId: String) {
@@ -94,12 +75,6 @@ class DetailViewModel @Inject constructor(
         loadInternal(session, itemId)
     }
 
-    // screens/detail.js's own real Retry (components/networkState.js's
-    // own renderRetry(), reached from renderDetailError()): a bad
-    // connection just needs asking the same real lookup again, not a
-    // trip back to a whole different screen first, the same real
-    // resetting of load()'s own dedupe guard so this actually re-fetches
-    // rather than a no-op against whatever itemId already "loaded".
     fun retry(session: Session, itemId: String) {
         loadedItemId = itemId
         loadInternal(session, itemId)
@@ -171,11 +146,6 @@ class DetailViewModel @Inject constructor(
 
                 if (item.Type == "Series" && preloaded?.Type != "Series") {
                     loadSeasons(session, item.Id)
-                    // screens/detail.js's own real targetPromise: started
-                    // once here, not per click, a tap on Play before this
-                    // resolves still awaits this exact same real deferred
-                    // in resolvePlayTarget() below rather than reading a
-                    // plain field that might still be null.
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 }
             } catch (err: Exception) {
@@ -268,12 +238,6 @@ class DetailViewModel @Inject constructor(
         repository.preloadDetails(itemId)
     }
 
-    // The one real item this screen's own Play button should hand off
-    // to a stream picker/player for: itself for a movie or an episode,
-    // whichever real episode resolveSeriesPlay above already resolved
-    // for a series (a series has no video of its own). Suspends on the
-    // real deferred rather than reading a plain field synchronously,
-    // same real reason seriesPlayDeferred's own comment gives.
     suspend fun resolvePlayTarget(): BaseItemDto? {
         val item = _uiState.value.item ?: return null
         return if (item.Type == "Series") seriesPlayDeferred?.await() else item
@@ -348,9 +312,6 @@ class DetailViewModel @Inject constructor(
     suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
         runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
 
-    // forceChoice skips the remembered shortcut below.
-    // If a stream choice is remembered, play directly. Otherwise show
-    // the stream picker so the user can verify or pick the source.
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
             val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
@@ -368,12 +329,6 @@ class DetailViewModel @Inject constructor(
         if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
     }
 
-    // Real port of screens/detail.js's own openEpisodeOptionsMenu(): a
-    // hold/right-click there, a real options button here (no direct
-    // Compose equivalent for a hold gesture worth trusting untested),
-    // same three real actions against the exact season track already
-    // in state rather than a second real fetch, context.episodes/
-    // context.onChanged's own real job here.
     fun toggleEpisodeWatched(session: Session, episode: BaseItemDto) {
         val next = !(episode.UserData?.Played ?: false)
         viewModelScope.launch {

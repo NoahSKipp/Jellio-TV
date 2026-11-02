@@ -51,7 +51,6 @@ data class LivePlayerUiState(
 class LivePlayerViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(LivePlayerUiState())
     val uiState: StateFlow<LivePlayerUiState> = _uiState.asStateFlow()
     val deviceId: String get() = repository.deviceId
@@ -112,9 +111,6 @@ class LivePlayerViewModel @Inject constructor(
         onFallback = false
         _uiState.value = _uiState.value.copy(channel = channel, status = LiveStatus.Starting, streamUrl = null, now = channel.now, next = null, infoVersion = _uiState.value.infoVersion + 1)
         loadNowNext(channel)
-        // Not cancelled midway: a request cut off after the server opened
-        // the stream would leave a tuner held with no id to close it. The
-        // lifecycle closes an open that finishes after it was superseded.
         openJob = closer.launch {
             openStartedAt = System.currentTimeMillis()
             val stream = try {

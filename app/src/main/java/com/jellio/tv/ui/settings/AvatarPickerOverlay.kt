@@ -60,23 +60,6 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-// Real port of components/avatarPicker.js's own openAvatarPicker():
-// a grid of real preset tiles (Jellio's own AvatarsController) plus
-// an Upload tile, the exact same real tile shape (a button wrapping
-// an image) already reading as "pick this option" for either kind.
-// Uses Android's own document picker for the upload tile rather than
-// that file's own hidden <input type="file">, the closest real
-// platform equivalent.
-//
-// Real port of that same file's own grouping: a preset's own Category
-// (AvatarsController.cs's own one real subfolder deep grouping) gets
-// its own collapsible section, real state kept per category rather
-// than a single expanded/collapsed flag, same real reason the web
-// picker's own plain <details> elements each toggle independently.
-// FlowRow instead of a second real LazyVerticalGrid per section: a
-// lazy grid nested inside this LazyColumn would need its own real
-// fixed height to lay out at all, FlowRow just wraps naturally at
-// whatever real width this overlay's own column gives it.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AvatarPickerOverlay(
@@ -90,23 +73,11 @@ fun AvatarPickerOverlay(
 ) {
     BackHandler(onBack = onDismiss)
     val context = LocalContext.current
-    // Real bug found live testing on device, same real class
-    // LibraryPickerOverlay.kt's own header already documents: nothing
-    // here ever requested initial D-pad focus on open, so a reader's
-    // own next press just kept moving whatever screen sat behind this
-    // real scrim instead of ever landing on a real tile in this
-    // overlay. focusProperties { onExit = { FocusRequester.Cancel } }
-    // below is that same file's own real fix for the second half of
-    // that bug too: without it, focus could still wander back out past
-    // this overlay's own edge once it did land inside.
     val firstEntryFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstEntryFocusRequester.requestFocus() }
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        // Reading a picked file's own bytes through ContentResolver is
-        // blocking I/O, off the main thread here the same real reason
-        // JellioRepository's own preset-bytes read is too.
         scope.launch(Dispatchers.IO) {
             val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
             if (bytes != null) {
@@ -120,10 +91,6 @@ fun AvatarPickerOverlay(
     val groupedPresets = remember(presets) {
         presets.filter { !it.Category.isNullOrBlank() }.groupBy { it.Category!! }
     }
-    // Every real category starts expanded, same real default the web
-    // picker's own <details open> already opens with: an admin who
-    // grouped presets into folders should still see all of them the
-    // first time this overlay opens, not a wall of collapsed headers.
     val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
 
     Box(
@@ -153,12 +120,6 @@ fun AvatarPickerOverlay(
             ) {
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Appended unconditionally, ahead of every real
-                        // preset: uploading a real device file has no
-                        // real dependency on the preset fetch ever
-                        // succeeding at all, same real reasoning that
-                        // file's own comment documents for its own
-                        // upload tile.
                         AvatarUploadTile(
                             busy = busyKey == "upload",
                             onClick = { launcher.launch("image/*") },

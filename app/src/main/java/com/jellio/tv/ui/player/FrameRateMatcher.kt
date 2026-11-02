@@ -6,11 +6,6 @@ import android.view.Display
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// Matches the TV's refresh rate to the video, the way Nuvio's frame rate
-// matching does: a mode with the same resolution whose refresh rate is a
-// whole multiple of the frame rate (24 Hz or 48 Hz for 23.976 fps films,
-// 50 Hz for 25 fps), so motion plays without the uneven 3:2 judder of 24 fps
-// on 60 Hz. The mode the TV had before is put back afterwards.
 object FrameRateMatcher {
     private const val TOLERANCE = 0.01f
     private var originalModeId: Int? = null

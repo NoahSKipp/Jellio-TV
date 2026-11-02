@@ -34,24 +34,16 @@ data class SearchUiState(
     val suggestions: com.jellio.tv.data.model.SearchSuggestionsDto? = null,
 )
 
-// Mirrors runtime/api.js's own searchItems(): the real /Users/{id}/Items
-// endpoint with a searchTerm added, Movie/Series only, same as the web
-// build. Debounced client side rather than on every keystroke, same
-// real reasoning any live-typing search box needs regardless of platform.
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
     private var permissionsLoadedFor: String? = null
 
-    // Decoupled from onQueryChange's own debounce below on purpose:
-    // real Policy fetched once per real session rather than once per
-    // real keystroke.
     fun loadPermissions(session: Session) {
         if (permissionsLoadedFor == session.userId) return
         permissionsLoadedFor = session.userId
@@ -61,15 +53,6 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    // Results fill in as each answer lands: titles already in the library
-    // (near instant) first, then each addon search's results appended
-    // after them, nothing shown twice and nothing reordered under the
-    // focus. isSearching stays on, with placeholder cards after the
-    // results, until every search has answered.
-    //
-    // Servers without Gelato (or an older build without the per-type
-    // routes) 404 on the addon searches and match nothing on "local:":
-    // the plain combined search answers instead, same as it always did.
     fun onQueryChange(session: Session, query: String) {
         _uiState.value = _uiState.value.copy(query = query)
         searchJob?.cancel()
@@ -169,9 +152,6 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    // The same title from the library and from an addon search: Gelato
-    // answers owned titles with the library's own item, so the id
-    // usually matches; provider ids and name plus year catch the rest.
     private fun identityKeys(item: BaseItemDto): List<String> = buildList {
         add("id:" + item.Id.replace("-", "").lowercase())
         item.ProviderIds?.forEach { (provider, value) ->

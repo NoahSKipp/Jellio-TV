@@ -45,9 +45,6 @@ sealed interface PartyCenter {
     data class Countdown(val secondsLeft: Int) : PartyCenter
 }
 
-// The watch party around a SyncPlay group, as components/partyLayer.js
-// runs it on the web: who hosts, host-only control, the ready check and
-// the shared countdown. SyncPlay still moves playback.
 @Singleton
 class PartyManager @Inject constructor(
     private val api: JellyfinApi,

@@ -46,14 +46,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real screens/library.js's own <select> pair rendered here as one
-// real field per real dropdown (a compact button carrying today's own
-// current choice) rather than every option laid out as its own always
-// visible chip: real feedback live asked for exactly this shape, the
-// same one this screen's own web counterpart already has (a plain
-// "Newest release ▾"/"All genres ▾" pair, real screenshot attached).
-// Opening either field mounts LibraryFilterFieldOverlay below, this
-// rail's own D-pad equivalent of that <select>'s own native popover.
 data class LibraryFilterOption(val label: String, val value: String?)
 
 @Composable
@@ -67,14 +59,6 @@ fun LibraryFilterField(label: String, onClick: () -> Unit, modifier: Modifier = 
             focusedContainerColor = Color.White.copy(alpha = 0.18f),
             focusedContentColor = JellioText,
         ),
-        // Real feedback live: this field's own real label sits close
-        // enough to this pill's own real edge (widthIn(max) truncation
-        // included) that TV Material3's own default real focus grow
-        // pushed its own text past this pill's own real clipped bounds
-        // on focus, reading as "enlarges ugly where it touches the
-        // border". No real grow at all instead: this pill's own real
-        // focusedContainerColor above already carries the whole real
-        // selected-state signal on its own.
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         modifier = modifier,
     ) {
@@ -93,10 +77,6 @@ fun LibraryFilterField(label: String, onClick: () -> Unit, modifier: Modifier = 
     }
 }
 
-// Mirrors ui/nav/LibraryPickerOverlay.kt's own real modal shape (a
-// dismiss scrim, a focus trap, initial focus onto this list's own
-// first real entry) almost exactly, generic over whichever field
-// opened it (sort or genre) rather than one bespoke overlay per field.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LibraryFilterFieldOverlay(
@@ -144,16 +124,6 @@ fun LibraryFilterFieldOverlay(
                 color = JellioTextSecondary,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
             )
-            // Mirrors ui/nav/LibraryPickerOverlay.kt's own plain
-            // Column+forEachIndexed exactly (that file's own header
-            // covers the real focus-trap shape both share): a real
-            // LazyColumn here would need this Column's own real parent
-            // to hand it a bounded height constraint of its own, not
-            // guaranteed just from a modifier chain alone the way this
-            // dialog's own real heightIn(max) above only bounds this
-            // outer Column, not implicitly whatever sits inside it. A
-            // plain scrollable Column carries no such real requirement,
-            // genre lists here are short enough it costs nothing.
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
                 options.forEachIndexed { index, option ->
                     val isSelected = option.value == selectedValue

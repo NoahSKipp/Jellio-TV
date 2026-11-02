@@ -20,12 +20,6 @@ import javax.inject.Singleton
 
 private val Context.subtitleStyleDataStore: DataStore<Preferences> by preferencesDataStore(name = "jellio_subtitle_style")
 
-// Mirrors screens/player.js's own SUBTITLE_STYLE_KEY: plain client
-// only persistence, same real reasoning that file's own
-// loadSubtitleStyle() header documents, a display preference nothing
-// server side needs to know about. DataStore instead of localStorage,
-// the same real job StreamPreferences already gives the other client
-// only preference in this codebase.
 @Singleton
 class SubtitleStylePreferences @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -38,9 +32,6 @@ class SubtitleStylePreferences @Inject constructor(
         val POSITION = stringPreferencesKey("position")
     }
 
-    // The subtitle picked for a show, kept per series so the next episode
-    // starts the same way: "off", a language code, or "label:<name>" for a
-    // track without one.
     private val choices = context.getSharedPreferences("jellio_subtitle_choice", Context.MODE_PRIVATE)
 
     fun subtitleChoice(seriesId: String): String? = choices.getString(seriesId, null)

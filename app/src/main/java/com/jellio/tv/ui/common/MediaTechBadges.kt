@@ -18,10 +18,6 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real port of screens/detail.js's own buildMediaTechBadges():
-// extracts video resolution (4K UHD, 1080p, 720p), HDR profile (Dolby Vision,
-// HDR10+, HDR10), codec (HEVC, AV1), and audio capabilities (Dolby Atmos,
-// DTS:X, TrueHD, DTS-HD, 7.1, 5.1, Stereo) from MediaStreams.
 enum class BadgeCategory {
     RES, HDR, CODEC, AUDIO
 }

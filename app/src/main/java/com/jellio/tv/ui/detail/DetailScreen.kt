@@ -117,10 +117,6 @@ private val PREMIERE_DATE_FORMATS = listOf(
     "yyyy-MM-dd",
 )
 
-// Mirrors screens/detail.js's own meta row exactly: an Episode with a
-// real PremiereDate shows that (new Date(...).toLocaleDateString()),
-// everything else, including an Episode with none, falls back to
-// ProductionYear.
 private fun formatPremiereDate(raw: String?): String? {
     if (raw == null) return null
     for (pattern in PREMIERE_DATE_FORMATS) {
@@ -150,41 +146,9 @@ fun DetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var episodeMenuTarget by remember { mutableStateOf<BaseItemDto?>(null) }
-    // Real bug found live testing on device: this screen is pushed as
-    // new content to the right of SidebarNav (JellioRoute.isImmersive()
-    // only ever excludes that rail for Player, not Detail), not
-    // switched to the way a rail tap itself is, so nothing had ever
-    // requested real focus into it - a reader pushing into a title from
-    // a card had no possible interaction once here. MainActivity's own
-    // central redirect now covers the generic case (any route push,
-    // this one included) as a real fallback, but an explicit target
-    // here is still worth keeping: precise (the real Play button, not
-    // whatever a generic rightward spatial search happens to land on
-    // first) and immediate, not waiting on that central mechanism's own
-    // reactive retry loop to eventually find its own way in.
-    // Real feedback live: cold focusRestorer() entry (the LazyColumn's
-    // own default "first focusable descendant" pick, back when this
-    // screen only ever requested focus onto the list itself) landed on
-    // the series-name link above the hero's own Play button for an
-    // Episode - the one earlier, purely incidental clickable Surface in
-    // reading order, not a deliberate first stop. Targeted explicitly
-    // now instead of left to that implicit default, same real lesson
-    // ui/detail/StreamPickerOverlay.kt's own header on Nuvio's pre-warm
-    // fix already covers: an explicit target beats trusting whichever
-    // child a cold focus group happens to pick first.
     val playButtonFocusRequester = remember { FocusRequester() }
-    // Hoisted so the hero-pin effect below can scrollToItem(0) on the
-    // same real list this screen's own focusRestorer() still reads.
     val listState = rememberLazyListState()
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
-    // Fires once the item actually loads and the LazyColumn below is
-    // really composed, not in the load effect above: requesting focus
-    // before that node exists would silently do nothing. Retried across
-    // real frames (matching StreamPickerOverlay.kt's own real fix,
-    // ported from Nuvio) rather than trusting a single call: this
-    // screen only ever requests real focus once, nothing else competes
-    // for it first the way Resume/chips did there, but the retry is
-    // cheap insurance against that same class of timing gap regardless.
     LaunchedEffect(uiState.item?.Id) {
         if (uiState.item != null) {
             listState.scrollToItem(0)
@@ -194,20 +158,6 @@ fun DetailScreen(
             }
         }
     }
-    // Real ui/home/HomeScreen.kt's own header on this exact mechanism
-    // (an 8-round real fix there): Compose's own default per-child
-    // bring-into-view request scrolls this list just far enough to
-    // reveal whatever's newly focused inside the hero (the Play button,
-    // sitting well down its own real bottom-aligned Column), cropping
-    // the hero's own real backdrop/title above it rather than keeping
-    // the full banner in view the way real feedback wants for every
-    // real focus target inside it, Play included, not just the hero's
-    // own real top edge. Ported wholesale rather than re-derived: same
-    // real NestedScrollConnection blocking scroll from ever reaching
-    // this list while the hero holds focus, same real
-    // NoOpBringIntoViewSpec suppressing Compose's own default request
-    // outright, same real reactive snapshotFlow correction as a
-    // fallback for whatever either of those still misses.
     var heroHasFocus by remember { mutableStateOf(false) }
     val blockScrollWhileHeroFocused = remember {
         object : NestedScrollConnection {
@@ -218,9 +168,6 @@ fun DetailScreen(
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
-            // Holds focus while a title loads (a newly added one can take
-            // a while), so the D-pad can't wander off into the sidebar.
-            // Back still leaves.
             uiState.isLoading -> {
                 val loadingFocus = remember { androidx.compose.ui.focus.FocusRequester() }
                 LaunchedEffect(Unit) { runCatching { loadingFocus.requestFocus() } }
@@ -261,11 +208,6 @@ fun DetailScreen(
                     modifier = Modifier.fillMaxSize().nestedScroll(blockScrollWhileHeroFocused).focusRestorer(),
                 ) {
                     item {
-                        // heroHasFocus (declared above, shared with the
-                        // nestedScroll connection) is the one real place
-                        // that sets it; the reactive correction below
-                        // reads it back to know how long to keep
-                        // watching this list's own scroll position.
                         LaunchedEffect(heroHasFocus) {
                             if (heroHasFocus) {
                                 snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
@@ -286,10 +228,6 @@ fun DetailScreen(
                                     onSeriesClick = onNavigateToDetail,
                                     playButtonFocusRequester = playButtonFocusRequester,
                                     onPlay = {
-                                // screens/detail.js's own real playButton.disabled
-                                // = true while its own targetPromise is still
-                                // resolving, re-enabled once it settles either
-                                // way (its own .finally()).
                                 com.jellio.tv.ui.player.PlayStartTrace.begin("title page")
                                 scope.launch {
                                     viewModel.setResolvingPlay(true)
@@ -378,12 +316,6 @@ fun DetailScreen(
     }
 }
 
-// Real port of screens/detail.js's own openEpisodeOptionsMenu(): the
-// same real three actions (no Play Manually here, that only ever made
-// sense for a Continue Watching card with a resume position to skip
-// past), reached through this screen's own options button rather than
-// that file's own hold/right-click (no direct D-pad equivalent for a
-// hold gesture worth trusting untested).
 @Composable
 private fun EpisodeOptionsMenu(
     episode: BaseItemDto,
@@ -550,15 +482,6 @@ private fun DetailHero(
                 )
             }
 
-            // Real port of js/detailButtonsExpand.js's own real
-            // collapse/expand: Play and the "..." trigger sit alone at
-            // rest, the same real Watchlist/Mark watched/Like/Dislike/
-            // Change Stream buttons that file's own real
-            // jellio-buttons-expanded class reveals only render into
-            // this composition (and so only ever become real focus
-            // targets) once expanded here, no separate real
-            // tabindex-sync concept needed the way that file's own
-            // header explains plain CSS visibility forced there.
             var actionsExpanded by remember { mutableStateOf(false) }
             Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
@@ -780,12 +703,6 @@ private fun SeasonsSection(
     }
 }
 
-// The options button is a separate, independently focusable Surface
-// sibling to the main clickable card rather than nested inside it
-// (Compose's own clickable-inside-clickable is ambiguous, real click
-// dispatch there is not something to trust without a device to test
-// on): a real D-pad-navigable stand in for screens/detail.js's own
-// hold/right-click trigger on this same card.
 @Composable
 private fun EpisodeCard(
     episode: BaseItemDto,

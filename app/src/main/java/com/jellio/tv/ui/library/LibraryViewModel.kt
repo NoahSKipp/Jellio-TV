@@ -33,10 +33,6 @@ private const val GENRE_ROWS = 6
 private const val ROW_LIMIT = 20
 private const val MAX_ANIME_ROWS = 8
 private const val COVERFLOW_MIN_ITEMS = 3
-// Real screens/library.js's own ROW_LIST_LIMIT: components/
-// rowListModal.js's own "browse everything" cap, that file's own
-// independently redeclared constant, kept the same way here rather
-// than reusing HomeViewModel's or ServiceViewModel's own private copy.
 private const val ROW_LIST_LIMIT = 500
 // A themed row needs this many matching titles to show.
 private const val MIN_THEMED_ITEMS = 6
@@ -47,19 +43,11 @@ private const val THEMED_TIMEOUT_MS = 8_000L
 
 private fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
 
-// Only a real anime catalog collection whose own name actually says
-// "trending" earns the coverflow below: JellioRepository's own
-// isAnimeCollection() elsewhere just answers "does this collection
-// belong on the Anime page at all", a much narrower real question.
 private val TRENDING_ANIME_NAME = Regex("anilist.*trending|trending.*anilist", RegexOption.IGNORE_CASE)
 
 private const val ANIME_EMPTY_MESSAGE =
     "No anime catalogs are configured on this server yet. Enable CreateCollection on an AniList catalog in Gelato to see it here."
 
-// Real port of screens/library.js's own SORT_OPTIONS: governs only
-// this page's own top row, the per genre rows below stay fixed
-// "browse by genre" shortcuts either way, same real reason that
-// file's own header comment gives.
 data class LibrarySortOption(val value: String, val label: String, val key: String = "")
 
 val LIBRARY_SORT_OPTIONS = listOf(
@@ -73,10 +61,6 @@ data class LibraryUiState(
     val coverflowItems: List<BaseItemDto> = emptyList(),
     val coverflowBadge: String? = null,
     val editorial: ShowsEditorial? = null,
-    // The main, sort/genre-filterable row: kept apart from the fixed
-    // per genre rows in sections below so changeSort()/changeGenre()
-    // below can re-fetch just this one row, same real scope
-    // screens/library.js's own loadMainRow() keeps.
     val mainRow: HomeSection? = null,
     val selectedSort: String = LIBRARY_SORT_OPTIONS.first().value,
     val selectedGenre: String? = null,
@@ -86,43 +70,18 @@ data class LibraryUiState(
     val canDeleteItems: Boolean = false,
 )
 
-// Real port of screens/library.js: a coverflow carousel (real random
-// Movie/Series candidates scoped to this library, same real
-// getHeroCandidates() call, below its own real MIN_SLIDES floor the
-// carousel just does not mount) over a main "Recently added" row plus
-// one row per real genre the library actually has enough of
-// (discoverGenres, the same sampled-and-counted approach that file's
-// own runtime/api.js sibling uses). Anime gets its own real dedicated
-// path (loadAnime below), same real reasoning renderAnime()'s own
-// header there documents.
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     private var loadedFor: String? = null
-    // Kept for changeSort()/changeGenre() below, called well after
-    // load()'s own real call: neither one wants to force a full real
-    // reload (coverflow, genre rows, canDeleteItems) just to
-    // re-fetch this one row with a different real sort/genre.
     private var currentLibrary: BaseItemDto? = null
     private var currentItemType: String? = null
 
-    // Real HomeViewModel.kt's own header on this exact fix: returning
-    // outright on a second real call for the same library key meant a
-    // real watch finished elsewhere never showed its own checkmark (or
-    // moved off Continue Watching-style state) here again until the app
-    // itself restarted, since LibraryScreen's own LaunchedEffect fires
-    // again on every real remount (Home/Settings/etc. and back), not
-    // just this screen's own first composition. Re-fetches every real
-    // call now, only skipping the isLoading reset (and its own full
-    // screen spinner) on a real returning visit to the same library so
-    // this quietly refreshes instead of flashing back to a loading
-    // state the reader already got past.
     fun load(session: Session, library: BaseItemDto) {
         val key = library.Id + (library.Name ?: "")
         val isReturningVisit = loadedFor == key
@@ -156,23 +115,9 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    // Real perf bug found live testing on device, fixed the same way
-    // screens/library.js's own renderLibrary() already does (its own
-    // Promise.all([getLibraryItems(...), excludeAnimeIds]) and
-    // Promise.all([Promise.allSettled(genres.map(getGenreItems)),
-    // excludeAnimeIds])): coverflow candidates, the main row, the
-    // anime exclude set and every real genre's own item fetch now all
-    // fire together instead of one after another, real seconds shaved
-    // off every real library load that used to await each of these in
-    // turn.
     private suspend fun loadLibrary(session: Session, library: BaseItemDto) = coroutineScope {
         val itemType = if (library.CollectionType == "movies") "Movie" else "Series"
 
-        // Anime has no library of its own (see isAnimeLibrary's own
-        // comment), so this is the only library kind with any real
-        // overlap to worry about: real feedback's own direct ask was
-        // "if possible show no anime at all in the Shows hub".
-        // Anime stays in the Anime library, out of Movies and Shows alike.
         val excludeIdsDeferred = async { repository.getAnimeIds() }
         val allGenresDeferred = async {
             runCatching { repository.getAllGenres(session.userId, library.Id, itemType) }.getOrDefault(emptyList())
@@ -200,9 +145,6 @@ class LibraryViewModel @Inject constructor(
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = defaultSort[0], sortOrder = defaultSort[1])
             }.getOrDefault(emptyList())
         }
-        // discoverGenres is a real data dependency for the per-genre
-        // fetch below, same real reason it stays its own real await
-        // before that one fires, unlike the three above.
         val genresDeferred = async {
             runCatching { repository.discoverGenres(session.userId, library.Id, itemType, GENRE_ROWS) }.getOrDefault(emptyList())
         }
@@ -298,10 +240,6 @@ class LibraryViewModel @Inject constructor(
 
     private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort_browse")
 
-    // Real port of screens/library.js's own loadMainRow(): only this
-    // one row re-fetches, the coverflow and every fixed per genre row
-    // below stay exactly as load() above already built them, same
-    // real scope that file's own header comment documents.
     fun changeSort(session: Session, sort: String) {
         val library = currentLibrary ?: return
         _uiState.value = _uiState.value.copy(selectedSort = sort)
@@ -336,16 +274,6 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    // Real port of screens/library.js's own renderAnime(): Anime has
-    // no library of its own (Gelato resolves one global SeriesPath
-    // for every series import), so only real anime/anilist catalog
-    // collections can speak for this page, one row per collection,
-    // same real "no fallback to the shared TV library" rule that
-    // file's own header documents. Falling back used to mean the
-    // whole TV catalog rendered here under an "Anime" heading (every
-    // non-anime show included), reported live against a screenshot;
-    // showing nothing is the honest outcome when no catalog is
-    // configured, not a copy of the Shows page.
     private suspend fun loadAnime(session: Session, libraryId: String) = coroutineScope {
         val collections = runCatching { repository.getCollections(session.userId) }
             .getOrDefault(emptyList())
@@ -372,11 +300,6 @@ class LibraryViewModel @Inject constructor(
                 )
             }.getOrDefault(emptyList())
         }
-        // Real perf bug found live, same real fix renderAnime()'s own
-        // Promise.allSettled(animeCollections.map(...)) already uses:
-        // every real anime catalog's own item fetch fires together
-        // instead of the second catalog waiting on the first one's own
-        // response.
         val progressive = _uiState.value.isLoading
         val fetches = picked.map { collection ->
             collection to async { runCatching { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIMIT) }.getOrDefault(emptyList()) }
@@ -450,13 +373,6 @@ class LibraryViewModel @Inject constructor(
     suspend fun showcaseInfo(session: Session, item: BaseItemDto): com.jellio.tv.ui.home.ShowcaseInfo =
         com.jellio.tv.ui.home.loadShowcaseInfo(repository, session.userId, item)
 
-    // Real port of components/cardOptionsMenu.js's own Watchlist/Mark
-    // Watched/Remove from Library options, same real handlers
-    // HomeViewModel's own toggleWatchlist()/toggleWatched()/
-    // deleteItem() already give the home screen, this screen's own
-    // sections just live as a plain List<HomeSection> rather than the
-    // sealed HomeRow hierarchy Home's own rows need for Continue
-    // Watching/Up Next's own real different card shapes.
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
             val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch

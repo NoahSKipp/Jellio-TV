@@ -33,26 +33,6 @@ interface ImageLoaderEntryPoint {
     fun sessionManager(): SessionManager
 }
 
-// Hilt entry point. No component actually needs it yet at this
-// scaffold stage; wired now so the real auth/session runtime and API
-// client land as real @Inject-ed singletons later rather than a
-// retrofit onto an app that never expected DI.
-//
-// Real feedback live: an animated GIF avatar (native Jellyfin already
-// supports uploading one, AvatarPickerOverlay's own header already
-// documents that) rendered as its own first frame only, frozen, on
-// this app's own SidebarNav/ProfileScreen AsyncImage calls. Coil's own
-// default decoder set never included GIF support at all, on any
-// platform, without this component registered explicitly.
-//
-// Real bug found live, on a real screenshot: StudioHubRow's own real
-// service logos (Services.kt's own logoUrl(), the same real .svg
-// FrontendController.cs already serves the web build's own logos from)
-// rendered as nothing at all, just this tile's own real name label
-// underneath - Coil's own default decoder set has no SVG support
-// either, on any platform, same real class of gap as the GIF one
-// above, silently failing rather than throwing since the real network
-// fetch itself still succeeds.
 @HiltAndroidApp
 class JellioTvApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader {
@@ -60,9 +40,6 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         val sessionManager = entryPoint.sessionManager()
 
         val imageDispatcher = okhttp3.Dispatcher().apply {
-            // Posters come from the Jellyfin server, which fetches each from
-            // TMDB the first time: more at once than NuvioTV (images from a
-            // CDN) keeps search results from filling in slowly.
             maxRequests = 64
             maxRequestsPerHost = 32
         }
@@ -129,10 +106,6 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                 }
                 add(SvgDecoder.Factory())
             }
-            // Memory cache, crossfade, precision, bitmap and decoder settings
-            // follow NuvioTV's NuvioApplication (GPL-3.0): a bigger share of
-            // RAM on roomier boxes, no global crossfade, inexact sizing and
-            // at most four decodes at once keep low end boxes scrolling.
             .memoryCache {
                 val activityManager = getSystemService(android.app.ActivityManager::class.java)
                 val memoryInfo = android.app.ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }

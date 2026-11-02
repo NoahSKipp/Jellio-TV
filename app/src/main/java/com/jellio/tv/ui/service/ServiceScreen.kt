@@ -70,9 +70,6 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 
 private const val ALL_FILTER = "all"
 
-// A Studio Hub: the same layout as Home and Libraries, the focused card's
-// backdrop and details on top and one row per matched collection below,
-// filtered by the All/Movies/Shows/genre chips.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServiceScreen(
@@ -225,12 +222,6 @@ fun ServiceScreen(
     }
 }
 
-// Mirrors screens/service.js's own applyFilter(): a row's own real
-// kind decides whether the Movies/TV Shows chip includes it at all
-// (a genre chip never filters by kind), a card inside a kind-matched
-// row still needs the real chosen genre among its own real Genres to
-// stay visible under a genre chip, "all" real cards visible under
-// either the All chip or a chip whose own kind already matched.
 private fun filteredItems(row: ServiceRow, filter: String): List<BaseItemDto> {
     val isGenreFilter = filter.startsWith("genre:")
     if (row.kind == MIXED_KIND && (filter == "movies" || filter == "tvshows")) {

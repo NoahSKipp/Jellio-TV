@@ -21,9 +21,6 @@ enum class AppLanguage(val code: String, val label: String, val nativeName: Stri
     }
 }
 
-// Controls the display safe area (overscan inset margin) for TVs where
-// the HDMI picture cuts off edges (common with 16:9 overscan on consumer panels),
-// as well as the active UI display language.
 object DisplayPreferences {
     private const val PREFS = "jellio_display"
     private const val KEY_OVERSCAN = "overscan_percent"

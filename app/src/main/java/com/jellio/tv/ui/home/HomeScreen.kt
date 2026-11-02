@@ -68,17 +68,8 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.launch
 
-// Which row a card's own options menu was opened from, real
-// components/cardOptionsMenu.js's own real continueWatching/upNext
-// options carried alongside the item itself: CardOptionsMenu's own
-// real content (and which of the callbacks below even apply) depends
-// on it.
 private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
-
-// Mirrors screens/home.js's own buildHomeSections(): a real hero over
-// real rows, fetched from the real Jellio-Plugin backend rather than
-// placeholder content.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
@@ -89,21 +80,8 @@ fun HomeScreen(
     onItemClick: (BaseItemDto) -> Unit,
     onComingSoonClick: (String) -> Unit,
     onServiceClick: (String) -> Unit,
-    // Real feedback live: SidebarNav's own items stayed reachable while
-    // Customize mode was active, so a reader mid-reorder could jump
-    // straight off this screen (and off the reorder state with it)
-    // with no equivalent to the modal's own scrim BackHandler standing
-    // in the way. MainActivity threads this straight to the rail's own
-    // enabled state, same real reasoning a modal overlay would trap
-    // focus if this screen mounted one instead of toggling in place.
     onEditModeChange: (Boolean) -> Unit = {},
     onPlay: (BaseItemDto) -> Unit,
-    // Real port of components/cardOptionsMenu.js's own "Play manually"
-    // (openStreamPicker(item, { forceChoice: true })): built at
-    // MainActivity's own root the same way DetailScreen's own Change
-    // Stream button already reaches AppViewModel.resolvePlayAction and
-    // the app-wide StreamPickerOverlay, not something this screen (or
-    // HomeViewModel) reaches into on its own.
     onPlayManually: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -119,15 +97,6 @@ fun HomeScreen(
         onDispose { com.jellio.tv.ui.perf.ScrollActivity.scrolling = false }
     }
     val scope = rememberCoroutineScope()
-    // Real ui/library/LibraryScreen.kt's own header on this exact fix:
-    // switching focus between an arrow and View Details still nudged
-    // this list a real few pixels for exactly one real frame before the
-    // real snapshotFlow correction below caught it back - reactive can
-    // only ever answer a real drift a frame after it already rendered.
-    // Blocking the real scroll from ever reaching this list in the
-    // first place, while this item holds real focus, closes that last
-    // Read only inside ShowcaseHost: a focus move then recomposes the
-    // showcase alone, not this whole screen.
     val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
     // The last focused card (row key and item id), kept across visits to a
     // title's page so coming back puts focus right where it was.
@@ -137,15 +106,6 @@ fun HomeScreen(
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var comingSoonMenuTarget by remember { mutableStateOf<com.jellio.tv.data.model.CalendarEntryDto?>(null) }
     var rowListTarget by remember { mutableStateOf<HomeSection?>(null) }
-    // Real port of components/cardOptionsMenu.js's own animateCardRemoval():
-    // "Remove" only ever starts the real shatter below, the real
-    // HomeViewModel.removeFromRow()/hideSeriesFromRow() call deferred to
-    // LandscapeRow's own onShatterFinished, the same real reason that
-    // file's own card stays in the DOM until its own overlay's
-    // setTimeout finishes. isShowRemoval picks which of those two real
-    // calls fires once the shatter actually finishes: "Remove from Up
-    // Next" (mark this one episode played) vs "Remove Show from Up
-    // Next" (hide the whole series server side).
     var removingTarget by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     val userImageUrl = remember(session) {
         { userId: String, tag: String? ->
@@ -155,13 +115,6 @@ fun HomeScreen(
             if (session.accessToken.isNotEmpty()) "$withTag&ApiKey=${session.accessToken}&api_key=${session.accessToken}" else withTag
         }
     }
-    // Real components/homeCustomizer.js's own header: editMode lives
-    // only in this real local closure, reset to off on every fresh
-    // visit to this screen the same way that file's own real editMode
-    // local variable already resets on every real remount, not
-    // something worth persisting across navigations. Only order/hidden
-    // itself is real persisted state, through HomeViewModel's own
-    // HomeCustomizationStore.
     var editMode by remember { mutableStateOf(false) }
 
     LaunchedEffect(session.userId) {
@@ -181,23 +134,7 @@ fun HomeScreen(
                     Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
                 }
             }
-            // Real gap real feedback caught live across several rounds:
-            // plain Compose Foundation LazyColumn/LazyRow, unlike
-            // tv-foundation's own TvLazyColumn/TvLazyRow, advertise no
-            // default D-pad entry point of their own for a system that
-            // has never yet focused anything inside them. focusRestorer()
-            // below is Compose's own real fix for that: finds a sensible
-            // default child to enter on first arrival, then remembers
-            // and restores the last focused child on every return trip.
             else -> {
-                // Real port of components/homeCustomizer.js's own
-                // applyHomeCustomization(): recomputed fresh off
-                // whatever this session's own real rows and saved
-                // customization currently are, same real "no DOM
-                // mutation to go stale" reasoning that file's own real
-                // bug-fix header documents, for free here since this is
-                // a plain derived value off uiState rather than
-                // anything mutated in place.
                 val (order, visibleRows) = remember(uiState.rows, uiState.customization, editMode) {
                     val liveKeys = uiState.rows.map { it.key }
                     val ord = HomeCustomization.effectiveOrder(liveKeys, uiState.customization)
@@ -350,10 +287,6 @@ fun HomeScreen(
             }
         }
 
-        // Rendered at this screen's own root Box, not inside the
-        // LazyColumn/PosterRow/PosterCard chain above: see PosterCard's
-        // own header comment for why a full-screen menu has to live
-        // here rather than inside a LazyRow item.
         cardMenuTarget?.let { target ->
             val item = target.item
             val continueWatching = target.row.section.key == "continue-watching"
@@ -405,11 +338,6 @@ fun HomeScreen(
     }
 }
 
-// Real port of components/homeCustomizer.js's own
-// buildHomeCustomizeBar()/updateHomeCustomizeBar(): a Reset button only
-// ever shown while editing, and the toggle itself relabelled Done/
-// tinted active the same way that file's own real
-// jellio-home-customize-toggle-active class is.
 @Composable
 private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier) {
@@ -441,13 +369,6 @@ private fun HomeCustomizeBar(editMode: Boolean, onToggleEdit: () -> Unit, onRese
     }
 }
 
-// Real port of components/homeCustomizer.js's own wrapRowForCustomization()
-// plus buildRowBar()/applyHomeCustomization()'s own real
-// data-hidden/jellio-home-editing CSS rules (css/app.css's own
-// .jellio-row-editor[data-hidden='true'] .jellio-row-editor-content):
-// a hidden row's own content never renders at all, editing or not,
-// only its own bar (name plus a Show toggle) does, and only while
-// editing; a visible row's own bar only ever shows while editing too.
 @Composable
 private fun HomeRowEditor(
     editMode: Boolean,

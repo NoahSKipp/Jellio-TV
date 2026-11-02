@@ -63,11 +63,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real port of screens/profile.js's own renderProfile(): banner, avatar,
-// name, bio, and (unless this is someone else's own private profile) a
-// stats row, a badges grid and a recent activity list. userId null means
-// the signed in reader's own profile, same real default JellioRoute.
-// Profile's own header documents.
 @Composable
 fun ProfileScreen(
     session: Session,
@@ -82,12 +77,6 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val targetUserId = userId ?: session.userId
-    // Real DetailScreen.kt's own header on this exact fix: nothing here
-    // ever requested initial D-pad focus either, so a reader pushed
-    // into this screen (View Profile from the account switcher, a Feed
-    // row's own avatar) had no real target at all once landed - stuck
-    // on this rail's own sidebar, unable to select or navigate anything
-    // inside this screen itself.
     val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(uiState.isLoading, uiState.error) {
         if (!uiState.isLoading && uiState.error == null) contentFocusRequester.requestFocus()
@@ -320,18 +309,6 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
     }
 }
 
-// Real bug found live testing on device: a LazyVerticalGrid nested
-// inside this screen's own outer LazyColumn item needs its own fixed
-// height to lay out at all (the same real reason
-// AvatarPickerOverlay.kt's own header already documents choosing
-// FlowRow over exactly this), and a nested lazy list is its own
-// separate real focus/scroll boundary regardless of that height being
-// sized correctly: a D-pad Down off its own last real row had nowhere
-// defined to go, real feedback's own "only see the first two rows,
-// nothing else" and "navigating down moves into the sidebar" both
-// traced to this same one real cause. FlowRow instead: no nested lazy
-// list, no separate focus boundary, every badge a real part of this
-// same outer LazyColumn's own real scroll and Down-navigation chain.
 @Composable
 private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
     FlowRow(
@@ -342,12 +319,6 @@ private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
     }
 }
 
-// Real feedback live: this used to be a plain Column, no Surface/
-// clickable anywhere on it, so a D-pad had nothing to actually land on
-// here at all. Real port of screens/profile.js's own badge tile
-// hover/title tooltip: focusable now, badge.Description still its own
-// real contentDescription for a screen reader, no separate action
-// behind it since unlocking already happened server side.
 @Composable
 private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
     val color = if (badge.Unlocked) rarityColor(badge.Rarity) else JellioBorder

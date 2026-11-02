@@ -70,11 +70,6 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    // WatchNextSyncer's own real deep link: a Watch Next row tile on
-    // Google TV's home launches this Activity through the manifest's
-    // own second intent-filter, singleTop keeping it to this same real
-    // instance (onNewIntent below) rather than a fresh one stacking
-    // underneath whatever screen was already open.
     private val deepLinkItemId = mutableStateOf<String?>(null)
     private var isPlayerActive: Boolean = false
 
@@ -166,9 +161,6 @@ private fun JellioTvRoot(
     appViewModel: AppViewModel = hiltViewModel(),
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
-    // Check for updates at the root level so logged-out users, users on the
-    // login screen, and logged-in users alike receive update prompts: on
-    // open, and in the background for as long as the app stays in front.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -178,10 +170,6 @@ private fun JellioTvRoot(
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val state = appViewModel.authState.collectAsState().value) {
-            // A DataStore-backed sessionFlow always eventually emits, but
-            // there is a real async gap before its first value: an empty
-            // Box here for one frame beats a false flash of the sign in
-            // screen for a reader who is actually already signed in.
             AuthState.Loading -> Box(Modifier.fillMaxSize()) {}
             AuthState.LoggedOut -> LoginScreen(modifier = Modifier.fillMaxSize())
             is AuthState.LoggedIn -> AppBootGate(
@@ -208,17 +196,6 @@ private fun JellioTvRoot(
     }
 }
 
-// Real feedback live: "Loading takes forever" on Home and every first
-// real Library visit, reported the same way a mobile app's own splash
-// screen is what actually covers that wait rather than a reader
-// staring at an empty, already-mounted screen while its own fetch
-// runs. HomeScreen's own hiltViewModel() call below resolves to this
-// exact same instance (both sit under the same real Activity-scoped
-// ViewModelStoreOwner, no Navigation Compose backstack entry between
-// them to change that), so kicking its real load() off here and
-// gating JellioTvApp's own reveal on it finishing means Home is
-// already populated the moment it first appears, not loading again in
-// front of the reader.
 @Composable
 private fun AppBootGate(
     session: Session,
@@ -230,23 +207,12 @@ private fun AppBootGate(
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val libraries by appViewModel.libraries.collectAsState()
-    // Long enough for the mark's pop-in not to flash past, no longer:
-    // this used to hold every launch for 10s, sized for a video splash
-    // that is gone.
     var minSplashTimeElapsed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(1_200)
         minSplashTimeElapsed = true
     }
     LaunchedEffect(session.userId) { homeViewModel.load(session) }
-    // Real speculative value, not a real parity port: which library a
-    // reader opens first is real screen state no server or web source
-    // predicts ahead of the real tap, this just warms the same real
-    // first entry LibraryPickerOverlay lists first, on the same real
-    // Activity-scoped instance LibraryScreen's own hiltViewModel()
-    // call later resolves to. A miss (a different library gets opened
-    // first) costs nothing beyond this app's own real pre-fix load
-    // time; a hit skips it entirely.
     LaunchedEffect(libraries) {
         libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
     }
@@ -277,11 +243,6 @@ private fun JellioTvApp(
     onPlayerActiveChanged: (Boolean) -> Unit = {},
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
 ) {
-    // A plain real back stack rather than Navigation Compose: the
-    // fixed tab set below resets it (real Nuvio/mobile-nav behaviour,
-    // switching tabs does not stack), Detail/Player push onto it
-    // (screens/detail.js's own #/item and #/play routes, real browser
-    // history underneath the web build's own back button).
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
     // Home keeps its scroll positions and focused card while a title's page is open.
     val screenStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
@@ -304,10 +265,6 @@ private fun JellioTvApp(
     var changelogReleaseToDisplay by remember { mutableStateOf(com.jellio.tv.ui.changelog.CURRENT_CHANGELOG) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    // Real feedback live: SidebarNav's own items stayed reachable while
-    // HomeScreen's own Customize mode was active, so a reader
-    // mid-reorder could jump straight off with nothing standing in the
-    // way. Threaded down the same real way SidebarNav's own enabled is.
     var homeEditMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -331,33 +288,7 @@ private fun JellioTvApp(
 
     LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
-    // Real SidebarNav.kt's own header on this exact fix: every one of
-    // this rail's own real Library/Profile popovers used to just flip
-    // its own real boolean back to false with nothing real requesting
-    // focus back onto this rail first, so whichever real item opened it
-    // was left with no real focus at all the instant its
-    // own real content actually unmounted mid-dismiss - the real remote
-    // going dead until a reader backed all the way out and back in.
-    // Reclaimed explicitly in every real dismiss/select callback below,
-    // right alongside flipping its own real boolean, so this rail's own
-    // currently selected item already holds real focus again before
-    // whichever real popover's own content is actually gone.
     val sidebarFocusRequester = remember { FocusRequester() }
-    // Real feedback live: switching views (sidebar clicks and content
-    // clicks alike, an episode card on a Detail page included) kept
-    // reopening this rail - the destination screen's own content
-    // wasn't reliably claiming real focus fast enough (or at all, some
-    // screens never tried), so whatever focused node the OLD screen
-    // held got torn down with nothing real waiting to receive it, and
-    // Compose's own global default fallback search landed back on this
-    // rail's own topmost item, the one always-present real focusable
-    // thing regardless of which screen. sidebarHasRealFocus mirrors
-    // SidebarNav's own real hasFocus (its own onFocusChange param
-    // explains why this couldn't just read that rail's own private
-    // state directly); sidebarForceCollapsed visually collapses this
-    // rail immediately on every real navigation, decoupled from that
-    // real focus state on purpose (SidebarNav's own forceCollapsed
-    // header explains why faking that state itself would be worse).
     var sidebarHasRealFocus by remember { mutableStateOf(false) }
     var sidebarForceCollapsed by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -389,9 +320,6 @@ private fun JellioTvApp(
             }
         }
     }
-    // By id, for the next episode and Watch Next links: plays straight on
-    // unless there's nothing to play, then the picker says so. leavePlayer
-    // closes the finished episode first.
     val onPlayId: (String, Boolean) -> Unit = { itemId, leavePlayer ->
         scope.launch {
             val item = appViewModel.getItemOrNull(session, itemId)
@@ -401,11 +329,6 @@ private fun JellioTvApp(
         }
     }
 
-    // WatchNextSyncer's own real deep link, consumed the moment this
-    // real signed in tree is up and able to push a route at all: a
-    // Watch Next row tile tapped from Google TV's own home jumps
-    // straight into that title's own player rather than landing on
-    // Home first the way a cold app open otherwise would.
     LaunchedEffect(deepLinkItemId) {
         val itemId = deepLinkItemId ?: return@LaunchedEffect
         if (itemId.startsWith("detail:")) onNavigateToDetail(itemId.removePrefix("detail:")) else onPlayId(itemId, false)
@@ -427,21 +350,9 @@ private fun JellioTvApp(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Real components/seasonalEffects.js's own real z-index: 5,
-        // pointer-events: none layer, mounted first (bottommost) so
-        // every real screen still draws over it, hidden during this
-        // route's own real fullscreen player the same real way that
-        // file's own .jellio-root-fullscreen rule already does for the
-        // sidebar/mobile nav mounts.
         if (!route.isImmersive()) {
             SeasonalEffectsOverlay(themeKey = seasonalTheme, modifier = Modifier.fillMaxSize())
         }
-        // SidebarNav sits fixed at x = 0 and always reserves this much
-        // real space, collapsed or not (its own header explains why);
-        // every non-immersive screen's own content starts clear of it
-        // here rather than each one padding around it individually, the
-        // same real reason MainActivity itself is the one root
-        // threading it down for the corner buttons below.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -475,13 +386,6 @@ private fun JellioTvApp(
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
                 onEditModeChange = { homeEditMode = it },
                 onPlay = onPlay,
-                // Real port of components/cardOptionsMenu.js's own
-                // "Play manually" (openStreamPicker(item,
-                // {forceChoice: true})): the exact same real
-                // AppViewModel.resolvePlayAction/StreamPickerOverlay
-                // path DetailScreen's own Change Stream button
-                // already reaches below, from a card's own options
-                // menu instead of the detail page.
                 onPlayManually = { item ->
                     scope.launch {
                         when (val action = appViewModel.resolvePlayAction(session, item, forceChoice = true)) {
@@ -604,33 +508,10 @@ private fun JellioTvApp(
         }
 
         if (!route.isImmersive()) {
-            // Real fix for sidebarHasRealFocus/sidebarForceCollapsed's
-            // own header above: forces this rail visually collapsed the
-            // instant any real navigation lands on a non-immersive
-            // route, then reacts to every real transition of this
-            // rail's own hasFocus for as long as this same route is
-            // current - moveFocus(Right) again each real time it
-            // becomes true (Compose's own fallback search can land back
-            // here more than once while a slow-loading destination has
-            // nothing real to claim yet), clearing the forced collapse
-            // once it finally leaves for good. snapshotFlow rather than
-            // a single deferred attempt: ui/home/HomeScreen.kt's own
-            // hero-pin header covers why a guessed one-shot delay keeps
-            // losing races a real reactive collect() doesn't have to
-            // guess at. Scoped inside this same real branch (not a bare
-            // top-level effect) so it starts fresh with every real
-            // mount here and simply doesn't exist during an immersive
-            // route, where this rail isn't mounted at all and
-            // moveFocus(Right) would have nothing real of its own to
-            // mean anyway.
             LaunchedEffect(route) {
                 sidebarForceCollapsed = true
                 snapshotFlow { sidebarHasRealFocus }.collect { hasFocus ->
                     if (hasFocus && sidebarForceCollapsed) {
-                        // A screen still loading has nothing to take focus
-                        // yet, so keep trying for a moment. One that stays
-                        // empty (an empty Watchlist) leaves focus here, so
-                        // the rail opens rather than holding focus hidden.
                         var moved = focusManager.moveFocus(FocusDirection.Right)
                         var tries = 0
                         while (!moved && tries < 16 && sidebarHasRealFocus) {
@@ -650,19 +531,9 @@ private fun JellioTvApp(
                 enabled = !homeEditMode,
                 focusable = !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding),
                 onSelect = { clicked ->
-                    // Mirrors components/mobileNav.js's own single Library
-                    // button: a tap opens the picker rather than
-                    // navigating straight there, since no one real
-                    // library speaks for the button itself.
                     if (clicked is JellioRoute.Library) {
                         showLibraryPicker = true
                     } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
-                        // Real components/accountSwitcher.js's own real
-                        // Profile button: opens the quick switcher
-                        // overlay rather than navigating straight to the
-                        // full ProfileScreen, same real reason that
-                        // file's own header gives (Settings already
-                        // reaches the same real screen on its own).
                         showAccountSwitcher = true
                     } else {
                         switchTab(clicked)
@@ -766,10 +637,6 @@ private fun JellioTvApp(
         if (pickerItem != null) {
             StreamPickerOverlay(
                 item = pickerItem,
-                // streamPicker.js's own buildOverlayShell(): falls back
-                // to the item's own Primary poster when there is no
-                // real Backdrop tag, rather than leaving the picker
-                // background blank for a backdrop-less item.
                 backdropUrl = pickerItem.BackdropImageTags?.firstOrNull()?.let {
                     appViewModel.rawImageUrl(session, pickerItem.Id, it, "Backdrop", 1920)
                 } ?: pickerItem.ImageTags?.get("Primary")?.let {

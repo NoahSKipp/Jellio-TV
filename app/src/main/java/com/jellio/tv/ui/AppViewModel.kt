@@ -24,32 +24,17 @@ sealed interface AuthState {
     data class LoggedIn(val session: Session) : AuthState
 }
 
-// Mirrors ui.detail.DetailViewModel's own PlayAction/resolvePlayAction:
-// a real single-source title needs no choice at all, forceChoice
-// always shows the picker regardless of any remembered choice
-// (components/cardOptionsMenu.js's own openStreamPicker(item,
-// {forceChoice: true}), the real "Play manually" semantics), otherwise
-// a still-valid remembered choice wins. Kept as this file's own real
-// copy rather than shared with that ViewModel's: this app's own
-// existing getMediaSources/rememberStreamChoice/rememberedMediaSourceId
-// wrappers already duplicate the same way between the two rather than
-// one ViewModel reaching into another.
 sealed interface PlayAction {
     data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
     data class ShowPicker(val item: BaseItemDto) : PlayAction
 }
 
-// Owns whatever every screen needs regardless of which one is active:
-// the real session state that gates Login vs the rest of the app, and
-// the real library list the top nav pill's own Library entries come
-// from.
 @HiltViewModel
 class AppViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
 ) : ViewModel() {
-
     val authState: StateFlow<AuthState> = repository.sessionFlow
         .map { session -> if (session != null) AuthState.LoggedIn(session) else AuthState.LoggedOut }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AuthState.Loading)
@@ -91,11 +76,6 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    // A Gelato-imported item commonly has a real Primary poster but no
-    // distinct Backdrop art at all (real gap found live: the hero
-    // stayed blank for exactly this reason on titles with no backdrop
-    // tag). Falls back to the Primary image rather than requesting a
-    // Backdrop type that was never going to exist server side.
     fun imageUrl(session: Session, item: BaseItemDto, imageType: String, maxWidth: Int): String {
         if (imageType == "Logo") {
             val logoTag = item.ImageTags?.get("Logo") ?: item.ParentLogoImageTag
@@ -125,50 +105,24 @@ class AppViewModel @Inject constructor(
         return repository.imageUrl(session.serverAddress, targetId, tag, resolvedType, maxWidth, session.accessToken)
     }
 
-    // The general form imageUrl() above builds on top of: an arbitrary
-    // itemId/tag pair, not necessarily the item currently being
-    // rendered. screens/detail.js's own heroBackdropUrl() needs exactly
-    // this for its own ParentBackdropItemId/ParentBackdropImageTags
-    // fallback, a real backdrop borrowed from a different item (an
-    // episode's own series) than the one this hero is actually showing.
     fun rawImageUrl(session: Session, itemId: String, tag: String?, imageType: String, maxWidth: Int): String =
         repository.imageUrl(session.serverAddress, itemId, tag, imageType, maxWidth, session.accessToken)
 
-    // Real port of runtime/api.js's own getUserImageUrl(): screens/
-    // feed.js and screens/profile.js's own avatar images, tag left
-    // null when the caller (a feed row) has no PrimaryImageTag handy,
-    // same real behaviour that file's own call already has.
     fun userImageUrl(session: Session, userId: String, tag: String?, maxWidth: Int): String =
         repository.userImageUrl(session.serverAddress, userId, tag, maxWidth, session.accessToken)
 
     fun bannerUrl(session: Session, userId: String): String =
         repository.bannerUrl(session.serverAddress, session.accessToken, userId)
 
-    // components/services.js's own real logoUrl(): the plugin's own
-    // FrontendController.cs serves these SVGs straight off the
-    // Jellyfin server itself, not through Coil's usual Items/Images
-    // endpoint.
     fun serviceLogoUrl(session: Session, name: String): String = logoUrl(session.serverAddress, name)
 
-    // components/streamPicker.js's own real source list, resolved once
-    // MainActivity's own picker overlay actually opens rather than
-    // eagerly for every item this screen ever renders.
     suspend fun getMediaSources(session: Session, itemId: String, forceFresh: Boolean = false) =
         repository.getMediaSources(session.userId, itemId, forceFresh = forceFresh)
 
-    // The picker's own real onSelect, components/streamPicker.js's own
-    // rememberSourceChoice(): only actually written when the reader's
-    // own real "remember my stream" preference is still on.
     suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
         if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
     }
 
-    // StreamPickerOverlay's own real Resume button, streamPicker.js's
-    // own resumeTicks handler: picks this exact real remembered source
-    // when the picker still offers it, the same real readRememberedSources()
-    // lookup that function makes, regardless of whether the "remember
-    // my stream" preference is even still on (a remembered choice
-    // already made stays honoured here even if turned off since).
     suspend fun rememberedMediaSourceId(itemId: String): String? = streamPreferences.rememberedMediaSourceId(itemId)
 
     suspend fun getItemOrNull(session: Session, itemId: String): BaseItemDto? =

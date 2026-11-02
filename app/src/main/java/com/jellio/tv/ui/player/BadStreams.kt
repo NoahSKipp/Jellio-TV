@@ -4,9 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.jellio.tv.data.model.MediaSourceDto
 
-// Streams that failed to play (an error, a placeholder clip, no picture),
-// remembered per title for 48 hours so the stream picker can flag them and
-// automatic retries skip them. Same idea as the web's runtime/streamHealth.js.
 object BadStreams {
     private const val LIFETIME_MS = 48L * 60 * 60 * 1000
     private const val SUBTITLE_CRASH_MIGRATION_KEY = "_v3_desc_poison_cleared"
@@ -27,8 +24,6 @@ object BadStreams {
     internal fun keys(itemId: String, source: MediaSourceDto): List<String> = listOfNotNull(
         source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
     )
-
-
 
     private fun purgeLegacyAndExpired(store: SharedPreferences, now: Long) {
         val all = store.all
@@ -71,11 +66,6 @@ object BadStreams {
     }
 }
 
-// A clip far shorter than the title it stands in for: AIOStreams' "download
-// failed" video and similar placeholders run under three minutes against a
-// runtime of ten minutes or more. Capping actualMs at 180s ensures real
-// streams are never misclassified as placeholders when catalog metadata has
-// an inflated expected runtime.
 private const val MAX_PLACEHOLDER_MS = 3L * 60 * 1000
 
 fun looksLikePlaceholder(actualMs: Long, expectedMs: Long): Boolean =

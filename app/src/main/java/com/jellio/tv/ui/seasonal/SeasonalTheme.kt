@@ -5,11 +5,6 @@ import com.jellio.tv.data.model.ClientConfigDto
 import com.jellio.tv.data.model.SeasonalRangeDto
 import java.util.Calendar
 
-// Four real occasions (Halloween, New Year's, Valentine's, Christmas),
-// matching Jellio Web's modern seasonal system and replacing the old
-// catalogue of three dozen themes ported from Jellyfin-Seasonals.
-// Heavy 60 FPS falling emoji particles caused severe UI lag on TV hardware;
-// the modern system uses ambient radial gradient washes behind the page.
 val THEME_ORDER = listOf(
     "halloween",
     "newyear",
@@ -24,13 +19,6 @@ data class SeasonalWashSpec(
     val accent2: Color,
 )
 
-// Matches css/app.css's own seasonal theme color tokens:
-// #jellioRoot[data-jellio-season="halloween"] {
-//   --jellio-season-accent: #ff7518;
-//   --jellio-season-accent-2: #7c3aed;
-//   --jellio-season-wash-1: #180a24;
-//   --jellio-season-wash-2: #1c0f04;
-// }
 val SEASONAL_THEMES: Map<String, SeasonalWashSpec> = mapOf(
     "halloween" to SeasonalWashSpec(
         wash1 = Color(0xFF180A24),
@@ -58,8 +46,6 @@ val SEASONAL_THEMES: Map<String, SeasonalWashSpec> = mapOf(
     ),
 )
 
-// Real port of components/seasons.js's own inRange(): a day-of-year range
-// comparison that wraps New Year's (December into January).
 fun inRange(month: Int, day: Int, range: SeasonalRangeDto?): Boolean {
     if (range == null) return false
     val now = month * 100 + day

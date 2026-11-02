@@ -56,9 +56,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// A full-screen 4-corner safe area calibration tool mirroring console game setup screens.
-// Displays corner alignment brackets (top-left, top-right, bottom-left, bottom-right)
-// and border guide lines that scale in real time as the user adjusts the margin.
 @Composable
 fun OverscanCalibrationModal(
     onDismiss: () -> Unit,

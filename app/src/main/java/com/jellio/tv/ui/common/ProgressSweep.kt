@@ -19,13 +19,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.jellio.tv.ui.theme.JellioSecondary
 
-// Real port of css/progress.css's own real .jellio-progress-bar: an
-// indeterminate sweep for real work that takes seconds with no
-// percentage to report, that file's own real Gelato-import caller.
-// Same real reasoning that file's own header comment gives for a
-// plain linear travel rather than easing: an ease-in-out idles at
-// both off-track ends and whips through the middle, and this sweep's
-// own two ends both sit off the real track.
 @Composable
 fun ProgressSweep(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "progressSweep")

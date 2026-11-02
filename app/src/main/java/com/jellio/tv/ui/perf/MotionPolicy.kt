@@ -9,10 +9,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-// How much of the seasonal scenes this device gets. FULL redraws every
-// frame; REDUCED fewer creatures and particles at a lower rate; STILL the
-// scenery (moon, cobwebs, garlands, glow) drawn once with nothing moving;
-// OFF nothing at all.
 enum class MotionLevel { FULL, REDUCED, STILL, OFF }
 
 // Set while a screen's list is scrolling: the scenes hold their frame
@@ -26,9 +22,6 @@ object ScrollActivity {
     val busy: Boolean get() = scrolling || rowsScrolling > 0
 }
 
-// What the device looks like, worked out once at start: low-RAM devices,
-// two cores or a small heap struggle with full-screen redraws, and a UI
-// drawn above 1080p (4K output) costs about four times as much per frame.
 data class DeviceProfile(
     val cores: Int,
     val heapMb: Int,

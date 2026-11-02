@@ -31,20 +31,6 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
-// fetchAll mirrors components/rowListModal.js's own options.fetchAll:
-// a real second, unbounded request for this exact same row, only ever
-// set for a catalog or genre row (a real Gelato collection or a real
-// discovered genre, either one worth a real "browse everything" beyond
-// its own real ROW_LIMIT), null for Continue Watching/Up Next and every
-// recommendation row, same real distinction buildRow()'s own callers
-// already draw.
-// key mirrors components/homeCustomizer.js's own real row key scheme
-// (wrapRowForCustomization's own second argument at every real call
-// site in screens/home.js): 'continue-watching', 'up-next',
-// 'catalog:<id>', 'genre:<name>', 'rec:<title>', stable across a
-// reload the same way that file's own real keys are, title alone
-// defaulting for a caller (Library, Service) that never sets one and
-// has no customization concept to key against.
 @androidx.compose.runtime.Immutable
 data class HomeSection(
     val title: String,
@@ -59,25 +45,9 @@ data class HomeSection(
 data class HomeUiState(
     val isLoading: Boolean = true,
     val heroItems: List<BaseItemDto> = emptyList(),
-    // Real screens/home.js's own greetingText(): local device clock,
-    // the reader's own real name when it resolves, "Welcome back"
-    // real feedback found always wrong the moment it was actually
-    // ever anything else.
     val greeting: String = "",
-    // Every real row this screen can show, in this file's own real
-    // build order (Continue Watching, Up Next, Coming Soon, Streaming
-    // Services, then recommendation/catalog/genre rows), the same real
-    // order screens/home.js's own wrapRowForCustomization() call sites
-    // wrap in. One flat list, not four separate typed ones, so
-    // HomeCustomization's reorder/hide below can work across all of
-    // them the same way that file's own single #rows container does.
     val rows: List<HomeRow> = emptyList(),
     val customization: HomeCustomizationDto = HomeCustomizationDto(),
-    // Real gate components/cardOptionsMenu.js's own header documents:
-    // Jellyfin's own DELETE /Items/{id} only actually succeeds for an
-    // admin or a user with their own real
-    // Policy.EnableContentDeletion, fetched once here alongside the
-    // rest of this screen's own load() rather than per card.
     val canDeleteItems: Boolean = false,
     val error: String? = null,
     // More rows are still loading below the ones shown (skeletons there).
@@ -90,15 +60,9 @@ private const val COMING_SOON_LIMIT = 60
 // which used to leave catalog and genre rows with only a few cards.
 private const val CATALOG_ROW_LIMIT = 60
 private const val ROW_DISPLAY_LIMIT = 24
-// Real screens/home.js's own ROW_LIST_LIMIT: components/rowListModal.js's
-// own real "browse everything" fetchAll, a catalog or genre row's own
-// full real depth rather than the row's own small ROW_LIMIT.
 private const val ROW_LIST_LIMIT = 500
 private const val MAX_CATALOG_ROWS = 8
 private const val MIN_CATALOG_ITEMS = 3
-// The anime library has a page of its own carrying every AniList
-// catalog. One of them here is a taste of it, more than one is that
-// page again in the wrong place.
 private const val MAX_ANIME_CATALOG_ROWS = 0
 
 private const val GENRE_ROWS = 4
@@ -145,32 +109,11 @@ private fun leadIndex(name: String?): Int {
     return if (index == -1) LEAD.size else index
 }
 
-// "Trending" alone on a page that can carry a movie one and a series
-// one of the same name says nothing about which is which: only these
-// three generic names get a kind suffix, everything else already has
-// a real name (a catalog's own configured title).
 private fun titleFor(name: String?, kind: String): String {
     if (name == null || !GENERIC_NAME.matches(name)) return name ?: ""
     return if (kind == "tvshows") "$name Shows" else "$name Movies"
 }
 
-// Real port of screens/home.js's own buildHomeSections(), the same
-// real order: Continue Watching, Up Next, Coming Soon (real
-// CalendarController answer, same GET Jellio/calendar endpoint
-// screens/calendar.js's own full page already uses), the Studio Hub
-// strip (real service tiles, one per real service
-// groupByService(collections) actually found, each opening its own
-// real ServiceScreen), RecommendationEngine's own real rows,
-// real Gelato catalog rows (Trending/Popular/Top Rated/..., a
-// service's own collection filtered out since it already has a hub
-// tile, ChildCount>=3, capped at MAX_CATALOG_ROWS with at most
-// MAX_ANIME_CATALOG_ROWS from the anime library), then real genre rows
-// (discoverGenres()/getGenreItems() scanning the whole real library,
-// no per-library scope). No per-library "Recently Added" row anywhere
-// on this screen, same real reason this whole file's own header
-// comment gives: DateCreated means nothing on a Gelato server, every
-// import lands at once, so real native home's own per-library row
-// says nothing worth showing here either.
 private const val HOME_BACKGROUND_RETRIES = 3
 private const val HOME_RETRY_DELAY_MS = 20_000L
 
@@ -182,25 +125,11 @@ class HomeViewModel @Inject constructor(
     private val recommendationPreferences: RecommendationPreferences,
     private val rowSnapshotStore: RowSnapshotStore,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private var loadedForUserId: String? = null
 
-    // Real bug found live: this used to return outright on a second
-    // real call for the same session, the real reason HomeScreen's own
-    // LaunchedEffect(session.userId) call (which fires again on every
-    // real remount, a genuine return trip through Library/Settings/
-    // etc. and back, not just this screen's own first real composition)
-    // never actually refreshed anything after the very first one. A
-    // real watch finished elsewhere never showed its own checkmark or
-    // moved Continue Watching until the app itself restarted. Runs the
-    // exact same real fetch on every real call now instead, only
-    // skipping the isLoading reset (and its own full-screen spinner)
-    // on a real returning visit so this quietly refreshes behind
-    // whatever this screen already has on it, the same real
-    // AppBootGate-gated first load still blocking on it same as before.
     private val failedFetches = java.util.concurrent.atomic.AtomicInteger()
     private var homeRetryJob: kotlinx.coroutines.Job? = null
     private var homeRetryRound = 0
@@ -246,13 +175,6 @@ class HomeViewModel @Inject constructor(
             }
             try {
                 coroutineScope {
-                    // Real port of screens/home.js's own buildHomeSections():
-                    // every real fetch with no dependency on another's own
-                    // result fires together (that file's own first
-                    // Promise.allSettled), not one after another. A real
-                    // perf bug found live testing on device: awaiting these
-                    // one at a time used to add real seconds to every Home
-                    // load, reported live as "loading takes forever".
                     val continueWatchingDeferred = async { orEmptyOnFailure { repository.getContinueWatching(session.userId) } }
                     val upNextDeferred = async { orEmptyOnFailure { repository.getNextUp(session.userId) } }
                     val comingSoonDeferred = async { orEmptyOnFailure { repository.getCalendarEntries().take(COMING_SOON_LIMIT) } }
@@ -265,10 +187,6 @@ class HomeViewModel @Inject constructor(
 
                     val upNext = upNextDeferred.await()
                     val continueWatching = continueWatchingDeferred.await().withoutStaleEpisodes(upNext)
-                    // Fired, not awaited: Google TV's own home Watch
-                    // Next row is real background bookkeeping, not
-                    // something this screen's own load has any reason
-                    // to wait on before it can render.
                     launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNext) } }
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through exclude below) every discovery row.
@@ -277,10 +195,6 @@ class HomeViewModel @Inject constructor(
                     val heroCandidates = emptyList<BaseItemDto>()
                     val user = userDeferred.await()
                     val customization = customizationDeferred.await()
-                    // First open: the banner, Continue Watching and Up Next
-                    // show as soon as they're in, with skeletons below for
-                    // everything still loading (Coming Soon in particular
-                    // asks TMDb and can take a while).
                     if (!isReturningVisit) {
                         _uiState.value = HomeUiState(
                             isLoading = false,
@@ -345,10 +259,6 @@ class HomeViewModel @Inject constructor(
                         if (comingSoon.isNotEmpty()) add(ComingSoonHomeRow(comingSoon, comingSoonItems))
                         if (studioHubs.isNotEmpty()) add(StudioHubsHomeRow(studioHubs))
                     }
-                    // First open: show the top of Home now, the recommendation,
-                    // catalog and genre rows below take the longest and are
-                    // added when they arrive. A returning visit keeps its
-                    // full rows until the refresh is done.
                     if (!isReturningVisit) {
                         _uiState.value = HomeUiState(
                             isLoading = false,
@@ -367,28 +277,10 @@ class HomeViewModel @Inject constructor(
                         getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
                         getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
                     )
-                    // Shared across recommendation, catalog and genre rows,
-                    // same real reasoning screens/home.js's own shared
-                    // `seen` object documents: a title one row already
-                    // picked should not also turn up further down the same
-                    // page. Only the synchronous dedupe step below actually
-                    // needs the three phases' own real priority order
-                    // though, none of their own real network fetches depend
-                    // on the other two at all, so all three fire together
-                    // next, same real port of that file's own second
-                    // Promise.all.
                     val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
                     val isCommunityEnabled = recommendationPreferences.isCommunityRowEnabled(session.userId)
                     val communityExcluded = recommendationPreferences.getCommunityExcludedUsers(session.userId).toList()
 
-                    // On a first open every row below goes on screen the
-                    // moment its own data arrives, in a fixed place:
-                    // recommendations (the seasonal row after Top Picks),
-                    // What Others Are Watching, catalogs, then genres. A
-                    // title a row already showed isn't repeated further
-                    // down. A returning visit still swaps everything in once
-                    // the refresh is done, so rows don't move under the
-                    // viewer.
                     var recommendationRows: List<HomeSection> = emptyList()
                     var seasonalSection: HomeSection? = null
                     var communitySection: HomeSection? = null
@@ -509,10 +401,6 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             } catch (err: Exception) {
-                // A quiet returning-visit refresh failing (a transient
-                // network blip, say) leaves whatever real rows already
-                // rendered alone rather than replacing a working screen
-                // with an error state over one failed background retry.
                 if (_uiState.value.loadingMore) _uiState.value = _uiState.value.copy(loadingMore = false)
                 if (!isReturningVisit && _uiState.value.rows.isEmpty()) {
                     _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
@@ -522,10 +410,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Real port of components/card.js's own buildCardActions() handlers:
-    // an optimistic-free round trip to the real server, then patched
-    // back into whichever real row(s) actually hold this item, same
-    // real reasoning updateItem() below documents.
     suspend fun showcaseInfo(session: Session, item: BaseItemDto): ShowcaseInfo =
         loadShowcaseInfo(repository, session.userId, item)
 
@@ -580,10 +464,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // A real item can appear in more than one real row at once (a
-    // recommendation row and a genre row both drawing from the same
-    // real library), so a toggle patches every real row holding it
-    // rather than just the one the real options menu was opened from.
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
         val updatedRows = state.rows.map { row ->
@@ -597,17 +477,6 @@ class HomeViewModel @Inject constructor(
         _uiState.value = state.copy(rows = updatedRows, heroItems = updatedHero)
     }
 
-    // Real port of components/cardOptionsMenu.js's own toggleWatched()
-    // real Continue Watching/Up Next branch: a real Remove there is
-    // always a real mark-played call, never a toggle, since neither
-    // row is reachable at all once its own title actually is played
-    // (that same real call is also the only way real Jellyfin ever
-    // clears a saved resume position or drops a title off NextUp, see
-    // that function's own header). Dropped from this screen's own row
-    // state directly rather than waiting on next real reload.
-    // Removals take the card out at once, when its animation ends, and put the
-    // rows back only if the server call fails; waiting for the call let the
-    // card reappear in its old spot first.
     fun removeFromRow(session: Session, item: BaseItemDto) {
         val before = _uiState.value.rows
         removeItemFromRows(item.Id)
@@ -617,13 +486,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Real port of components/cardOptionsMenu.js's own "Remove Show from
-    // Up Next": hides the whole series server side (Controllers/
-    // NextUpHiddenController.cs) instead of removeFromRow's own
-    // mark-played call above, which only ever advances this same series
-    // to its own next episode rather than actually leaving Up Next. See
-    // JellioRepository.getNextUp()'s own header for the real gap this
-    // closes.
     fun hideShowFromRow(item: BaseItemDto) {
         val seriesId = item.SeriesId ?: return
         val before = _uiState.value.rows
@@ -634,12 +496,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Real port of components/cardOptionsMenu.js's own Remove from
-    // Library option: the confirm step itself already happened
-    // (HomeScreen's own RemoveFromLibraryConfirm), this only fires
-    // the real DELETE call and drops the item from every row holding
-    // it, same real reasoning removeItemFromRows() above already
-    // documents for a toggle.
     fun deleteItem(item: BaseItemDto) {
         viewModelScope.launch {
             runCatching { repository.deleteItem(item.Id) }
@@ -708,15 +564,6 @@ class HomeViewModel @Inject constructor(
         _uiState.value = state.copy(rows = updatedRows)
     }
 
-    // Real port of components/cardOptionsMenu.js's own
-    // restartFromBeginning(): no real Jellyfin endpoint clears a saved
-    // resume position on its own, marking played and immediately
-    // unplayed again is the only real way to reset it back to 0
-    // without leaving the title stuck flagged watched, same real gap
-    // that function's own header (and removeFromRow's above) already
-    // documents. Returns whether it actually succeeded so the caller
-    // only navigates into real playback on a real success, same real
-    // order that function's own .then(navigateTo) already keeps.
     suspend fun restartFromBeginning(session: Session, item: BaseItemDto): Boolean {
         return try {
             repository.setPlayed(session.userId, item.Id, true)
@@ -728,11 +575,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Real port of components/homeCustomizer.js's own real
-    // buildRowBar() button handlers: HomeCustomization's own pure
-    // effectiveOrder()/moveKey()/toggleHidden() do the actual work,
-    // this just persists the result the same real way that file's own
-    // saveHomeCustomization() does after every single call.
     fun moveRow(key: String, delta: Int) {
         val liveKeys = _uiState.value.rows.map { it.key }
         val updated = HomeCustomization.moveKey(_uiState.value.customization, liveKeys, key, delta)
@@ -754,22 +596,6 @@ class HomeViewModel @Inject constructor(
 
     private data class CatalogRowEntry(val title: String, val items: List<BaseItemDto>, val collectionId: String, val kind: String)
 
-    // Mirrors screens/home.js's own fetchCatalogRows(): the real fetch
-    // phase only, no exclude touched here at all (real port of that
-    // file's own comment: "fetching has no dependency on seen/exclude
-    // at all"), so every real Gelato catalog collection's own real
-    // network round trip fires together via Promise.all rather than
-    // the second collection waiting on the first one's own response.
-    // Real Gelato catalog collections (Trending, Popular, Top Rated,
-    // ...), led by LEAD's own real order then by ChildCount, at most
-    // MAX_ANIME_CATALOG_ROWS of them from the anime library (that
-    // library has a page of its own carrying every one of those),
-    // capped at MAX_CATALOG_ROWS total. A service's own collection is
-    // filtered out here (serviceOf(name) != null): it already has a
-    // real tile in the Studio Hub strip above and a real page of its
-    // own behind that tile, same real reason fetchCatalogRows() itself
-    // excludes it, a Netflix row directly under the Netflix tile would
-    // be the same content twice.
     private fun chooseCatalogs(collections: List<BaseItemDto>): List<BaseItemDto> {
         var usable = collections.filter { serviceOf(it.Name) == null && (it.ChildCount ?: 0) >= MIN_CATALOG_ITEMS }
         usable = usable.sortedWith(
@@ -813,22 +639,11 @@ class HomeViewModel @Inject constructor(
 
     private data class GenreRowEntry(val genre: String, val items: List<BaseItemDto>)
 
-    // Mirrors screens/home.js's own fetchGenreRows(): real genres
-    // discoverGenres() finds enough of across the whole real library
-    // (no parentId, unlike LibraryScreen's own per-library call), every
-    // genre's own real item fetch fired together via Promise.all once
-    // discoverGenres() itself resolves (a real data dependency, unlike
-    // the catalog collections above), not one genre waiting on the
-    // last.
     private suspend fun chooseGenres(userId: String): List<String> {
         val selected = recommendationPreferences.getSelectedGenres(userId)
         return if (selected.isNotEmpty()) selected else repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
     }
 
-    // Mirrors screens/home.js's own buildGenreRows(): last in line for
-    // the shared exclude set, same real priority order that file's own
-    // comment documents (recommendation rows first pick, then catalog,
-    // genre rows last).
     private fun genreSection(userId: String, entry: GenreRowEntry, exclude: MutableSet<String>): HomeSection? {
         val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }.take(ROW_DISPLAY_LIMIT)
         deduped.forEach { item ->
@@ -846,9 +661,6 @@ class HomeViewModel @Inject constructor(
     }
 }
 
-// Continue Watching without what is already done: titles marked watched that
-// still carry an old resume position, and half-watched episodes of a show
-// whose Next Up has already moved past them.
 internal fun List<BaseItemDto>.withoutStaleEpisodes(upNext: List<BaseItemDto>): List<BaseItemDto> {
     fun order(item: BaseItemDto) = (item.ParentIndexNumber ?: 0) * 10_000 + (item.IndexNumber ?: 0)
     val nextBySeries = upNext.filter { it.SeriesId != null }.associateBy { it.SeriesId }

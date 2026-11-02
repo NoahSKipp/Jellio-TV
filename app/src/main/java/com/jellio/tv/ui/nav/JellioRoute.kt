@@ -11,29 +11,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
 private val ANIME_NAME = Regex("anime", RegexOption.IGNORE_CASE)
-// Mirrors components/mobileNav.js's own real link set and its own
-// consolidated Library button (components/libraryPicker.js's own
-// popover behind it), not components/sidebar.js's desktop rail: this
-// pill is a floating bar the same shape as the phone's own, not a
-// tall scrollable rail with room for one entry per real library.
-// Library carries no per-library identity here on purpose, same
-// reason mobileNav.js's own buildLibraryButton() stores its real
-// hashes as a group rather than one hash per button: which library is
-// currently open is real screen state (MainActivity's own
-// selectedLibrary), not nav identity.
-//
-// Detail/Player are real screens too but never appear in JellioNavItems
-// below: reached only by pushing onto MainActivity's own real back
-// stack (a card, a hero, Play), the same real distinction
-// screens/detail.js's own #/item route and screens/player.js's own
-// #/play route draw against the sidebar's fixed link set.
 sealed interface JellioRoute {
-    // userId null means the signed in reader's own profile
-    // (switchTab() below always uses that default); Feed rows push a
-    // real other user's own id instead (Workstream 2's own real
-    // #/profile?id=X port), same real reason Detail/Person/Player
-    // below already carry their own real identity rather than reading
-    // it back out of some other piece of screen state.
     data class Profile(val userId: String? = null) : JellioRoute
     data object Home : JellioRoute
     data object Search : JellioRoute
@@ -53,30 +31,6 @@ sealed interface JellioRoute {
     data class LivePlayer(val channelId: String) : JellioRoute
 }
 
-// Real css/persistent-sidebar.css's own mobile breakpoint (its own
-// comment: "Real screenshot order: Home, Search, Libraries, Profile,
-// matching Nuvio's own four-item mobile nav exactly") sets that exact
-// order via CSS `order`, not DOM order, on those four survivors of the
-// pill's own real Settings/Favorites/back/bottom-group cull. This
-// pill has no cull of its own (Watchlist/Calendar/Settings all stay
-// reachable, no other affordance reaches them the way the phone's own
-// profile button and home tabs do), so those three sit appended after
-// the same shared four, in that same shared order.
-// Real components/sidebar.js's own real order: Profile leads the rail
-// (real feedback's own explicit ask, matching web pixel for pixel),
-// then Home/Search/Watchlist/Feed/Calendar exactly as that file's own
-// FIXED_NAV_LINKS + Calendar append it, Library folded in right after
-// (the one real library link a reader's own libraries would occupy
-// there on web, consolidated to this app's own single picker button
-// instead, JellioRoute's own header already explains why), Settings
-// still last.
-// Real feedback live: Settings sat in this rail too, its own real
-// second door onto the exact same real screen the Profile row's own
-// account switcher popover (its own header above already explains)
-// already opens a Settings button into - removed here rather than
-// leaving two real rail entries for one real screen.
-// Watchlist and Calendar live on Home as rows now; every library is a
-// button of its own between Search and Feed.
 fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<JellioRoute> = buildList {
     add(JellioRoute.Profile())
     add(JellioRoute.Home)
@@ -91,16 +45,9 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
 fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Profile -> Icons.Filled.AccountCircle
     JellioRoute.Home -> Icons.Filled.Home
-    // js/persistentSidebar.js's own SVG_ICONS.search, ported path data
-    // the same real way Library's own icon already is: the Material
-    // glyph was close in silhouette but not the real shape drawn here.
     JellioRoute.Search -> SearchIconVector
     JellioRoute.Watchlist -> Icons.Filled.BookmarkAdd
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
-    // js/persistentSidebar.js's own SVG_ICONS.library, ported path
-    // data rather than a Material approximation: real feedback live
-    // called out VideoLibrary and then PermMedia in turn as visible
-    // mismatches against this exact icon.
     JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
     // The same icons Jellio web draws (components/navShared.js SVG_ICONS),
@@ -116,36 +63,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> Icons.Filled.Home
 }
 
-// Material's own filled Settings glyph carries noticeably more
-// built-in padding around the gear than the rest of this rail's icons
-// (the ported search/library path data especially), so it reads
-// visibly smaller than its siblings at the same box size even though
-// every SidebarItem box is identical. Real feedback live: nudge just
-// this one glyph up rather than resizing the whole rail to compensate
-// for one icon's own viewBox padding.
 fun JellioRoute.iconScale(): Float = when (this) {
-    // Real feedback live, round three: 1.2f then 1.35f both still read
-    // as visibly smaller than every sibling glyph side by side. Pushed
-    // further rather than guessing again blind: this app's own bundled
-    // Icons.Filled.Settings vector (androidx.compose.material:
-    // material-icons-extended) carries real, unusually generous
-    // viewBox padding around its own gear, a documented quirk of that
-    // exact icon in that exact pack, not something a modest scale bump
-    // was ever going to fully close out.
-    //
-    // Real feedback live, round four: 2.0f still read as far smaller
-    // than every sibling. This icon's own dedicated slot
-    // (SidebarCollapsedWidth minus this rail's own horizontal padding,
-    // see SidebarItem below) is only 68dp wide once scaled, so this
-    // can't just keep climbing forever without this glyph's own bounds
-    // starting to press against that slot's own edges (26dp base size *
-    // 2.6f already reaches ~68dp) - 2.4f is the largest further step
-    // that still stays clear of it. A reader should confirm this
-    // against a clean, settled (not mid-expand) screenshot of the rail
-    // next round: a change this size should be unmistakable if it's
-    // actually reaching the screen, and if it still reads as smaller
-    // even now, the fix belongs on this slot's own size instead, not
-    // this scale factor again.
     JellioRoute.Settings -> 2.4f
     else -> 1f
 }
@@ -164,16 +82,5 @@ fun JellioRoute.label(): String = when (this) {
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""
 }
 
-// Real app.js's own FULLSCREEN_ROUTES: only the player route
-// ('play') ever hides the sidebar/mobile nav on web - Detail/Person/
-// Service all render their own hero with the nav rail still up
-// alongside it, same as Home/Library. Wrongly folded those three in
-// here before, which read as "the nav bar disappears on movie/series
-// pages" - it should only ever go away for the actual playback
-// surface.
 fun JellioRoute.isImmersive(): Boolean = this is JellioRoute.Player || this is JellioRoute.LivePlayer
 
-// A pushed real other-user Profile (Feed row click) still reserves
-// this pill's own real space and stays reachable, same as any other
-// non-immersive real screen: only Detail/Person/Service/Player above
-// go full bleed.

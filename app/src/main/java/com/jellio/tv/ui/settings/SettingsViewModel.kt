@@ -20,7 +20,6 @@ class SettingsViewModel @Inject constructor(
     private val streamPreferences: StreamPreferences,
     private val recommendationPreferences: com.jellio.tv.data.prefs.RecommendationPreferences,
 ) : ViewModel() {
-
     private val _communityRowEnabled = MutableStateFlow(true)
     val communityRowEnabled: StateFlow<Boolean> = _communityRowEnabled.asStateFlow()
 
@@ -39,9 +38,6 @@ class SettingsViewModel @Inject constructor(
     private val _rememberStream = MutableStateFlow(true)
     val rememberStream: StateFlow<Boolean> = _rememberStream.asStateFlow()
 
-    // Real codes, or null for "No preference", matching the currently
-    // saved UserDto.Configuration.AudioLanguagePreference/
-    // SubtitleLanguagePreference exactly.
     private val _audioLanguage = MutableStateFlow<String?>(null)
     val audioLanguage: StateFlow<String?> = _audioLanguage.asStateFlow()
 
@@ -57,20 +53,9 @@ class SettingsViewModel @Inject constructor(
     private val _passwordStatus = MutableStateFlow<String?>(null)
     val passwordStatus: StateFlow<String?> = _passwordStatus.asStateFlow()
 
-    // Incremented only on a real successful password update, the
-    // screen's own signal to clear its three local text fields
-    // (mirrors screens/settings.js's own form.reset() on success).
     private val _passwordUpdateTick = MutableStateFlow(0)
     val passwordUpdateTick: StateFlow<Int> = _passwordUpdateTick.asStateFlow()
 
-    // Real port of screens/settings.js's own buildSleepTimerSection():
-    // real cross-client status (a timer started from the player on
-    // this same account/device pair) surfaced here too, for a reader
-    // not currently on the player screen. "No active playback
-    // session." is the same real placeholder that file's own status
-    // paragraph starts with before the real fetch below ever resolves,
-    // left in place on a failed fetch the same way that function's own
-    // empty catch block does, never overwritten with an error message.
     private val _sleepTimerStatusText = MutableStateFlow("No active playback session.")
     val sleepTimerStatusText: StateFlow<String> = _sleepTimerStatusText.asStateFlow()
 
@@ -80,13 +65,6 @@ class SettingsViewModel @Inject constructor(
     private val _isCancellingSleepTimer = MutableStateFlow(false)
     val isCancellingSleepTimer: StateFlow<Boolean> = _isCancellingSleepTimer.asStateFlow()
 
-    // Real port of components/avatarPicker.js's own openAvatarPicker()
-    // state: presets re-fetched fresh every real open (that file's own
-    // real getAvatarPresets() call, no caching), a single busy key
-    // rather than a per-tile boolean list since only one real upload
-    // or preset-set request is ever in flight at once, same real
-    // reasoning that file's own option.disabled/uploadOption.disabled
-    // toggle only ever the one real tile clicked.
     private val _showAvatarPicker = MutableStateFlow(false)
     val showAvatarPicker: StateFlow<Boolean> = _showAvatarPicker.asStateFlow()
 
@@ -99,15 +77,9 @@ class SettingsViewModel @Inject constructor(
     private val _avatarPickerStatus = MutableStateFlow<String?>(null)
     val avatarPickerStatus: StateFlow<String?> = _avatarPickerStatus.asStateFlow()
 
-    // Null when nothing is in flight, "upload" for the upload tile, or
-    // a real preset's own Id for that tile.
     private val _avatarBusyKey = MutableStateFlow<String?>(null)
     val avatarBusyKey: StateFlow<String?> = _avatarBusyKey.asStateFlow()
 
-    // Real port of screens/settings.js's own buildPrivacyCard(): badges
-    // and activity go dark for other users, the profile picture and
-    // banner stay visible either way, same real Steam-style split
-    // ProfileScreen.kt's own header already documents.
     private val _isPrivate = MutableStateFlow(false)
     val isPrivate: StateFlow<Boolean> = _isPrivate.asStateFlow()
 
@@ -137,8 +109,6 @@ class SettingsViewModel @Inject constructor(
                 _subtitleLanguage.value = if (configuration.SubtitleMode.equals("None", ignoreCase = true) || configuration.SubtitleLanguagePreference == "off") "off" else matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
             }
         }
-        // Real screens/settings.js's own async loaded Privacy card:
-        // fired alongside the user fetch above, not blocking it.
         viewModelScope.launch {
             val settings = runCatching { repository.getProfileSettings() }.getOrNull() ?: return@launch
             _isPrivate.value = settings.IsPrivate
@@ -163,9 +133,6 @@ class SettingsViewModel @Inject constructor(
         saveLanguagePreferences(session, _audioLanguage.value, code)
     }
 
-    // A save that reports an error may still have been stored (the screen
-    // used to flip back to the old choice while the server kept the new
-    // one), so the server's own answer decides what is shown.
     private fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
         viewModelScope.launch {
             _languageStatus.value = "Saving…"
@@ -206,13 +173,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // Real port of that file's own Cancel timer click handler: on
-    // success the status line and button both react (Compose drops the
-    // button itself once sleepTimerActive flips false, the same real
-    // job that function's own cancel.remove() does); on failure only
-    // the button re-enables, the "A sleep timer is running." text and
-    // button both left in place for a retry, same real fallback that
-    // function's own catch block leaves too.
     fun cancelSleepTimer() {
         viewModelScope.launch {
             _isCancellingSleepTimer.value = true
@@ -226,10 +186,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // Real port of components/avatarPicker.js's own openAvatarPicker():
-    // presets fetched fresh on every real open, an empty real result
-    // getting the exact same real "upload your own instead" status
-    // that function's own early return shows.
     fun openAvatarPicker() {
         _showAvatarPicker.value = true
         _avatarPickerStatus.value = null
@@ -273,10 +229,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // Real port of that file's own file input change handler: a real
-    // file the reader picked off their own device, Jellyfin already
-    // supports this natively (an animated gif included), real feedback
-    // asked directly for a way to reach it rather than presets only.
     fun uploadAvatar(session: Session, bytes: ByteArray, contentType: String) {
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {

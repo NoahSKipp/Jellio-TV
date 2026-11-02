@@ -21,13 +21,6 @@ private val Context.streamPrefsDataStore: DataStore<Preferences> by preferencesD
 @JsonClass(generateAdapter = true)
 data class RememberedSource(val mediaSourceId: String, val timestampMs: Long)
 
-// Mirrors components/streamPicker.js's own real REMEMBER_ENABLED_KEY/
-// REMEMBERED_SOURCES_KEY: on by default (absent reads as on, same real
-// reasoning that file's own isRememberStreamEnabled() documents), one
-// remembered choice per real item id rather than one single slot, and
-// a choice past the same real 4 day TTL is dropped as it is found
-// rather than kept around stale (a source Gelato resolved days ago is
-// exactly the kind of thing real feedback called "bad").
 private val REMEMBER_TTL_MS = 4L * 24 * 60 * 60 * 1000
 
 @Singleton

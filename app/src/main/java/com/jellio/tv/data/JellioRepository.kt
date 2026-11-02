@@ -53,10 +53,6 @@ import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// BackdropImageTags is not included by default (real bug found live:
-// the hero backdrop silently never loaded because this app never
-// asked the server whether one even existed), same real field
-// screens/home.js's own hero already knows to ask for.
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
@@ -75,19 +71,11 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
 // Overview so Home's showcase can describe a title without asking again.
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags,Overview"
 
-// Mirrors runtime/api.js's own getItemDetails(): a detail screen needs
-// real metadata a plain row/grid fetch never asks for.
 internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
 private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks,PremiereDate,CommunityRating,BackdropImageTags," +
     "ParentBackdropItemId,ParentBackdropImageTags"
 
-// Two distinct real patterns, same distinction navShared.js's own
-// getPrimaryNavLinks()/isAnimeCollection() draw: a real hand-made
-// Anime library is only ever literally named that, but a collection
-// with no Stremio provider id to fall back on (anything imported
-// before Gelato started writing one, or made by hand) is matched
-// more loosely.
 private val ANIME_VIEW_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 private val ANIME_COLLECTION_NAME = Regex("anime|anilist|kitsu", RegexOption.IGNORE_CASE)
 private const val ANIME_ITEM_ID_LIMIT = 500
@@ -99,13 +87,6 @@ sealed interface LoginResult {
 
 data class SeriesPlayTarget(val episode: BaseItemDto, val resume: Boolean)
 
-// Real MediaSource plus the one real playback session id
-// (PlaySessionId) a fresh PlaybackInfo negotiation hands back, both a
-// player screen needs to build a real stream URL and report real
-// progress against.
-// liveStreamId is null for a stream added by link: no tuner to close.
-// requestHeaders null means the server's own auth headers; a link to
-// another site gets its own instead, never the Jellyfin token.
 data class OpenedLiveStream(
     val channelId: String,
     val liveStreamId: String?,
@@ -124,52 +105,17 @@ data class PlaybackTarget(
     val mediaSource: MediaSourceDto,
     val playSessionId: String?,
     val startPositionTicks: Long,
-    // Lets PlayerViewModel skip a full re-negotiation entirely when
-    // switching audio tracks on a source already Direct Playing - see
-    // switchAudioTrack()'s own header for why that real distinction
-    // matters there.
     val directPlay: Boolean,
 )
 
-// A native Media3/ExoPlayer decode envelope on real Android TV
-// hardware is far broader than a browser <video> element's own (HEVC,
-// AC3/EAC3, MKV all commonly hardware or software decode here), so
-// this real allowlist is deliberately wider than runtime/api.js's own
-// canBrowserDirectPlay(), not a guess: the same real MediaSourceInfo
-// fields, judged against what this real player can actually decode
-// instead of what a browser tag can.
 private val DIRECT_PLAY_CONTAINERS = setOf("mp4", "webm", "m4v", "mkv", "m2ts", "ts", "avi")
 private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8", "vp9", "av1", "mpeg4")
 private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "ac3", "eac3", "dts", "truehd")
 
-// Real fallback runtime/api.js's own estimateVideoBitrate() uses when
-// a source reports no real bitrate of its own to negotiate a forced
-// transcode against: leaving this unset let the server fall back to
-// its own real default, real feedback found every transcoded stream
-// coming back noticeably, incorrectly low quality regardless of the
-// source's own real resolution.
 private const val FALLBACK_VIDEO_BITRATE = 20000000L
 private const val COPY_RANGE_TYPES = "SDR,HDR10,HDR10Plus,HLG,DOVIWithHDR10,DOVIWithHLG,DOVIWithSDR,DOVIWithHDR10Plus"
 
-// Real port of runtime/api.js's own cached()/invalidateCache(): a
-// small in-memory cache keyed by request identity, TTL'd rather than
-// invalidated by hand for the same real reason that file's own header
-// gives, nothing here persists past a process restart anyway, same
-// as the rest of this app's own in-memory state. A real Mutex per
-// key, not just a plain map read/write, so two callers landing
-// within the same real tick (JellioRepository is a real @Singleton,
-// shared by every screen's own ViewModel) share one real in-flight
-// fetch instead of firing two, same real guarantee that file's own
-// header calls out caching the in-flight promise itself, not just
-// the resolved value, for.
 private const val CACHE_TTL_MS = 60_000L
-// Real SHORT_CACHE_TTL_MS: long enough to collapse the real near-
-// simultaneous duplicate requests the detail screen, the player and
-// the player's own episode panel make for the same series' own
-// seasons/episodes, and what a watchlist/filmography screen asks for
-// on repeat visits, short enough that a mark watched/unwatched or a
-// watchlist toggle reads correctly again well within the time it
-// takes to navigate back and look.
 private const val SHORT_CACHE_TTL_MS = 8_000L
 private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 // Same as the web row cache's genres/people class: a title's genre and
@@ -206,9 +152,6 @@ private class TtlCache {
     }
 }
 
-// The one real place both auth and every other Jellyfin call go
-// through, mirroring runtime/auth.js and runtime/api.js's own
-// combined real job on the web side.
 @Singleton
 class JellioRepository @Inject constructor(
     private val api: JellyfinApi,
@@ -221,35 +164,13 @@ class JellioRepository @Inject constructor(
     val deviceId: String get() = sessionManager.getCachedDeviceId()
     private val cache = TtlCache()
 
-    // Own scope rather than viewModelScope: prefetchStreams below is
-    // called from a poster's own onFocusChanged, fired from five
-    // different screens (Home/Library/Watchlist/Service rows, Search's
-    // own grid), each with its own ViewModel and its own lifetime. A
-    // request already in flight when a reader navigates away should
-    // still finish and warm Gelato's own cache rather than being
-    // cancelled with the screen that happened to trigger it, same real
-    // reasoning this @Singleton's own clearCache() above already
-    // applies to living longer than any one screen.
     private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // Stream lookups: reused across screens (SourceCache), one request per
-    // title at a time, and prefetches at most two at once, once per title
-    // every 8 minutes.
     private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
     private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
     private val prefetchedAt = ConcurrentHashMap<String, Long>()
     private val prefetchSlots = java.util.concurrent.Semaphore(2)
 
-    // Real port of runtime/api.js's own clearCache(): every real cache
-    // entry keyed off the previously signed in user (items, details,
-    // seasons/episodes, the user object itself, ...) is still real,
-    // still fresh data for that user, just the wrong one the moment
-    // this same real @Singleton switches to a different real account
-    // without a real process restart. Called from every real place
-    // sessionManager.saveSession() below actually changes which user is
-    // signed in (connectAndLogin, quickSignIn) plus logout() itself, so
-    // nothing cached under the outgoing account can leak into the next
-    // one that signs in during this same real process.
     fun clearCache() {
         cache.clear()
         preloaded.clear()
@@ -258,19 +179,8 @@ class JellioRepository @Inject constructor(
         prefetchedAt.clear()
     }
 
-    // The one real server address a fresh install has never asked for
-    // yet: null only before the very first successful connectAndLogin()
-    // this device ever makes, since SessionManager.clearSession() keeps
-    // it across a sign out the same real way runtime/auth.js's own
-    // clearSession() leaves SERVER_ADDRESS_KEY alone. LoginViewModel's
-    // own start() reads this to decide whether there is a real server
-    // to show a profile picker for at all, or whether this is a true
-    // first run.
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
 
-    // An address typed without http:// or https:// is tried both ways (the
-    // likelier one first) and the first that answers as a Jellyfin server
-    // wins; the failure names every address tried.
     suspend fun resolveServerAddress(input: String): Result<String> {
         val trimmed = input.trim().trimEnd('/')
         if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Enter your server address"))
@@ -297,9 +207,6 @@ class JellioRepository @Inject constructor(
             return LoginResult.Failure(it.message ?: "Could not reach that server")
         }
         return try {
-            // NetworkModule.kt's own auth interceptor attaches this
-            // request's own real Authorization header itself now (device
-            // metadata, no session token to fold in yet at this point).
             val result = api.authenticateByName(AuthenticateByNameRequest(username, password))
             clearCache()
             sessionManager.saveSession(normalized, result.AccessToken, result.User.Id, result.User.Name)
@@ -310,11 +217,6 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    // Real port of runtime/auth.js's own {userId: entry} store: written
-    // on every real successful sign in (setSession()'s own real
-    // rememberUser() call), read back by LoginScreen.kt's own "Who's
-    // watching?" grid the next time this device opens the login screen
-    // for the same real server.
     suspend fun getRememberedUsers(serverAddress: String): Map<String, RememberedUserEntry> =
         rememberedUsersStore.getRememberedUsers(com.jellio.tv.di.normalizeServerAddress(serverAddress))
 
@@ -330,27 +232,12 @@ class JellioRepository @Inject constructor(
         )
     }
 
-    // Real port of runtime/auth.js's own getPublicUsers(): unauthenticated,
-    // a real admin's own "Display this user on the login screen" toggle
-    // already enforced server side. Throws rather than swallowing a
-    // real failure to an empty list now: LoginViewModel's own
-    // loadProfiles() needs to tell "the server said zero users are
-    // public" apart from "this request never actually reached the
-    // server" to prune a remembered profile the server no longer
-    // vouches for without also wiping every remembered profile out
-    // over a server that is just briefly unreachable, same real
-    // distinction runtime/auth.js's own getPublicUsers() now draws.
     suspend fun getPublicUsers(serverAddress: String): List<UserDto> {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         sessionManager.saveServerAddress(normalized)
         return api.getPublicUsers()
     }
 
-    // Real port of runtime/auth.js's own quickSignIn(): spends one real
-    // GET on the remembered token before ever trusting it, dropping
-    // that remembered entry the same real way on a real 401/expired
-    // token rather than silently committing a session the very next
-    // request would fail.
     suspend fun quickSignIn(serverAddress: String, userId: String): LoginResult {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         val entry = rememberedUsersStore.getRememberedUsers(normalized)[userId]
@@ -387,28 +274,11 @@ class JellioRepository @Inject constructor(
         return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
     }
 
-    // Real Controllers/ProfileBannerController.cs's own GET {userId}:
-    // cache-busted with a real timestamp query param, same real reason
-    // screens/profile.js's own buildBanner() appends '&t=' +
-    // Date.now() (a fresh upload replacing the file at this same real
-    // path otherwise keeps serving whatever Coil already cached for
-    // it). That controller carries [Authorize], same as avatarPresetUrl's
-    // own real Jellio/avatars endpoint just above, so this needs the
-    // exact same ApiKey query param that one already sends: never
-    // loaded at all on device without it, Coil's own image request
-    // getting back a plain 401 no <img> tag / browser cookie session
-    // ever hits.
     fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String {
         val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         return "$cleanServer/Jellio/profile/banner/$userId?ApiKey=$accessToken&api_key=$accessToken&t=${System.currentTimeMillis()}"
     }
 
-    // Real port of runtime/auth.js's own requestPasswordReset(): a real
-    // failure comes back true anyway, the same real leak-prevention
-    // design UserController.cs's own ForgotPassword action documents
-    // (a nonexistent username gets the exact same real response a real
-    // one does), so this app has nothing more specific to report than
-    // whether the request itself reached the server at all.
     suspend fun requestPasswordReset(serverAddress: String, username: String): Boolean {
         sessionManager.saveServerAddress(serverAddress)
         return try {
@@ -419,13 +289,6 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    // Real port of screens/login.js's own forgot password flow past a
-    // real Success redeem: that real call clears the account's own
-    // password server side rather than setting the one the reader
-    // asked for (real Jellyfin behaviour, not a choice made here), so
-    // this signs back in with a blank one immediately after, then
-    // calls updatePassword with the real new one, the same two real
-    // calls that file's own header comment documents.
     suspend fun redeemPasswordReset(serverAddress: String, username: String, pin: String, newPassword: String): LoginResult {
         return try {
             val redeemed = api.redeemPasswordResetPin(ForgotPasswordPinRequest(pin))
@@ -451,15 +314,6 @@ class JellioRepository @Inject constructor(
     suspend fun getLibraries(userId: String): List<BaseItemDto> =
         cache.get("views:$userId", CACHE_TTL_MS) { api.getUserViews(userId).Items }
 
-    // Mirrors components/navShared.js's own real getPrimaryNavLinks():
-    // Anime has no real Jellyfin library of its own (Gelato resolves
-    // one global SeriesPath for every series import, so AniList
-    // titles physically live in the TV library). A real hand-made
-    // Anime view wins if one exists; otherwise the TV library itself
-    // stands in for it, but only when there is really something to
-    // show behind it (a real anime/anilist catalog among the reader's
-    // own collections), same real ProviderIds.Stremio check
-    // isAnimeCollection() already makes on the web side.
     suspend fun getLibraryNavEntries(userId: String): List<BaseItemDto> {
         val views = try {
             getLibraries(userId)
@@ -471,32 +325,12 @@ class JellioRepository @Inject constructor(
         val tvView = views.firstOrNull { it.CollectionType == "tvshows" }
         val realAnimeView = views.firstOrNull { ANIME_VIEW_NAME.containsMatchIn(it.Name ?: "") }
 
-        // Real components/navShared.js's own getPrimaryNavLinks(): this
-        // used to wait on a real getCollections() round trip first,
-        // gating the fallback Anime entry on an actual anime/anilist
-        // catalog turning up, real feedback traced to that same real
-        // bug that file's own header now documents: Anime sat visibly
-        // slower to appear than Movies/Shows, and any failure or empty
-        // real result along that path (this one adds a second real
-        // network call getCollections() doesn't need to make at all)
-        // dropped the entry outright rather than degrading to an empty
-        // state. Pushed unconditionally now, the same real bet every
-        // other library entry here already makes: a server with no
-        // real anime catalogs still gets a real Anime entry, its own
-        // screen's own empty state the one real place that check lives.
         val animeEntry = realAnimeView ?: tvView?.copy(Name = "Anime")
         val liveTvView = views.firstOrNull { it.CollectionType == "livetv" }
 
         return listOfNotNull(moviesView, tvView, animeEntry, liveTvView)
     }
 
-    // Real bug runtime/api.js's own getAllCollections() documents and
-    // fixes, ported the same way rather than left in the single-page
-    // form this used to take: a single Limit: 200 page silently drops
-    // every collection past it, alphabetically, no error, an entire
-    // real service missing from the hub strip and catalog rows both
-    // with nothing wrong server side. Pages through the real
-    // TotalRecordCount instead.
     suspend fun getCollections(userId: String): List<BaseItemDto> = cache.get("collections:$userId", CACHE_TTL_MS) {
         val pageSize = 100
         val collected = mutableListOf<BaseItemDto>()
@@ -518,16 +352,6 @@ class JellioRepository @Inject constructor(
         collected
     }
 
-    // Gelato's own GetOrCreateBoxSetAsync writes a collection's
-    // ProviderIds.Stremio as "{catalogType}.{catalogId}", catalogType
-    // being the literal type string configured on that catalog in
-    // AIOStreams: "movie", "series", or "anime". A real signal
-    // straight from Gelato, not a guess off a name a reader can
-    // rename freely.
-    // Controllers/AnimeController.cs: every title in an anime catalog, so
-    // anime stays in the Anime library and out of Home and the Movies and
-    // Shows pages. Empty when the server can't say, so nothing is hidden
-    // by mistake.
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto> = api.getJellioNotifications()
 
     // An announcement's picture; adds ApiKey query param so Jellyfin authorizes it.
@@ -589,12 +413,6 @@ class JellioRepository @Inject constructor(
         return ANIME_COLLECTION_NAME.containsMatchIn(collection.Name ?: "")
     }
 
-    // Mirrors runtime/api.js's own collectionKind() exactly: anime
-    // always reads as the tvshows kind (the anime library stands in
-    // for it, same real reasoning getLibraryNavEntries() above already
-    // documents), otherwise the real Stremio catalogType decides,
-    // movies kind the real fallback for anything with no provider id
-    // to read at all.
     fun collectionKind(collection: BaseItemDto): String {
         if (isAnimeCollection(collection)) return "tvshows"
         val stremio = collection.ProviderIds?.get("Stremio") ?: collection.ProviderIds?.get("stremio")
@@ -604,33 +422,8 @@ class JellioRepository @Inject constructor(
         return "movies"
     }
 
-    // Real port of screens/library.js's own isAnime check
-    // (params.get('jellioKind') === 'anime'): both a real dedicated
-    // Anime view and getLibraryNavEntries()'s own synthetic
-    // tvView.copy(Name = "Anime") stand-in match this exact real
-    // regex against their own Name, the one real signal a caller
-    // needs to tell "this is the Anime page" apart from the plain
-    // Shows page without threading a second flag through the route.
     fun isAnimeLibrary(library: BaseItemDto): Boolean = ANIME_VIEW_NAME.containsMatchIn(library.Name ?: "")
 
-    // Real port of screens/library.js's own getAnimeItemIds(): every
-    // real item id any real anime/anilist catalog collection
-    // currently claims, best effort same as that file's own real
-    // reasoning documents (no CollectionType tells a real anime
-    // Series apart from any other one sharing the same real TV
-    // library). The Shows hub's own main row and genre rows drop
-    // anything in this set, real feedback's own direct ask. Failure
-    // of any part of this resolves to an empty real Set rather than
-    // throwing, the Shows hub renders unfiltered same as before this
-    // existed rather than breaking outright over a real best effort
-    // feature.
-    // A real perf bug found live testing on device, fixed the same way
-    // runtime/api.js's own getAnimeItemIds() already does
-    // (Promise.allSettled(animeCollections.map(...))): every real
-    // anime/anilist catalog collection's own item fetch now fires
-    // together instead of the second catalog waiting on the first
-    // one's own response, real seconds shaved off every Shows library
-    // load that used to await this one collection at a time.
     suspend fun getAnimeItemIds(userId: String): Set<String> = coroutineScope {
         val animeCollections = runCatching { getCollections(userId) }.getOrDefault(emptyList()).filter { isAnimeCollection(it) }
         if (animeCollections.isEmpty()) return@coroutineScope emptySet()
@@ -652,37 +445,12 @@ class JellioRepository @Inject constructor(
             limit = limit,
             startIndex = startIndex,
             sortBy = "SortName",
-            // BackdropImageTags is not part of the default field set:
-            // screens/service.js's own pickHeroItem() needs it to judge
-            // which real item across a matched collection is even
-            // eligible to lead that page's own hero.
             fields = "PrimaryImageAspectRatio,ProductionYear,CommunityRating,Genres,BackdropImageTags,Overview",
         ).Items
 
-    // Real runtime/api.js's own getResumeItems(): RunTimeTicks
-    // alongside the fields already asked for, real bug that file's own
-    // comment documents and fixes: components/card.js's own landscape
-    // Continue Watching card computes a real "Nm left" label from that
-    // and UserData.PlaybackPositionTicks (already a default real
-    // field), not something this query fetched before.
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
         api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items
 
-    // Real runtime/api.js's own getNextUp(): Genres/People beyond the
-    // default PrimaryImageAspectRatio (the same real fields
-    // runtime/recommend.js's own scorer needs off this exact shared
-    // real fetch, no second query added just to get them), RunTimeTicks
-    // for the same real landscape card reason getResumeItems above
-    // documents.
-    //
-    // Real gap in stock Jellyfin, same header runtime/api.js's own
-    // getNextUp() already documents: no endpoint hides one series from
-    // this row on its own, only ever the side effect of marking its
-    // current episode played, which just advances that same series to
-    // its own next episode instead of actually leaving. Filtered here
-    // against Controllers/NextUpHiddenController.cs's own per user list
-    // rather than in HomeViewModel, so every real caller of this
-    // function gets the same real exclusion for free.
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> {
         val items = api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
         seedPreviews(items)
@@ -695,20 +463,10 @@ class JellioRepository @Inject constructor(
         api.hideSeriesFromNextUp(seriesId)
     }
 
-    // Scoped to one series, screens/detail.js's own resolveSeriesPlayTarget():
-    // enableResumable stays at its own real server default (true) here,
-    // unlike the Up Next row above, this call's whole point is
-    // surfacing a title actually in progress.
     suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? =
         api.getNextUp(userId, limit = 1, fields = "PrimaryImageAspectRatio,RunTimeTicks", seriesId = seriesId)
             .Items.firstOrNull()
 
-    // Mirrors runtime/api.js's own getHeroCandidates(): a real random
-    // Movie/Series, never an Episode (the web hero never once asks for
-    // one), so there is no episode title/art to ever land in a hero in
-    // the first place, same real reasoning as the fix itself rather
-    // than a patch bolted onto whatever a Continue Watching item
-    // happened to be.
     suspend fun getHeroCandidates(userId: String, limit: Int = 8, parentId: String? = null): List<BaseItemDto> =
         api.getItems(
             userId = userId,
@@ -743,15 +501,6 @@ class JellioRepository @Inject constructor(
             fields = ITEM_FIELDS,
         ).Items
 
-    // Sampled rather than a real dedicated endpoint (none exists),
-    // mirrors runtime/api.js's own discoverGenres(): counted off a
-    // random sample of the library, not every genre Jellyfin has ever
-    // heard of, dropped below a real minimum count so a genre row is
-    // never built with nothing worth scrolling behind it, the real
-    // remaining ones led by real count rather than left in whatever
-    // order a Kotlin Map happens to iterate (a real bug found rereading
-    // that file directly: the count itself was never actually sorted
-    // on before this).
     suspend fun discoverGenres(userId: String, parentId: String?, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
         // The server's cached genre list first; sampling items is the fallback.
         runCatching { api.getGenreCounts(itemType, parentId).Genres }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { counts ->
@@ -776,10 +525,6 @@ class JellioRepository @Inject constructor(
             .take(limit)
     }
 
-    // The whole genre list for a library, A to Z, for the genre picker.
-    // The reader's chosen audio language (Settings > Language), e.g. "ger".
-    // The reader's default subtitle language, unless their subtitle mode
-    // is set to never show any.
     suspend fun getSubtitleLanguagePreference(userId: String): String? =
         runCatching {
             val config = getUser(userId)?.Configuration
@@ -829,9 +574,6 @@ class JellioRepository @Inject constructor(
         ).Items,
         )
 
-    // Showcase details for titles whose row entry came without them (older
-    // cached rows, episodes needing their show): one request for the item and
-    // its show together, kept for half an hour.
     private val showcaseCache = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
 
     suspend fun getShowcaseItems(userId: String, ids: List<String>): Map<String, BaseItemDto> {
@@ -868,9 +610,6 @@ class JellioRepository @Inject constructor(
         ).Items
     }
 
-    // Ported from Jellio Web runtime/api.js's own getSeasonalItems():
-    // Queries items matching seasonal genres (e.g. Horror, Mystery) sorted by rating,
-    // plus items matching search terms (e.g. Halloween, Spooky), then merges and dedupes.
     suspend fun getSeasonalItems(
         userId: String,
         genres: List<String>,
@@ -925,17 +664,6 @@ class JellioRepository @Inject constructor(
         combined
     }
 
-    // Split halves of searchItems above, fired independently by
-    // SearchViewModel so a slower half never holds up the faster one.
-    // JellyfinApi.kt's own header on these documents the real bottleneck
-    // (Gelato's own SearchActionFilter.cs waiting on both before
-    // answering); no runCatching here, SearchViewModel's own per-call
-    // try/catch already needs the real thrown exception to tell an HTTP
-    // 404 (no Gelato on this server, fall back to searchItems) apart
-    // from any other real failure.
-    // Only what the library already holds: Gelato passes a "local:" search
-    // straight to Jellyfin's own search (tens of milliseconds) instead of
-    // asking the addons. Without Gelato nothing matches it.
     suspend fun searchLibrary(userId: String, term: String): List<BaseItemDto> {
         if (term.isBlank()) return emptyList()
         return api.getItems(
@@ -1022,9 +750,6 @@ class JellioRepository @Inject constructor(
             .associateBy { it.Id }
     }
 
-    // Title info through /Items?ids=, never with MediaSources or
-    // MediaStreams. A title Gelato has not imported yet only exists once
-    // it is asked for by id, so that request stays as the fallback.
     private suspend fun <T> withRetry(maxAttempts: Int = 3, initialDelayMs: Long = 1000L, block: suspend () -> T): T {
         var currentDelay = initialDelayMs
         repeat(maxAttempts - 1) {
@@ -1049,15 +774,8 @@ class JellioRepository @Inject constructor(
                 ?: api.getItem(userId, itemId, fields)
         }
 
-    // screens/person.js's own real getPerson(): a plain item lookup,
-    // real Jellyfin Person items share the same BaseItemDto shape as
-    // everything else this app already reads.
     suspend fun getPerson(userId: String, personId: String): BaseItemDto = fetchItemInfo(userId, personId, null)
 
-    // Real endpoint, GET /Items?personIds=X (Jellyfin.Api's own
-    // ItemsController, confirmed against screens/person.js's own
-    // getPersonFilmography() before porting this): every real Movie/
-    // Series this person is credited on.
     suspend fun getPersonFilmography(userId: String, personId: String, limit: Int = 50): List<BaseItemDto> =
         cache.get("filmography:$personId:$limit", CACHE_TTL_MS) {
             api.getItems(
@@ -1088,10 +806,6 @@ class JellioRepository @Inject constructor(
         return entry.second.takeIf { System.currentTimeMillis() - entry.first < PRELOAD_TTL_MS }
     }
 
-    // Real endpoint, runtime/recommend.js's own real seed history:
-    // real Jellyfin Filters=IsPlayed, sorted by DatePlayed, real real
-    // recency signal a Gelato server's own DateCreated cannot give
-    // (every import lands at once, DateCreated means nothing there).
     suspend fun getRecentlyCompleted(userId: String, limit: Int): List<BaseItemDto> =
         api.getItems(
             userId = userId,
@@ -1104,12 +818,6 @@ class JellioRepository @Inject constructor(
             fields = "Genres,People,ProductionYear,CommunityRating,RunTimeTicks",
         ).Items
 
-    // One seed's own real candidate pool for RecommendationEngine's
-    // own scorer: its own genres and its own top billed cast/director,
-    // each a separate real query narrowed server side rather than
-    // scoring the whole library client side to fill one row. Mirrors
-    // runtime/api.js's own getRecommendationCandidates() exactly,
-    // including its own real Genres=a|b OR-join convention.
     suspend fun getRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> =
         cachedUnlessEmpty("reccand:$userId:${seed.Id}:$limit") { fetchRecommendationCandidates(userId, seed, limit) }
 
@@ -1171,11 +879,6 @@ class JellioRepository @Inject constructor(
             recentLists["episodes:$seriesId:$seasonId"] = System.currentTimeMillis() to it
         }
 
-    // Real port of runtime/api.js's own getNextEpisode(): the next real
-    // episode in this same season if this one is not the season's own
-    // last, otherwise season one's own first episode of the next real
-    // season, null past the series finale, same real fallback that
-    // file's own comment documents.
     suspend fun getNextEpisode(userId: String, item: BaseItemDto): BaseItemDto? {
         if (item.Type != "Episode") return null
         val seriesId = item.SeriesId ?: return null
@@ -1192,18 +895,9 @@ class JellioRepository @Inject constructor(
         return getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull()
     }
 
-    // Real port of runtime/api.js's own getIntroSkipperSegments(): any
-    // failure (plugin not installed, unknown item) resolves to null
-    // rather than throwing, same real soft-dependency reasoning that
-    // file's own try/catch already documents (no segments is a normal
-    // outcome, not an error worth surfacing).
     suspend fun getIntroSkipperSegments(itemId: String): IntroSkipperSegmentsDto? =
         runCatching { api.getIntroSkipperSegments(itemId) }.getOrNull()
 
-    // A series' own hero Play button (screens/detail.js's own
-    // resolveSeriesPlayTarget()): the next real unfinished episode if
-    // one exists, otherwise season one's own first episode, a real
-    // fallback for a series with no watch history at all.
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
         val nextUp = try {
             getSeriesNextUp(seriesId, userId)
@@ -1230,10 +924,6 @@ class JellioRepository @Inject constructor(
         return Regex("special", RegexOption.IGNORE_CASE).containsMatchIn(season.Name ?: "")
     }
 
-    // With no releases found, Gelato lists the title's own placeholder so
-    // the list is never empty: no file behind it, no size, and named after
-    // the title itself (or not at all) rather than by the addon the way a
-    // real release is. It can't play, so it's dropped.
     suspend fun getMediaSources(
         userId: String,
         itemId: String,
@@ -1385,10 +1075,6 @@ class JellioRepository @Inject constructor(
             ),
         ).Items
 
-    // Media3 plays the source's MPEG-TS as is when the audio is AAC, which
-    // every TV decodes. AC3 and MP2 (common on provider channels) are not
-    // decoded on many devices and come out silent, so for those Jellyfin
-    // hands back an HLS address with the audio rewritten as AAC.
     suspend fun openLiveChannel(userId: String, channelId: String): OpenedLiveStream {
         val profile = com.jellio.tv.data.model.LiveDeviceProfile(
             DirectPlayProfiles = listOf(
@@ -1517,27 +1203,12 @@ class JellioRepository @Inject constructor(
     suspend fun hideFromComingSoon(itemId: String): Boolean =
         runCatching { api.hideFromComingSoon(itemId).isSuccessful }.getOrDefault(false)
 
-    // Real bug found live: this app's own cache.get(key, ttl) wrapper
-    // around getCollectionItems/getLibraryItems/getGenreItems/
-    // getResumeItems (this repository's own real Home/Library/Continue
-    // Watching data) kept serving whatever it already had cached for up
-    // to CACHE_TTL_MS after a real watch just finished, so a reader
-    // landing back on Home/Library right after finishing something kept
-    // seeing it without a real watched checkmark until that cache
-    // entry aged out on its own. A played-state flip can appear in any
-    // one of those real cached lists, not just one, so the whole real
-    // cache clears here rather than guessing which specific keys need
-    // it, the same real blunt real reset connectAndLogin/quickSignIn/
-    // logout already reach for on an account switch.
     suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto {
         val result = if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
         cache.clear()
         return result
     }
 
-    // Takes a title off Continue Watching without marking it watched. Servers
-    // without the user data endpoint get watched then unwatched, which also
-    // resets the position.
     suspend fun clearResumePosition(userId: String, itemId: String): UserItemDataDto {
         val result = runCatching { api.updateUserData(itemId, userId, com.jellio.tv.data.model.UserDataUpdate(0L)) }
             .getOrElse {
@@ -1551,37 +1222,13 @@ class JellioRepository @Inject constructor(
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
-    // Real port of runtime/api.js's own deleteItem(): removes the
-    // item's own record outright. The caller's own job to gate this
-    // behind Policy.IsAdministrator/EnableContentDeletion first, same
-    // real reason components/cardOptionsMenu.js's own header gives:
-    // showing this to every reader and letting the request itself
-    // fail reads live as a broken button, not a real permission
-    // boundary.
     suspend fun deleteItem(itemId: String) = api.deleteItem(itemId)
 
-    // Shared real gate every screen offering Remove from Library
-    // checks before showing it at all, same real Policy fields
-    // deleteItem()'s own header documents. Failing the underlying
-    // getUser() call (a real network hiccup, not a real permission
-    // answer) reads as false rather than throwing, same real
-    // fail-closed default a broken button would otherwise become.
     suspend fun canDeleteItems(userId: String): Boolean {
         val policy = runCatching { getUser(userId) }.getOrNull()?.Policy ?: return false
         return policy.IsAdministrator || policy.EnableContentDeletion
     }
 
-    // Mirrors runtime/api.js's own prefetchStreams(): fired from a
-    // poster's own onFocusChanged (PosterCard.kt), well before a real
-    // click/Enter commits to opening it, so Gelato's own stream sync is
-    // already warm by the time GetStaticMediaSources actually needs it.
-    // Non-suspend and best-effort by design, same as the web version:
-    // a Composable's onFocusChanged callback is not itself a coroutine,
-    // and a server without Gelato installed, or an old build without
-    // this route yet, must fail silently here, never surface anywhere
-    // a reader could see it. A failed prefetch still counts for the
-    // 8 minute window, so a card refocused after a failure does not fire
-    // the same request again straight away.
     fun prefetchStreams(itemId: String) {
         val now = System.currentTimeMillis()
         val last = prefetchedAt[itemId]
@@ -1625,15 +1272,8 @@ class JellioRepository @Inject constructor(
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
 
-    // Plain passthrough, same as getCalendarEntries above: FeedViewModel's
-    // own load() decides what a failed request means (a real retry
-    // state, matching screens/feed.js's own try/catch), not this layer.
     suspend fun getFeed(): List<FeedEntryDto> = api.getFeed()
 
-    // Plain passthroughs, same real reason getFeed above is:
-    // ProfileViewModel's own load() decides what a failure means (a
-    // real retry state, matching screens/profile.js's own try/catch),
-    // not this layer.
     suspend fun getProfile(userId: String): ProfileDto = api.getProfile(userId)
 
     suspend fun getAchievements(userId: String): AchievementsDto = api.getAchievements(userId)
@@ -1648,10 +1288,6 @@ class JellioRepository @Inject constructor(
         api.setProfilePrivacy(SetPrivacyRequest(isPrivate))
     }
 
-    // PlayerViewModel's own real markRealWatchComplete()/
-    // reportRealDurationIfUseful() decide when either of these actually
-    // fires, off ui/player's own real ExoPlayer signals, not this
-    // layer.
     suspend fun creditRealWatch(itemId: String) = api.creditRealWatch(RealWatchRequest(itemId))
 
     suspend fun reportRealDuration(itemId: String, durationTicks: Long) =
@@ -1692,10 +1328,6 @@ class JellioRepository @Inject constructor(
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
-    // Real screens/player.js's own cancelSleepTimer(): a real 404 when
-    // nothing was active is not an error worth surfacing there either
-    // (that file's own fetch() never even inspects response.ok before
-    // its .then() fires), same real reasoning for swallowing it here.
     suspend fun cancelSleepTimer() {
         runCatching { api.cancelSleepTimer() }
     }
@@ -1710,12 +1342,6 @@ class JellioRepository @Inject constructor(
         return getUser(userId)
     }
 
-    // Mirrors runtime/api.js's own updateLanguagePreferences() exactly:
-    // starts from the signed in user's own current Configuration and
-    // only overwrites the two real fields screens/settings.js's own
-    // Language section exposes, AudioLanguagePreference and
-    // SubtitleLanguagePreference, real ISO 639-2 codes Jellyfin's own
-    // PlaybackInfo negotiation already reads server side.
     suspend fun updateLanguagePreferences(userId: String, audioLanguage: String?, subtitleLanguage: String?) {
         val current = api.getUser(userId).Configuration ?: UserConfigurationDto()
         val isOff = subtitleLanguage == "off" || subtitleLanguage == "none"
@@ -1764,76 +1390,33 @@ class JellioRepository @Inject constructor(
 
     suspend fun getAvatarPresets(): List<AvatarPresetDto> = api.getAvatarPresets()
 
-    // id can carry a real "/" (a grouped preset's own subfolder, see
-    // AvatarPresetDto's own header): each real segment gets its own
-    // percent-encoding, java.net.URLEncoder left for URLEncoder itself
-    // (which also turns a literal "/" into %2F, real form-encoding
-    // syntax a URL path segment never wants), joined back with a real
-    // "/" so AvatarsController.cs's own {**id} catch-all route reads
-    // real path segments the same way FrontendController's own
-    // {**path} already does.
     private fun encodeAvatarId(id: String): String =
         id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
 
-    // Token goes on as an ApiKey query param, same real reason
-    // getStreamUrl already does this: AvatarsController's
-    // [Authorize] gate has nothing to check on a plain Coil AsyncImage
-    // request, which never carries this app's own X-Emby-Authorization
-    // header the way a Retrofit call does.
     fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
         "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?ApiKey=$accessToken&api_key=$accessToken"
 
-    // Real port of runtime/api.js's own setUserAvatar(presetId): fetch
-    // that preset's own real bytes off Jellio's own AvatarsController,
-    // hand them to the same real upload path a device file already
-    // goes through below (setUserAvatarFromBytes).
     suspend fun setUserAvatarFromPreset(userId: String, presetId: String) {
         val response = api.getAvatarPresetImage(encodeAvatarId(presetId))
-        // Reading a real ResponseBody's own bytes is blocking I/O
-        // (@Streaming keeps it off the main network dispatcher's own
-        // buffering), off the main thread here for the same real
-        // reason the file picker's own ContentResolver read is too.
         val (bytes, contentType) = withContext(Dispatchers.IO) {
             response.bytes() to (response.contentType()?.toString() ?: "image/png")
         }
         uploadUserAvatarBlob(userId, bytes, contentType)
     }
 
-    // Real port of runtime/api.js's own setUserAvatarFromFile(file):
-    // a real file the reader picked off their own device, real
-    // Jellyfin already accepts this natively (an animated gif
-    // included) for a user's own avatar.
     suspend fun setUserAvatarFromBytes(userId: String, bytes: ByteArray, contentType: String) {
         uploadUserAvatarBlob(userId, bytes, contentType)
     }
 
-    // Real port of runtime/api.js's own uploadUserAvatarBlob(): base64
-    // encode whatever real image bytes the caller already has, POST to
-    // the same real endpoint the stock profile page's own file upload
-    // already uses, body the base64 payload itself with Content-Type
-    // set to the image's own real mime type, not JSON.
     private suspend fun uploadUserAvatarBlob(userId: String, bytes: ByteArray, contentType: String) {
         val body = withContext(Dispatchers.Default) {
             val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
             base64.toRequestBody(contentType.toMediaTypeOrNull())
         }
         api.uploadUserAvatar(userId, body)
-        // Mirrors runtime/api.js's own setUserAvatar() calling its own
-        // invalidateCurrentUser() right after: the one real place a
-        // cached user can go visibly stale sooner than CACHE_TTL_MS,
-        // an avatar the reader just picked should show up on the very
-        // next real getUser() call, not up to a minute later.
         cache.invalidate("user:$userId")
     }
 
-    // Real mechanism, mirrors runtime/api.js's own getPlaybackInfo() +
-    // buildStreamUrl(): POST /Items/{id}/PlaybackInfo negotiates a real
-    // MediaSource plus a PlaySessionId, then a plain /Videos/{id}/stream
-    // URL carrying that source's own id is something ExoPlayer can just
-    // open directly, same real flow, no jellyfin-web playbackManager
-    // involved.
-    // PlaybackInfo asked for while Play is focused, used once by the player
-    // if it opens the same source at the same position soon after.
     private class PrefetchedPlayback(val at: Long, val target: kotlinx.coroutines.Deferred<PlaybackTarget?>)
     private val playbackPrefetch = ConcurrentHashMap<String, PrefetchedPlayback>()
 
@@ -1878,13 +1461,6 @@ class JellioRepository @Inject constructor(
                 UserId = userId,
                 StartTimeTicks = startTimeTicks,
                 MediaSourceId = mediaSourceId,
-                // Real fields runtime/api.js's own getPlaybackInfo()
-                // also sends: a bare stream URL query param change alone
-                // (no fresh negotiation carrying these) never once
-                // produced a genuinely new transcode job server side,
-                // confirmed against a real server log before this
-                // existed, same real reasoning that file's own comment
-                // documents.
                 AudioStreamIndex = audioStreamIndex,
                 SubtitleStreamIndex = burnInSubtitleStreamIndex,
             ),
@@ -1893,15 +1469,6 @@ class JellioRepository @Inject constructor(
             ?: response.MediaSources.firstOrNull()
             ?: throw IllegalStateException("No playable source for this title")
 
-        // Mirrors runtime/api.js's own buildStreamUrl() exactly: always
-        // this app's own /Videos/{id}/stream.{container} endpoint, never
-        // MediaSourceInfo.TranscodingUrl (that file never once reads
-        // that field either, a forced transcode is this same endpoint
-        // with VideoCodec/AudioCodec params instead of Static=true). A
-        // non-default real audio track forces the same real transcode a
-        // burned in subtitle already does: Static=true (a direct
-        // playable file) serves every embedded track as is, no way to
-        // tell the server which one to actually decode.
         val targetAudioStream = if (audioStreamIndex != null) {
             mediaSource.MediaStreams?.firstOrNull { it.Type == "Audio" && it.Index == audioStreamIndex }
         } else {
@@ -1936,9 +1503,6 @@ class JellioRepository @Inject constructor(
                 append("&Static=true")
             } else {
                 if (com.jellio.tv.data.playback.VideoTranscodePolicy.avoiding) {
-                    // Every codec this TV decodes, no bitrate cap: the
-                    // server copies the video and converts only the
-                    // container or audio.
                     val codecs = com.jellio.tv.data.playback.copyableVideoCodecs(com.jellio.tv.data.playback.DeviceDecoderCaps)
                     append("&VideoCodec=").append(codecs.joinToString(","))
                     append("&AudioCodec=aac&AudioBitRate=192000")
@@ -1965,7 +1529,6 @@ class JellioRepository @Inject constructor(
         return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks, directPlay)
     }
 
-    // Real port of runtime/api.js's own getAudioStreams().
     fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =
         mediaSource.MediaStreams?.filter { it.Type == "Audio" } ?: emptyList()
 
@@ -1974,17 +1537,6 @@ class JellioRepository @Inject constructor(
         return video?.BitRate ?: mediaSource.Bitrate ?: FALLBACK_VIDEO_BITRATE
     }
 
-    // Real endpoint confirmed against SubtitleController.cs's own
-    // registered route: GET /Videos/{itemId}/{mediaSourceId}/Subtitles/
-    // {streamIndex}/Stream.vtt converts any real text subtitle format
-    // to WebVTT server side, so requesting .vtt always works for a
-    // text stream regardless of its own real source codec. An already
-    // external stream (DeliveryMethod == "External") carries its own
-    // DeliveryUrl instead, absolute when IsExternalUrl is set,
-    // otherwise still relative to this same server.
-    // offsetTicks: where a transcode began. Its clock starts at zero there,
-    // so the server shifts the cues by the same amount
-    // (Subtitles/{index}/{startPositionTicks}/Stream.vtt).
     suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto, offsetTicks: Long = 0): String {
         val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
         if (stream.DeliveryMethod == "External" && !stream.DeliveryUrl.isNullOrEmpty()) {

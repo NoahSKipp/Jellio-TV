@@ -16,16 +16,6 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 
-// AppBootGate's own real loading wait (usually ~8s for Home's own
-// prefetch to finish) used to sit behind jellio_load.webm, a plain
-// looping video clip. JellioMarkOcean draws a real Compose port of
-// jellio-mark-animated.svg instead: gradient triangle, clipped teal
-// glow, caustic ellipses, wake-trail dots and the jellyfish silhouette
-// itself morphing through the SVG's own 11 path keyframes, all driven
-// off one shared clock, same as the web boot splash.
-//
-// "Jellio" and "Loading…" sit under the mark now too, same real
-// wording and reasoning the web plugin's own splash carries.
 @Composable
 fun BootSplashMark(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {

@@ -23,9 +23,6 @@ private const val SHATTER_COLUMNS = 7
 private const val SHATTER_ROWS = 10
 private const val SHATTER_DURATION_MS = 550
 
-// Real port of components/cardOptionsMenu.js's own real cubic-bezier(0.4,
-// 0, 1, 1) easing on .jellio-card-snap-shard's own real
-// jellio-card-snap-dissolve keyframe.
 private val ShatterEasing = CubicBezierEasing(0.4f, 0f, 1f, 1f)
 
 private data class ShardSpec(
@@ -37,11 +34,6 @@ private data class ShardSpec(
     val rotateDeg: Float,
 )
 
-// Real port of that file's own animateCardRemoval() shard generation:
-// same real 7x10 grid, same real per-column stagger (col * 45 plus up
-// to 90ms of real per-shard randomness) and drift/rotate ranges, real
-// feedback's own reasoning for not using a mechanical column by column
-// sweep preserved the same way.
 private fun buildShardSpecs(): List<ShardSpec> = buildList {
     for (row in 0 until SHATTER_ROWS) {
         for (col in 0 until SHATTER_COLUMNS) {
@@ -59,21 +51,6 @@ private fun buildShardSpecs(): List<ShardSpec> = buildList {
     }
 }
 
-// Real port of components/cardOptionsMenu.js's own animateCardRemoval():
-// a real Thanos snap, the same real 7x10 grid of shards fading,
-// drifting and rotating away with a staggered left to right delay.
-// That file slices a single decoded <img> into background-position
-// offset shards; this app has no equivalent decoded-bitmap access
-// worth a second real Coil request for, so each shard is instead its
-// own full size AsyncImage clipped to a 1/70th window and offset
-// negatively, the same real trick CSS's own background-position does,
-// just with Coil's own memory cache making every one of the 70 real
-// requests resolve from the same already-decoded image the row's own
-// card was already showing. Blur, the CSS keyframe's own real final
-// touch, is deliberately left out: 70 real blurred layers redrawing
-// every frame is a real cost this app is not spending on a purely
-// cosmetic effect, same real reasoning DetailScreen's own scope-cut
-// comments document elsewhere in this codebase.
 @Composable
 fun CardShatterOverlay(
     imageUrl: String,

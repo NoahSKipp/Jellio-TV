@@ -53,10 +53,6 @@ private const val OVERLAY_FADE_MS = 400
 
 data class ScreenOverlay(val text: String?, val imageUrl: String?, val opacity: Float, val seconds: Int, val seq: Long)
 
-// Screen overlays sent from the Jellio dashboard
-// (Controllers/OverlaysController.cs): a picture or a line of text in the
-// middle of the screen for a few seconds, over every screen, never
-// taking focus.
 @HiltViewModel
 class ScreenOverlayViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -133,9 +129,6 @@ fun ScreenOverlayHost(viewModel: ScreenOverlayViewModel = hiltViewModel()) {
         animationSpec = tween(OVERLAY_FADE_MS),
         label = "overlayAlpha",
     )
-    // Opacity goes on the picture and the text themselves, not a layer
-    // around them: an offscreen alpha layer can drop out over the video
-    // surface during playback.
     Box(
         modifier = Modifier.fillMaxSize().graphicsLayer {
             alpha = overlayAlpha

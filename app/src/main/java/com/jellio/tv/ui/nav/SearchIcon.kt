@@ -7,11 +7,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-// The exact path data js/persistentSidebar.js's own SVG_ICONS.search
-// draws (a 20x20 viewBox lens-and-handle glyph), same real reason
-// LibraryIconVector ports its own icon's real path data rather than a
-// Material approximation: Icons.Filled.Search is close in silhouette
-// but not the real shape this app's own web build actually draws.
 val SearchIconVector: ImageVector by lazy {
     ImageVector.Builder(
         name = "JellioSearch",

@@ -16,12 +16,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Adapted from Nuvio's DpadFastScrollModifier. Holding Up or Down glides the
-// list at a steady speed instead of queueing one scroll animation per key
-// repeat, which is what made a held key stutter. Releasing the key (or no
-// repeat for END_TIMEOUT_MS) stops it and onLand puts focus on the row that
-// ended up at the top. Held Left/Right repeats are spaced out so a row
-// doesn't fall behind the key.
 private const val VELOCITY_DP_PER_SEC = 3200f
 private const val END_TIMEOUT_MS = 160L
 private const val MAX_FRAME_DT_SEC = 0.048f

@@ -37,15 +37,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real feedback live: a real per-app-open update check with nothing
-// on screen to surface it isn't a real notification at all. A small
-// floating card rather than a real full-screen scrim: this is
-// information, not a real blocking choice the rest of the screen
-// needs to wait on.
-// Focus still claimed on appearance and trapped while it's up though,
-// same real pattern every other overlay in this app already uses:
-// unprompted content appearing with no D-pad path to it yet is a real
-// dead end regardless of how much of the screen it covers.
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun UpdateToast(
@@ -55,9 +46,6 @@ fun UpdateToast(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The prompt holds the focus until a choice is made: it takes it when it
-    // opens and takes it back if anything behind it grabs it (Home restoring
-    // a card, rows arriving), and focus can't be moved out of it.
     val downloadFocusRequester = remember { FocusRequester() }
     var hasFocus by remember { mutableStateOf(false) }
     LaunchedEffect(hasFocus) {

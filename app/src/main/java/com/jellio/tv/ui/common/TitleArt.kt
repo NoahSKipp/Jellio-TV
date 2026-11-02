@@ -8,10 +8,6 @@ data class ArtCandidate(val url: String, val blurred: Boolean)
 // them softens it on every Android version, Modifier.blur only on 12+.
 const val BLURRED_POSTER_WIDTH = 64
 
-// Wide art for a title header, best first: backdrops, the series' for an
-// episode, an episode still, Thumb art, then the poster blurred. Callers
-// move to the next entry when one fails to load and draw only the gradient
-// and title once the list runs out.
 fun titleArtCandidates(
     item: BaseItemDto,
     url: (itemId: String, tag: String, imageType: String, maxWidth: Int) -> String,

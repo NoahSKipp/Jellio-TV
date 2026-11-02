@@ -34,12 +34,6 @@ data class UpdateUiState(
     val downloading: Boolean = false,
 )
 
-// SettingsScreen's own "Check for Updates" button real result, this
-// app's own real equivalent of a mobile update check dialog reporting
-// back "you're up to date" as much as "here's a new version": the
-// unprompted UpdateToast above only ever surfaces itself on an actual
-// find, silent otherwise, real feedback asked for a real manual path
-// that always answers back.
 sealed interface ManualCheckResult {
     data object Checking : ManualCheckResult
     data object UpToDate : ManualCheckResult
@@ -58,19 +52,11 @@ private sealed interface LatestRelease {
 // A release is published a few minutes before its APK is attached.
 private const val PREPARING_RECHECK_MS = 10L * 60 * 1000
 
-// Real feedback live: no in-app way at all to learn a new real
-// version had shipped short of checking GitHub by hand. Checked once
-// per real app open (AppBootGate's own real callers below), never
-// suppressed by an earlier real dismissal the way a persisted flag
-// would: a reader who cancels today still hears about the same real
-// update again tomorrow, same real nagging a mobile app's own update
-// prompt already does.
 @HiltViewModel
 class AppUpdateViewModel @Inject constructor(
     private val gitHubApi: GitHubApi,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(UpdateUiState())
     val uiState: StateFlow<UpdateUiState> = _uiState.asStateFlow()
 
@@ -113,10 +99,6 @@ class AppUpdateViewModel @Inject constructor(
         _uiState.value = UpdateUiState(availableVersion = latestVersion, downloadUrl = apkUrl)
     }
 
-    // Background checks while the app is in front, like Jellio for macOS:
-    // a TV left on Jellio for days still hears about a release. Called
-    // each time the app comes to the front; checks right away if the last
-    // check is old enough, then every UPDATE_CHECK_INTERVAL_MS.
     suspend fun checkPeriodically() {
         while (true) {
             if (System.currentTimeMillis() - lastCheckAt >= UPDATE_RECHECK_ON_RETURN_MS) runCheck()
@@ -126,11 +108,6 @@ class AppUpdateViewModel @Inject constructor(
         }
     }
 
-    // SettingsScreen's own "Check for Updates" button: unlike
-    // checkForUpdate() above, this always reports something back
-    // (ManualCheckResult), a real caught fetch failure or "no newer
-    // release" included, not silent the way the unprompted toast's
-    // own check already is elsewhere.
     fun checkForUpdateManually() {
         viewModelScope.launch {
             _manualCheckResult.value = ManualCheckResult.Checking
@@ -233,11 +210,6 @@ class AppUpdateViewModel @Inject constructor(
     }
 }
 
-// Plain numeric segment compare (1.2.3 vs 1.10.0 lexically would get
-// 1.10.0 backwards): BuildConfig.VERSION_NAME and a release tag_name
-// are both always this app's own plain three-segment scheme, git-cliff
-// and build.gradle.kts's own versionName never producing anything
-// else for this to actually need to handle.
 private fun isNewerVersion(remote: String, local: String): Boolean {
     val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
     val localParts = local.split(".").mapNotNull { it.toIntOrNull() }

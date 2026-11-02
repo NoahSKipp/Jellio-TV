@@ -11,9 +11,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-// Replaces Compose Foundation's heavy spring() physics animation with a
-// lightweight, snappy 90ms tween for TV D-pad focus scrolling so scrolling
-// keeps direct pace with remote button presses and key repeats without lag.
 @OptIn(ExperimentalFoundationApi::class)
 internal object TvBringIntoViewSpec : BringIntoViewSpec {
     override val scrollAnimationSpec: AnimationSpec<Float> =
@@ -42,9 +39,6 @@ internal object TvBringIntoViewSpec : BringIntoViewSpec {
     }
 }
 
-// Horizontal rows: the focused card stays at the row's start edge, so the
-// cards after it keep sliding in from the right. Near the end the row can't
-// scroll any further and focus moves along to the last item (View All).
 @OptIn(ExperimentalFoundationApi::class)
 internal class TvHorizontalBringIntoViewSpec(private val leadingPx: Float) : BringIntoViewSpec {
     override val scrollAnimationSpec: AnimationSpec<Float> =
@@ -71,10 +65,6 @@ internal class TvVerticalRowBringIntoViewSpec(
     override val scrollAnimationSpec: AnimationSpec<Float>,
     private val canScrollBackward: () -> Boolean = { true },
 ) : BringIntoViewSpec {
-    // Nuvio's home: Compose's own default scroll animation, and the focused
-    // card parked topInsetPx below the top. One target per move, so a scroll
-    // never changes course halfway.
-
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         if (kotlin.math.abs(offset - topInsetPx) < 1f) return 0f
         val distance = offset - topInsetPx
@@ -82,5 +72,4 @@ internal class TvVerticalRowBringIntoViewSpec(
         return distance
     }
 }
-
 

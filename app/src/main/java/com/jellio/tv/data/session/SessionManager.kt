@@ -28,10 +28,6 @@ data class Session(
     val userName: String,
 )
 
-// Mirrors frontend/runtime/auth.js's own real shape: a token store
-// independent of anything else, real Jellyfin login, no native
-// ApiClient equivalent here to defer to. DataStore instead of
-// localStorage, same real job.
 @Singleton
 class SessionManager @Inject constructor(
     @ApplicationContext private val context: Context,

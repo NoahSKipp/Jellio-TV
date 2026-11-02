@@ -59,13 +59,6 @@ import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.random.Random
 
-// The seasonal effects of Jellio web (components/seasons.js), drawn with
-// Compose: a static layer (washes and decorations, drawn once), an
-// animated layer (creatures and particles, positions worked out from
-// the clock each frame) and, above the page, the sky (Halloween
-// lightning, the New Year title). STILL keeps the washes and scenery
-// without motion; OFF draws nothing.
-
 private fun svg(d: String): Path = PathParser().parsePathString(d).toPath()
 
 private object Art {
@@ -93,20 +86,12 @@ private fun cycle(t: Float, duration: Float, offset: Float): Float {
     return v - floor(v)
 }
 
-// Nothing moves on STILL (and nothing at all is drawn on OFF): from the
-// Settings choice, the device check in MotionPolicy, or the system's
-// animations being off.
 @Composable
 private fun animationsOff(): Boolean = MotionPolicy.level == MotionLevel.STILL || MotionPolicy.level == MotionLevel.OFF
 
 @Composable
 private fun reducedMotion(): Boolean = MotionPolicy.level == MotionLevel.REDUCED
 
-// The scenes' time. Every frame on capable devices; on REDUCED it only
-// moves on about 15 times a second, so the full-screen redraw behind the
-// page costs a fraction as much. While a list scrolls it holds still
-// (ScrollActivity), leaving the frames to the scroll; the scene then
-// carries on from where it was.
 @Composable
 private fun rememberClock(): MutableLongState {
     val clock = remember { mutableLongStateOf(0L) }

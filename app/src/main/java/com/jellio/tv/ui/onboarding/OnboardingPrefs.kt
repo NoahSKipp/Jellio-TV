@@ -16,9 +16,6 @@ object OnboardingPrefs {
             val playerPrefs = context.applicationContext.getSharedPreferences("jellio_player", Context.MODE_PRIVATE)
             val sessionSync = context.applicationContext.getSharedPreferences("jellio_session_sync", Context.MODE_PRIVATE)
 
-            // If the device already carried changelog history, display configuration,
-            // player choices, or an existing server session before this first check,
-            // it is an established install (not a first-time install).
             val hasPreExistingInstall = changelogPrefs.all.isNotEmpty() ||
                 !sessionSync.getString("server_address", null).isNullOrBlank() ||
                 !sessionSync.getString("access_token", null).isNullOrBlank() ||

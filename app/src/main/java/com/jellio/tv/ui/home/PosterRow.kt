@@ -44,9 +44,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec
 
-// Mirrors components/row.js: a title (the real library/Continue
-// Watching name, not an invented category) over a horizontally
-// scrolling real-content track.
 @Composable
 fun PosterRow(
     section: HomeSection,
@@ -83,14 +80,6 @@ fun PosterRow(
                 modifier = (if (rowFocusRequester != null) Modifier.focusRequester(rowFocusRequester) else Modifier)
                     .rowEntry(firstCard),
             ) {
-                // Real feedback live: a focusable heading blocked ordinary
-                // Left/Right between cards in the same row, the nearest
-                // focusable candidate above a row's own first card being
-                // the title itself rather than nothing. Real feedback also
-                // asked for the header back to plain, unfocusable text. A
-                // real button at the row's own start, same shape and
-                // height a real card here has, replaces it instead of
-                // dropping "view all" entirely.
                 items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
                     val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                     val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
@@ -128,15 +117,6 @@ fun PosterRow(
     }
 }
 
-// Mirrors css/app.css's own .jellio-row-title/::after, shared by every
-// real row heading (PosterRow, StudioHubRow, ComingSoonRow,
-// LandscapeRow): a short accent bar under the title, not a full width
-// rule, real feedback found on an earlier attempt that a border-bottom
-// always spans an element's own full width, no way to make it read as
-// short without this. Plain, unfocusable text now: RowExpandButton
-// below carries whatever real "view all" action this used to.
-// Row layout copied from Nuvio's home: 16sp semibold titles 52dp in with
-// 14dp below, 24dp between rows, 12dp between cards.
 @Composable
 fun RowTitle(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -157,14 +137,6 @@ internal val RowTitleFontSize = 16.sp
 // Space kept above a focused row's cards so its title stays in view.
 internal val RowHeaderHeight = 40.dp
 
-// Real port of components/rowListModal.js's own makeRowTitleClickable():
-// the same "view all" action this used to hang off the row's own
-// title (real feedback asked for that back to plain, unfocusable
-// text), moved to a real focusable button of its own instead, first
-// in the row rather than fighting the title for the same bounds. A
-// list icon over a bare chevron: this button is the only real
-// indicator left that a "view everything in this row" screen exists
-// at all, not just a decoration next to one.
 @Composable
 fun RowExpandButton(onClick: () -> Unit, height: Dp, modifier: Modifier = Modifier) {
     val width = RowExpandButtonWidth.scaled()

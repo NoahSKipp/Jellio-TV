@@ -59,9 +59,6 @@ import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Same layout as Home: the focused card's backdrop and details fill the top
-// of the screen and the rows scroll underneath. What the old carousel showed
-// is now the first row (Featured, or Trending on AniList for Anime).
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(
@@ -299,14 +296,6 @@ private fun LibraryHeader(
 
 private enum class LibraryFilterFieldTarget { Sort, Genre }
 
-// Real port of screens/library.js's own sort/genre <select> pair
-// (SORT_OPTIONS, discoverGenres()): governs only the main row above
-// this, same real scope that file's own header comment gives. Real
-// feedback live asked for this rail's own field-plus-popover shape
-// (matching that <select> pair's own real screenshot) rather than the
-// always visible chip row this used to be: LibraryFilterField opens
-// LibraryFilterFieldOverlay.kt's own real modal list instead of laying
-// every option out inline.
 @Composable
 private fun LibraryFilterFields(
     genres: List<String>,

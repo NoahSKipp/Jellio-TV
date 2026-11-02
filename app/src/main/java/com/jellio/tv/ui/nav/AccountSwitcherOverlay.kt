@@ -64,15 +64,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
-// Real port of components/accountSwitcher.js's own openAccountSwitcher():
-// opened from this rail's own Profile row instead of navigating
-// straight to the full ProfileScreen, real feedback's own explicit
-// ask matching real desktop parity - Settings and this row used to
-// both just reach #/account with no real second job of their own.
-// A small floating panel over whatever screen was already open rather
-// than a full screen of its own, same real reason that file's own
-// header gives: switching mid-browse should not need leaving the page
-// first.
 @OptIn(ExperimentalComposeUiApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AccountSwitcherOverlay(
@@ -90,10 +81,6 @@ fun AccountSwitcherOverlay(
     LaunchedEffect(session.userId) { viewModel.load(session) }
     BackHandler(onBack = onDismiss)
 
-    // Real bug every other real overlay in this app already had to fix
-    // the same real way: claim initial D-pad focus on open, and trap
-    // exit so it cannot wander back out into whatever real screen sits
-    // behind this scrim.
     val viewProfileFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { viewProfileFocusRequester.requestFocus() }
 
@@ -119,11 +106,6 @@ fun AccountSwitcherOverlay(
                 .padding(32.dp)
                 .pointerInput(Unit) { detectTapGestures { } },
         ) {
-            // Real components/accountSwitcher.js's own header: the
-            // signed in reader's own avatar/name plus View Profile/
-            // Settings/Sign Out, sitting above the grid rather than
-            // inside it since there is no tile of its own for the
-            // reader's own currently signed in account to anchor to.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = viewModel.avatarUrl(session, session.userId, null),
@@ -220,18 +202,6 @@ fun AccountSwitcherOverlay(
             } else if (uiState.remembered.isEmpty() && uiState.publicOnly.isEmpty()) {
                 Text(text = com.jellio.tv.ui.i18n.string("account_no_other_profiles"), color = JellioTextSecondary)
             } else {
-                // Real bug found live, on a real screenshot: this grid
-                // had no real weight of its own inside this real Column,
-                // so it measured against this dialog's own full real
-                // fillMaxHeight(0.8f) budget rather than whatever real
-                // space the header row and this title actually left
-                // behind - its own last real row (names included) then
-                // rendered past this real Column's own intended bottom
-                // edge with nothing clipping it, off the real screen
-                // entirely rather than scrolled inside its own bounds.
-                // weight(1f) bounds it to that real remaining space
-                // instead, this real grid's own lazy nature scrolls
-                // inside it rather than overflowing past it.
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 140.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),

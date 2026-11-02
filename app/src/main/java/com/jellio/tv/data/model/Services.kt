@@ -1,10 +1,6 @@
 package com.jellio.tv.data.model
 
 private val NON_SLUG = Regex("[^a-z0-9]+")
-// Service name matching, grouping and logo slugs, ported from
-// components/services.js: a service only shows up when its real
-// catalog collections exist, matched on the collection's own name
-// since Gelato writes no field an item could carry instead.
 
 val SERVICES = listOf(
     "Netflix",
@@ -38,9 +34,6 @@ fun logoSlug(name: String): String =
         .replace(NON_SLUG, "-")
         .trim('-')
 
-// FrontendController.cs's own real static asset route, the same real
-// SVGs the web build's own logoUrl() already serves from the Jellyfin
-// server itself, not a Coil image proxy call.
 fun logoUrl(serverAddress: String, name: String): String =
     "$serverAddress/Jellio/frontend/img/services/${logoSlug(name)}.svg"
 
@@ -74,11 +67,6 @@ fun groupByService(items: List<BaseItemDto>): Map<String, List<BaseItemDto>> {
     return groups
 }
 
-// A row's own name. The bare service catalogs are called just
-// "Netflix" twice over, which says nothing on a page already titled
-// Netflix, so those two get named for what they hold. Anything else
-// already carries a real name ("Netflix Top 10 Movies (Global)") and
-// keeps it.
 fun rowTitle(collection: BaseItemDto, service: String, kind: String): String {
     if (!(collection.Name ?: "").equals(service, ignoreCase = true)) {
         return collection.Name ?: ""

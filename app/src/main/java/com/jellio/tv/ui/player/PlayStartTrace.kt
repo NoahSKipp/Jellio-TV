@@ -2,9 +2,6 @@ package com.jellio.tv.ui.player
 
 import android.util.Log
 
-// One line per step from pressing Play to the first frame, under the log
-// tag JellioPlayStart, so a device can report where the time goes:
-//   adb logcat -s JellioPlayStart
 object PlayStartTrace {
     private const val TAG = "JellioPlayStart"
     private const val STALE_MS = 120_000L

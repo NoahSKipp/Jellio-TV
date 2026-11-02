@@ -37,9 +37,6 @@ fun normalizeServerAddress(raw: String): String {
             "https://$trimmed"
         }
     }
-    // A TV keyboard happily capitalises the first letter ("HTTPS://..."),
-    // which the API client tolerates but the image loader doesn't: it only
-    // fetches lowercase http/https URLs. HttpUrl lowercases scheme and host.
     return withScheme.toHttpUrlOrNull()?.toString()?.trimEnd('/') ?: withScheme
 }
 
@@ -54,14 +51,6 @@ private annotation class AuthInterceptor
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
-    // Retrofit needs a real base URL at build time; the actual
-    // Jellyfin server address is only known once the reader has typed
-    // it into screens/login.js's own real equivalent here
-    // (ui/auth/LoginScreen.kt). This interceptor swaps scheme/host/
-    // port onto every outgoing request right before it leaves,
-    // keeping the path/query Retrofit's own @GET/@POST annotations
-    // already built.
     @Provides
     @Singleton
     @BaseUrlInterceptor
@@ -98,16 +87,6 @@ object NetworkModule {
             chain.proceed(original.newBuilder().url(newUrlBuilder.build()).build())
         }
 
-    // Real "Authorization" header, not X-Emby-Token: AuthorizationContext.cs's
-    // own GetAuthorizationInfoFromDictionary() only ever reads that legacy
-    // header behind the same disabled EnableLegacyAuthorization flag
-    // JellyfinApi.kt's own buildEmbyAuthorizationHeader() documents, so an
-    // X-Emby-Token here used to authenticate nothing at all on a server with
-    // it off: every request after a real successful login still read back
-    // as anonymous. Sent on every request, session token or not, since the
-    // Client/Device/DeviceId fields matter even pre-login (AuthenticateByName
-    // itself reads them off this same header, JellyfinApi.kt's own header on
-    // that call explains why).
     @Provides
     @Singleton
     @AuthInterceptor

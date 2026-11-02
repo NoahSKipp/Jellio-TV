@@ -21,17 +21,10 @@ data class FeedUiState(
     val error: String? = null,
 )
 
-// Real port of screens/feed.js's own renderFeed(): a real retry state
-// on failure (matching that file's own renderRetry(), not a silent
-// empty list) rather than JellioRepository swallowing the error the
-// way most other list endpoints here do, same real reasoning
-// getCalendarEntries()'s own header already gives for that call being
-// a bare passthrough too.
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
@@ -47,9 +40,6 @@ class FeedViewModel @Inject constructor(
 
     private var fetchJob: kotlinx.coroutines.Job? = null
 
-    // A busy server (a nightly database task can hold it for a minute) gets
-    // a few bounded attempts before the retry state shows; entries already
-    // on screen stay, and a failed load tries again quietly later.
     private fun fetch(round: Int = 0) {
         fetchJob?.cancel()
         fetchJob = viewModelScope.launch {

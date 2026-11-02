@@ -19,13 +19,10 @@ data class PersonUiState(
     val filmography: List<BaseItemDto> = emptyList(),
 )
 
-// Real port of screens/person.js: a real actor's own photo/overview
-// plus real filmography, reached from a Detail screen's own cast row.
 @HiltViewModel
 class PersonViewModel @Inject constructor(
     private val repository: JellioRepository,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(PersonUiState())
     val uiState: StateFlow<PersonUiState> = _uiState.asStateFlow()
 
