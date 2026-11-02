@@ -44,6 +44,7 @@ jobs:
       - name: Assemble release APK
         run: ./gradlew :app:assembleRelease
         env:
+          REQUIRE_RELEASE_SIGNING: "true"
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}

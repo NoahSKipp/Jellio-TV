@@ -58,6 +58,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // A published APK must carry the real key, or it won't install over
+            // existing ones; CI builds without the secrets may still use debug.
+            if (System.getenv("REQUIRE_RELEASE_SIGNING") == "true" && signingConfigs.findByName("sideload") == null) {
+                throw GradleException("Release signing key missing: set SIGNING_KEYSTORE_FILE and SIGNING_STORE_PASSWORD.")
+            }
             signingConfig = signingConfigs.findByName("sideload") ?: signingConfigs.getByName("debug")
         }
     }
