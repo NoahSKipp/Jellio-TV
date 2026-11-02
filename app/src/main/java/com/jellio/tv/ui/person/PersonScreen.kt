@@ -111,7 +111,7 @@ fun PersonScreen(
                         item {
                             Column(modifier = Modifier.padding(top = 32.dp)) {
                                 Text(
-                                    text = "Filmography",
+                                    text = com.jellio.tv.ui.i18n.Strings.get("tv_filmography"),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = JellioText,
                                     modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),

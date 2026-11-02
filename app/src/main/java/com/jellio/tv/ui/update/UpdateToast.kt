@@ -85,7 +85,7 @@ fun UpdateToast(
         ) {
             Text(text = com.jellio.tv.ui.i18n.string("update_available_title"), style = MaterialTheme.typography.titleMedium, color = JellioText)
             Text(
-                text = "Jellio TV $version is ready to download.",
+                text = com.jellio.tv.ui.i18n.Strings.format("tv_update_ready", version),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
                 modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),

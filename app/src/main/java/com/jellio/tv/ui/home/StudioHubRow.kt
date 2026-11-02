@@ -49,7 +49,7 @@ fun StudioHubRow(
 ) {
     if (services.isEmpty()) return
     Column(modifier = Modifier.padding(bottom = RowSpacing)) {
-        RowTitle(text = "Studio Hubs")
+        RowTitle(text = com.jellio.tv.ui.i18n.Strings.get("tv_studio_hubs"))
         val firstTile = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(

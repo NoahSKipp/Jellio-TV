@@ -1079,7 +1079,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
             }
             is ManualCheckResult.UpdateFound -> {
                 Text(
-                    text = "Update available: ${current.version}",
+                    text = com.jellio.tv.ui.i18n.Strings.format("tv_update_available", current.version),
                     color = JellioText,
                     modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
                 )

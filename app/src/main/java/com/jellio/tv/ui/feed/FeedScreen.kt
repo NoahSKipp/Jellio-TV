@@ -121,7 +121,7 @@ fun FeedScreen(
                 val groups = remember(visible) { groupByDay(visible) }
                 Column(modifier = Modifier.fillMaxSize().padding(top = 28.dp)) {
                     Text(
-                        text = "Feed",
+                        text = com.jellio.tv.ui.i18n.Strings.get("tv_feed"),
                         color = JellioText,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -144,7 +144,7 @@ fun FeedScreen(
                         Box(modifier = Modifier.width(420.dp).fillMaxHeight()) {
                             if (visible.isEmpty()) {
                                 Text(
-                                    text = "Nothing to show with these filters.",
+                                    text = com.jellio.tv.ui.i18n.Strings.get("tv_feed_empty_filtered"),
                                     color = JellioTextSecondary,
                                     modifier = Modifier.padding(start = 48.dp, top = 8.dp),
                                 )

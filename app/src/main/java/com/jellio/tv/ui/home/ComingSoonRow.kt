@@ -105,7 +105,7 @@ fun ComingSoonRow(
 ) {
     if (entries.isEmpty()) return
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
-        RowTitle(text = "Coming Soon")
+        RowTitle(text = com.jellio.tv.ui.i18n.Strings.get("tv_coming_soon"))
         val firstCard = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(

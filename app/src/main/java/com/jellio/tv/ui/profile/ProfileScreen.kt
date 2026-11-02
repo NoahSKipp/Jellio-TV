@@ -175,7 +175,7 @@ fun ProfileScreen(
                         item { StatsRow(achievements.MoviesCompleted, achievements.EpisodesCompleted, achievements.TotalCompleted, achievements.BestBingeStreak) }
                         item {
                             Text(
-                                text = "Badges (${achievements.Badges.count { it.Unlocked }}/${achievements.Badges.size})",
+                                text = com.jellio.tv.ui.i18n.Strings.format("tv_badges_count", achievements.Badges.count { it.Unlocked }, achievements.Badges.size),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 12.dp),
                             )
@@ -185,7 +185,7 @@ fun ProfileScreen(
                         }
                         item {
                             Text(
-                                text = "Recent activity",
+                                text = com.jellio.tv.ui.i18n.Strings.get("tv_recent_activity"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 12.dp),
                             )
@@ -284,7 +284,7 @@ private fun BioSection(
             Text(text = bio, color = JellioTextSecondary, modifier = Modifier.clickableIfOwner(isOwner, onEdit))
         } else if (isOwner) {
             Text(
-                text = "Add a short bio.",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_add_bio"),
                 color = JellioTextSecondary,
                 modifier = Modifier.clickableIfOwner(isOwner, onEdit),
             )

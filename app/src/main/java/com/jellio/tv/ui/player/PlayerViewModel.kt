@@ -1033,7 +1033,7 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                 )
                 rememberSubtitleChoice(streamIndex)
-                showToast("Requested $requestedLabel (burned in), reloading…")
+                showToast(com.jellio.tv.ui.i18n.Strings.format("tv_requested_burned_in", requestedLabel))
             } catch (err: Exception) {
                 _uiState.value = _uiState.value.copy(isSwitchingSubtitle = false)
                 showToast(
@@ -1059,10 +1059,10 @@ class PlayerViewModel @Inject constructor(
         // reload, no restart, unless the picked track needs transcoding.
         if (_uiState.value.directPlay && currentSource?.let { repository.canDirectPlay(it, streamIndex) } != false) {
             _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
-            showToast("Audio: $label")
+            showToast(com.jellio.tv.ui.i18n.Strings.format("tv_audio_label", label))
             return
         }
-        showToast("Switching to $label…")
+        showToast(com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", label))
         viewModelScope.launch {
             try {
                 val currentSubIndex = _uiState.value.selectedSubtitleIndex
@@ -1092,7 +1092,7 @@ class PlayerViewModel @Inject constructor(
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                     directPlay = target.directPlay,
                 )
-                showToast("Requested $label, reloading…")
+                showToast(com.jellio.tv.ui.i18n.Strings.format("tv_requested_reloading", label))
             } catch (err: Exception) {
                 showToast(
                     if (err is IllegalStateException) {
@@ -1133,7 +1133,7 @@ class PlayerViewModel @Inject constructor(
                     subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks),
                 )
             } catch (err: Exception) {
-                showToast("Couldn't jump there. Try again.")
+                showToast(com.jellio.tv.ui.i18n.Strings.get("tv_seek_failed"))
             }
         }
     }

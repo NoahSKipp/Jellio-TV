@@ -161,7 +161,7 @@ fun PlaybackErrorPanel(
                 modifier = Modifier.padding(top = 10.dp),
             )
             Text(
-                text = "Press Back to return.",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_press_back"),
                 color = JellioTextSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = 18.dp),

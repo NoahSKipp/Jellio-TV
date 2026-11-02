@@ -207,13 +207,13 @@ fun OverscanCalibrationModal(
                 .padding(32.dp),
         ) {
             Text(
-                text = "Display Safe Area (Overscan)",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_title"),
                 style = MaterialTheme.typography.titleLarge,
                 color = JellioText,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Adjust using Left / Right until all four white corner brackets and outer borders fit completely inside your TV screen.",
+                text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_hint"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
                 textAlign = TextAlign.Center,
@@ -285,7 +285,7 @@ fun OverscanCalibrationModal(
                         },
                 ) {
                     Text(
-                        text = "Inset (+) ▶",
+                        text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_inset"),
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }
@@ -316,7 +316,7 @@ fun OverscanCalibrationModal(
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
                         Text(
-                            text = "Reset (0%)",
+                            text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_reset"),
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                         )
                     }
@@ -335,7 +335,7 @@ fun OverscanCalibrationModal(
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                 ) {
                     Text(
-                        text = "Save & Apply",
+                        text = com.jellio.tv.ui.i18n.Strings.get("tv_save_apply"),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
                     )

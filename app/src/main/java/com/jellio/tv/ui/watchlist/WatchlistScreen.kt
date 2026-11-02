@@ -59,7 +59,7 @@ fun WatchlistScreen(
             ) {
                 item {
                     Text(
-                        text = "Watchlist",
+                        text = com.jellio.tv.ui.i18n.Strings.get("tv_watchlist"),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
                     )

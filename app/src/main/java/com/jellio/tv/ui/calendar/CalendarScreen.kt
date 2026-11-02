@@ -101,7 +101,7 @@ fun CalendarScreen(
             }
             uiState.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "Nothing upcoming yet. Your Watchlist and the shows you have been watching appear here once a new episode or release date is announced.",
+                    text = com.jellio.tv.ui.i18n.Strings.get("calendar_empty"),
                     color = JellioTextSecondary,
                 )
             }
@@ -121,7 +121,7 @@ fun CalendarScreen(
                 ) {
                     item {
                         Text(
-                            text = "Calendar",
+                            text = com.jellio.tv.ui.i18n.Strings.get("tv_calendar"),
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(start = 48.dp, bottom = 24.dp),
                         )
