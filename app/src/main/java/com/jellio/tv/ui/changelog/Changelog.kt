@@ -106,6 +106,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.65.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.65.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Switch Streams When Buffering", "When a stream keeps stopping to buffer, Jellio offers to switch to another one and picks up right where you were. In Settings, under Playback, you can have it ask, switch on its own, or keep playing."),
+            ChangelogFeature(Icons.Filled.Translate, "Failover in Your Language", "When a stream doesn't play, Jellio now tries streams in your preferred audio language first, or your menu language if you haven't set one, then multi-audio streams, and only then streams in other languages."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.64.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.64.3",
