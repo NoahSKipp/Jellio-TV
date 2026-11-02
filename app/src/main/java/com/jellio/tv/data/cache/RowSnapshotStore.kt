@@ -17,6 +17,7 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private val UNSAFE_KEY_CHARS = Regex("[^a-zA-Z0-9_-]")
 @JsonClass(generateAdapter = true)
 data class CachedRowDto(
     val key: String,
@@ -170,5 +171,5 @@ class RowSnapshotStore @Inject constructor(
         runCatching { file.writeText(serviceAdapter.toJson(snapshot)) }
     }
 
-    private fun sanitizeKey(key: String): String = key.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+    private fun sanitizeKey(key: String): String = key.replace(UNSAFE_KEY_CHARS, "_")
 }

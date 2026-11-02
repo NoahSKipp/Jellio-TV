@@ -7,6 +7,9 @@ import kotlinx.coroutines.sync.withLock
 import java.text.Normalizer
 import java.time.Instant
 
+private val COMBINING_MARKS = Regex("\\p{M}+")
+private val TUNER_BUSY = Regex("tuner|no available|too many|limit")
+private val TIMED_OUT = Regex("timed? ?out|timeout")
 // Channel ids are stable (tvg id); channel numbers are not, so nothing here
 // keys or remembers a channel by number.
 
@@ -106,7 +109,7 @@ fun mapChannels(items: List<LiveChannelDto>, nowMs: Long): List<LiveChannel> =
     }
 
 private fun normalize(text: String): String =
-    Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+    Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD).replace(COMBINING_MARKS, "")
 
 // Every word has to appear in the channel name or what is on now, then the
 // type and language filters when set.
@@ -146,7 +149,7 @@ fun playableNeighbour(list: List<LiveChannel>, currentId: String?, delta: Int): 
 
 // Busy tuners say nothing about the channel itself.
 fun countsAsChannelFailure(message: String?): Boolean =
-    !Regex("tuner|no available|too many|limit").containsMatchIn(message.orEmpty().lowercase())
+    !TUNER_BUSY.containsMatchIn(message.orEmpty().lowercase())
 
 fun guideWindow(programs: List<LiveProgramDto>, nowMs: Long, hours: Int = GUIDE_HOURS): List<LiveProgramme> {
     val until = nowMs + hours * HOUR_MS
@@ -220,9 +223,9 @@ class LiveLifecycle<T>(
 fun describeOpenFailure(message: String?): String {
     val text = message.orEmpty().lowercase()
     return when {
-        Regex("tuner|no available|too many|limit").containsMatchIn(text) ->
+        TUNER_BUSY.containsMatchIn(text) ->
             com.jellio.tv.ui.i18n.Strings.get("live_tuners_busy")
-        Regex("timed? ?out|timeout").containsMatchIn(text) ->
+        TIMED_OUT.containsMatchIn(text) ->
             com.jellio.tv.ui.i18n.Strings.get("live_open_timeout")
         else -> com.jellio.tv.ui.i18n.Strings.get("live_open_failed")
     }

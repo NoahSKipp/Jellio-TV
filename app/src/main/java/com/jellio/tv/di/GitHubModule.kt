@@ -32,6 +32,7 @@ object GitHubModule {
         .baseUrl("https://api.github.com/")
         .client(
             OkHttpClient.Builder()
+                .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
                 .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
                 // GitHub's API asks every client for a User-Agent naming it.

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
+private val ANIME_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 // Mirrors components/mobileNav.js's own real link set and its own
 // consolidated Library button (components/libraryPicker.js's own
 // popover behind it), not components/sidebar.js's desktop rail: this
@@ -105,7 +106,7 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     // The same icons Jellio web draws (components/navShared.js SVG_ICONS),
     // ported in JellioIcons.kt.
     is JellioRoute.LibraryTab -> when {
-        Regex("anime", RegexOption.IGNORE_CASE).containsMatchIn(name) -> AnimeIconVector
+        ANIME_NAME.containsMatchIn(name) -> AnimeIconVector
         collectionType == "movies" -> MovieIconVector
         collectionType == "tvshows" -> TvShowsIconVector
         else -> LibraryIconVector

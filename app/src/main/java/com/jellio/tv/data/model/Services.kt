@@ -1,5 +1,6 @@
 package com.jellio.tv.data.model
 
+private val NON_SLUG = Regex("[^a-z0-9]+")
 // Service name matching, grouping and logo slugs, ported from
 // components/services.js: a service only shows up when its real
 // catalog collections exist, matched on the collection's own name
@@ -34,7 +35,7 @@ fun serviceOf(name: String?): String? {
 fun logoSlug(name: String): String =
     name.lowercase()
         .replace("+", "")
-        .replace(Regex("[^a-z0-9]+"), "-")
+        .replace(NON_SLUG, "-")
         .trim('-')
 
 // FrontendController.cs's own real static asset route, the same real

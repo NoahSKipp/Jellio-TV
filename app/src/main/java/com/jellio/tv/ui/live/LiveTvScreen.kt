@@ -67,6 +67,7 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
+private val NAME_SEPARATORS = Regex("[\\s\\-_.]+")
 private val accent = Color(0xFFFF9800)
 
 // A big channel list shows this many rows until a search narrows it.
@@ -90,7 +91,7 @@ internal fun ChannelLogo(channel: LiveChannel, imageUrl: (String, String?) -> St
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = channel.name.split(Regex("[\\s\\-_.]+")).filter { it.isNotEmpty() }.take(2).joinToString("") { it.take(1).uppercase() },
+            text = channel.name.split(NAME_SEPARATORS).filter { it.isNotEmpty() }.take(2).joinToString("") { it.take(1).uppercase() },
             color = JellioTextSecondary,
             fontWeight = FontWeight.Bold,
         )

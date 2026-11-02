@@ -68,6 +68,7 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
         }
 
         val imageOkHttpClient = OkHttpClient.Builder()
+            .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
             .dispatcher(imageDispatcher)
             .retryOnConnectionFailure(true)
             .followRedirects(true)

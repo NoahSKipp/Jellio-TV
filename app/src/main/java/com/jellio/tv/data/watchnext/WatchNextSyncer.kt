@@ -60,6 +60,7 @@ class WatchNextSyncer @Inject constructor(
     private val sessionManager: SessionManager,
 ) {
     private val http = OkHttpClient.Builder()
+        .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

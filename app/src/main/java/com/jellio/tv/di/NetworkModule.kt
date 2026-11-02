@@ -2,6 +2,7 @@ package com.jellio.tv.di
 
 import com.jellio.tv.BuildConfig
 import com.jellio.tv.data.network.APP_VERSION
+import com.jellio.tv.data.network.SharedHttp
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.session.SessionManager
@@ -139,6 +140,7 @@ object NetworkModule {
         @BaseUrlInterceptor baseUrlInterceptor: Interceptor,
         @AuthInterceptor authInterceptor: Interceptor,
     ): OkHttpClient = OkHttpClient.Builder()
+        .connectionPool(SharedHttp.connectionPool)
         .followRedirects(true)
         .followSslRedirects(true)
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)

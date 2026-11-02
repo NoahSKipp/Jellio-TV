@@ -5,6 +5,8 @@ import com.jellio.tv.data.prefs.AppLanguage
 import com.jellio.tv.data.prefs.DisplayPreferences
 
 object Strings {
+    private val NAMED_PLACEHOLDER = Regex("\\{([a-z]+)\\}")
+
     private fun mapFor(lang: AppLanguage): Map<String, String> = when (lang) {
         AppLanguage.ENGLISH -> StringsEn.MAP
         AppLanguage.GERMAN -> StringsDe.MAP
@@ -36,7 +38,7 @@ object Strings {
         }
         // Any other {word} placeholders take the remaining arguments in order.
         var next = 0
-        result = Regex("\\{([a-z]+)\\}").replace(result) { match ->
+        result = NAMED_PLACEHOLDER.replace(result) { match ->
             if (next < args.size) args[next++].toString() else match.value
         }
         return runCatching {
