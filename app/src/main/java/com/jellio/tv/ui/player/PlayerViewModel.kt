@@ -135,6 +135,7 @@ data class PlayerUiState(
     // Set while another stream is being fetched and started, so the screen
     // can say so until it actually plays.
     val switchingTo: String? = null,
+    val switchingLoaded: Boolean = false,
     val toastId: Long = 0L,
 )
 
@@ -335,7 +336,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun clearSwitching() {
-        if (_uiState.value.switchingTo != null) _uiState.value = _uiState.value.copy(switchingTo = null)
+        val label = _uiState.value.switchingTo ?: return
+        _uiState.value = _uiState.value.copy(switchingTo = null, switchingLoaded = false)
+        showToast(Strings.format("player_switch_done", label))
     }
 
     fun clearToast(id: Long) {
@@ -939,7 +942,6 @@ class PlayerViewModel @Inject constructor(
         }
         val next = orderByLanguage(pool, failoverLanguage ?: streamLanguage()).firstOrNull() ?: return false
         currentSource?.let { BadStreams.mark(id, it) }
-        showToast(Strings.format("player_buffer_switching", sourceLabel(next)))
         switchSource(session, next, currentPositionTicks)
         return true
     }
@@ -947,7 +949,7 @@ class PlayerViewModel @Inject constructor(
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
         val id = itemId ?: return
         if (source.Id == _uiState.value.mediaSourceId) return
-        _uiState.value = _uiState.value.copy(switchingTo = source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifBlank { null } ?: "another stream")
+        _uiState.value = _uiState.value.copy(switchingTo = sourceLabel(source), switchingLoaded = false)
         viewModelScope.launch {
             try {
                 val target = repository.resolvePlayback(
@@ -972,9 +974,10 @@ class PlayerViewModel @Inject constructor(
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                     directPlay = target.directPlay,
                     reencodingVideo = VideoTranscodePolicy.avoiding && VideoTranscodePolicy.needsReencode(target.mediaSource),
+                    switchingLoaded = true,
                 )
             } catch (err: Exception) {
-                _uiState.value = _uiState.value.copy(switchingTo = null)
+                _uiState.value = _uiState.value.copy(switchingTo = null, switchingLoaded = false)
                 showToast(
                     if (err is IllegalStateException) {
                         "That stream is no longer available."

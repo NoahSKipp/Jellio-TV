@@ -555,5 +555,8 @@ internal object StringsIt {
         m["settings_buffer_switch_ask"] = "Chiedimelo"
         m["settings_buffer_switch_auto"] = "Cambia automaticamente"
         m["settings_buffer_switch_off"] = "Continua a riprodurre"
+        m["player_switch_connecting"] = "Connessione al nuovo stream…"
+        m["player_switch_loading"] = "Caricamento del nuovo stream…"
+        m["player_switch_done"] = "Ora in riproduzione: {label}"
     }
 }

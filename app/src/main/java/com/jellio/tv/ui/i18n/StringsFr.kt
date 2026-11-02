@@ -555,5 +555,8 @@ internal object StringsFr {
         m["settings_buffer_switch_ask"] = "Me demander"
         m["settings_buffer_switch_auto"] = "Changer automatiquement"
         m["settings_buffer_switch_off"] = "Continuer la lecture"
+        m["player_switch_connecting"] = "Connexion au nouveau flux…"
+        m["player_switch_loading"] = "Chargement du nouveau flux…"
+        m["player_switch_done"] = "Lecture de {label}"
     }
 }

@@ -555,5 +555,8 @@ internal object StringsPt {
         m["settings_buffer_switch_ask"] = "Perguntar"
         m["settings_buffer_switch_auto"] = "Trocar automaticamente"
         m["settings_buffer_switch_off"] = "Continuar reproduzindo"
+        m["player_switch_connecting"] = "Conectando ao novo stream…"
+        m["player_switch_loading"] = "Carregando o novo stream…"
+        m["player_switch_done"] = "Reproduzindo agora: {label}"
     }
 }

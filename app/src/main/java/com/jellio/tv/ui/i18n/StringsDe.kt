@@ -555,5 +555,8 @@ internal object StringsDe {
         m["settings_buffer_switch_ask"] = "Fragen"
         m["settings_buffer_switch_auto"] = "Automatisch wechseln"
         m["settings_buffer_switch_off"] = "Weiterspielen"
+        m["player_switch_connecting"] = "Verbindung zum neuen Stream…"
+        m["player_switch_loading"] = "Neuer Stream wird geladen…"
+        m["player_switch_done"] = "Jetzt läuft {label}"
     }
 }

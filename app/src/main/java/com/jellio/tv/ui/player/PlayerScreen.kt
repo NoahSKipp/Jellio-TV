@@ -148,6 +148,8 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
@@ -306,6 +308,7 @@ fun PlayerScreen(
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },
                 onShowToast = { message -> viewModel.showToast(message) },
                 switchingTo = uiState.switchingTo,
+                switchingLoaded = uiState.switchingLoaded,
                 onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
                 onSwitchSettled = { viewModel.clearSwitching() },
                 onBufferSwitch = { ticks -> viewModel.switchForBuffering(session, ticks) },
@@ -421,6 +424,7 @@ internal fun PlayerSurface(
     onCancelSleepTimer: () -> Unit,
     onShowToast: (String) -> Unit,
     switchingTo: String?,
+    switchingLoaded: Boolean,
     onSwitchSettled: () -> Unit,
     onBufferSwitch: suspend (Long) -> Boolean,
     onSeekReload: (Long) -> Unit,
@@ -1305,29 +1309,21 @@ internal fun PlayerSurface(
             }
         }
 
-        // Switching streams: say so until the new one is actually playing.
+        // Switching streams: shown until the new stream has buffered and plays.
         if (switchingTo != null) {
-            LaunchedEffect(switchingTo, isBuffering, isPlaying) {
-                if (!isBuffering && isPlaying) {
-                    delay(300)
-                    onSwitchSettled()
-                }
+            LaunchedEffect(switchingTo, switchingLoaded) {
+                if (!switchingLoaded) return@LaunchedEffect
+                androidx.compose.runtime.snapshotFlow { isBuffering to isPlaying }
+                    .dropWhile { !it.first }
+                    .first { !it.first && it.second }
+                delay(300)
+                onSwitchSettled()
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(JellioBgElevated.copy(alpha = 0.92f))
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-            ) {
-                Text(
-                    text = com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", switchingTo),
-                    color = JellioText,
-                    style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                )
-            }
+            SwitchingCard(
+                label = switchingTo,
+                step = com.jellio.tv.ui.i18n.Strings.get(if (switchingLoaded) "player_switch_loading" else "player_switch_connecting"),
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         val anyMenuOpen = menuOpen

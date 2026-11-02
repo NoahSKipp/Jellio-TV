@@ -596,6 +596,41 @@ internal fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit
 }
 
 @Composable
+internal fun SwitchingCard(label: String, step: String, modifier: Modifier = Modifier) {
+    val spin = rememberInfiniteTransition(label = "switchSpin")
+    val angle by spin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(900, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "switchAngle",
+    )
+    Row(
+        modifier = modifier
+            .widthIn(max = 640.dp)
+            .background(JellioBgElevated.copy(alpha = 0.95f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 28.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.size(32.dp)) {
+            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            drawArc(color = Color.White.copy(alpha = 0.2f), startAngle = 0f, sweepAngle = 360f, useCenter = false, style = stroke)
+            drawArc(color = Color.White, startAngle = angle, sweepAngle = 90f, useCenter = false, style = stroke)
+        }
+        Column {
+            Text(
+                text = com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", label),
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            Text(text = step, color = JellioTextSecondary, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
 internal fun BufferSwitchPrompt(onSwitch: () -> Unit, onKeep: () -> Unit, onAlways: () -> Unit, modifier: Modifier = Modifier) {
     val switchFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { switchFocusRequester.requestFocus() } }

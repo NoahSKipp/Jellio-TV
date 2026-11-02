@@ -555,5 +555,8 @@ internal object StringsEn {
         m["settings_buffer_switch_ask"] = "Ask me"
         m["settings_buffer_switch_auto"] = "Switch automatically"
         m["settings_buffer_switch_off"] = "Keep playing"
+        m["player_switch_connecting"] = "Connecting to the new stream…"
+        m["player_switch_loading"] = "Loading the new stream…"
+        m["player_switch_done"] = "Now playing {label}"
     }
 }

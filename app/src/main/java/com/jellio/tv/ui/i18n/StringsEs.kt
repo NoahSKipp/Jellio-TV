@@ -555,5 +555,8 @@ internal object StringsEs {
         m["settings_buffer_switch_ask"] = "Preguntarme"
         m["settings_buffer_switch_auto"] = "Cambiar automáticamente"
         m["settings_buffer_switch_off"] = "Seguir reproduciendo"
+        m["player_switch_connecting"] = "Conectando con la nueva emisión…"
+        m["player_switch_loading"] = "Cargando la nueva emisión…"
+        m["player_switch_done"] = "Ahora en reproducción: {label}"
     }
 }

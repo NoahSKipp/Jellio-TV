@@ -555,5 +555,8 @@ internal object StringsPl {
         m["settings_buffer_switch_ask"] = "Pytaj mnie"
         m["settings_buffer_switch_auto"] = "Zmieniaj automatycznie"
         m["settings_buffer_switch_off"] = "Odtwarzaj dalej"
+        m["player_switch_connecting"] = "Łączenie z nowym strumieniem…"
+        m["player_switch_loading"] = "Wczytywanie nowego strumienia…"
+        m["player_switch_done"] = "Teraz odtwarzane: {label}"
     }
 }
