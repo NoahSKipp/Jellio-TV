@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1438,7 +1439,7 @@ private fun PlayerSurface(
                 subtitle = subtitle,
                 isPlaying = isPlaying,
                 enabled = !anyMenuOpen,
-                positionMs = positionMs,
+                positionMs = { positionMs },
                 durationMs = shownDurationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
                 hasAudioTracks = true,
@@ -1599,7 +1600,10 @@ private fun PlayerSurface(
         // both there too, but that file never actually has to render
         // both onscreen at once the way this app's own fixed 120 second
         // Up Next fallback now can against a real Credits segment).
-        val activeSkip = activeSkipSegment(skipSegments, positionMs / 1000.0)
+        // Derived, so the 500 ms position tick only recomposes this screen
+        // when the segment under the playhead changes.
+        val activeSkipState by remember(skipSegments) { derivedStateOf { activeSkipSegment(skipSegments, positionMs / 1000.0) } }
+        val activeSkip = activeSkipState
         // Auto-skip intros (Settings > Playback): once per intro, the same
         // as screens/player.js does when it's switched on.
         LaunchedEffect(activeSkip?.targetSeconds, PlayerPrefs.autoSkipIntro) {
@@ -1718,7 +1722,7 @@ private fun PlayerControls(
     title: String,
     subtitle: String,
     isPlaying: Boolean,
-    positionMs: Long,
+    positionMs: () -> Long,
     durationMs: Long,
     hasSubtitleTracks: Boolean,
     hasAudioTracks: Boolean,
@@ -1930,7 +1934,7 @@ private fun TransportButton(
 // spot, and letting go jumps there. Up/Down leave it as usual.
 @Composable
 private fun SeekBar(
-    positionMs: Long,
+    positionMs: () -> Long,
     durationMs: Long,
     onScrub: (Long) -> Unit,
     onScrubEnd: (Long?) -> Unit,
@@ -1938,7 +1942,7 @@ private fun SeekBar(
 ) {
     var focused by remember { mutableStateOf(false) }
     var target by remember { mutableStateOf<Long?>(null) }
-    val shown = target ?: positionMs
+    val shown = target ?: positionMs()
     val progress = if (durationMs > 0) (shown.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
     Column(
@@ -1962,7 +1966,7 @@ private fun SeekBar(
                                 held > 15 -> 30_000L
                                 else -> SEEK_STEP_MS
                             }
-                            val next = ((target ?: positionMs) + if (event.key == Key.DirectionRight) step else -step).coerceIn(0L, durationMs)
+                            val next = ((target ?: positionMs()) + if (event.key == Key.DirectionRight) step else -step).coerceIn(0L, durationMs)
                             target = next
                             onScrub(next)
                         } else if (event.type == KeyEventType.KeyUp) {
