@@ -10,6 +10,7 @@ internal object StringsDe {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillBufferSwitch(m)
         m
     }
 
@@ -541,5 +542,18 @@ internal object StringsDe {
         m["party_notice_scheduled"] = "{0} hat dich zu {1} eingeladen · {2}"
         m["party_notice_starting"] = "{0} beginnt"
         m["party_notice_sub"] = "Watch-Party"
+    }
+
+    private fun fillBufferSwitch(m: HashMap<String, String>) {
+        m["player_buffer_prompt"] = "Dieser Stream lädt immer wieder nach."
+        m["player_buffer_switch"] = "Stream wechseln"
+        m["player_buffer_keep"] = "Weiterschauen"
+        m["player_buffer_always"] = "Immer automatisch wechseln"
+        m["player_buffer_no_other"] = "Kein anderer Stream verfügbar."
+        m["player_buffer_switching"] = "Wechsel zu {label}…"
+        m["settings_buffer_switch_label"] = "Wenn ein Stream ständig puffert"
+        m["settings_buffer_switch_ask"] = "Fragen"
+        m["settings_buffer_switch_auto"] = "Automatisch wechseln"
+        m["settings_buffer_switch_off"] = "Weiterspielen"
     }
 }

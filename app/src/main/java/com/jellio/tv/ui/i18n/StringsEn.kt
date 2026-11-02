@@ -10,6 +10,7 @@ internal object StringsEn {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillBufferSwitch(m)
         m
     }
 
@@ -541,5 +542,18 @@ internal object StringsEn {
         m["party_notice_scheduled"] = "{0} invited you to {1} · {2}"
         m["party_notice_starting"] = "{0} is starting"
         m["party_notice_sub"] = "Watch party"
+    }
+
+    private fun fillBufferSwitch(m: HashMap<String, String>) {
+        m["player_buffer_prompt"] = "This stream keeps stopping to buffer."
+        m["player_buffer_switch"] = "Switch stream"
+        m["player_buffer_keep"] = "Keep watching"
+        m["player_buffer_always"] = "Always switch automatically"
+        m["player_buffer_no_other"] = "No other stream to switch to."
+        m["player_buffer_switching"] = "Switching to {label}…"
+        m["settings_buffer_switch_label"] = "When a stream keeps buffering"
+        m["settings_buffer_switch_ask"] = "Ask me"
+        m["settings_buffer_switch_auto"] = "Switch automatically"
+        m["settings_buffer_switch_off"] = "Keep playing"
     }
 }

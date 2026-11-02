@@ -16,6 +16,7 @@ object PlayerPrefs {
     // New key so it starts off for everyone while playback start is checked.
     private const val MATCH_FRAME_RATE_V2 = "match_frame_rate_v2"
     private const val AUDIO_DELAY = "audio_delay_ms"
+    private const val BUFFER_SWITCH = "buffer_switch"
 
     var autoSkipIntro by mutableStateOf(false)
         private set
@@ -38,6 +39,10 @@ object PlayerPrefs {
     var audioDelayMs by mutableStateOf(0)
         private set
 
+    // "ask", "auto" or "off": what to do when a stream keeps buffering.
+    var bufferSwitch by mutableStateOf("ask")
+        private set
+
     fun init(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         autoSkipIntro = prefs.getBoolean(AUTO_SKIP, false)
@@ -46,6 +51,12 @@ object PlayerPrefs {
         audioPassthrough = prefs.getBoolean(AUDIO_PASSTHROUGH, false)
         matchFrameRate = prefs.getBoolean(MATCH_FRAME_RATE_V2, false)
         audioDelayMs = prefs.getInt(AUDIO_DELAY, 0)
+        bufferSwitch = prefs.getString(BUFFER_SWITCH, "ask") ?: "ask"
+    }
+
+    fun setBufferSwitch(context: Context, mode: String) {
+        bufferSwitch = mode
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(BUFFER_SWITCH, mode).apply()
     }
 
     fun setPrebuffer(context: Context, level: String) {

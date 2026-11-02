@@ -10,6 +10,7 @@ internal object StringsFr {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillBufferSwitch(m)
         m
     }
 
@@ -541,5 +542,18 @@ internal object StringsFr {
         m["party_notice_scheduled"] = "{0} vous invite à {1} · {2}"
         m["party_notice_starting"] = "{0} commence"
         m["party_notice_sub"] = "Soirée visionnage"
+    }
+
+    private fun fillBufferSwitch(m: HashMap<String, String>) {
+        m["player_buffer_prompt"] = "Ce flux s'arrête sans cesse pour charger."
+        m["player_buffer_switch"] = "Changer de flux"
+        m["player_buffer_keep"] = "Continuer"
+        m["player_buffer_always"] = "Toujours changer automatiquement"
+        m["player_buffer_no_other"] = "Aucun autre flux disponible."
+        m["player_buffer_switching"] = "Passage à {label}…"
+        m["settings_buffer_switch_label"] = "Quand un flux charge sans arrêt"
+        m["settings_buffer_switch_ask"] = "Me demander"
+        m["settings_buffer_switch_auto"] = "Changer automatiquement"
+        m["settings_buffer_switch_off"] = "Continuer la lecture"
     }
 }

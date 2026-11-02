@@ -308,6 +308,7 @@ fun PlayerScreen(
                 switchingTo = uiState.switchingTo,
                 onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
                 onSwitchSettled = { viewModel.clearSwitching() },
+                onBufferSwitch = { ticks -> viewModel.switchForBuffering(session, ticks) },
                 expectedRuntimeMs = uiState.expectedRuntimeMs,
                 reencodingVideo = uiState.reencodingVideo,
                 onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
@@ -421,6 +422,7 @@ internal fun PlayerSurface(
     onShowToast: (String) -> Unit,
     switchingTo: String?,
     onSwitchSettled: () -> Unit,
+    onBufferSwitch: suspend (Long) -> Boolean,
     onSeekReload: (Long) -> Unit,
     expectedRuntimeMs: Long = 0,
     reencodingVideo: Boolean = false,
@@ -620,6 +622,8 @@ internal fun PlayerSurface(
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember { mutableStateOf(true) }
+    val bufferWatch = remember { BufferWatch() }
+    var bufferPromptVisible by remember { mutableStateOf(false) }
 
     val hostView = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(isPlaying, isBuffering) {
@@ -639,6 +643,7 @@ internal fun PlayerSurface(
 
     var pendingReloadMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
     fun seekToReal(targetMs: Long) {
+        bufferWatch.lastSeekAt = System.currentTimeMillis()
         if (directPlay) {
             player.seekTo(targetMs.coerceAtLeast(0L))
         } else {
@@ -798,6 +803,41 @@ internal fun PlayerSurface(
         player.setPlaybackSpeed(playbackSpeed)
     }
 
+    val bufferScope = rememberCoroutineScope()
+    LaunchedEffect(streamUrl) {
+        bufferWatch.reset()
+        bufferPromptVisible = false
+    }
+    fun switchForBuffering() {
+        bufferPromptVisible = false
+        bufferWatch.offered()
+        val ticks = realPositionMs() * TICKS_PER_MS
+        bufferScope.launch {
+            if (!onBufferSwitch(ticks)) {
+                bufferWatch.snooze(System.currentTimeMillis(), 10 * 60_000L)
+                onShowToast(com.jellio.tv.ui.i18n.Strings.get("player_buffer_no_other"))
+            }
+        }
+    }
+    LaunchedEffect(isBuffering, streamUrl) {
+        if (!isBuffering || PlayerPrefs.bufferSwitch == "off") return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        if (!bufferWatch.counts(now, playWhenReadyState, syncPlaylistItemId != null, switchingTo != null)) return@LaunchedEffect
+        bufferWatch.stallStarted(now)
+        try {
+            while (true) {
+                if (!bufferPromptVisible && bufferWatch.shouldOffer(System.currentTimeMillis())) {
+                    bufferWatch.offered()
+                    if (PlayerPrefs.bufferSwitch == "auto") switchForBuffering() else bufferPromptVisible = true
+                    break
+                }
+                delay(1000)
+            }
+        } finally {
+            bufferWatch.stallEnded(System.currentTimeMillis())
+        }
+    }
+
     LaunchedEffect(sleepTimerEndTimeMs) {
         val endTimeMs = sleepTimerEndTimeMs ?: return@LaunchedEffect
         val remaining = endTimeMs - System.currentTimeMillis()
@@ -808,10 +848,14 @@ internal fun PlayerSurface(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
+                if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
                 PlayStartTrace.end("first frame")
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+            }
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) bufferWatch.lastSeekAt = System.currentTimeMillis()
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 playWhenReadyState = playWhenReady
@@ -1145,6 +1189,14 @@ internal fun PlayerSurface(
                 if (showEpisodesPanel) {
                     if (event.key == Key.Back) {
                         showEpisodesPanel = false
+                        return@onKeyEvent true
+                    }
+                    return@onKeyEvent false
+                }
+                if (bufferPromptVisible) {
+                    if (event.key == Key.Back) {
+                        bufferPromptVisible = false
+                        bufferWatch.snooze(System.currentTimeMillis(), 10 * 60_000L)
                         return@onKeyEvent true
                     }
                     return@onKeyEvent false
@@ -1505,6 +1557,21 @@ internal fun PlayerSurface(
                         syncPlay.leave()
                         onRestart()
                     }
+                },
+            )
+        }
+
+        if (bufferPromptVisible) {
+            val promptContext = LocalContext.current
+            BufferSwitchPrompt(
+                onSwitch = { switchForBuffering() },
+                onKeep = {
+                    bufferPromptVisible = false
+                    bufferWatch.snooze(System.currentTimeMillis(), 10 * 60_000L)
+                },
+                onAlways = {
+                    PlayerPrefs.setBufferSwitch(promptContext, "auto")
+                    switchForBuffering()
                 },
             )
         }

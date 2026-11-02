@@ -10,6 +10,7 @@ internal object StringsEs {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillBufferSwitch(m)
         m
     }
 
@@ -541,5 +542,18 @@ internal object StringsEs {
         m["party_notice_scheduled"] = "{0} te invitó a {1} · {2}"
         m["party_notice_starting"] = "{0} está empezando"
         m["party_notice_sub"] = "Fiesta para ver juntos"
+    }
+
+    private fun fillBufferSwitch(m: HashMap<String, String>) {
+        m["player_buffer_prompt"] = "Esta emisión se detiene a cargar una y otra vez."
+        m["player_buffer_switch"] = "Cambiar emisión"
+        m["player_buffer_keep"] = "Seguir viendo"
+        m["player_buffer_always"] = "Cambiar siempre automáticamente"
+        m["player_buffer_no_other"] = "No hay otra emisión a la que cambiar."
+        m["player_buffer_switching"] = "Cambiando a {label}…"
+        m["settings_buffer_switch_label"] = "Cuando una emisión se queda cargando"
+        m["settings_buffer_switch_ask"] = "Preguntarme"
+        m["settings_buffer_switch_auto"] = "Cambiar automáticamente"
+        m["settings_buffer_switch_off"] = "Seguir reproduciendo"
     }
 }

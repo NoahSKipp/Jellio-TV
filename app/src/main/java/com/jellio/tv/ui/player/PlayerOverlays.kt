@@ -596,6 +596,49 @@ internal fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit
 }
 
 @Composable
+internal fun BufferSwitchPrompt(onSwitch: () -> Unit, onKeep: () -> Unit, onAlways: () -> Unit, modifier: Modifier = Modifier) {
+    val switchFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { switchFocusRequester.requestFocus() } }
+    val secondary = ClickableSurfaceDefaults.colors(
+        containerColor = Color.White.copy(alpha = 0.12f),
+        contentColor = JellioText,
+        focusedContainerColor = Color.White.copy(alpha = 0.28f),
+        focusedContentColor = JellioText,
+    )
+    val border = ClickableSurfaceDefaults.border(
+        focusedBorder = Border(border = BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(999.dp)),
+    )
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Column(
+            modifier = Modifier
+                .padding(bottom = 64.dp)
+                .background(JellioBgElevated.copy(alpha = 0.96f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 28.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    onClick = onSwitch,
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                    colors = com.jellio.tv.ui.common.primaryButtonColors(),
+                    border = border,
+                    modifier = Modifier.focusRequester(switchFocusRequester),
+                ) {
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_switch"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                }
+                Surface(onClick = onKeep, shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)), colors = secondary, border = border) {
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_keep"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                }
+                Surface(onClick = onAlways, shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)), colors = secondary, border = border) {
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_always"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun PlayerToast(message: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier

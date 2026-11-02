@@ -308,6 +308,23 @@ fun SettingsScreen(
                             PlayerPrefs.setPrebuffer(playerContext, next)
                         },
                     )
+                    SettingsDivider()
+                    SettingsPickerRow(
+                        label = string("settings_buffer_switch_label"),
+                        value = when (PlayerPrefs.bufferSwitch) {
+                            "auto" -> string("settings_buffer_switch_auto")
+                            "off" -> string("settings_buffer_switch_off")
+                            else -> string("settings_buffer_switch_ask")
+                        },
+                        onClick = {
+                            val next = when (PlayerPrefs.bufferSwitch) {
+                                "ask" -> "auto"
+                                "auto" -> "off"
+                                else -> "ask"
+                            }
+                            PlayerPrefs.setBufferSwitch(playerContext, next)
+                        },
+                    )
                 }
 
                 SettingsSection(title = string("onboarding_step_playback"), icon = Icons.Filled.Translate) {

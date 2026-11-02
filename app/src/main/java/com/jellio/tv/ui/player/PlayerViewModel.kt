@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.player
 
+import com.jellio.tv.ui.i18n.Strings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
@@ -494,6 +495,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
+                currentSource = target.mediaSource
                 PlayStartTrace.mark(itemId, "stream url ready")
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
                 val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
@@ -918,6 +920,28 @@ class PlayerViewModel @Inject constructor(
                 showToast(com.jellio.tv.ui.i18n.Strings.get("tv_seek_failed"))
             }
         }
+    }
+
+    // Moves a stream that keeps buffering to the next one in the preferred
+    // language, at the same spot. False when there is none left to try.
+    suspend fun switchForBuffering(session: Session, currentPositionTicks: Long): Boolean {
+        val id = itemId ?: return false
+        val current = _uiState.value.mediaSourceId
+        current?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
+        val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "buffering") }.getOrDefault(emptyList())
+        val candidates = sources.filter { it.Id != null && it.Id != current && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
+        val policy = VideoTranscodePolicy
+        val pool = if (policy.avoiding) {
+            val (reencode, copyable) = candidates.partition { policy.needsReencode(it) }
+            copyable.ifEmpty { if (policy.blocking) emptyList() else reencode }
+        } else {
+            candidates
+        }
+        val next = orderByLanguage(pool, failoverLanguage ?: streamLanguage()).firstOrNull() ?: return false
+        currentSource?.let { BadStreams.mark(id, it) }
+        showToast(Strings.format("player_buffer_switching", sourceLabel(next)))
+        switchSource(session, next, currentPositionTicks)
+        return true
     }
 
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {

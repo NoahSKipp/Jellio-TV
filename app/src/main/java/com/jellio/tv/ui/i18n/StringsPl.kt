@@ -10,6 +10,7 @@ internal object StringsPl {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillBufferSwitch(m)
         m
     }
 
@@ -541,5 +542,18 @@ internal object StringsPl {
         m["party_notice_scheduled"] = "{0} zaprasza cię na {1} · {2}"
         m["party_notice_starting"] = "{0} się zaczyna"
         m["party_notice_sub"] = "Wspólny seans"
+    }
+
+    private fun fillBufferSwitch(m: HashMap<String, String>) {
+        m["player_buffer_prompt"] = "Ten strumień ciągle się zatrzymuje, by buforować."
+        m["player_buffer_switch"] = "Zmień strumień"
+        m["player_buffer_keep"] = "Oglądaj dalej"
+        m["player_buffer_always"] = "Zawsze zmieniaj automatycznie"
+        m["player_buffer_no_other"] = "Brak innego strumienia."
+        m["player_buffer_switching"] = "Przełączanie na {label}…"
+        m["settings_buffer_switch_label"] = "Gdy strumień ciągle buforuje"
+        m["settings_buffer_switch_ask"] = "Pytaj mnie"
+        m["settings_buffer_switch_auto"] = "Zmieniaj automatycznie"
+        m["settings_buffer_switch_off"] = "Odtwarzaj dalej"
     }
 }
