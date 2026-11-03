@@ -34,6 +34,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -222,6 +223,7 @@ interface JellyfinApi {
     @GET("Jellio/StreamLinks")
     suspend fun getStreamLinks(): List<com.jellio.tv.data.model.StreamLinkDto>
 
+    @Headers("X-Read-Timeout-Seconds: 140")
     @POST("Jellio/StreamLinks/{id}/play")
     suspend fun playStreamLink(@Path("id") id: String, @Query("entry") entry: Int?): com.jellio.tv.data.model.StreamLinkPlayDto
 
@@ -231,6 +233,7 @@ interface JellyfinApi {
     @DELETE("Jellio/StreamLinks/{id}/entries/{index}")
     suspend fun removeStreamLinkEntry(@Path("id") id: String, @Path("index") index: Int): retrofit2.Response<Unit>
 
+    @Headers("X-Read-Timeout-Seconds: 140")
     @POST("Jellio/StreamLinks/{id}/refresh")
     suspend fun refreshStreamLink(@Path("id") id: String): com.jellio.tv.data.model.StreamLinkDto
 

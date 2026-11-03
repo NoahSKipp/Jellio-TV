@@ -126,6 +126,17 @@ object NetworkModule {
         .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
+        // A call can ask for a longer wait with this header (following a pasted page to its stream can take
+        // over a minute on the server); everything else keeps the short read timeout.
+        .addInterceptor { chain ->
+            val seconds = chain.request().header("X-Read-Timeout-Seconds")?.toIntOrNull()
+            if (seconds == null) {
+                chain.proceed(chain.request())
+            } else {
+                chain.withReadTimeout(seconds, java.util.concurrent.TimeUnit.SECONDS)
+                    .proceed(chain.request().newBuilder().removeHeader("X-Read-Timeout-Seconds").build())
+            }
+        }
         .apply {
             if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
         }

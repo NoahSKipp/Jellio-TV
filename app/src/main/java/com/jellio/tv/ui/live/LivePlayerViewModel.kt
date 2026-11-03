@@ -32,6 +32,8 @@ import com.jellio.tv.data.playStreamLink
 
 private const val TAG = "JellioLive"
 private const val OPEN_TIMEOUT_MS = 25_000L
+// A pasted page can need the server's browser and a bot-check solver before it yields a stream.
+private const val LINK_OPEN_TIMEOUT_MS = 140_000L
 private const val STALL_NOTICE_MS = 15_000L
 private const val STALL_RESTART_MS = 30_000L
 private const val MAX_RESTARTS = 2
@@ -72,7 +74,7 @@ class LivePlayerViewModel @Inject constructor(
         open = { channelId ->
             val session = this.session ?: throw IllegalStateException("Not signed in")
             val link = parseLinkChannelId(channelId)
-            withTimeout(OPEN_TIMEOUT_MS) {
+            withTimeout(if (link != null) LINK_OPEN_TIMEOUT_MS else OPEN_TIMEOUT_MS) {
                 if (link != null) {
                     repository.playStreamLink(channelId, link.linkId, link.entry)
                 } else {
