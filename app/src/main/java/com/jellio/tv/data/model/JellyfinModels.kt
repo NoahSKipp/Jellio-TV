@@ -215,6 +215,18 @@ data class ItemsResultDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class PrefetchBatchRequest(
+    val ItemIds: List<String>,
+    val Probe: Boolean = false,
+)
+
+@JsonClass(generateAdapter = true)
+data class PrefetchBatchResponse(
+    val Queued: List<String>? = null,
+    val AlreadyWarm: List<String>? = null,
+)
+
+@JsonClass(generateAdapter = true)
 data class PlaybackInfoRequest(
     val UserId: String,
     val StartTimeTicks: Long = 0,

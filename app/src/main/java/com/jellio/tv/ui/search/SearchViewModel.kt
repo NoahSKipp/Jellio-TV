@@ -21,6 +21,7 @@ import retrofit2.HttpException
 import javax.inject.Inject
 
 private const val DEBOUNCE_MS = 400L
+private const val SEARCH_WARM_COUNT = 3
 
 data class SearchUiState(
     val query: String = "",
@@ -43,6 +44,44 @@ class SearchViewModel @Inject constructor(
 
     private var searchJob: Job? = null
     private var permissionsLoadedFor: String? = null
+    private var warmJob: Job? = null
+    private var batchJob: Job? = null
+    private var warmSession: Session? = null
+
+    // The top results' stream lists are warmed once they stop changing; a
+    // new query drops what the last one had pending.
+    private val warmer = com.jellio.tv.data.streams.SearchWarmer<BaseItemDto>(
+        scheduler = { delayMs, block ->
+            val job = viewModelScope.launch {
+                delay(delayMs)
+                block()
+            }
+            com.jellio.tv.data.streams.Cancellable { job.cancel() }
+        },
+        onSettled = { items -> warmTopResults(items) },
+        onQueryChanged = {
+            warmJob?.cancel()
+            warmJob = null
+            batchJob?.cancel()
+            batchJob = null
+        },
+    )
+
+    private fun warmTopResults(items: List<BaseItemDto>) {
+        val session = warmSession ?: return
+        val top = items.filter { it.Type == "Movie" || it.Type == "Episode" || it.Type == "Series" }.take(SEARCH_WARM_COUNT)
+        warmJob?.cancel()
+        warmJob = viewModelScope.launch {
+            // A series plays its next (or first) episode; one not in the
+            // library yet is sent as is, which adds it.
+            val ids = top.map { item ->
+                if (item.Type != "Series") item.Id
+                else runCatching { repository.getSeriesNextUp(item.Id, session.userId)?.Id }.getOrNull() ?: item.Id
+            }
+            batchJob?.cancel()
+            batchJob = repository.prefetchStreamsBatch(ids)
+        }
+    }
 
     fun loadPermissions(session: Session) {
         if (permissionsLoadedFor == session.userId) return
@@ -56,6 +95,8 @@ class SearchViewModel @Inject constructor(
     fun onQueryChange(session: Session, query: String) {
         _uiState.value = _uiState.value.copy(query = query)
         searchJob?.cancel()
+        warmSession = session
+        warmer.query()
         if (query.isBlank()) {
             _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null, suggestions = null)
             return
@@ -80,6 +121,7 @@ class SearchViewModel @Inject constructor(
                     }
                     if (fresh.isNotEmpty()) {
                         _uiState.value = _uiState.value.copy(results = _uiState.value.results + fresh, error = null)
+                        warmer.results(_uiState.value.results)
                     }
                 }
             }

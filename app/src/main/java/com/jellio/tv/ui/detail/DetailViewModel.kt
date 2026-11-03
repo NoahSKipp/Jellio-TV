@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val SECOND_SOURCE_DELAY_MS = 1_500L
+
 sealed interface PlayAction {
     data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
     data class ShowPicker(val item: BaseItemDto) : PlayAction
@@ -293,11 +295,22 @@ class DetailViewModel @Inject constructor(
 
     // Streams are looked up only once the page is drawn; Play reuses this
     // same lookup (the repository shares it and caches the answer).
+    private var secondSourceJob: kotlinx.coroutines.Job? = null
+
+    // Leaving the page drops the second source's warm-up if it hasn't run.
+    fun onScreenHidden() {
+        secondSourceJob?.cancel()
+        secondSourceJob = null
+    }
+
     private fun lookForStreams(session: Session, itemId: String) {
+        repository.prefetchStreams(itemId)
+        val openedAt = System.currentTimeMillis()
         _uiState.value = _uiState.value.copy(findingStreams = true, streamStatus = null)
         viewModelScope.launch {
             val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
             if (_uiState.value.item?.Id != itemId) return@launch
+            warmSecondSource(session, itemId, sources.getOrNull().orEmpty(), openedAt)
             _uiState.value = _uiState.value.copy(
                 findingStreams = false,
                 streamStatus = when {
@@ -306,6 +319,22 @@ class DetailViewModel @Inject constructor(
                     else -> null
                 },
             )
+        }
+    }
+
+    // Still on the page after a moment: the next source in line is the likely
+    // fallback, so have its probe done too.
+    private fun warmSecondSource(session: Session, itemId: String, sources: List<MediaSourceDto>, openedAt: Long) {
+        secondSourceJob?.cancel()
+        secondSourceJob = viewModelScope.launch {
+            kotlinx.coroutines.delay((SECOND_SOURCE_DELAY_MS - (System.currentTimeMillis() - openedAt)).coerceAtLeast(0L))
+            if (_uiState.value.item?.Id != itemId) return@launch
+            val bad = sources.filter { com.jellio.tv.ui.player.BadStreams.isBad(itemId, it) }
+            val second = ((sources - bad.toSet()) + bad).getOrNull(1)?.Id ?: return@launch
+            val warm = repository.getWarmSources(itemId).orEmpty().keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }
+            if (com.jellio.tv.data.streams.normalizeSourceId(second) !in warm) {
+                repository.probeSource(session.userId, itemId, second)
+            }
         }
     }
 

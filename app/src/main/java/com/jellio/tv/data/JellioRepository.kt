@@ -54,6 +54,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
+private const val PREFETCH_SLOT_WAIT_MS = 3_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
@@ -169,7 +170,10 @@ class JellioRepository @Inject constructor(
     private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
     private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
     private val prefetchedAt = ConcurrentHashMap<String, Long>()
-    private val prefetchSlots = java.util.concurrent.Semaphore(2)
+    // One warm-up request to the server at a time, whoever asks.
+    private val prefetchSlots = java.util.concurrent.Semaphore(1)
+    // Titles the server said are already warm.
+    private val knownWarm = ConcurrentHashMap.newKeySet<String>()
 
     fun clearCache() {
         cache.clear()
@@ -1078,18 +1082,81 @@ class JellioRepository @Inject constructor(
         return policy.IsAdministrator || policy.EnableContentDeletion
     }
 
+    fun isKnownWarm(itemId: String): Boolean =
+        knownWarm.contains(com.jellio.tv.data.streams.normalizeSourceId(itemId))
+
     fun prefetchStreams(itemId: String) {
         val now = System.currentTimeMillis()
         val last = prefetchedAt[itemId]
         if (last != null && now - last < PREFETCH_WINDOW_MS) return
+        if (isKnownWarm(itemId)) return
         if (sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)) return
-        // Two already running: skip, a later dwell on this card tries again.
-        if (!prefetchSlots.tryAcquire()) return
         prefetchedAt[itemId] = now
-        com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
         prefetchScope.launch {
+            // Waits its turn briefly; given up, a later dwell tries again.
+            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) {
+                prefetchedAt.remove(itemId)
+                return@launch
+            }
+            com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
             try {
                 runCatching { api.prefetchGelatoStreams(itemId) }
+            } finally {
+                prefetchSlots.release()
+            }
+        }
+    }
+
+    private suspend fun acquirePrefetchSlot(waitMs: Long): Boolean {
+        val until = System.currentTimeMillis() + waitMs
+        while (!prefetchSlots.tryAcquire()) {
+            if (System.currentTimeMillis() >= until) return false
+            delay(100)
+        }
+        return true
+    }
+
+    // Stream lists only, a few titles in one call; the job is cancelled
+    // when the search that asked for it changes.
+    fun prefetchStreamsBatch(itemIds: List<String>): kotlinx.coroutines.Job? {
+        val ids = itemIds.filter { it.isNotBlank() && !isKnownWarm(it) }.distinct()
+        if (ids.isEmpty()) return null
+        return prefetchScope.launch {
+            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
+            try {
+                val response = runCatching {
+                    api.prefetchGelatoBatch(com.jellio.tv.data.model.PrefetchBatchRequest(ids, Probe = false))
+                }.getOrNull()
+                response?.body()?.AlreadyWarm.orEmpty().forEach {
+                    knownWarm.add(com.jellio.tv.data.streams.normalizeSourceId(it))
+                }
+            } finally {
+                prefetchSlots.release()
+            }
+        }
+    }
+
+    // { sourceId: warmedAt } for sources that start fast now; null when the
+    // server can't say.
+    suspend fun getWarmSources(itemId: String): Map<String, String>? = runCatching {
+        val response = api.getWarmSources(itemId)
+        if (response.isSuccessful) response.body().orEmpty() else null
+    }.getOrNull()
+
+    suspend fun getQualityTiers(itemId: String): Map<String, String> = runCatching {
+        val response = api.getQualityTiers(itemId)
+        if (response.isSuccessful) response.body().orEmpty() else emptyMap()
+    }.getOrDefault(emptyMap())
+
+    // The probe Play would run for one particular source, so picking it
+    // later starts fast.
+    fun probeSource(userId: String, itemId: String, mediaSourceId: String) {
+        prefetchScope.launch {
+            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
+            try {
+                runCatching {
+                    api.getPlaybackInfo(itemId, PlaybackInfoRequest(UserId = userId, MediaSourceId = mediaSourceId))
+                }
             } finally {
                 prefetchSlots.release()
             }

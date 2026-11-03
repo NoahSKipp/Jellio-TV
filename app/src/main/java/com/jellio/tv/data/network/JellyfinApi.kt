@@ -396,6 +396,15 @@ interface JellyfinApi {
     @POST("gelato/prefetch/{itemId}")
     suspend fun prefetchGelatoStreams(@Path("itemId") itemId: String)
 
+    @POST("gelato/prefetch-batch")
+    suspend fun prefetchGelatoBatch(@Body body: com.jellio.tv.data.model.PrefetchBatchRequest): retrofit2.Response<com.jellio.tv.data.model.PrefetchBatchResponse>
+
+    @GET("gelato/warm/{itemId}")
+    suspend fun getWarmSources(@Path("itemId") itemId: String): retrofit2.Response<Map<String, String>>
+
+    @GET("gelato/tiers/{itemId}")
+    suspend fun getQualityTiers(@Path("itemId") itemId: String): retrofit2.Response<Map<String, String>>
+
     @GET("Jellio/next-up-hidden")
     suspend fun getHiddenNextUpSeries(): List<String>
 
