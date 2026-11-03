@@ -439,6 +439,7 @@ internal object StringsDe {
         m["live_badge"] = "LIVE"
         m["live_retry"] = "Erneut versuchen"
         m["live_tuning"] = "Sender wird eingeschaltet…"
+        m["live_opening_link"] = "Dein Stream wird geöffnet, das kann ein paar Minuten dauern…"
         m["live_load_error"] = "Sender konnten nicht geladen werden."
         m["live_tuners_busy"] = "Alle Tuner sind belegt. Beende einen anderen Live-Stream und versuche es erneut."
         m["live_open_timeout"] = "Der Sender hat zu lange zum Starten gebraucht."

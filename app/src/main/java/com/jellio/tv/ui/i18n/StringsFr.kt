@@ -439,6 +439,7 @@ internal object StringsFr {
         m["live_badge"] = "DIRECT"
         m["live_retry"] = "Réessayer"
         m["live_tuning"] = "Réglage en cours…"
+        m["live_opening_link"] = "Ouverture de votre flux, cela peut prendre quelques minutes…"
         m["live_load_error"] = "Impossible de charger les chaînes."
         m["live_tuners_busy"] = "Tous les tuners sont occupés. Fermez un autre flux en direct et réessayez."
         m["live_open_timeout"] = "La chaîne a mis trop de temps à démarrer."

@@ -439,6 +439,7 @@ internal object StringsEn {
         m["live_badge"] = "LIVE"
         m["live_retry"] = "Try again"
         m["live_tuning"] = "Tuning in…"
+        m["live_opening_link"] = "Opening your stream, this can take a couple of minutes…"
         m["live_load_error"] = "Couldn't load channels."
         m["live_tuners_busy"] = "All tuners are busy. Close another live stream and try again."
         m["live_open_timeout"] = "The channel took too long to start."

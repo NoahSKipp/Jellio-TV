@@ -439,6 +439,7 @@ internal object StringsPl {
         m["live_badge"] = "NA ŻYWO"
         m["live_retry"] = "Spróbuj ponownie"
         m["live_tuning"] = "Dostrajanie…"
+        m["live_opening_link"] = "Otwieranie twojego streamu, może to potrwać kilka minut…"
         m["live_load_error"] = "Nie udało się wczytać kanałów."
         m["live_tuners_busy"] = "Wszystkie tunery są zajęte. Zamknij inną transmisję na żywo i spróbuj ponownie."
         m["live_open_timeout"] = "Uruchamianie kanału trwało zbyt długo."

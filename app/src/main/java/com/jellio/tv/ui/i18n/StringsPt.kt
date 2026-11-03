@@ -439,6 +439,7 @@ internal object StringsPt {
         m["live_badge"] = "AO VIVO"
         m["live_retry"] = "Tentar novamente"
         m["live_tuning"] = "Sintonizando…"
+        m["live_opening_link"] = "Abrindo seu stream, isso pode levar alguns minutos…"
         m["live_load_error"] = "Não foi possível carregar os canais."
         m["live_tuners_busy"] = "Todos os sintonizadores estão ocupados. Feche outra transmissão ao vivo e tente novamente."
         m["live_open_timeout"] = "O canal demorou demais para iniciar."

@@ -251,7 +251,13 @@ fun LivePlayerScreen(
             Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 ScreenSpinner()
                 Text(
-                    text = Strings.get(if (status == LiveStatus.Reconnecting) "live_reconnecting" else "live_tuning"),
+                    text = Strings.get(
+                        when {
+                            status == LiveStatus.Reconnecting -> "live_reconnecting"
+                            uiState.channel?.userStream == true -> "live_opening_link"
+                            else -> "live_tuning"
+                        },
+                    ),
                     color = JellioTextSecondary,
                     modifier = Modifier.padding(top = 12.dp),
                 )

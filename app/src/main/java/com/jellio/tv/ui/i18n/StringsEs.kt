@@ -439,6 +439,7 @@ internal object StringsEs {
         m["live_badge"] = "EN DIRECTO"
         m["live_retry"] = "Reintentar"
         m["live_tuning"] = "Sintonizando…"
+        m["live_opening_link"] = "Abriendo tu stream, puede tardar un par de minutos…"
         m["live_load_error"] = "No se pudieron cargar los canales."
         m["live_tuners_busy"] = "Todos los sintonizadores están ocupados. Cierra otra emisión en directo e inténtalo de nuevo."
         m["live_open_timeout"] = "El canal tardó demasiado en iniciarse."
