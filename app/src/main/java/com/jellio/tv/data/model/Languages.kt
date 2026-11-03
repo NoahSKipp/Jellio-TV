@@ -39,8 +39,6 @@ val KEY_BY_CODE = mapOf(
     "ml" to "lang_ml", "mal" to "lang_ml",
 )
 
-private val LANGUAGE_KEY_MAP = KEY_BY_CODE
-
 private val FALLBACK_ENGLISH_NAMES = mapOf(
     "eng" to "English", "en" to "English",
     "ger" to "German", "deu" to "German", "de" to "German",

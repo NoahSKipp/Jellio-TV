@@ -63,7 +63,6 @@ class PartyManager @Inject constructor(
 
     // The newest chat line from someone else: what a reaction answers.
     private val _lastIncoming = MutableStateFlow<GroupWatchMessageDto?>(null)
-    val lastIncoming: StateFlow<GroupWatchMessageDto?> = _lastIncoming.asStateFlow()
     @Volatile private var lastIncomingAtMs = 0L
 
     // Set by the app root so a party card can open its title.

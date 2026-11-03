@@ -49,18 +49,20 @@ class StreamPreferences @Inject constructor(
         return entry.mediaSourceId
     }
 
+    // Read and written in one edit so concurrent saves don't drop each
+    // other; expired picks are dropped here, as nothing else reads them.
     suspend fun remember(itemId: String, mediaSourceId: String) {
-        val map = readMap().toMutableMap()
-        map[itemId] = RememberedSource(mediaSourceId, System.currentTimeMillis())
-        writeMap(map)
+        val now = System.currentTimeMillis()
+        context.streamPrefsDataStore.edit { prefs ->
+            val map = parse(prefs[Keys.REMEMBERED_SOURCES]).filterValues { now - it.timestampMs <= REMEMBER_TTL_MS }.toMutableMap()
+            map[itemId] = RememberedSource(mediaSourceId, now)
+            prefs[Keys.REMEMBERED_SOURCES] = adapter.toJson(map)
+        }
     }
 
-    private suspend fun readMap(): Map<String, RememberedSource> {
-        val raw = context.streamPrefsDataStore.data.map { it[Keys.REMEMBERED_SOURCES] }.first() ?: return emptyMap()
-        return runCatching { adapter.fromJson(raw) }.getOrNull() ?: emptyMap()
-    }
+    private suspend fun readMap(): Map<String, RememberedSource> =
+        parse(context.streamPrefsDataStore.data.map { it[Keys.REMEMBERED_SOURCES] }.first())
 
-    private suspend fun writeMap(map: Map<String, RememberedSource>) {
-        context.streamPrefsDataStore.edit { it[Keys.REMEMBERED_SOURCES] = adapter.toJson(map) }
-    }
+    private fun parse(raw: String?): Map<String, RememberedSource> =
+        raw?.let { runCatching { adapter.fromJson(it) }.getOrNull() } ?: emptyMap()
 }

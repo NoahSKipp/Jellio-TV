@@ -28,7 +28,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.time.Instant
-import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -152,6 +151,13 @@ class SyncPlayManager @Inject constructor(
                         } else {
                             handleMessage(message)
                         }
+                    }
+
+                    // A close from the server is only finished once this side answers;
+                    // without it onClosed never comes and the socket is never reopened.
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        webSocket.close(1000, null)
+                        closed.complete(Unit)
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -406,12 +412,7 @@ class SyncPlayManager @Inject constructor(
 
     private fun remoteNowIso(): String = Instant.ofEpochMilli(System.currentTimeMillis() + offsetMs()).toString()
 
-    private fun parseTime(value: String?): Long? {
-        if (value.isNullOrEmpty()) return null
-        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
-            ?: runCatching { OffsetDateTime.parse(value).toInstant().toEpochMilli() }.getOrNull()
-            ?: runCatching { Instant.parse(value + "Z").toEpochMilli() }.getOrNull()
-    }
+    private fun parseTime(value: String?): Long? = PartyManager.parseTime(value)
 
     companion object {
         fun sameId(a: String?, b: String?): Boolean =

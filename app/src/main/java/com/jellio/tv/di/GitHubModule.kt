@@ -6,7 +6,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import javax.inject.Singleton
@@ -19,10 +18,7 @@ object GitHubModule {
     fun provideGitHubApi(moshi: Moshi): GitHubApi = Retrofit.Builder()
         .baseUrl("https://api.github.com/")
         .client(
-            OkHttpClient.Builder()
-                .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
-                .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            com.jellio.tv.data.network.SharedHttp.plainClient.newBuilder()
                 // GitHub's API asks every client for a User-Agent naming it.
                 .addInterceptor { chain ->
                     chain.proceed(

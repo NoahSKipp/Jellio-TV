@@ -26,7 +26,6 @@ private const val LIKED_SEED_BOOST = 1.35
 private const val MAX_PER_PERSON = 2
 private const val MAX_PER_GENRE = 3
 
-private const val MIN_RATING = 5.0
 private const val MIN_GENRE_COUNT = 3
 private const val MAX_GENRE_ROWS = 1
 

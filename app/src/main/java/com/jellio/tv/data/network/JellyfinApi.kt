@@ -26,7 +26,6 @@ import com.jellio.tv.data.model.SetPrivacyRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.UpdatePasswordRequest
-import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.WatchlistAutoRemoveRequest
@@ -64,10 +63,15 @@ interface JellyfinApi {
         @Header("Authorization") authorization: String,
     ): UserDto
 
+    // Raw JSON so a configuration update can send back every field it
+    // does not change: the server replaces the whole configuration.
+    @GET("Users/{userId}")
+    suspend fun getUserJson(@Path("userId") userId: String): ResponseBody
+
     @POST("Users/{userId}/Configuration")
     suspend fun updateUserConfiguration(
         @Path("userId") userId: String,
-        @Body body: UserConfigurationDto,
+        @Body body: RequestBody,
     )
 
     @GET("Users/{userId}/Views")

@@ -25,7 +25,6 @@ import com.jellio.tv.data.model.MediaStreamDto
 import com.jellio.tv.data.model.PlaybackInfoRequest
 import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.UpdatePasswordRequest
-import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.WatchlistAutoRemoveRequest
@@ -92,7 +91,31 @@ private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks
 
 private val ANIME_VIEW_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 private val ANIME_COLLECTION_NAME = Regex("anime|anilist|kitsu", RegexOption.IGNORE_CASE)
-private const val ANIME_ITEM_ID_LIMIT = 500
+private val SPECIALS_SEASON_NAME = Regex("special", RegexOption.IGNORE_CASE)
+private val TRANSCODE_REASONS_PARAM = Regex("[?&]TranscodeReasons=([^&]*)", RegexOption.IGNORE_CASE)
+// Named because their genres rarely say so; episodes stand alone.
+private val KNOWN_ANTHOLOGIES = listOf(
+    "black mirror",
+    "love, death & robots",
+    "love death and robots",
+    "love death & robots",
+    "love death + robots",
+    "twilight zone",
+    "cabinet of curiosities",
+    "electric dreams",
+    "room 104",
+    "star wars: visions",
+    "star wars visions",
+    "inside no. 9",
+    "inside no 9",
+    "modern love",
+    "oats studios",
+    "tales from the crypt",
+    "tales from the loop",
+    "american horror stories",
+)
+
+private const val WATCHLIST_EPISODE_FIELDS = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber"
 
 sealed interface LoginResult {
     data object Success : LoginResult
@@ -126,9 +149,12 @@ private val DIRECT_PLAY_CONTAINERS = setOf("mp4", "webm", "m4v", "mkv", "m2ts", 
 private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8", "vp9", "av1", "mpeg4")
 private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "ac3", "eac3", "dts", "truehd")
 
+private val SOFTWARE_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "pcm", "pcm_s16le", "pcm_s24le", "alac")
+
 private const val FALLBACK_VIDEO_BITRATE = 20000000L
 private const val COPY_RANGE_TYPES = "SDR,HDR10,HDR10Plus,HLG,DOVIWithHDR10,DOVIWithHLG,DOVIWithSDR,DOVIWithHDR10Plus"
 
+private const val FAILOVER_FIRST_TIMEOUT_SECONDS = 20
 private const val CACHE_TTL_MS = 60_000L
 private const val SHORT_CACHE_TTL_MS = 8_000L
 private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
@@ -136,10 +162,23 @@ private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 // cast neighbours barely change, so Home refreshes reuse them.
 private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
 
+// Per-title hint maps (prefetch times, last stream lists, empty checks)
+// start over past this size rather than grow for the whole session.
+private const val MAX_HINTS = 500
+
+// These maps only hold hints that can be fetched again, so dropping them
+// all at a size limit is enough to keep them bounded.
+private fun <K, V> MutableMap<K, V>.capAt(max: Int) {
+    if (size > max) clear()
+}
+
 internal class TtlCache {
     private data class Entry(val value: Any?, val expiresAt: Long)
     private val entries = ConcurrentHashMap<String, Entry>()
     private val locks = ConcurrentHashMap<String, Mutex>()
+    private companion object {
+        const val PRUNE_ABOVE = 300
+    }
 
     @Suppress("UNCHECKED_CAST")
     suspend fun <T> get(key: String, ttlMs: Long, fetcher: suspend () -> T): T {
@@ -149,8 +188,17 @@ internal class TtlCache {
             entries[key]?.let { entry -> if (System.currentTimeMillis() < entry.expiresAt) return@withLock entry.value as T }
             val value = fetcher()
             entries[key] = Entry(value, System.currentTimeMillis() + ttlMs)
+            if (entries.size > PRUNE_ABOVE) prune()
             value
         }
+    }
+
+    // Expired entries are otherwise only replaced when the same key is asked
+    // for again; every title and genre visited would stay for the session.
+    private fun prune() {
+        val now = System.currentTimeMillis()
+        entries.entries.removeIf { now >= it.value.expiresAt }
+        locks.entries.removeIf { !it.value.isLocked && !entries.containsKey(it.key) }
     }
 
     fun invalidate(key: String) {
@@ -183,10 +231,10 @@ class JellioRepository @Inject constructor(
 
     suspend fun setRemoveFromWatchlistAfterWatching(enabled: Boolean) {
         watchlistPreferences.removeFromWatchlistAfterWatching = enabled
-        runCatching { api.setWatchlistAutoRemove(WatchlistAutoRemoveRequest(enabled)) }
+        catching { api.setWatchlistAutoRemove(WatchlistAutoRemoveRequest(enabled)) }
     }
 
-    fun syncRemoveFromWatchlistAfterWatching(enabled: Boolean) {
+    private fun syncRemoveFromWatchlistAfterWatching(enabled: Boolean) {
         watchlistPreferences.removeFromWatchlistAfterWatching = enabled
     }
 
@@ -213,6 +261,13 @@ class JellioRepository @Inject constructor(
         sourceCache.clear()
         lastSources.clear()
         prefetchedAt.clear()
+        // Seen items carry the last account's watched state, and prefetched
+        // playback its token in the stream URL.
+        previews.clear()
+        showcaseCache.clear()
+        playbackPrefetch.clear()
+        emptyTodayStreamCheckAt.clear()
+        knownWarm.clear()
     }
 
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
@@ -231,7 +286,7 @@ class JellioRepository @Inject constructor(
         }
         for (candidate in candidates) {
             sessionManager.saveServerAddress(candidate)
-            if (runCatching { api.getPublicSystemInfo() }.isSuccess) return Result.success(candidate)
+            if (catching { api.getPublicSystemInfo() }.isSuccess) return Result.success(candidate)
         }
         sessionManager.saveServerAddress(first)
         val tried = candidates.joinToString(" and ")
@@ -347,7 +402,7 @@ class JellioRepository @Inject constructor(
         sessionManager.clearSession()
     }
 
-    suspend fun getLibraries(userId: String): List<BaseItemDto> =
+    private suspend fun getLibraries(userId: String): List<BaseItemDto> =
         cache.get("views:$userId", CACHE_TTL_MS) { api.getUserViews(userId).Items }
 
     suspend fun getLibraryNavEntries(userId: String): List<BaseItemDto> {
@@ -391,22 +446,15 @@ class JellioRepository @Inject constructor(
     suspend fun getJellioNotifications(): List<com.jellio.tv.data.model.JellioNotificationDto> = api.getJellioNotifications()
 
     // An announcement's picture; adds ApiKey query param so Jellyfin authorizes it.
-    suspend fun announcementImageUrl(imageId: String): String? {
-        val server = sessionManager.serverAddress() ?: return null
-        if (imageId.startsWith("http://", ignoreCase = true) || imageId.startsWith("https://", ignoreCase = true)) {
-            return imageId
-        }
-        if (imageId.startsWith("/")) {
-            return "$server$imageId"
-        }
-        val token = sessionManager.accessToken()
-        val base = "$server/Jellio/notifications/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
-        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
-    }
+    suspend fun announcementImageUrl(imageId: String): String? = jellioImageUrl("notifications", imageId)
 
     suspend fun getPendingOverlays(after: Long): com.jellio.tv.data.model.PendingOverlaysDto = api.getPendingOverlays(after)
 
-    suspend fun overlayImageUrl(imageId: String): String? {
+    suspend fun overlayImageUrl(imageId: String): String? = jellioImageUrl("overlays", imageId)
+
+    // A full URL is used as is, a server path is put on the server, and a
+    // bare id goes through the plugin's image route with the token.
+    private suspend fun jellioImageUrl(feature: String, imageId: String): String? {
         val server = sessionManager.serverAddress() ?: return null
         if (imageId.startsWith("http://", ignoreCase = true) || imageId.startsWith("https://", ignoreCase = true)) {
             return imageId
@@ -415,7 +463,7 @@ class JellioRepository @Inject constructor(
             return "$server$imageId"
         }
         val token = sessionManager.accessToken()
-        val base = "$server/Jellio/overlays/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
+        val base = "$server/Jellio/$feature/image/" + java.net.URLEncoder.encode(imageId, "UTF-8")
         return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
     }
 
@@ -437,7 +485,7 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getAnimeIds(): Set<String> =
-        runCatching {
+        catching {
             cache.get("anime-ids", CACHE_TTL_MS) { api.getAnimeIds().Ids.map { it.replace("-", "").lowercase() }.toSet() }
         }.getOrDefault(emptySet())
 
@@ -459,16 +507,6 @@ class JellioRepository @Inject constructor(
     }
 
     fun isAnimeLibrary(library: BaseItemDto): Boolean = ANIME_VIEW_NAME.containsMatchIn(library.Name ?: "")
-
-    suspend fun getAnimeItemIds(userId: String): Set<String> = coroutineScope {
-        val animeCollections = runCatching { getCollections(userId) }.getOrDefault(emptyList()).filter { isAnimeCollection(it) }
-        if (animeCollections.isEmpty()) return@coroutineScope emptySet()
-        animeCollections.map { collection ->
-            async {
-                runCatching { getCollectionItems(userId, collection.Id, "tvshows", ANIME_ITEM_ID_LIMIT) }.getOrDefault(emptyList())
-            }
-        }.awaitAll().flatten().mapTo(mutableSetOf()) { it.Id }
-    }
 
     // Not recursive, like the web client: a collection's titles are its
     // direct children, and a recursive walk of a large one is much slower.
@@ -495,12 +533,13 @@ class JellioRepository @Inject constructor(
         if (lastEmptyAt != null && System.currentTimeMillis() - lastEmptyAt < 120_000L) {
             return false
         }
-        val sources = runCatching {
+        val sources = catching {
             getMediaSources(userId, item.Id, reason = "today release check")
         }.getOrDefault(emptyList())
         val hasValid = sources.isNotEmpty()
         markTodayItemHasStream(item.Id, hasValid)
         if (!hasValid) {
+            emptyTodayStreamCheckAt.capAt(MAX_HINTS)
             emptyTodayStreamCheckAt[item.Id] = System.currentTimeMillis()
         } else {
             emptyTodayStreamCheckAt.remove(item.Id)
@@ -531,7 +570,7 @@ class JellioRepository @Inject constructor(
         val items = api.getNextUp(userId, fetchLimit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks,PremiereDate,EndDate", enableResumable = false).Items
         val released = filterReadyToWatchItems(userId, items)
         seedPreviews(released)
-        val hidden = runCatching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
+        val hidden = catching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
         val filtered = if (hidden.isEmpty()) released else released.filterNot { hidden.contains(it.SeriesId) }
         return filtered.take(limit)
     }
@@ -581,7 +620,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun discoverGenres(userId: String, parentId: String?, itemType: String, limit: Int = 6, minCount: Int = 8): List<String> {
         // The server's cached genre list first; sampling items is the fallback.
-        runCatching { api.getGenreCounts(itemType, parentId).Genres }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { counts ->
+        catching { api.getGenreCounts(itemType, parentId).Genres }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { counts ->
             return counts.filter { it.Count >= minCount }.sortedByDescending { it.Count }.map { it.Name }.take(limit)
         }
         val sample = api.getItems(
@@ -604,13 +643,13 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getSubtitleLanguagePreference(userId: String): String? =
-        runCatching {
+        catching {
             val config = getUser(userId)?.Configuration
             if (config?.SubtitleMode.equals("None", ignoreCase = true)) null else config?.SubtitleLanguagePreference
         }.getOrNull()?.trim()?.ifBlank { null }
 
     suspend fun getAudioLanguagePreference(userId: String): String? =
-        runCatching { getUser(userId)?.Configuration?.AudioLanguagePreference }.getOrNull()?.trim()?.ifBlank { null }
+        catching { getUser(userId)?.Configuration?.AudioLanguagePreference }.getOrNull()?.trim()?.ifBlank { null }
 
     suspend fun getAllGenres(userId: String, parentId: String?, itemType: String): List<String> =
         api.getGenres(userId = userId, parentId = parentId, includeItemTypes = itemType).Items
@@ -618,7 +657,7 @@ class JellioRepository @Inject constructor(
             .distinct()
 
     suspend fun searchGenreOrCategory(query: String): com.jellio.tv.data.model.GenreSearchResultDto? =
-        runCatching { api.searchGenreOrCategory(query) }.getOrNull()
+        catching { api.searchGenreOrCategory(query) }.getOrNull()
 
     // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
@@ -626,8 +665,18 @@ class JellioRepository @Inject constructor(
 
     // One page of a genre, for grids that keep loading as they are scrolled.
     suspend fun getGenreItemsPage(userId: String, parentId: String?, itemType: String, genre: String, startIndex: Int, limit: Int): List<BaseItemDto> =
+        fetchGenreItems(userId, parentId, itemType, genre, limit, startIndex)
+
+    private suspend fun fetchGenreItems(
+        userId: String,
+        parentId: String?,
+        itemType: String,
+        genre: String,
+        limit: Int,
+        startIndex: Int? = null,
+    ): List<BaseItemDto> =
         distinctTitles(
-            runCatching {
+            catching {
                 api.getCachedGenreItems(
                     genre = genre,
                     types = itemType,
@@ -650,29 +699,6 @@ class JellioRepository @Inject constructor(
             ).Items,
         )
 
-    private suspend fun fetchGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int): List<BaseItemDto> =
-        distinctTitles(
-            runCatching {
-                api.getCachedGenreItems(
-                    genre = genre,
-                    types = itemType,
-                    parentId = parentId,
-                    limit = limit,
-                    enableVirtual = true,
-                ).Items
-            }.getOrNull() ?: api.getItems(
-                userId = userId,
-                parentId = parentId,
-                includeItemTypes = itemType,
-                recursive = true,
-                limit = limit,
-                genres = genre,
-                sortBy = "CommunityRating",
-                sortOrder = "Descending",
-                fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
-            ).Items,
-        )
-
     private val showcaseCache = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
 
     suspend fun getShowcaseItems(userId: String, ids: List<String>): Map<String, BaseItemDto> {
@@ -681,7 +707,7 @@ class JellioRepository @Inject constructor(
         val missing = ids.filter { it !in fresh }.distinct()
         if (missing.isEmpty()) return fresh
         val fetched = api.getItemsByIds(userId, missing.joinToString(","), SHOWCASE_FIELDS).Items
-        if (showcaseCache.size > 400) showcaseCache.clear()
+        showcaseCache.capAt(400)
         fetched.forEach { showcaseCache[it.Id] = now to it }
         return fresh + fetched.associateBy { it.Id }
     }
@@ -719,7 +745,7 @@ class JellioRepository @Inject constructor(
         if (genres.isNotEmpty()) {
             jobs.add(
                 async {
-                    runCatching {
+                    catching {
                         api.getItems(
                             userId = userId,
                             recursive = true,
@@ -737,7 +763,7 @@ class JellioRepository @Inject constructor(
         searchTerms.take(2).forEach { term ->
             jobs.add(
                 async {
-                    runCatching {
+                    catching {
                         api.getItems(
                             userId = userId,
                             recursive = true,
@@ -799,11 +825,12 @@ class JellioRepository @Inject constructor(
             }
         }
 
-    suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
+    suspend fun getItemDetails(userId: String, itemId: String): BaseItemDto =
         cache.get("details:$itemId", SHORT_CACHE_TTL_MS) {
             fetchItemInfo(userId, itemId, DETAIL_FIELDS)
         }.also {
             previews[it.Id] = it
+            preloaded.capAt(200)
             preloaded[itemId] = System.currentTimeMillis() to it
         }
 
@@ -824,22 +851,22 @@ class JellioRepository @Inject constructor(
             try {
                 val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
                 val item = existing ?: fetchItemInfo(userId, itemId, DETAIL_FIELDS).also {
-                    if (preloaded.size > 200) preloaded.clear()
+                    preloaded.capAt(200)
                     preloaded[itemId] = System.currentTimeMillis() to it
                     previews[it.Id] = it
                 }
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     coroutineScope {
-                        launch { runCatching { getSeasons(item.SeriesId, userId) } }
+                        launch { catching { getSeasons(item.SeriesId, userId) } }
                         if (item.SeasonId != null) {
-                            launch { runCatching { getEpisodes(item.SeriesId, userId, item.SeasonId) } }
+                            launch { catching { getEpisodes(item.SeriesId, userId, item.SeasonId) } }
                         }
                     }
                 } else if (item.Type == "Series") {
-                    val seasons = runCatching { getSeasons(item.Id, userId) }.getOrNull()
+                    val seasons = catching { getSeasons(item.Id, userId) }.getOrNull()
                     val firstSeason = seasons?.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }?.firstOrNull()
                     if (firstSeason != null) {
-                        runCatching { getEpisodes(item.Id, userId, firstSeason.Id) }
+                        catching { getEpisodes(item.Id, userId, firstSeason.Id) }
                     }
                 }
             } catch (_: Exception) {
@@ -860,10 +887,10 @@ class JellioRepository @Inject constructor(
                 if (!seenSeasons.add(key)) continue
                 coroutineScope {
                     if (recentSeasons(seriesId) == null) {
-                        launch { runCatching { getSeasons(seriesId, userId) } }
+                        launch { catching { getSeasons(seriesId, userId) } }
                     }
                     if (seasonId != null && recentEpisodes(seriesId, seasonId) == null) {
-                        launch { runCatching { getEpisodes(seriesId, userId, seasonId) } }
+                        launch { catching { getEpisodes(seriesId, userId, seasonId) } }
                     }
                 }
             }
@@ -880,7 +907,7 @@ class JellioRepository @Inject constructor(
     private val previews = ConcurrentHashMap<String, BaseItemDto>()
 
     fun seedPreviews(items: List<BaseItemDto>) {
-        if (previews.size > 600) previews.clear()
+        previews.capAt(600)
         items.forEach { previews[it.Id] = it }
     }
 
@@ -916,7 +943,7 @@ class JellioRepository @Inject constructor(
 
     private suspend fun fetchItemInfo(userId: String, itemId: String, fields: String?): BaseItemDto =
         withRetry {
-            runCatching {
+            catching {
                 api.getItemsByIds(userId, itemId, fields).Items.firstOrNull {
                     it.Id.equals(itemId, ignoreCase = true) ||
                         it.Id.replace("-", "").equals(itemId.replace("-", ""), ignoreCase = true)
@@ -942,7 +969,10 @@ class JellioRepository @Inject constructor(
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { withRetry { api.getSeasons(seriesId, userId).Items } }
-            .also { recentLists["seasons:$seriesId"] = System.currentTimeMillis() to it }
+            .also {
+                recentLists.capAt(300)
+                recentLists["seasons:$seriesId"] = System.currentTimeMillis() to it
+            }
 
     // Seasons and episodes as last seen, to draw a series page at once.
     private val recentLists = ConcurrentHashMap<String, Pair<Long, List<BaseItemDto>>>()
@@ -983,7 +1013,7 @@ class JellioRepository @Inject constructor(
         val byId = linkedMapOf<String, CandidateEntry>()
 
         if (genres.isNotEmpty()) {
-            runCatching {
+            catching {
                 api.getItems(
                     userId = userId,
                     includeItemTypes = "Movie,Series",
@@ -999,7 +1029,7 @@ class JellioRepository @Inject constructor(
         }
 
         if (people.isNotEmpty()) {
-            runCatching {
+            catching {
                 api.getItems(
                     userId = userId,
                     includeItemTypes = "Movie,Series",
@@ -1025,7 +1055,7 @@ class JellioRepository @Inject constructor(
             }
         }.also {
             seedPreviews(it)
-            if (recentLists.size > 300) recentLists.clear()
+            recentLists.capAt(300)
             recentLists["episodes:$seriesId:$seasonId"] = System.currentTimeMillis() to it
         }
 
@@ -1050,30 +1080,30 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getCommunitySkipSegments(itemId: String): SkipSegments? =
-        runCatching { api.getCommunityIntroCredits(itemId).toSkipSegments() }.getOrNull()
+        catching { api.getCommunityIntroCredits(itemId).toSkipSegments() }.getOrNull()
 
     // Jellyfin's own Media Segments first, the Intro Skipper's older
     // Timestamps endpoint only when those have neither intro nor credits.
     suspend fun getIntroSkipperSegments(itemId: String): SkipSegments? {
-        val native = runCatching { nativeSkipSegments(api.getMediaSegments(itemId).Items) }.getOrNull()
+        val native = catching { nativeSkipSegments(api.getMediaSegments(itemId).Items) }.getOrNull()
         if (native != null) return native
-        return runCatching { api.getIntroSkipperSegments(itemId).toSkipSegments() }.getOrNull()
+        return catching { api.getIntroSkipperSegments(itemId).toSkipSegments() }.getOrNull()
     }
 
     suspend fun getChapterSkipSegments(userId: String, itemId: String, runTimeTicks: Long?): SkipSegments? =
-        runCatching {
+        catching {
             val item = api.getItemsByIds(userId, itemId, "Chapters").Items.firstOrNull()
             chapterSkipSegments(item?.Chapters, runTimeTicks ?: item?.RunTimeTicks)
         }.getOrNull()
 
     suspend fun getJellioIntroCredits(itemId: String): SkipSegments? =
-        runCatching { api.getJellioIntroCredits(itemId).toSkipSegments() }.getOrNull()
+        catching { api.getJellioIntroCredits(itemId).toSkipSegments() }.getOrNull()
 
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
-        val continueWatchingEp = runCatching {
+        val continueWatchingEp = catching {
             getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId && it.UserData?.Played != true }
         }.getOrNull()
-        val seriesNextUp = runCatching {
+        val seriesNextUp = catching {
             getSeriesNextUp(seriesId, userId)
         }.getOrNull()
         fun epOrder(item: BaseItemDto) = (item.ParentIndexNumber ?: 0) * 10_000 + (item.IndexNumber ?: 0)
@@ -1099,34 +1129,14 @@ class JellioRepository @Inject constructor(
         return SeriesPlayTarget(episode, resume)
     }
 
-    fun isEpisodicAnthology(series: BaseItemDto?): Boolean {
+    private fun isEpisodicAnthology(series: BaseItemDto?): Boolean {
         if (series == null) return false
         val genres = series.Genres.orEmpty()
         val tags = series.Tags.orEmpty()
         if (genres.any { it.contains("anthology", ignoreCase = true) }) return true
         if (tags.any { it.contains("anthology", ignoreCase = true) }) return true
         val name = series.Name?.lowercase() ?: ""
-        val knownAnthologies = listOf(
-            "black mirror",
-            "love, death & robots",
-            "love death and robots",
-            "love death & robots",
-            "love death + robots",
-            "twilight zone",
-            "cabinet of curiosities",
-            "electric dreams",
-            "room 104",
-            "star wars: visions",
-            "star wars visions",
-            "inside no. 9",
-            "inside no 9",
-            "modern love",
-            "oats studios",
-            "tales from the crypt",
-            "tales from the loop",
-            "american horror stories",
-        )
-        return knownAnthologies.any { name.contains(it) }
+        return KNOWN_ANTHOLOGIES.any { name.contains(it) }
     }
 
     suspend fun autoCompletePreviousEpisodesIfSkipped(userId: String, episode: BaseItemDto) {
@@ -1135,7 +1145,7 @@ class JellioRepository @Inject constructor(
         val currentEpNum = episode.IndexNumber ?: return
         if (currentSeasonNum <= 0) return
 
-        val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
+        val series = catching { getItemDetails(userId, seriesId) }.getOrNull()
         if (isEpisodicAnthology(series)) {
             android.util.Log.d("JellioProgress", "Skipping auto-complete for anthology series: ${series?.Name}")
             return
@@ -1159,7 +1169,7 @@ class JellioRepository @Inject constructor(
             if (toMark.isNotEmpty()) {
                 android.util.Log.i("JellioProgress", "Auto-completing ${toMark.size} previous skipped episodes for series ${series?.Name ?: seriesId}")
                 for (prevEp in toMark) {
-                    runCatching {
+                    catching {
                         api.markPlayed(userId, prevEp.Id)
                     }
                 }
@@ -1172,7 +1182,7 @@ class JellioRepository @Inject constructor(
 
     fun isSpecialsSeason(season: BaseItemDto): Boolean {
         if (season.IndexNumber == 0) return true
-        return Regex("special", RegexOption.IGNORE_CASE).containsMatchIn(season.Name ?: "")
+        return SPECIALS_SEASON_NAME.containsMatchIn(season.Name ?: "")
     }
 
     suspend fun getMediaSources(
@@ -1195,6 +1205,7 @@ class JellioRepository @Inject constructor(
                 val sources = fetchMediaSources(userId, itemId)
                 if (sources.isNotEmpty()) {
                     sourceCache.put(itemId, sources, System.currentTimeMillis())
+                    lastSources.capAt(MAX_HINTS)
                     lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, System.currentTimeMillis())
                 }
                 com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
@@ -1256,21 +1267,20 @@ class JellioRepository @Inject constructor(
         loadVideoTranscodePolicy()
         return com.jellio.tv.data.streams.loadFailoverSources(lastSources[itemId], System::currentTimeMillis, skipRecent = fresh) { timeout ->
             val started = System.currentTimeMillis()
-            val sources = fetchMediaSources(userId, itemId, timeout ?: failoverFirstTimeoutSeconds)
+            val sources = fetchMediaSources(userId, itemId, timeout ?: FAILOVER_FIRST_TIMEOUT_SECONDS)
             com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, "failover", sources.size, System.currentTimeMillis() - started)
             if (sources.isNotEmpty()) {
                 val now = System.currentTimeMillis()
                 sourceCache.put(itemId, sources, now)
+                lastSources.capAt(MAX_HINTS)
                 lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, now)
             }
             sources
         }
     }
 
-    private val failoverFirstTimeoutSeconds = 20
-
     suspend fun logFailover(body: com.jellio.tv.data.model.FailoverLogBody) {
-        runCatching { api.logFailover(body) }
+        catching { api.logFailover(body) }
     }
 
     private suspend fun fetchMediaSources(userId: String, itemId: String, readTimeoutSeconds: Int? = null): List<MediaSourceDto> {
@@ -1325,135 +1335,59 @@ class JellioRepository @Inject constructor(
         }
         cache.invalidatePrefix("watchlist:$userId:")
         // Back on the Watchlist means back in Coming Soon if it was taken out.
-        if (result) runCatching { api.unhideFromComingSoon(item.Id) }
+        if (result) catching { api.unhideFromComingSoon(item.Id) }
         return result
     }
 
     suspend fun hideFromComingSoon(itemId: String): Boolean =
-        runCatching { api.hideFromComingSoon(itemId).isSuccessful }.getOrDefault(false)
+        catching { api.hideFromComingSoon(itemId).isSuccessful }.getOrDefault(false)
 
     suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto {
         val result = if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
         cache.clear()
         if (played) {
-            runCatching { maybeRemoveFromWatchlistAfterWatching(userId, itemId) }
+            catching { maybeRemoveFromWatchlistAfterWatching(userId, itemId) }
         }
         return result
     }
 
     private suspend fun isItemWatchlisted(userId: String, item: BaseItemDto): Boolean {
         if (item.UserData?.IsFavorite == true) return true
-        val watchlistItems = runCatching { getWatchlistItems(userId) }.getOrNull()
+        val watchlistItems = catching { getWatchlistItems(userId) }.getOrNull()
         return watchlistItems?.any { it.Id == item.Id } == true
     }
 
-    suspend fun maybeRemoveFromWatchlistAfterWatching(userId: String, itemId: String): Set<String> {
+    private suspend fun maybeRemoveFromWatchlistAfterWatching(userId: String, itemId: String): Set<String> {
         if (!isRemoveFromWatchlistAfterWatchingEnabled()) return emptySet()
-        val item = runCatching { getItemDetails(userId, itemId) }.getOrNull() ?: return emptySet()
+        val item = catching { getItemDetails(userId, itemId) }.getOrNull() ?: return emptySet()
         val removedIds = mutableSetOf<String>()
 
         when (item.Type) {
             "Movie" -> {
                 if (isMovieWatchlistRemovalEligible(item, isItemWatchlisted(userId, item))) {
-                    runCatching { api.removeFavorite(userId, item.Id) }
-                    cache.invalidatePrefix("watchlist:$userId:")
-                    removedIds.add(item.Id)
+                    removeFromWatchlist(userId, item.Id, removedIds)
                 }
             }
             "Episode" -> {
                 if (isItemWatchlisted(userId, item)) {
-                    runCatching { api.removeFavorite(userId, item.Id) }
-                    cache.invalidatePrefix("watchlist:$userId:")
-                    removedIds.add(item.Id)
+                    removeFromWatchlist(userId, item.Id, removedIds)
                 }
-                val seriesId = item.SeriesId
-                if (!seriesId.isNullOrBlank()) {
-                    val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
-                    val isSeriesFavorite = series?.let { isItemWatchlisted(userId, it) } ?: false
-                    if (series != null && series.Status.equals("Ended", ignoreCase = true) && isSeriesFavorite) {
-                        val allEpisodes = runCatching {
-                            api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
-                        }.getOrElse {
-                            val seasons = runCatching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
-                            seasons.flatMap { season ->
-                                runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
-                            }
-                        }
-                        if (isSeriesWatchlistRemovalEligible(
-                            series = series,
-                            episodes = allEpisodes,
-                            watchedItemId = itemId,
-                            isFavorite = isSeriesFavorite,
-                        )) {
-                            runCatching { api.removeFavorite(userId, seriesId) }
-                            cache.invalidatePrefix("watchlist:$userId:")
-                            removedIds.add(seriesId)
-                        }
-                    }
-                }
+                removeSeriesIfFinished(userId, item.SeriesId, null, itemId, removedIds)
             }
-            "Series" -> {
-                val isSeriesFavorite = isItemWatchlisted(userId, item)
-                if (isSeriesFavorite && item.Status.equals("Ended", ignoreCase = true)) {
-                    val allEpisodes = runCatching {
-                        api.getEpisodes(item.Id, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
-                    }.getOrElse {
-                        val seasons = runCatching { getSeasons(item.Id, userId) }.getOrDefault(emptyList())
-                        seasons.flatMap { season ->
-                            runCatching { getEpisodes(item.Id, userId, season.Id) }.getOrDefault(emptyList())
-                        }
-                    }
-                    if (isSeriesWatchlistRemovalEligible(
-                        series = item,
-                        episodes = allEpisodes,
-                        watchedItemId = itemId,
-                        isFavorite = isSeriesFavorite,
-                    )) {
-                        runCatching { api.removeFavorite(userId, item.Id) }
-                        cache.invalidatePrefix("watchlist:$userId:")
-                        removedIds.add(item.Id)
-                    }
-                }
-            }
+            "Series" -> removeSeriesIfFinished(userId, item.Id, item, itemId, removedIds)
             "Season" -> {
                 if (isItemWatchlisted(userId, item)) {
-                    val seasonEpisodes = runCatching {
-                        api.getEpisodes(item.SeriesId ?: "", userId, seasonId = item.Id, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
+                    val seasonEpisodes = catching {
+                        api.getEpisodes(item.SeriesId ?: "", userId, seasonId = item.Id, fields = WATCHLIST_EPISODE_FIELDS).Items
                     }.getOrDefault(emptyList())
                     if (seasonEpisodes.isNotEmpty() &&
                         seasonEpisodes.none { isUnreleasedItem(it) } &&
                         seasonEpisodes.all { it.Id == itemId || it.UserData?.Played == true }
                     ) {
-                        runCatching { api.removeFavorite(userId, item.Id) }
-                        cache.invalidatePrefix("watchlist:$userId:")
-                        removedIds.add(item.Id)
+                        removeFromWatchlist(userId, item.Id, removedIds)
                     }
                 }
-                val seriesId = item.SeriesId
-                if (!seriesId.isNullOrBlank()) {
-                    val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
-                    val isSeriesFavorite = series?.let { isItemWatchlisted(userId, it) } ?: false
-                    if (series != null && series.Status.equals("Ended", ignoreCase = true) && isSeriesFavorite) {
-                        val allEpisodes = runCatching {
-                            api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
-                        }.getOrElse {
-                            val seasons = runCatching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
-                            seasons.flatMap { season ->
-                                runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
-                            }
-                        }
-                        if (isSeriesWatchlistRemovalEligible(
-                            series = series,
-                            episodes = allEpisodes,
-                            watchedItemId = itemId,
-                            isFavorite = isSeriesFavorite,
-                        )) {
-                            runCatching { api.removeFavorite(userId, seriesId) }
-                            cache.invalidatePrefix("watchlist:$userId:")
-                            removedIds.add(seriesId)
-                        }
-                    }
-                }
+                removeSeriesIfFinished(userId, item.SeriesId, null, itemId, removedIds)
             }
         }
 
@@ -1463,8 +1397,40 @@ class JellioRepository @Inject constructor(
         return removedIds
     }
 
+    private suspend fun removeFromWatchlist(userId: String, itemId: String, removedIds: MutableSet<String>) {
+        catching { api.removeFavorite(userId, itemId) }
+        cache.invalidatePrefix("watchlist:$userId:")
+        removedIds.add(itemId)
+    }
+
+    // An ended series on the watchlist leaves it once every episode is watched.
+    // series is looked up by id when the caller does not have it.
+    private suspend fun removeSeriesIfFinished(
+        userId: String,
+        seriesId: String?,
+        series: BaseItemDto?,
+        watchedItemId: String,
+        removedIds: MutableSet<String>,
+    ) {
+        if (seriesId.isNullOrBlank()) return
+        val show = series ?: catching { getItemDetails(userId, seriesId) }.getOrNull() ?: return
+        val isFavorite = isItemWatchlisted(userId, show)
+        if (!isFavorite || !show.Status.equals("Ended", ignoreCase = true)) return
+        val allEpisodes = catching {
+            api.getEpisodes(seriesId, userId, seasonId = null, fields = WATCHLIST_EPISODE_FIELDS).Items
+        }.getOrElse {
+            val seasons = catching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
+            seasons.flatMap { season ->
+                catching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
+            }
+        }
+        if (isSeriesWatchlistRemovalEligible(series = show, episodes = allEpisodes, watchedItemId = watchedItemId, isFavorite = isFavorite)) {
+            removeFromWatchlist(userId, seriesId, removedIds)
+        }
+    }
+
     suspend fun clearResumePosition(userId: String, itemId: String): UserItemDataDto {
-        val result = runCatching { api.updateUserData(itemId, userId, com.jellio.tv.data.model.UserDataUpdate(0L)) }
+        val result = catching { api.updateUserData(itemId, userId, com.jellio.tv.data.model.UserDataUpdate(0L)) }
             .getOrElse {
                 api.markPlayed(userId, itemId)
                 api.markUnplayed(userId, itemId)
@@ -1479,19 +1445,17 @@ class JellioRepository @Inject constructor(
     suspend fun deleteItem(itemId: String) = api.deleteItem(itemId)
 
     suspend fun canDeleteItems(userId: String): Boolean {
-        val policy = runCatching { getUser(userId) }.getOrNull()?.Policy ?: return false
+        val policy = catching { getUser(userId) }.getOrNull()?.Policy ?: return false
         return policy.IsAdministrator || policy.EnableContentDeletion
     }
 
-    fun isKnownWarm(itemId: String): Boolean =
+    private fun isKnownWarm(itemId: String): Boolean =
         knownWarm.contains(com.jellio.tv.data.streams.normalizeSourceId(itemId))
 
     fun prefetchStreams(itemId: String) {
         val now = System.currentTimeMillis()
-        val last = prefetchedAt[itemId]
-        if (last != null && now - last < PREFETCH_WINDOW_MS) return
-        if (isKnownWarm(itemId)) return
-        if (sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)) return
+        if (isKnownWarm(itemId) || hasRecentStreams(itemId, now)) return
+        prefetchedAt.capAt(MAX_HINTS)
         prefetchedAt[itemId] = now
         prefetchScope.launch {
             // Waits its turn briefly; given up, a later dwell tries again.
@@ -1501,11 +1465,18 @@ class JellioRepository @Inject constructor(
             }
             com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
             try {
-                runCatching { api.prefetchGelatoStreams(itemId) }
+                catching { api.prefetchGelatoStreams(itemId) }
             } finally {
                 prefetchSlots.release()
             }
         }
+    }
+
+    // Warmed a short while ago, or its stream list is cached or loading.
+    private fun hasRecentStreams(itemId: String, now: Long): Boolean {
+        val last = prefetchedAt[itemId]
+        if (last != null && now - last < PREFETCH_WINDOW_MS) return true
+        return sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)
     }
 
     private suspend fun acquirePrefetchSlot(waitMs: Long): Boolean {
@@ -1525,9 +1496,10 @@ class JellioRepository @Inject constructor(
         return prefetchScope.launch {
             if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
             try {
-                val response = runCatching {
+                val response = catching {
                     api.prefetchGelatoBatch(com.jellio.tv.data.model.PrefetchBatchRequest(ids, Probe = false))
                 }.getOrNull()
+                if (knownWarm.size > MAX_HINTS) knownWarm.clear()
                 response?.body()?.AlreadyWarm.orEmpty().forEach {
                     knownWarm.add(com.jellio.tv.data.streams.normalizeSourceId(it))
                 }
@@ -1539,12 +1511,12 @@ class JellioRepository @Inject constructor(
 
     // { sourceId: warmedAt } for sources that start fast now; null when the
     // server can't say.
-    suspend fun getWarmSources(itemId: String): Map<String, String>? = runCatching {
+    suspend fun getWarmSources(itemId: String): Map<String, String>? = catching {
         val response = api.getWarmSources(itemId)
         if (response.isSuccessful) response.body().orEmpty() else null
     }.getOrNull()
 
-    suspend fun getQualityTiers(itemId: String): Map<String, String> = runCatching {
+    suspend fun getQualityTiers(itemId: String): Map<String, String> = catching {
         val response = api.getQualityTiers(itemId)
         if (response.isSuccessful) response.body().orEmpty() else emptyMap()
     }.getOrDefault(emptyMap())
@@ -1555,7 +1527,7 @@ class JellioRepository @Inject constructor(
         prefetchScope.launch {
             if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
             try {
-                runCatching {
+                catching {
                     api.getPlaybackInfo(itemId, PlaybackInfoRequest(UserId = userId, MediaSourceId = mediaSourceId))
                 }
             } finally {
@@ -1571,15 +1543,13 @@ class JellioRepository @Inject constructor(
         queuedPrefetch?.cancel()
         queuedPrefetch = prefetchScope.launch {
             for (itemId in itemIds) {
-                val now = System.currentTimeMillis()
-                val last = prefetchedAt[itemId]
-                if (last != null && now - last < PREFETCH_WINDOW_MS) continue
-                if (sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)) continue
+                if (hasRecentStreams(itemId, System.currentTimeMillis())) continue
                 while (!prefetchSlots.tryAcquire()) delay(500)
+                prefetchedAt.capAt(MAX_HINTS)
                 prefetchedAt[itemId] = System.currentTimeMillis()
                 com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
                 try {
-                    runCatching { api.prefetchGelatoStreams(itemId) }
+                    catching { api.prefetchGelatoStreams(itemId) }
                 } finally {
                     prefetchSlots.release()
                 }
@@ -1590,22 +1560,20 @@ class JellioRepository @Inject constructor(
     // Pre-warms the stream connection and Usenet/nzbdav reader for the upcoming episode.
     fun prewarmStreamUrl(streamUrl: String) {
         prefetchScope.launch {
-            runCatching {
-                val url = java.net.URL(streamUrl)
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.requestMethod = "GET"
-                conn.setRequestProperty("Range", "bytes=0-65535")
-                conn.connect()
-                val code = conn.responseCode
-                if (code in 200..206) {
-                    val stream = conn.inputStream
-                    val buf = ByteArray(8192)
-                    stream.read(buf)
-                    stream.close()
+            catching {
+                val conn = java.net.URL(streamUrl).openConnection() as java.net.HttpURLConnection
+                try {
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("Range", "bytes=0-65535")
+                    conn.connect()
+                    if (conn.responseCode in 200..206) {
+                        conn.inputStream.use { it.read(ByteArray(8192)) }
+                    }
+                } finally {
+                    conn.disconnect()
                 }
-                conn.disconnect()
             }
         }
     }
@@ -1625,8 +1593,6 @@ class JellioRepository @Inject constructor(
     suspend fun getProfileSettings(): ProfileDto = api.getProfileSettings().also { profile ->
         syncRemoveFromWatchlistAfterWatching(profile.RemoveFromWatchlistAfterWatching)
     }
-
-    suspend fun getMyProfile(): ProfileDto = getProfileSettings()
 
     suspend fun saveProfileRecommendations(
         selectedGenres: List<String>?,
@@ -1649,7 +1615,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
-    suspend fun getJellioConfig(): ClientConfigDto? = runCatching { api.getJellioConfig() }.getOrNull()
+    suspend fun getJellioConfig(): ClientConfigDto? = catching { api.getJellioConfig() }.getOrNull()
         ?.also { com.jellio.tv.data.playback.VideoTranscodePolicy.set(it.VideoTranscodePolicy) }
 
     // The admin's Video transcode policy, re-read every few minutes.
@@ -1663,9 +1629,9 @@ class JellioRepository @Inject constructor(
         val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
         val classification = policy.classify(mediaSource)
         val serverReasons = mediaSource.TranscodingUrl
-            ?.let { Regex("[?&]TranscodeReasons=([^&]*)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
-            ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
-        runCatching {
+            ?.let { TRANSCODE_REASONS_PARAM.find(it)?.groupValues?.get(1) }
+            ?.let { catching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
+        catching {
             api.logPlaybackDecision(
                 com.jellio.tv.data.model.PlaybackDecisionBody(
                     ItemId = itemId,
@@ -1683,10 +1649,10 @@ class JellioRepository @Inject constructor(
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
     suspend fun cancelSleepTimer() {
-        runCatching { api.cancelSleepTimer() }
+        catching { api.cancelSleepTimer() }
     }
 
-    suspend fun getSleepTimerStatus(): SleepTimerStatusDto? = runCatching { api.getSleepTimerStatus() }.getOrNull()
+    suspend fun getSleepTimerStatus(): SleepTimerStatusDto? = catching { api.getSleepTimerStatus() }.getOrNull()
 
     suspend fun getUser(userId: String): UserDto =
         cache.get("user:$userId", CACHE_TTL_MS) { api.getUser(userId) }
@@ -1697,14 +1663,17 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun updateLanguagePreferences(userId: String, audioLanguage: String?, subtitleLanguage: String?) {
-        val current = api.getUser(userId).Configuration ?: UserConfigurationDto()
+        val configuration = org.json.JSONObject(api.getUserJson(userId).string()).optJSONObject("Configuration")
+            ?: org.json.JSONObject()
         val isOff = subtitleLanguage == "off" || subtitleLanguage == "none"
-        val configuration = current.copy(
-            AudioLanguagePreference = audioLanguage.orEmpty(),
-            SubtitleLanguagePreference = if (isOff) "" else subtitleLanguage.orEmpty(),
-            SubtitleMode = if (isOff) "None" else if (current.SubtitleMode == "None") "Default" else current.SubtitleMode,
-        )
-        api.updateUserConfiguration(userId, configuration)
+        configuration.put("AudioLanguagePreference", audioLanguage.orEmpty())
+        configuration.put("SubtitleLanguagePreference", if (isOff) "" else subtitleLanguage.orEmpty())
+        if (isOff) {
+            configuration.put("SubtitleMode", "None")
+        } else if (configuration.optString("SubtitleMode") == "None") {
+            configuration.put("SubtitleMode", "Default")
+        }
+        api.updateUserConfiguration(userId, configuration.toString().toRequestBody("application/json".toMediaTypeOrNull()))
         cache.invalidate("user:$userId")
     }
 
@@ -1712,16 +1681,16 @@ class JellioRepository @Inject constructor(
         api.updatePassword(userId, UpdatePasswordRequest(CurrentPw = currentPassword, NewPw = newPassword))
     }
 
-    suspend fun isQuickConnectEnabled(): Boolean = runCatching { api.isQuickConnectEnabled() }.getOrDefault(false)
+    suspend fun isQuickConnectEnabled(): Boolean = catching { api.isQuickConnectEnabled() }.getOrDefault(false)
 
     suspend fun authorizeQuickConnect(code: String): Boolean = api.authorizeQuickConnect(code)
 
-    suspend fun initiateQuickConnect(serverAddress: String): com.jellio.tv.data.model.QuickConnectResultDto? = runCatching {
+    suspend fun initiateQuickConnect(serverAddress: String): com.jellio.tv.data.model.QuickConnectResultDto? = catching {
         sessionManager.saveServerAddress(com.jellio.tv.di.normalizeServerAddress(serverAddress))
         api.initiateQuickConnect()
     }.getOrNull()
 
-    suspend fun checkQuickConnect(secret: String): com.jellio.tv.data.model.QuickConnectResultDto? = runCatching {
+    suspend fun checkQuickConnect(secret: String): com.jellio.tv.data.model.QuickConnectResultDto? = catching {
         api.checkQuickConnect(secret)
     }.getOrNull()
 
@@ -1783,7 +1752,7 @@ class JellioRepository @Inject constructor(
         if (playbackPrefetch.containsKey(key)) return
         playbackPrefetch[key] = PrefetchedPlayback(
             now,
-            prefetchScope.async { runCatching { resolvePlayback(userId, itemId, mediaSourceId, startTicks) }.getOrNull() },
+            prefetchScope.async { catching { resolvePlayback(userId, itemId, mediaSourceId, startTicks) }.getOrNull() },
         )
     }
 
@@ -1911,22 +1880,28 @@ class JellioRepository @Inject constructor(
 
     internal fun canDirectPlayAudio(codec: String?): Boolean {
         val c = codec?.lowercase() ?: return false
-        if (c in setOf("aac", "mp3", "opus", "vorbis", "flac", "pcm", "pcm_s16le", "pcm_s24le", "alac")) return true
+        if (c in SOFTWARE_AUDIO_CODECS) return true
         if (com.jellio.tv.ui.player.PlayerPrefs.audioPassthrough && c in DIRECT_PLAY_AUDIO_CODECS) return true
         val mimeType = when (c) {
             "ac3" -> "audio/ac3"
             "eac3" -> "audio/eac3"
             else -> return false // DTS, TrueHD, etc. have no native software decoder in Android/Media3 without passthrough
         }
-        return try {
-            val list = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
-            list.codecInfos.any { info ->
-                !info.isEncoder && info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
+        return hasAudioDecoder.getOrPut(mimeType) {
+            try {
+                val list = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+                list.codecInfos.any { info ->
+                    !info.isEncoder && info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
+                }
+            } catch (_: Exception) {
+                false
             }
-        } catch (_: Exception) {
-            false
         }
     }
+
+    // The decoder list is fixed for the device, and building it is slow
+    // enough to show when every stream of a title is checked.
+    private val hasAudioDecoder = ConcurrentHashMap<String, Boolean>()
 
     // ignoreAudio: whether the picture and container alone can be played as is.
     internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null, ignoreAudio: Boolean = false): Boolean {
@@ -1949,24 +1924,24 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun reportPlaybackStart(itemId: String, mediaSourceId: String?, positionTicks: Long) {
-        runCatching {
+        catching {
             api.reportPlaybackStart(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
         }
     }
 
     suspend fun reportPlaybackProgress(itemId: String, mediaSourceId: String?, positionTicks: Long, isPaused: Boolean) {
-        runCatching {
+        catching {
             api.reportPlaybackProgress(PlaybackReportRequest(itemId, mediaSourceId, positionTicks, isPaused))
         }
     }
 
     suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) {
-        runCatching {
+        catching {
             api.reportPlaybackStopped(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
         }
     }
 
-    suspend fun reportCapabilities(): Result<Unit> = runCatching {
+    suspend fun reportCapabilities(): Result<Unit> = catching {
         api.postCapabilities(com.jellio.tv.data.model.ClientCapabilitiesDto())
     }
 

@@ -51,26 +51,20 @@ class NowPlayingManager @Inject constructor(
         if (pollJob?.isActive == true) return
         pollJob = scope.launch {
             while (isActive) {
-                fetchNowPlaying(session)
+                fetchNowPlaying()
                 delay(intervalMs)
             }
         }
     }
 
-    fun stopPolling() {
-        pollJob?.cancel()
-        pollJob = null
-    }
-
     fun refresh() {
-        val s = lastSession ?: return
-        scope.launch { fetchNowPlaying(s) }
+        if (lastSession == null) return
+        scope.launch { fetchNowPlaying() }
     }
 
-    private suspend fun fetchNowPlaying(session: Session) {
+    private suspend fun fetchNowPlaying() {
         runCatching {
             val list = api.getNowPlaying()
-            // Filter sessions that have valid active media
             val active = list.filter { it.Item != null && !it.Item.Name.isNullOrBlank() }
             _sessions.value = active
             _activeCount.value = active.size

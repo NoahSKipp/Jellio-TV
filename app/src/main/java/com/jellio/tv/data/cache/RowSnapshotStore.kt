@@ -8,6 +8,7 @@ import com.jellio.tv.ui.home.HomeRow
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.home.PosterHomeRow
 import com.jellio.tv.ui.home.StudioHubsHomeRow
+import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -126,50 +127,38 @@ class RowSnapshotStore @Inject constructor(
     private val libraryAdapter by lazy { moshi.adapter(LibrarySnapshot::class.java) }
     private val serviceAdapter by lazy { moshi.adapter(ServiceSnapshot::class.java) }
 
-    suspend fun loadHomeSnapshot(userId: String): HomeSnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "home_${sanitizeKey(userId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        if (!file.exists()) return@withContext null
-        runCatching {
-            val json = file.readText()
-            homeAdapter.fromJson(json)
-        }.getOrNull()
+    suspend fun loadHomeSnapshot(userId: String): HomeSnapshot? = read(homeAdapter, "home", userId)
+
+    suspend fun saveHomeSnapshot(userId: String, snapshot: HomeSnapshot) = write(homeAdapter, snapshot, "home", userId)
+
+    suspend fun loadLibrarySnapshot(userId: String, libraryId: String): LibrarySnapshot? =
+        read(libraryAdapter, "library", userId, libraryId)
+
+    suspend fun saveLibrarySnapshot(userId: String, libraryId: String, snapshot: LibrarySnapshot) =
+        write(libraryAdapter, snapshot, "library", userId, libraryId)
+
+    suspend fun loadServiceSnapshot(userId: String, serviceName: String): ServiceSnapshot? =
+        read(serviceAdapter, "service", userId, serviceName)
+
+    suspend fun saveServiceSnapshot(userId: String, serviceName: String, snapshot: ServiceSnapshot) =
+        write(serviceAdapter, snapshot, "service", userId, serviceName)
+
+    // One file per screen, account and display language.
+    private fun snapshotFile(kind: String, vararg keys: String): File {
+        val parts = keys.joinToString("_") { sanitizeKey(it) }
+        return File(cacheDir, "${kind}_${parts}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
     }
 
-    suspend fun saveHomeSnapshot(userId: String, snapshot: HomeSnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "home_${sanitizeKey(userId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        runCatching {
-            val json = homeAdapter.toJson(snapshot)
-            file.writeText(json)
+    private suspend fun <T> read(adapter: JsonAdapter<T>, kind: String, vararg keys: String): T? = withContext(Dispatchers.IO) {
+        val file = snapshotFile(kind, *keys)
+        if (!file.exists()) return@withContext null
+        runCatching { adapter.fromJson(file.readText()) }.getOrNull()
+    }
+
+    private suspend fun <T> write(adapter: JsonAdapter<T>, snapshot: T, kind: String, vararg keys: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { snapshotFile(kind, *keys).writeText(adapter.toJson(snapshot)) }
         }
-    }
-
-    suspend fun loadLibrarySnapshot(userId: String, libraryId: String): LibrarySnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        if (!file.exists()) return@withContext null
-        runCatching {
-            val json = file.readText()
-            libraryAdapter.fromJson(json)
-        }.getOrNull()
-    }
-
-    suspend fun saveLibrarySnapshot(userId: String, libraryId: String, snapshot: LibrarySnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        runCatching {
-            val json = libraryAdapter.toJson(snapshot)
-            file.writeText(json)
-        }
-    }
-
-    suspend fun loadServiceSnapshot(userId: String, serviceName: String): ServiceSnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        if (!file.exists()) return@withContext null
-        runCatching { serviceAdapter.fromJson(file.readText()) }.getOrNull()
-    }
-
-    suspend fun saveServiceSnapshot(userId: String, serviceName: String, snapshot: ServiceSnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
-        runCatching { file.writeText(serviceAdapter.toJson(snapshot)) }
-    }
 
     private fun sanitizeKey(key: String): String = key.replace(UNSAFE_KEY_CHARS, "_")
 }

@@ -1,58 +1,5 @@
 package com.jellio.tv.data
 
-import com.jellio.tv.data.model.AchievementsDto
-import com.jellio.tv.data.model.AuthenticateByNameRequest
-import com.jellio.tv.data.model.AvatarPresetDto
-import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.CalendarEntryDto
-import com.jellio.tv.data.model.ClientConfigDto
-import com.jellio.tv.data.model.FeedEntryDto
-import com.jellio.tv.data.model.ForgotPasswordPinRequest
-import com.jellio.tv.data.model.ForgotPasswordRequest
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
-import com.jellio.tv.data.model.MediaSourceDto
-import com.jellio.tv.data.model.ProfileDto
-import com.jellio.tv.data.model.RealWatchRequest
-import com.jellio.tv.data.model.ReportDurationRequest
-import com.jellio.tv.data.model.SetBioRequest
-import com.jellio.tv.data.model.SetPrivacyRequest
-import com.jellio.tv.data.model.SleepTimerStartRequest
-import com.jellio.tv.data.model.SleepTimerStatusDto
-import com.jellio.tv.data.model.MediaStreamDto
-import com.jellio.tv.data.model.PlaybackInfoRequest
-import com.jellio.tv.data.model.PlaybackReportRequest
-import com.jellio.tv.data.model.UpdatePasswordRequest
-import com.jellio.tv.data.model.UserConfigurationDto
-import com.jellio.tv.data.model.UserDto
-import com.jellio.tv.data.model.UserItemDataDto
-import com.jellio.tv.data.network.JellyfinApi
-import com.jellio.tv.data.recommend.CandidateEntry
-import com.jellio.tv.data.session.RememberedUserEntry
-import com.jellio.tv.data.session.RememberedUsersStore
-import com.jellio.tv.data.session.Session
-import com.jellio.tv.data.session.SessionManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.util.concurrent.ConcurrentHashMap
-import retrofit2.HttpException
-import javax.inject.Inject
-import javax.inject.Singleton
-
 // Live TV. Opening a channel holds one of the tuner slots until
 // closeLiveStream; the player always closes what it opened.
 suspend fun JellioRepository.getLiveChannels(userId: String): List<com.jellio.tv.data.model.LiveChannelDto> =
@@ -63,23 +10,23 @@ fun JellioRepository.invalidateLiveChannels(userId: String) = cache.invalidatePr
 // Ids of channels that failed to start for anyone recently; empty when
 // the server can't say.
 suspend fun JellioRepository.getBrokenLiveChannels(): Set<String> =
-    runCatching { cache.get("live:health", 60_000L) { api.getLiveHealth().keys } }.getOrDefault(emptySet())
+    catching { cache.get("live:health", 60_000L) { api.getLiveHealth().keys } }.getOrDefault(emptySet())
 
 suspend fun JellioRepository.reportLiveChannel(channelId: String, ok: Boolean, error: String?) {
     cache.invalidatePrefix("live:health")
-    runCatching { api.reportLiveChannel(channelId, com.jellio.tv.data.model.LiveChannelReportDto(ok, error?.take(60))) }
+    catching { api.reportLiveChannel(channelId, com.jellio.tv.data.model.LiveChannelReportDto(ok, error?.take(60))) }
 }
 
 suspend fun JellioRepository.reportLiveWatching(body: com.jellio.tv.data.model.LiveWatchingDto) {
-    runCatching { api.reportLiveWatching(body) }
+    catching { api.reportLiveWatching(body) }
 }
 
 suspend fun JellioRepository.stopLiveWatching() {
-    runCatching { api.stopLiveWatching() }
+    catching { api.stopLiveWatching() }
 }
 
 suspend fun JellioRepository.reportStreamLinkPlay(linkId: String, ok: Boolean) {
-    runCatching { api.reportStreamLinkPlay(linkId, com.jellio.tv.data.model.StreamLinkPlayReportDto(ok)) }
+    catching { api.reportStreamLinkPlay(linkId, com.jellio.tv.data.model.StreamLinkPlayReportDto(ok)) }
 }
 
 suspend fun JellioRepository.getLivePrograms(userId: String, channelId: String, fromMs: Long, untilMs: Long): List<com.jellio.tv.data.model.LiveProgramDto> =
@@ -141,11 +88,11 @@ suspend fun JellioRepository.openLiveChannel(userId: String, channelId: String):
 }
 
 suspend fun JellioRepository.closeLiveStream(liveStreamId: String, playSessionId: String? = null) {
-    runCatching { api.closeLiveStream(liveStreamId) }
+    catching { api.closeLiveStream(liveStreamId) }
     // A transcode keeps reading the channel after the live stream closes, and a
     // provider that allows one connection would refuse the next channel meanwhile.
     if (!playSessionId.isNullOrBlank()) {
-        runCatching { api.stopEncoding(sessionManager.getCachedDeviceId(), playSessionId) }
+        catching { api.stopEncoding(sessionManager.getCachedDeviceId(), playSessionId) }
     }
 }
 
@@ -171,7 +118,7 @@ suspend fun JellioRepository.playStreamLink(channelId: String, linkId: String, e
         info.UserAgent?.let { put("User-Agent", it) }
         info.Referer?.let {
             put("Referer", it)
-            runCatching { java.net.URI(it) }.getOrNull()?.let { uri -> put("Origin", uri.scheme + "://" + uri.authority) }
+            catching { java.net.URI(it) }.getOrNull()?.let { uri -> put("Origin", uri.scheme + "://" + uri.authority) }
         }
     }
     return OpenedLiveStream(channelId, null, direct, mime, headers, proxy)
@@ -198,11 +145,13 @@ suspend fun JellioRepository.streamPairingStatus(code: String): com.jellio.tv.da
     return response.body()
 }
 
+private val STREAM_LINK_ERROR = Regex("\"[Ee]rror\"\\s*:\\s*\"([a-z_]+)\"")
+
 private suspend fun <T> JellioRepository.streamLinkCall(block: suspend () -> T): T = try {
     block()
 } catch (err: retrofit2.HttpException) {
-    val body = runCatching { err.response()?.errorBody()?.string() }.getOrNull().orEmpty()
-    val code = Regex("\"[Ee]rror\"\\s*:\\s*\"([a-z_]+)\"").find(body)?.groupValues?.get(1)
+    val body = catching { err.response()?.errorBody()?.string() }.getOrNull().orEmpty()
+    val code = STREAM_LINK_ERROR.find(body)?.groupValues?.get(1)
     throw StreamLinkException(code ?: if (err.code() == 404) "not_found" else "failed")
 }
 

@@ -10,7 +10,6 @@ class WatchNextTopPicksTest {
     @Test
     fun googleTvTopPicksSizeIsSix() {
         assertEquals(6, GOOGLE_TV_TOP_PICKS_SIZE)
-        assertEquals(6, WatchNextSyncer.GOOGLE_TV_TOP_PICKS_SIZE)
     }
 
     @Test

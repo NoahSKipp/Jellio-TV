@@ -24,6 +24,8 @@ class SourceCache<T>(
 
     fun put(key: String, value: List<T>, now: Long) {
         entries[key] = Entry(now, value)
+        // Entries are otherwise only dropped when their own key is read again.
+        if (entries.size > 200) entries.entries.removeIf { now - it.value.at > ttlMs }
     }
 
     fun clear() = entries.clear()

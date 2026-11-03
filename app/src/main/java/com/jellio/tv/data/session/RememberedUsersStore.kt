@@ -35,20 +35,24 @@ class RememberedUsersStore @Inject constructor(
 
     private fun keyFor(serverAddress: String) = stringPreferencesKey("remembered::$serverAddress")
 
-    suspend fun getRememberedUsers(serverAddress: String): Map<String, RememberedUserEntry> {
-        val raw = context.rememberedUsersDataStore.data.map { it[keyFor(serverAddress)] }.first() ?: return emptyMap()
-        return runCatching { adapter.fromJson(raw) }.getOrNull() ?: emptyMap()
-    }
+    private fun parse(raw: String?): Map<String, RememberedUserEntry> =
+        raw?.let { runCatching { adapter.fromJson(it) }.getOrNull() } ?: emptyMap()
 
-    suspend fun rememberUser(serverAddress: String, userId: String, entry: RememberedUserEntry) {
-        val map = getRememberedUsers(serverAddress).toMutableMap()
-        map[userId] = entry
-        context.rememberedUsersDataStore.edit { it[keyFor(serverAddress)] = adapter.toJson(map) }
-    }
+    suspend fun getRememberedUsers(serverAddress: String): Map<String, RememberedUserEntry> =
+        parse(context.rememberedUsersDataStore.data.map { it[keyFor(serverAddress)] }.first())
 
-    suspend fun forgetUser(serverAddress: String, userId: String) {
-        val map = getRememberedUsers(serverAddress).toMutableMap()
-        map.remove(userId)
-        context.rememberedUsersDataStore.edit { it[keyFor(serverAddress)] = adapter.toJson(map) }
+    suspend fun rememberUser(serverAddress: String, userId: String, entry: RememberedUserEntry) =
+        update(serverAddress) { it[userId] = entry }
+
+    suspend fun forgetUser(serverAddress: String, userId: String) =
+        update(serverAddress) { it.remove(userId) }
+
+    // Read and written in one edit, so two sign-ins at once both stick.
+    private suspend fun update(serverAddress: String, change: (MutableMap<String, RememberedUserEntry>) -> Unit) {
+        context.rememberedUsersDataStore.edit { prefs ->
+            val map = parse(prefs[keyFor(serverAddress)]).toMutableMap()
+            change(map)
+            prefs[keyFor(serverAddress)] = adapter.toJson(map)
+        }
     }
 }

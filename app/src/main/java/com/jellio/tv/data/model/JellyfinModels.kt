@@ -6,7 +6,6 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class PublicSystemInfoDto(
-    val ServerName: String? = null,
     val Version: String? = null,
     val Id: String? = null,
 )
@@ -46,7 +45,6 @@ data class UserConfigurationDto(
 data class AuthenticationResultDto(
     val User: UserDto,
     val AccessToken: String,
-    val ServerId: String? = null,
 )
 
 @Immutable
@@ -118,7 +116,6 @@ data class MediaSourceDto(
     val Size: Long? = null,
     val Bitrate: Long? = null,
     val SupportsDirectPlay: Boolean? = null,
-    val SupportsDirectStream: Boolean? = null,
     val DefaultAudioStreamIndex: Int? = null,
     val TranscodingUrl: String? = null,
     val MediaStreams: List<MediaStreamDto>? = null,
@@ -204,10 +201,6 @@ data class GenreSearchResultDto(
     val Name: String? = null,
     val Category: String? = null,
     val IsStandard: Boolean = false,
-    val TmdbGenreId: Int? = null,
-    val KeywordId: Int? = null,
-    val OriginalLanguage: String? = null,
-    val MatchCount: Int? = null,
 )
 
 @Immutable
@@ -246,7 +239,6 @@ data class PrefetchBatchRequest(
 
 @JsonClass(generateAdapter = true)
 data class PrefetchBatchResponse(
-    val Queued: List<String>? = null,
     val AlreadyWarm: List<String>? = null,
 )
 
@@ -374,7 +366,6 @@ data class GroupWatchMessageDto(
     val ItemId: String? = null,
     val ReplyToId: Long? = null,
     val ReplyToName: String? = null,
-    val ReplyToText: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -668,7 +659,6 @@ data class BadgeDto(
     val Description: String? = null,
     val Rarity: String? = null,
     val Unlocked: Boolean = false,
-    val UnlockedAt: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

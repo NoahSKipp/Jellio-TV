@@ -12,10 +12,8 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
 import kotlinx.coroutines.flow.first
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
-import java.util.concurrent.TimeUnit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
@@ -44,11 +42,7 @@ class WatchNextSyncer @Inject constructor(
     private val repository: JellioRepository,
     private val sessionManager: SessionManager,
 ) {
-    private val http = OkHttpClient.Builder()
-        .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val http = com.jellio.tv.data.network.SharedHttp.plainClient
 
     private fun supported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 
@@ -452,7 +446,6 @@ class WatchNextSyncer @Inject constructor(
         const val TAG = "JellioWatchNext"
         const val MAX_ROWS = 5
         const val CHANNEL_SIZE = 15
-        const val GOOGLE_TV_TOP_PICKS_SIZE = 6
         private val CHANNELS = listOf(
             ChannelSpec("continue", "Continue Watching"),
             ChannelSpec("nextup", "Next Up"),

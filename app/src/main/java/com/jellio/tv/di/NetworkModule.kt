@@ -24,6 +24,9 @@ import javax.inject.Singleton
 
 private const val PLACEHOLDER_BASE_URL = "http://localhost/"
 
+// 172.16.0.0/12, the private range Docker networks use.
+private val PRIVATE_172 = Regex("^172\\.(1[6-9]|2\\d|3[01])\\.")
+
 fun normalizeServerAddress(raw: String): String {
     val trimmed = raw.trim().trimEnd('/')
     if (trimmed.isEmpty()) return trimmed
@@ -31,7 +34,7 @@ fun normalizeServerAddress(raw: String): String {
         trimmed
     } else {
         val lower = trimmed.lowercase()
-        if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || lower.startsWith("172.16.") || lower.startsWith("localhost")) {
+        if (lower.contains(":8096") || lower.startsWith("192.168.") || lower.startsWith("10.") || PRIVATE_172.containsMatchIn(lower) || lower.startsWith("localhost")) {
             "http://$trimmed"
         } else {
             "https://$trimmed"
@@ -93,24 +96,16 @@ object NetworkModule {
     fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
         Interceptor { chain ->
             val original = chain.request()
+            val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
+            val request = original.newBuilder()
+                .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
             // A request carrying its own credentials (checking a saved
             // profile's token) keeps them.
-            val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
-            if (original.header("Authorization") != null) {
-                return@Interceptor chain.proceed(
-                    original.newBuilder()
-                        .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
-                        .build()
-                )
+            if (original.header("Authorization") == null) {
+                val token = sessionManager.getCachedAccessToken()
+                request.header("Authorization", buildEmbyAuthorizationHeader(sessionManager.getCachedDeviceId(), APP_VERSION, token))
             }
-            val token = sessionManager.getCachedAccessToken()
-            val deviceId = sessionManager.getCachedDeviceId()
-            val header = buildEmbyAuthorizationHeader(deviceId, APP_VERSION, token)
-            val request = original.newBuilder()
-                .header("Authorization", header)
-                .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
-                .build()
-            chain.proceed(request)
+            chain.proceed(request.build())
         }
 
     @Provides
