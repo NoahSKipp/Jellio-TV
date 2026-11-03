@@ -559,5 +559,8 @@ internal object StringsDe {
         m["player_switch_connecting"] = "Verbindung zum neuen Stream…"
         m["player_switch_loading"] = "Neuer Stream wird geladen…"
         m["player_switch_done"] = "Jetzt läuft {label}"
+        m["stream_ready"] = "Bereit"
+        m["settings_prefer_ready"] = "Bereite Quellen bevorzugen"
+        m["settings_prefer_ready_desc"] = "Ist eine Quelle gleicher Qualität auf dem Server schon vorbereitet, wird mit ihr gestartet. Eine bereite Quelle in schlechterer Qualität ersetzt nie eine bessere."
     }
 }

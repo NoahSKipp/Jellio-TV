@@ -559,5 +559,8 @@ internal object StringsFr {
         m["player_switch_connecting"] = "Connexion au nouveau flux…"
         m["player_switch_loading"] = "Chargement du nouveau flux…"
         m["player_switch_done"] = "Lecture de {label}"
+        m["stream_ready"] = "Prête"
+        m["settings_prefer_ready"] = "Préférer les sources prêtes"
+        m["settings_prefer_ready_desc"] = "Si une source de même qualité est déjà préparée sur le serveur, la lecture commence avec elle. Une source prête de qualité inférieure ne remplace jamais une meilleure."
     }
 }

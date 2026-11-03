@@ -264,6 +264,13 @@ fun SettingsScreen(
                     val playerContext = LocalContext.current
                     SettingsDivider()
                     SettingsToggleRow(
+                        label = string("settings_prefer_ready"),
+                        description = string("settings_prefer_ready_desc"),
+                        checked = PlayerPrefs.preferReady,
+                        onToggle = { PlayerPrefs.setPreferReady(playerContext, !PlayerPrefs.preferReady) },
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
                         label = string("settings_match_frame_rate"),
                         description = string("settings_match_frame_rate_desc"),
                         checked = PlayerPrefs.matchFrameRate,

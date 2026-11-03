@@ -17,6 +17,7 @@ object PlayerPrefs {
     private const val MATCH_FRAME_RATE_V2 = "match_frame_rate_v2"
     private const val AUDIO_DELAY = "audio_delay_ms"
     private const val BUFFER_SWITCH = "buffer_switch"
+    private const val PREFER_READY = "prefer_ready"
 
     var autoSkipIntro by mutableStateOf(false)
         private set
@@ -39,6 +40,10 @@ object PlayerPrefs {
     var audioDelayMs by mutableStateOf(0)
         private set
 
+    // Start with a source the server has ready when it has the same quality.
+    var preferReady by mutableStateOf(true)
+        private set
+
     // "ask", "auto" or "off": what to do when a stream keeps buffering.
     var bufferSwitch by mutableStateOf("ask")
         private set
@@ -52,6 +57,12 @@ object PlayerPrefs {
         matchFrameRate = prefs.getBoolean(MATCH_FRAME_RATE_V2, false)
         audioDelayMs = prefs.getInt(AUDIO_DELAY, 0)
         bufferSwitch = prefs.getString(BUFFER_SWITCH, "ask") ?: "ask"
+        preferReady = prefs.getBoolean(PREFER_READY, true)
+    }
+
+    fun setPreferReady(context: Context, enabled: Boolean) {
+        preferReady = enabled
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(PREFER_READY, enabled).apply()
     }
 
     fun setBufferSwitch(context: Context, mode: String) {

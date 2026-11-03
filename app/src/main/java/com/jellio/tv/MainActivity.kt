@@ -644,6 +644,7 @@ private fun JellioTvApp(
                 },
                 loadSources = { forceFresh -> appViewModel.getMediaSources(session, pickerItem.Id, forceFresh) },
                 rememberedSourceId = { appViewModel.rememberedMediaSourceId(pickerItem.Id) },
+                loadReadyInfo = { appViewModel.readyInfo(pickerItem.Id) },
                 onSelect = { source ->
                     streamPickerItem = null
                     val mediaSourceId = source.Id

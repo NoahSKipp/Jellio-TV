@@ -559,5 +559,8 @@ internal object StringsIt {
         m["player_switch_connecting"] = "Connessione al nuovo stream…"
         m["player_switch_loading"] = "Caricamento del nuovo stream…"
         m["player_switch_done"] = "Ora in riproduzione: {label}"
+        m["stream_ready"] = "Pronta"
+        m["settings_prefer_ready"] = "Preferisci le fonti pronte"
+        m["settings_prefer_ready_desc"] = "Se una fonte della stessa qualità è già pronta sul server, si parte da quella. Una fonte pronta di qualità inferiore non sostituisce mai una migliore."
     }
 }

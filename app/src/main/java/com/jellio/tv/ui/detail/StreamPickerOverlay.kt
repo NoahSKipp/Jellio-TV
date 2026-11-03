@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.detail
 
+import kotlinx.coroutines.async
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -202,6 +203,8 @@ private sealed interface SourcesState {
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
+private const val READY_INFO_WAIT_MS = 1_200L
+
 @Composable
 fun StreamPickerOverlay(
     item: BaseItemDto,
@@ -209,6 +212,7 @@ fun StreamPickerOverlay(
     loadSources: suspend (forceFresh: Boolean) -> List<MediaSourceDto>,
     rememberedSourceId: suspend () -> String?,
     onSelect: (MediaSourceDto) -> Unit,
+    loadReadyInfo: suspend () -> com.jellio.tv.data.streams.ReadyInfo? = { null },
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -217,6 +221,7 @@ fun StreamPickerOverlay(
     var remembered by remember { mutableStateOf<String?>(null) }
     var selectedLanguage by remember { mutableStateOf<String?>(null) }
     var selectedQuality by remember { mutableStateOf<String?>(null) }
+    var readyInfo by remember { mutableStateOf<com.jellio.tv.data.streams.ReadyInfo?>(null) }
     val initialFocusRequester = remember { FocusRequester() }
     val resumeFocusRequester = remember { FocusRequester() }
     val firstSourceCardFocusRequester = remember { FocusRequester() }
@@ -240,15 +245,29 @@ fun StreamPickerOverlay(
         state = SourcesState.Loading
         state = try {
             val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
+            // Never holds the list up for long.
+            val ready = async { kotlinx.coroutines.withTimeoutOrNull(READY_INFO_WAIT_MS) { loadReadyInfo() } }
             val loaded = loadSources(reloadKey > 0)
             val kept = if (policy.blocking) loaded.filterNot { policy.needsReencode(it) } else loaded
             if (policy.blocking && loaded.isNotEmpty() && kept.isEmpty()) {
                 SourcesState.Error(com.jellio.tv.ui.i18n.Strings.get("stream_policy_blocked"))
             } else {
+                fun rank(source: MediaSourceDto) =
+                    (if (com.jellio.tv.ui.player.BadStreams.isBad(item.Id, source)) 2 else 0) +
+                        (if (policy.avoiding && policy.needsReencode(source)) 1 else 0)
+                val ranked = kept.sortedBy { rank(it) }
+                val info = ready.await()
+                readyInfo = info
                 SourcesState.Loaded(
-                    kept.sortedBy {
-                        (if (com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it)) 2 else 0) +
-                            (if (policy.avoiding && policy.needsReencode(it)) 1 else 0)
+                    if (info != null && com.jellio.tv.ui.player.PlayerPrefs.preferReady) {
+                        com.jellio.tv.data.streams.preferReadySource(
+                            ranked,
+                            isReady = { info.isReady(it.Id) },
+                            tierOf = { info.tierOf(it.Id) },
+                            rankOf = { rank(it) },
+                        )
+                    } else {
+                        ranked
                     },
                 )
             }
@@ -506,6 +525,7 @@ fun StreamPickerOverlay(
                             SourceCard(
                                 source = source,
                                 recentlyFailed = com.jellio.tv.ui.player.BadStreams.isBad(item.Id, source),
+                                ready = readyInfo?.isReady(source.Id) == true,
                                 onClick = { onSelect(source) },
                                 modifier = if (index == 0) {
                                     Modifier
@@ -606,6 +626,7 @@ internal fun SourceCard(
     // In the player: mark a stream that needs a video re-encode, yellow
     // under Avoid, red under Block.
     transcodeMark: Boolean = false,
+    ready: Boolean = false,
 ) {
     val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
     val classification = remember(source) {
@@ -642,6 +663,17 @@ internal fun SourceCard(
             }
             if (classification != null) {
                 OutlookBadge(com.jellio.tv.data.playback.playbackOutlook(classification, policy.policy))
+            }
+            if (ready) {
+                Text(
+                    text = "⚡ " + com.jellio.tv.ui.i18n.string("stream_ready"),
+                    color = Color(0xFF81C784),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .background(Color(0xFF66BB6A).copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
             }
             Text(
                 text = (source.Name ?: "Source").substringBefore('\n'),

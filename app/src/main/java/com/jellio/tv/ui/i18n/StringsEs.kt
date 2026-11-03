@@ -559,5 +559,8 @@ internal object StringsEs {
         m["player_switch_connecting"] = "Conectando con la nueva emisión…"
         m["player_switch_loading"] = "Cargando la nueva emisión…"
         m["player_switch_done"] = "Ahora en reproducción: {label}"
+        m["stream_ready"] = "Lista"
+        m["settings_prefer_ready"] = "Preferir fuentes listas"
+        m["settings_prefer_ready_desc"] = "Si una fuente de la misma calidad ya está preparada en el servidor, se empieza con ella. Una fuente lista de menor calidad nunca sustituye a una mejor."
     }
 }

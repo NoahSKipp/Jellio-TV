@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -118,6 +119,15 @@ class AppViewModel @Inject constructor(
 
     suspend fun getMediaSources(session: Session, itemId: String, forceFresh: Boolean = false) =
         repository.getMediaSources(session.userId, itemId, forceFresh = forceFresh)
+
+    suspend fun readyInfo(itemId: String): com.jellio.tv.data.streams.ReadyInfo? = kotlinx.coroutines.coroutineScope {
+        val tiers = async { repository.getQualityTiers(itemId) }
+        val warm = repository.getWarmSources(itemId) ?: return@coroutineScope null
+        com.jellio.tv.data.streams.ReadyInfo(
+            warm.keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet(),
+            tiers.await().mapKeys { com.jellio.tv.data.streams.normalizeSourceId(it.key) },
+        )
+    }
 
     suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
         if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)

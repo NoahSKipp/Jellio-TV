@@ -559,5 +559,8 @@ internal object StringsPt {
         m["player_switch_connecting"] = "Conectando ao novo stream…"
         m["player_switch_loading"] = "Carregando o novo stream…"
         m["player_switch_done"] = "Reproduzindo agora: {label}"
+        m["stream_ready"] = "Pronta"
+        m["settings_prefer_ready"] = "Preferir fontes prontas"
+        m["settings_prefer_ready_desc"] = "Se uma fonte da mesma qualidade já estiver preparada no servidor, começa por ela. Uma fonte pronta de qualidade inferior nunca substitui uma melhor."
     }
 }

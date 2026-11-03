@@ -559,5 +559,8 @@ internal object StringsPl {
         m["player_switch_connecting"] = "Łączenie z nowym strumieniem…"
         m["player_switch_loading"] = "Wczytywanie nowego strumienia…"
         m["player_switch_done"] = "Teraz odtwarzane: {label}"
+        m["stream_ready"] = "Gotowe"
+        m["settings_prefer_ready"] = "Preferuj gotowe źródła"
+        m["settings_prefer_ready_desc"] = "Jeśli źródło tej samej jakości jest już przygotowane na serwerze, odtwarzanie zaczyna się od niego. Gotowe źródło niższej jakości nigdy nie zastępuje lepszego."
     }
 }
