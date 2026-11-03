@@ -106,6 +106,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.67.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.67.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "No More Two Minute Placeholder", "When a stream turns out to be the short, silent stand-in clip served for a release that couldn't be found, Jellio TV now notices and moves on to the next stream by itself."),
+            ChangelogFeature(Icons.Filled.Speed, "Faster Starts", "Titles in Continue Watching and the next episode are prepared in the background while you browse or watch, so they start sooner."),
+            ChangelogFeature(Icons.Filled.LiveTv, "Opening Your Own Streams", "Your own streams now say they are opening and that this can take a couple of minutes, instead of a plain loading spinner."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.66.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.66.1",
