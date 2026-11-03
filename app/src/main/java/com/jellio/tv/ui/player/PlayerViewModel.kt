@@ -176,6 +176,16 @@ class PlayerViewModel @Inject constructor(
     private fun streamLanguage(): String? =
         preferredStreamLanguage(audioLanguagePreference, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code)
 
+    // Each source is failed over for a placeholder clip at most once.
+    private val placeholderSources = mutableSetOf<String>()
+
+    fun placeholderDetected(session: Session, sign: PlaceholderSign) {
+        val key = currentSource?.Id ?: _uiState.value.mediaSourceId ?: return
+        if (!placeholderSources.add(key)) return
+        android.util.Log.w("JellioPlayer", "${sign.reason} on source $key, trying the next one")
+        streamFailed(session, sign.reason)
+    }
+
     fun streamFailed(session: Session, reason: String) {
         if (failingOver || syncPlay.group.value != null) return
         val id = itemId ?: return
@@ -376,6 +386,7 @@ class PlayerViewModel @Inject constructor(
         if (!fromFailover && loadedItemId == key) return
         loadedItemId = key
         if (!fromFailover) {
+            placeholderSources.clear()
             triedSourceIds.clear()
             transcodeRetriedSourceIds.clear()
             directRetriedSourceIds.clear()

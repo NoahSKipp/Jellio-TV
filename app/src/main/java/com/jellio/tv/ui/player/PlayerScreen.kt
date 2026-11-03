@@ -315,6 +315,7 @@ fun PlayerScreen(
                 expectedRuntimeMs = uiState.expectedRuntimeMs,
                 reencodingVideo = uiState.reencodingVideo,
                 onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
+                onPlaceholder = { sign -> viewModel.placeholderDetected(session, sign) },
                 onPlaybackStarted = { viewModel.failoverPlaying() },
             )
         }
@@ -431,6 +432,7 @@ internal fun PlayerSurface(
     expectedRuntimeMs: Long = 0,
     reencodingVideo: Boolean = false,
     onStreamFailed: (String) -> Unit = {},
+    onPlaceholder: (PlaceholderSign) -> Unit = {},
     onPlaybackStarted: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -612,7 +614,7 @@ internal fun PlayerSurface(
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
     var isEnded by remember(streamUrl) { mutableStateOf(false) }
     var endedAsPlaceholder by remember(streamUrl) { mutableStateOf(false) }
-    var placeholderReported by remember(streamUrl) { mutableStateOf(false) }
+    val placeholderWatch = remember(streamUrl) { PlaceholderWatch() }
     var stopAtEnd by remember { mutableStateOf(false) }
     var subtitleMissingReported by remember { mutableStateOf(false) }
     val selectedSubtitleLanguage = subtitleTracks.firstOrNull { it.streamIndex == selectedSubtitleIndex }?.language
@@ -853,6 +855,7 @@ internal fun PlayerSurface(
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() {
                 if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
+                if (placeholderWatch.firstFrameAt == 0L) placeholderWatch.firstFrameAt = System.currentTimeMillis()
                 PlayStartTrace.end("first frame")
             }
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -882,6 +885,9 @@ internal fun PlayerSurface(
                 }
             }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                if (tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO || it.type == C.TRACK_TYPE_AUDIO }) {
+                    placeholderWatch.hasAudio = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }
+                }
                 val found = applySubtitleSelection(player, currentSubtitleTracks, currentSubtitleIndex, currentSubtitleLanguage)
                 // Picked, the stream has its tracks, and none of them is it:
                 // say so instead of quietly showing nothing.
@@ -941,15 +947,46 @@ internal fun PlayerSurface(
         selectAudioTrack(player, audioTracks, selectedAudioStreamIndex, defaultAudioStreamIndex)
     }
 
+    fun checkPlaceholder() {
+        if (placeholderWatch.reported || syncGroup != null) return
+        val now = System.currentTimeMillis()
+        val stalled = player.playbackState == Player.STATE_BUFFERING && player.playWhenReady
+        if (!stalled) {
+            placeholderWatch.stallStartedAt = 0L
+        } else if (placeholderWatch.stallStartedAt == 0L) {
+            placeholderWatch.stallStartedAt = now
+            // Waiting on a seek is not the stream failing.
+            placeholderWatch.stallAfterSeek = now - bufferWatch.lastSeekAt < 2_000
+        }
+        placeholderWatch.sampleFrames(
+            player.videoDecoderCounters?.also { it.ensureUpdated() }?.renderedOutputBufferCount,
+            player.isPlaying,
+            now,
+        )
+        val sign = detectPlaceholder(
+            PlaceholderSignals(
+                expectedRuntimeMs = expectedRuntimeMs,
+                durationMs = if (directPlay && player.duration > 0) streamOffsetMs + player.duration else 0L,
+                firstFrameRendered = placeholderWatch.firstFrameAt > 0,
+                formatFrameRate = player.videoFormat?.frameRate?.takeIf { it > 0f },
+                measuredFrameRate = placeholderWatch.measuredFps,
+                hasAudioTrack = placeholderWatch.hasAudio,
+                ended = player.playbackState == Player.STATE_ENDED,
+                stalledMs = if (placeholderWatch.stallStartedAt > 0 && !placeholderWatch.stallAfterSeek) now - placeholderWatch.stallStartedAt else 0L,
+                positionMs = realPositionMs(),
+            ),
+        ) ?: return
+        placeholderWatch.reported = true
+        endedAsPlaceholder = sign == PlaceholderSign.ENDED_EARLY || player.playbackState == Player.STATE_ENDED
+        onPlaceholder(sign)
+    }
+
     LaunchedEffect(player, startPositionTicks) {
         while (isActive) {
+            checkPlaceholder()
             if (player.duration > 0 && player.playbackState != Player.STATE_IDLE) {
                 durationMs = streamOffsetMs + player.duration
                 val placeholder = looksLikePlaceholder(durationMs, expectedRuntimeMs)
-                if (directPlay && placeholder && !placeholderReported && syncGroup == null) {
-                    placeholderReported = true
-                    onStreamFailed("placeholder clip of ${durationMs / 1000}s")
-                }
                 if (directPlay && !placeholder) onReportRealDuration(durationMs / 1000.0)
                 if (!seekedToResume && startPositionTicks > 0 && directPlay) {
                     seekedToResume = true
@@ -1022,9 +1059,9 @@ internal fun PlayerSurface(
 
     LaunchedEffect(isEnded) {
         if (!isEnded) return@LaunchedEffect
-        if (looksLikePlaceholder(realPositionMs(), expectedRuntimeMs) && syncGroup == null) {
+        checkPlaceholder()
+        if (placeholderWatch.reported) {
             endedAsPlaceholder = true
-            onStreamFailed("ended after ${realPositionMs() / 1000}s")
             return@LaunchedEffect
         }
         if (!stopAtEnd && upNextInfo == null && EpisodeSleepTimer.remaining != null) {
