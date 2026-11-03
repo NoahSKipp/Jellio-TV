@@ -551,7 +551,6 @@ class PlayerViewModel @Inject constructor(
                         val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
-                            repository.prefetchStreams(next.Id)
                         }
                     }
                 }
@@ -1042,6 +1041,13 @@ class PlayerViewModel @Inject constructor(
 
     fun reportProgress(positionTicks: Long, isPaused: Boolean) {
         val id = itemId ?: return
+        // Warmed from 70% on, late enough to still be fresh when Up Next
+        // comes; the repository skips repeats for a few minutes.
+        val expected = _uiState.value.expectedRuntimeMs
+        val nextId = _uiState.value.upNextInfo?.itemId
+        if (nextId != null && expected > 0 && positionTicks / 10_000 >= expected * 7 / 10) {
+            repository.prefetchStreams(nextId)
+        }
         viewModelScope.launch { repository.reportPlaybackProgress(id, uiState.value.mediaSourceId, positionTicks, isPaused) }
     }
 

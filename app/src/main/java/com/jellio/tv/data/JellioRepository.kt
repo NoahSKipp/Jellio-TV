@@ -1096,6 +1096,29 @@ class JellioRepository @Inject constructor(
         }
     }
 
+    private var queuedPrefetch: kotlinx.coroutines.Job? = null
+
+    // One title at a time, so a slot stays free for whatever gets focus.
+    fun prefetchStreamsInTurn(itemIds: List<String>) {
+        queuedPrefetch?.cancel()
+        queuedPrefetch = prefetchScope.launch {
+            for (itemId in itemIds) {
+                val now = System.currentTimeMillis()
+                val last = prefetchedAt[itemId]
+                if (last != null && now - last < PREFETCH_WINDOW_MS) continue
+                if (sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)) continue
+                while (!prefetchSlots.tryAcquire()) delay(500)
+                prefetchedAt[itemId] = System.currentTimeMillis()
+                com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
+                try {
+                    runCatching { api.prefetchGelatoStreams(itemId) }
+                } finally {
+                    prefetchSlots.release()
+                }
+            }
+        }
+    }
+
     // Pre-warms the stream connection and Usenet/nzbdav reader for the upcoming episode.
     fun prewarmStreamUrl(streamUrl: String) {
         prefetchScope.launch {

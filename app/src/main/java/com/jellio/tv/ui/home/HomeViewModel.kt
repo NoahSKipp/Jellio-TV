@@ -117,6 +117,9 @@ private fun titleFor(name: String?, kind: String): String {
 private const val HOME_BACKGROUND_RETRIES = 3
 private const val HOME_RETRY_DELAY_MS = 20_000L
 
+// Warmed in the background while the viewer is still browsing.
+private const val CONTINUE_PREFETCH_COUNT = 6
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -188,6 +191,9 @@ class HomeViewModel @Inject constructor(
                     val upNext = upNextDeferred.await()
                     val continueWatching = continueWatchingDeferred.await().withoutStaleEpisodes(upNext)
                     launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNext) } }
+                    repository.prefetchStreamsInTurn(
+                        continueWatching.filter { it.Type == "Movie" || it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT).map { it.Id },
+                    )
                     // Anime stays in the Anime library: out of the hero, Coming
                     // Soon and (through exclude below) every discovery row.
                     animeIds = animeIdsDeferred.await()
