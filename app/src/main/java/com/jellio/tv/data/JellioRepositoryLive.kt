@@ -92,6 +92,11 @@ suspend fun JellioRepository.getLivePrograms(userId: String, channelId: String, 
         ),
     ).Items
 
+// One line per channel opened, to see on the device which ones get converted.
+internal fun describeLivePath(channelId: String, audioCodec: String?, viaHls: Boolean): String =
+    "channel $channelId: source audio ${audioCodec?.lowercase() ?: "unknown"}, " +
+        if (viaHls) "server HLS with AAC" else "direct play"
+
 suspend fun JellioRepository.openLiveChannel(userId: String, channelId: String): OpenedLiveStream {
     val profile = com.jellio.tv.data.model.LiveDeviceProfile(
         DirectPlayProfiles = listOf(
@@ -118,7 +123,10 @@ suspend fun JellioRepository.openLiveChannel(userId: String, channelId: String):
     val liveStreamId = source.LiveStreamId ?: throw IllegalStateException("No live stream was opened")
     val server = com.jellio.tv.di.normalizeServerAddress(sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in"))
     val transcoding = source.TranscodingUrl
-    if (!transcoding.isNullOrBlank() && source.SupportsDirectPlay != true) {
+    val viaHls = !transcoding.isNullOrBlank() && source.SupportsDirectPlay != true
+    val audioCodec = source.MediaStreams?.firstOrNull { it.Type == "Audio" }?.Codec
+    android.util.Log.i("JellioLive", describeLivePath(channelId, audioCodec, viaHls))
+    if (viaHls && transcoding != null) {
         val path = if (transcoding.startsWith("/")) transcoding else "/$transcoding"
         return OpenedLiveStream(
             channelId, liveStreamId, server + path,

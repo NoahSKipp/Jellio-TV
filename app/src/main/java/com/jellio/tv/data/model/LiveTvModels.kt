@@ -85,6 +85,7 @@ data class LiveMediaSourceDto(
     val Container: String? = null,
     val TranscodingUrl: String? = null,
     val SupportsDirectPlay: Boolean? = null,
+    val MediaStreams: List<MediaStreamDto>? = null,
 )
 
 @JsonClass(generateAdapter = true)
