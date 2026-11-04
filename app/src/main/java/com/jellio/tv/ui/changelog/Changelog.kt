@@ -106,6 +106,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.67.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.67.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Expired Stream Links", "When the server reports that a stream is not ready because its link expired, Jellio TV now asks for the title's streams again and goes on with that list, instead of trying every old stream and ending with none left. Such a stream is no longer set aside for two days."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.67.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.67.1",
