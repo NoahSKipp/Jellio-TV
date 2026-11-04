@@ -169,6 +169,7 @@ class JellioRepository @Inject constructor(
 
     private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
     private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
+    private val lastSources = ConcurrentHashMap<String, com.jellio.tv.data.streams.LastList<MediaSourceDto>>()
     private val prefetchedAt = ConcurrentHashMap<String, Long>()
     // One warm-up request to the server at a time, whoever asks.
     private val prefetchSlots = java.util.concurrent.Semaphore(1)
@@ -180,6 +181,7 @@ class JellioRepository @Inject constructor(
         preloaded.clear()
         recentLists.clear()
         sourceCache.clear()
+        lastSources.clear()
         prefetchedAt.clear()
     }
 
@@ -948,6 +950,7 @@ class JellioRepository @Inject constructor(
                 val sources = fetchMediaSources(userId, itemId)
                 if (sources.isNotEmpty()) {
                     sourceCache.put(itemId, sources, System.currentTimeMillis())
+                    lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, System.currentTimeMillis())
                 }
                 com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
                 sources
@@ -1002,8 +1005,36 @@ class JellioRepository @Inject constructor(
         return false
     }
 
-    private suspend fun fetchMediaSources(userId: String, itemId: String): List<MediaSourceDto> {
-        val item = withRetry { api.getItem(userId, itemId, fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear") }
+    // The other streams after one failed: a fresh list, then one retry with a
+    // longer timeout, then the last list loaded for the title. Errors are kept.
+    suspend fun getFailoverSources(userId: String, itemId: String): com.jellio.tv.data.streams.FailoverLoad<MediaSourceDto> {
+        loadVideoTranscodePolicy()
+        return com.jellio.tv.data.streams.loadFailoverSources(lastSources[itemId], System::currentTimeMillis) { timeout ->
+            val started = System.currentTimeMillis()
+            val sources = fetchMediaSources(userId, itemId, timeout ?: failoverFirstTimeoutSeconds)
+            com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, "failover", sources.size, System.currentTimeMillis() - started)
+            if (sources.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                sourceCache.put(itemId, sources, now)
+                lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, now)
+            }
+            sources
+        }
+    }
+
+    private val failoverFirstTimeoutSeconds = 20
+
+    suspend fun logFailover(body: com.jellio.tv.data.model.FailoverLogBody) {
+        runCatching { api.logFailover(body) }
+    }
+
+    private suspend fun fetchMediaSources(userId: String, itemId: String, readTimeoutSeconds: Int? = null): List<MediaSourceDto> {
+        val fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear"
+        val item = if (readTimeoutSeconds == null) {
+            withRetry { api.getItem(userId, itemId, fields = fields) }
+        } else {
+            api.getItem(userId, itemId, fields = fields, readTimeoutSeconds = readTimeoutSeconds)
+        }
         val sources = item.MediaSources ?: emptyList()
         if (sources.size == 1 && !hasStreamInfo(sources[0])) {
             return emptyList()

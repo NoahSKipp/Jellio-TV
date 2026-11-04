@@ -128,6 +128,7 @@ fun PlaybackErrorPanel(
     problem: PlaybackProblem,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
 ) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(problem) { runCatching { focus.requestFocus() } }
@@ -138,7 +139,13 @@ fun PlaybackErrorPanel(
             .focusRequester(focus)
             .focusable()
             .onKeyEvent { event ->
-                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) onBack()
+                if (event.type == KeyEventType.KeyUp) {
+                    when (event.key) {
+                        Key.Back -> onBack()
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> onRetry?.invoke()
+                        else -> Unit
+                    }
+                }
                 true
             },
         contentAlignment = Alignment.Center,
@@ -157,6 +164,14 @@ fun PlaybackErrorPanel(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 10.dp),
             )
+            if (onRetry != null) {
+                Text(
+                    text = com.jellio.tv.ui.i18n.Strings.get("tv_failover_press_ok"),
+                    color = JellioText,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 18.dp),
+                )
+            }
             Text(
                 text = com.jellio.tv.ui.i18n.Strings.get("tv_press_back"),
                 color = JellioTextSecondary,

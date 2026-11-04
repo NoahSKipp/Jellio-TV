@@ -535,6 +535,25 @@ data class PlaybackDecisionBody(
 )
 
 @JsonClass(generateAdapter = true)
+data class FailoverLogBody(
+    val ItemId: String,
+    val FailedSourceId: String?,
+    val Reason: String,
+    val Total: Int,
+    val Tried: Int,
+    val BadHard: Int,
+    val BadSoft: Int,
+    val AfterLanguage: Int,
+    val AfterTranscode: Int,
+    val ListOrigin: String,
+    val ListError: String?,
+    val ListMs: Long?,
+    val Outcome: String,
+    val NextSourceId: String?,
+    val Client: String = "tv",
+)
+
+@JsonClass(generateAdapter = true)
 data class ClientConfigDto(
     val SeasonalEffectsEnabled: Boolean = false,
     val SeasonalEffects: Map<String, SeasonalEffectConfigDto> = emptyMap(),

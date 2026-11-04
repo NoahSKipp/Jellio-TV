@@ -9,6 +9,14 @@ import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
+import com.jellio.tv.data.streams.BadKind
+import com.jellio.tv.data.streams.FailoverCounts
+import com.jellio.tv.data.streams.FailoverLoad
+import com.jellio.tv.data.streams.FailoverOutcome
+import com.jellio.tv.data.streams.describeFailover
+import com.jellio.tv.data.streams.failoverOutcome
+import com.jellio.tv.data.streams.outcomeLabel
+import com.jellio.tv.data.streams.planFailover
 import com.jellio.tv.data.playback.TranscodeReason
 import com.jellio.tv.data.playback.VideoTranscodePolicy
 import com.jellio.tv.data.playback.videoInfoOf
@@ -101,6 +109,8 @@ data class PlayerUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val errorDetail: String? = null,
+    // The list of other streams could not be loaded; OK tries again.
+    val failoverRetry: Boolean = false,
     val streamUrl: String? = null,
     val mediaSourceId: String? = null,
     val startPositionTicks: Long = 0,
@@ -236,9 +246,10 @@ class PlayerViewModel @Inject constructor(
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
         val remuxFailed = !state.directPlay && reason == "error before the first frame"
         viewModelScope.launch {
+            var loaded: FailoverLoad<com.jellio.tv.data.model.MediaSourceDto>? = null
             if (remuxFailed && sourceId != null) {
-                val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "failover") }.getOrDefault(emptyList())
-                val playable = sources.filter {
+                loaded = repository.getFailoverSources(session.userId, id)
+                val playable = loaded.sources.orEmpty().filter {
                     it.Id != null && it.Id != sourceId && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) && repository.canDirectPlay(it)
                 }
                 if (playable.isEmpty() && repository.canDirectPlay(source, ignoreAudio = true) && directRetriedSourceIds.add(sourceId)) {
@@ -267,45 +278,116 @@ class PlayerViewModel @Inject constructor(
             BadStreams.mark(id, source)
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-            val language = failoverLanguage ?: streamLanguage()
-            failoverLanguage = language
-            val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "failover") }.getOrDefault(emptyList())
-            val candidates = sources.filter { it.Id != null && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
-            fun pick(list: List<com.jellio.tv.data.model.MediaSourceDto>) = orderByLanguage(list, language).firstOrNull()
-            // Avoid and Block try streams whose video can be copied first;
-            // Block never falls back to one the server would re-encode.
-            val policy = VideoTranscodePolicy
-            val directFirst = if (remuxFailed) candidates.filter { repository.canDirectPlay(it) } else emptyList()
-            val next = pick(directFirst) ?: if (policy.avoiding) {
-                val (reencode, copyable) = candidates.partition { policy.needsReencode(it) }
-                pick(copyable) ?: if (policy.blocking) null else pick(reencode)
-            } else {
-                pick(candidates)
-            }
-            if (next == null) {
-                _failover.value = null
-                _uiState.value = PlayerUiState(
-                    isLoading = false,
-                    error = "None of the streams worked",
-                    errorDetail = if (triedSourceIds.size > 1) {
+            chooseNextStream(session, PendingFailover(id, sourceId, reason, state, remuxFailed), loaded)
+        }
+    }
+
+    private data class PendingFailover(
+        val itemId: String,
+        val failedSourceId: String?,
+        val reason: String,
+        val state: PlayerUiState,
+        val remuxFailed: Boolean,
+    )
+
+    private var pendingFailover: PendingFailover? = null
+
+    fun retryFailover(session: Session) {
+        val pending = pendingFailover ?: return
+        if (failingOver) return
+        failingOver = true
+        _uiState.value = pending.state.copy(isLoading = true, error = null, errorDetail = null, failoverRetry = false)
+        viewModelScope.launch { chooseNextStream(session, pending, null) }
+    }
+
+    private suspend fun chooseNextStream(
+        session: Session,
+        pending: PendingFailover,
+        preloaded: FailoverLoad<com.jellio.tv.data.model.MediaSourceDto>?,
+    ) {
+        val id = pending.itemId
+        val state = pending.state
+        val language = failoverLanguage ?: streamLanguage()
+        failoverLanguage = language
+        val loaded = preloaded ?: repository.getFailoverSources(session.userId, id)
+        // Avoid and Block try streams whose video can be copied first;
+        // Block never falls back to one the server would re-encode.
+        val policy = VideoTranscodePolicy
+        val plan = planFailover(
+            loaded.sources,
+            triedSourceIds,
+            id = { it.Id },
+            isBad = { if (BadStreams.isBad(id, it)) BadKind.HARD else null },
+            byLanguage = { orderByLanguage(it, language) },
+            needsReencode = if (policy.avoiding) { s -> policy.needsReencode(s) } else null,
+            blockReencode = policy.blocking,
+            preferred = if (pending.remuxFailed) { s -> repository.canDirectPlay(s) } else null,
+        )
+        val outcome = failoverOutcome(loaded, plan) { it.Id }
+        logFailoverDecision(pending, plan.counts, loaded, outcome)
+        val next = (outcome as? FailoverOutcome.Navigate)?.let { nav -> plan.ordered.first { it.Id == nav.sourceId } }
+        if (next == null) {
+            pendingFailover = pending
+            _failover.value = null
+            val listFailed = outcome as? FailoverOutcome.ListFailed
+            _uiState.value = PlayerUiState(
+                isLoading = false,
+                error = if (listFailed != null) {
+                    com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_title")
+                } else {
+                    "None of the streams worked"
+                },
+                errorDetail = when {
+                    listFailed?.kind == "timeout" -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_timeout")
+                    listFailed != null -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_error")
+                    triedSourceIds.size > 1 ->
                         "${triedSourceIds.size} streams were tried for this title and none of them played. Try again later, or pick one from Change stream on the title's page."
-                    } else {
-                        "This stream couldn't be played and there's no other one to try. Try again later."
-                    },
-                    title = state.title,
-                    pauseInfo = state.pauseInfo,
-                )
-                failingOver = false
-                return@launch
-            }
-            _failover.value = FailoverNotice(
-                attempt = triedSourceIds.size + 1,
-                sourceLabel = sourceLabel(next),
-                slowTranscode = state.reencodingVideo && reason.startsWith("no picture"),
+                    else -> "This stream couldn't be played and there's no other one to try. Try again later."
+                },
+                failoverRetry = listFailed != null,
+                title = state.title,
+                pauseInfo = state.pauseInfo,
             )
             failingOver = false
-            currentSource = next
-            load(session, id, next.Id, fromFailover = true)
+            return
+        }
+        pendingFailover = null
+        _failover.value = FailoverNotice(
+            attempt = triedSourceIds.size + 1,
+            sourceLabel = sourceLabel(next),
+            slowTranscode = state.reencodingVideo && pending.reason.startsWith("no picture"),
+        )
+        failingOver = false
+        currentSource = next
+        load(session, id, next.Id, fromFailover = true)
+    }
+
+    private fun logFailoverDecision(
+        pending: PendingFailover,
+        counts: FailoverCounts,
+        loaded: FailoverLoad<*>,
+        outcome: FailoverOutcome,
+    ) {
+        android.util.Log.w("JellioPlayer", describeFailover(pending.reason, counts, loaded, outcome))
+        viewModelScope.launch {
+            repository.logFailover(
+                com.jellio.tv.data.model.FailoverLogBody(
+                    ItemId = pending.itemId,
+                    FailedSourceId = pending.failedSourceId,
+                    Reason = pending.reason,
+                    Total = counts.total,
+                    Tried = counts.tried,
+                    BadHard = counts.badHard,
+                    BadSoft = counts.badSoft,
+                    AfterLanguage = counts.afterLanguage,
+                    AfterTranscode = counts.afterTranscode,
+                    ListOrigin = loaded.origin.name.lowercase(),
+                    ListError = loaded.error?.kind,
+                    ListMs = loaded.error?.ms,
+                    Outcome = outcomeLabel(outcome),
+                    NextSourceId = (outcome as? FailoverOutcome.Navigate)?.sourceId,
+                ),
+            )
         }
     }
     // -------------------------------------------------------------------------
@@ -391,6 +473,7 @@ class PlayerViewModel @Inject constructor(
             transcodeRetriedSourceIds.clear()
             directRetriedSourceIds.clear()
             failoverLanguage = null
+            pendingFailover = null
             if (mediaSourceId != null) {
                 BadStreams.unmark(itemId, com.jellio.tv.data.model.MediaSourceDto(Id = mediaSourceId))
             }
@@ -941,16 +1024,21 @@ class PlayerViewModel @Inject constructor(
         val id = itemId ?: return false
         val current = _uiState.value.mediaSourceId
         current?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-        val sources = runCatching { repository.getMediaSources(session.userId, id, reason = "buffering") }.getOrDefault(emptyList())
-        val candidates = sources.filter { it.Id != null && it.Id != current && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) }
+        val loaded = repository.getFailoverSources(session.userId, id)
+        val language = failoverLanguage ?: streamLanguage()
         val policy = VideoTranscodePolicy
-        val pool = if (policy.avoiding) {
-            val (reencode, copyable) = candidates.partition { policy.needsReencode(it) }
-            copyable.ifEmpty { if (policy.blocking) emptyList() else reencode }
-        } else {
-            candidates
-        }
-        val next = orderByLanguage(pool, failoverLanguage ?: streamLanguage()).firstOrNull() ?: return false
+        val plan = planFailover(
+            loaded.sources?.filter { it.Id != current },
+            triedSourceIds,
+            id = { it.Id },
+            isBad = { if (BadStreams.isBad(id, it)) BadKind.HARD else null },
+            byLanguage = { orderByLanguage(it, language) },
+            needsReencode = if (policy.avoiding) { s -> policy.needsReencode(s) } else null,
+            blockReencode = policy.blocking,
+        )
+        val outcome = failoverOutcome(loaded, plan) { it.Id }
+        logFailoverDecision(PendingFailover(id, current, "buffering switch", _uiState.value, false), plan.counts, loaded, outcome)
+        val next = plan.ordered.firstOrNull() ?: return false
         currentSource?.let { BadStreams.mark(id, it) }
         switchSource(session, next, currentPositionTicks)
         return true

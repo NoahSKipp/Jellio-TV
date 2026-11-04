@@ -118,6 +118,7 @@ interface JellyfinApi {
         @Path("userId") userId: String,
         @Path("itemId") itemId: String,
         @Query("Fields") fields: String? = null,
+        @Header("X-Read-Timeout-Seconds") readTimeoutSeconds: Int? = null,
     ): BaseItemDto
 
     @GET("Users/{userId}/Items/Resume")
@@ -383,6 +384,9 @@ interface JellyfinApi {
 
     @POST("Jellio/playback/decision")
     suspend fun logPlaybackDecision(@Body body: com.jellio.tv.data.model.PlaybackDecisionBody)
+
+    @POST("Jellio/playback/failover")
+    suspend fun logFailover(@Body body: com.jellio.tv.data.model.FailoverLogBody)
 
     @POST("Jellio/sleep-timer/start")
     suspend fun startSleepTimer(@Body body: SleepTimerStartRequest): SleepTimerStatusDto

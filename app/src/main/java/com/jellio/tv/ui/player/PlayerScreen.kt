@@ -248,6 +248,11 @@ fun PlayerScreen(
                 PlaybackErrorPanel(
                     problem = PlaybackProblem(uiState.error ?: "Couldn't start playback", uiState.errorDetail.orEmpty()),
                     onBack = onBack,
+                    onRetry = if (uiState.failoverRetry) {
+                        { viewModel.retryFailover(session) }
+                    } else {
+                        null
+                    },
                 )
             }
             uiState.streamUrl != null -> PlayerSurface(
