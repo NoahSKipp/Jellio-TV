@@ -17,6 +17,20 @@ data class FailoverLoad<T>(val sources: List<T>?, val origin: ListOrigin, val er
 
 data class LastList<T>(val sources: List<T>, val at: Long)
 
+// The server has no stream by the requested id any more: the title's
+// streams were fetched again and got new ids.
+class SourceGoneException : IllegalStateException("No playable source for this title")
+
+// Gelato could not open the stream's stored link (expired at the addon, or
+// the title's streams are gone). The stream itself is not bad, and the ids
+// in a list loaded before can be stale. Reads the error body.
+fun isSourceNotReady(err: Throwable?): Boolean = when (err) {
+    is SourceGoneException -> true
+    is HttpException -> err.code() == 503 &&
+        runCatching { err.response()?.errorBody()?.string().orEmpty() }.getOrDefault("").contains("\"source_not_ready\"")
+    else -> false
+}
+
 fun errorKind(err: Throwable?): String = when {
     err == null -> "unknown"
     err is InterruptedIOException -> "timeout"
@@ -27,12 +41,14 @@ fun errorKind(err: Throwable?): String = when {
 }
 
 // fetch(null) uses the normal timeout, fetch(RETRY_TIMEOUT_SECONDS) the longer one.
+// skipRecent when the ids or links in the recent list may be stale.
 suspend fun <T> loadFailoverSources(
     last: LastList<T>?,
     now: () -> Long,
+    skipRecent: Boolean = false,
     fetch: suspend (timeoutSeconds: Int?) -> List<T>,
 ): FailoverLoad<T> {
-    if (last != null && last.sources.isNotEmpty() && now() - last.at < RECENT_LIST_MS) {
+    if (!skipRecent && last != null && last.sources.isNotEmpty() && now() - last.at < RECENT_LIST_MS) {
         return FailoverLoad(last.sources, ListOrigin.RECENT, null)
     }
     val started = now()

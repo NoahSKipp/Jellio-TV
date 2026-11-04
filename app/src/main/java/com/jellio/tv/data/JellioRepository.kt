@@ -1007,9 +1007,9 @@ class JellioRepository @Inject constructor(
 
     // The other streams after one failed: a fresh list, then one retry with a
     // longer timeout, then the last list loaded for the title. Errors are kept.
-    suspend fun getFailoverSources(userId: String, itemId: String): com.jellio.tv.data.streams.FailoverLoad<MediaSourceDto> {
+    suspend fun getFailoverSources(userId: String, itemId: String, fresh: Boolean = false): com.jellio.tv.data.streams.FailoverLoad<MediaSourceDto> {
         loadVideoTranscodePolicy()
-        return com.jellio.tv.data.streams.loadFailoverSources(lastSources[itemId], System::currentTimeMillis) { timeout ->
+        return com.jellio.tv.data.streams.loadFailoverSources(lastSources[itemId], System::currentTimeMillis, skipRecent = fresh) { timeout ->
             val started = System.currentTimeMillis()
             val sources = fetchMediaSources(userId, itemId, timeout ?: failoverFirstTimeoutSeconds)
             com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, "failover", sources.size, System.currentTimeMillis() - started)
@@ -1437,7 +1437,11 @@ class JellioRepository @Inject constructor(
         )
         val mediaSource = response.MediaSources.firstOrNull { it.Id == mediaSourceId }
             ?: response.MediaSources.firstOrNull()
-            ?: throw IllegalStateException("No playable source for this title")
+            ?: if (mediaSourceId != null) {
+                throw com.jellio.tv.data.streams.SourceGoneException()
+            } else {
+                throw IllegalStateException("No playable source for this title")
+            }
 
         val targetAudioStream = if (audioStreamIndex != null) {
             mediaSource.MediaStreams?.firstOrNull { it.Type == "Audio" && it.Index == audioStreamIndex }

@@ -1,6 +1,9 @@
 package com.jellio.tv.data.streams
 
 import java.net.SocketTimeoutException
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.HttpException
+import retrofit2.Response
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -93,5 +96,24 @@ class FailoverSourcesTest {
         assertTrue(line.contains("sources 5, tried 1"))
         assertTrue(line.endsWith("next s2"))
         assertFalse(line.contains("http"))
+    }
+
+    @Test
+    fun afterSourceNotReadyTheRecentListIsSkipped() = runBlocking {
+        val fresh = listOf(Src("new"))
+        val loaded = loadFailoverSources(LastList(all, at = 0L), { RECENT_LIST_MS - 1 }, skipRecent = true) { fresh }
+        assertEquals(ListOrigin.FRESH, loaded.origin)
+        assertEquals(fresh, loaded.sources)
+    }
+
+    private fun http(code: Int, body: String) = HttpException(Response.error<Any>(code, body.toResponseBody(null)))
+
+    @Test
+    fun sourceNotReadyIsToldApartFromOtherServerErrors() {
+        assertTrue(isSourceNotReady(http(503, """{"Error":"source_not_ready","Reason":"probe failed"}""")))
+        assertFalse(isSourceNotReady(http(503, "busy")))
+        assertFalse(isSourceNotReady(http(500, """{"Error":"source_not_ready"}""")))
+        assertTrue(isSourceNotReady(SourceGoneException()))
+        assertFalse(isSourceNotReady(IllegalStateException("No playable source for this title")))
     }
 }

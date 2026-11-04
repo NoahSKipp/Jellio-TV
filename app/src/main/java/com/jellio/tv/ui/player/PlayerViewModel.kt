@@ -15,6 +15,7 @@ import com.jellio.tv.data.streams.FailoverLoad
 import com.jellio.tv.data.streams.FailoverOutcome
 import com.jellio.tv.data.streams.describeFailover
 import com.jellio.tv.data.streams.failoverOutcome
+import com.jellio.tv.data.streams.isSourceNotReady
 import com.jellio.tv.data.streams.outcomeLabel
 import com.jellio.tv.data.streams.planFailover
 import com.jellio.tv.data.playback.TranscodeReason
@@ -196,13 +197,17 @@ class PlayerViewModel @Inject constructor(
         streamFailed(session, sign.reason)
     }
 
-    fun streamFailed(session: Session, reason: String) {
+    // notReady: the server could not open the stream's stored link and
+    // fetches the title's streams again, so the stream is not marked bad and
+    // the next one comes from a fresh list.
+    fun streamFailed(session: Session, reason: String, notReady: Boolean = false) {
         if (failingOver || syncPlay.group.value != null) return
         val id = itemId ?: return
         val source = currentSource ?: return
         val sourceId = source.Id
         val state = _uiState.value
         if (
+            !notReady &&
             reason == "error before the first frame" &&
             state.directPlay &&
             !VideoTranscodePolicy.blocking &&
@@ -248,7 +253,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             var loaded: FailoverLoad<com.jellio.tv.data.model.MediaSourceDto>? = null
             if (remuxFailed && sourceId != null) {
-                loaded = repository.getFailoverSources(session.userId, id)
+                loaded = repository.getFailoverSources(session.userId, id, fresh = notReady)
                 val playable = loaded.sources.orEmpty().filter {
                     it.Id != null && it.Id != sourceId && it.Id !in triedSourceIds && !BadStreams.isBad(id, it) && repository.canDirectPlay(it)
                 }
@@ -275,10 +280,10 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             }
-            BadStreams.mark(id, source)
+            if (!notReady) BadStreams.mark(id, source)
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-            chooseNextStream(session, PendingFailover(id, sourceId, reason, state, remuxFailed), loaded)
+            chooseNextStream(session, PendingFailover(id, sourceId, reason, state, remuxFailed, notReady), loaded)
         }
     }
 
@@ -288,6 +293,7 @@ class PlayerViewModel @Inject constructor(
         val reason: String,
         val state: PlayerUiState,
         val remuxFailed: Boolean,
+        val freshList: Boolean = false,
     )
 
     private var pendingFailover: PendingFailover? = null
@@ -309,7 +315,7 @@ class PlayerViewModel @Inject constructor(
         val state = pending.state
         val language = failoverLanguage ?: streamLanguage()
         failoverLanguage = language
-        val loaded = preloaded ?: repository.getFailoverSources(session.userId, id)
+        val loaded = preloaded ?: repository.getFailoverSources(session.userId, id, fresh = pending.freshList)
         // Avoid and Block try streams whose video can be copied first;
         // Block never falls back to one the server would re-encode.
         val policy = VideoTranscodePolicy
@@ -683,12 +689,15 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             } catch (err: Exception) {
-                // A retry that the server can't even start moves on too.
-                if (fromFailover && syncPlay.group.value == null) {
+                // A retry that the server can't even start moves on too, and
+                // so does a chosen stream whose stored link expired.
+                val notReady = isSourceNotReady(err)
+                if ((fromFailover || (notReady && mediaSourceId != null)) && syncPlay.group.value == null) {
                     if (currentSource == null) {
                         currentSource = com.jellio.tv.data.model.MediaSourceDto(Id = mediaSourceId ?: itemId)
                     }
-                    streamFailed(session, "could not start: ${err.message}")
+                    val why = if (notReady) "source not ready" else err.message
+                    streamFailed(session, "could not start: $why", notReady)
                     return@launch
                 }
                 val problem = friendlyPlaybackError(err)
