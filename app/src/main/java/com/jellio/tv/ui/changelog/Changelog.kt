@@ -106,6 +106,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.67.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.67.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Finding the Next Stream", "When a stream fails and the list of other streams is slow to arrive, Jellio TV now waits longer and tries again, then falls back to the list it already has. If the list really can't be loaded, it says so and lets you try again with OK, instead of claiming there is no other stream."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.67.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.67.0",
