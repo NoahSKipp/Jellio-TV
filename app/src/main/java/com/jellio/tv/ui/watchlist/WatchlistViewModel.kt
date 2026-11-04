@@ -45,11 +45,6 @@ class WatchlistViewModel @Inject constructor(
         }
     }
 
-    fun refresh(session: Session) {
-        loadedForUserId = null
-        load(session)
-    }
-
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         val currentlyFavorite = item.UserData?.IsFavorite ?: true
         val willBeFavorite = !currentlyFavorite

@@ -106,7 +106,7 @@ fun ProfileScreen(
                 val user = uiState.user
                 val profile = uiState.profile
                 val achievements = uiState.achievements
-                val bannerImageUrl = remember(targetUserId, uiState.bannerBustToken) { bannerUrl(targetUserId) }
+                val bannerImageUrl = remember(targetUserId) { bannerUrl(targetUserId) }
 
                 LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
                     item { ProfileBanner(bannerUrl = bannerImageUrl) }

@@ -36,7 +36,7 @@ class CalendarViewModel @Inject constructor(
                 _uiState.value = CalendarUiState(isLoading = false, entries = entries)
             } catch (err: Exception) {
                 loaded = false
-                _uiState.value = CalendarUiState(isLoading = false, error = err.message ?: "Could not load the calendar")
+                _uiState.value = CalendarUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("calendar_load_error"))
             }
         }
     }

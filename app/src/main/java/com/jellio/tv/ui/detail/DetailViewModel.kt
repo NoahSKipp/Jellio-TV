@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.PersonDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
@@ -40,7 +41,7 @@ data class DetailUiState(
     // The picked season's own details: its description, cast and backdrop
     // replace the show's where it has them.
     val selectedSeason: BaseItemDto? = null,
-    val cast: List<com.jellio.tv.data.model.PersonDto> = emptyList(),
+    val cast: List<PersonDto> = emptyList(),
     val trailers: List<com.jellio.tv.data.model.TrailerDto> = emptyList(),
     val playLabel: String = com.jellio.tv.ui.i18n.Strings.get("action_play"),
     val isWatchlisted: Boolean = false,
@@ -124,7 +125,7 @@ class DetailViewModel @Inject constructor(
                 isLoading = false,
                 item = preloaded,
                 loadingArt = loadingArt(session, preloaded),
-                cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
+                cast = castFor(preloaded, null),
                 trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
                 isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
                 isWatched = preloaded.UserData?.Played ?: false,
@@ -187,7 +188,7 @@ class DetailViewModel @Inject constructor(
                     error = null,
                     detailsRetrying = false,
                     detailsFailed = false,
-                    cast = item.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
+                    cast = castFor(item, _uiState.value.selectedSeason),
                     trailers = item.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
                     isWatchlisted = item.UserData?.IsFavorite ?: false,
                     isWatched = item.UserData?.Played ?: false,
@@ -273,6 +274,16 @@ class DetailViewModel @Inject constructor(
         return target.episode
     }
 
+    // The same answer whichever of the title's and the season's details lands
+    // last: an episode or movie shows its own cast, falling back to the
+    // season's; a series shows the picked season's, falling back to its own.
+    private fun castFor(item: BaseItemDto?, season: BaseItemDto?): List<PersonDto> {
+        fun actors(of: BaseItemDto?) = of?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
+        val own = actors(item)
+        val seasonCast = actors(season)
+        return if (item?.Type == "Series") seasonCast.ifEmpty { own } else own.ifEmpty { seasonCast }
+    }
+
     // An episode page opens on the episode's own season, specials included.
     private fun episodeSeason(seasons: List<BaseItemDto>): BaseItemDto? {
         val episode = _uiState.value.item?.takeIf { it.Type == "Episode" } ?: return null
@@ -330,12 +341,9 @@ class DetailViewModel @Inject constructor(
             launch {
                 val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
                 if (!isCurrentSeries(seriesId, ownerItemId) || _uiState.value.selectedSeasonId != seasonId) return@launch
-                val isEpisode = _uiState.value.item?.Type == "Episode"
-                val itemCast = _uiState.value.item?.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
-                val seasonCast = season.People?.filter { it.Type == "Actor" }?.take(20).orEmpty()
                 _uiState.value = _uiState.value.copy(
                     selectedSeason = season,
-                    cast = if (isEpisode && itemCast.isNotEmpty()) itemCast else seasonCast.ifEmpty { itemCast },
+                    cast = castFor(_uiState.value.item, season),
                 )
             }
             launch {
@@ -370,7 +378,7 @@ class DetailViewModel @Inject constructor(
         return if (item.Type == "Series") seriesPlayDeferred?.await() else item
     }
 
-    private var playPrefetchJob: kotlinx.coroutines.Job? = null
+    private var playPrefetchJob: Job? = null
     private val playPrefetched = HashSet<String>()
 
     // Resting on Play asks the server for the stream it will start, so the
@@ -479,12 +487,10 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    // Streams are looked up only once the page is drawn; Play reuses this
-    // same lookup (the repository shares it and caches the answer).
-    private var secondSourceJob: kotlinx.coroutines.Job? = null
+    private var secondSourceJob: Job? = null
 
     // Leaving the page cancels active warmups.
-    fun onScreenHidden(itemId: String? = null) {
+    fun onScreenHidden() {
         secondSourceJob?.cancel()
         secondSourceJob = null
         playPrefetchJob?.cancel()
@@ -539,7 +545,7 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
+    private suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
         runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
 
     fun selectEdition(edition: String) {
@@ -564,10 +570,6 @@ class DetailViewModel @Inject constructor(
             }
         }
         return PlayAction.ShowPicker(item)
-    }
-
-    suspend fun rememberStreamChoice(itemId: String, mediaSourceId: String) {
-        if (streamPreferences.isRememberEnabled()) streamPreferences.remember(itemId, mediaSourceId)
     }
 
     fun toggleEpisodeWatched(session: Session, episode: BaseItemDto) {

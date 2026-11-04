@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
@@ -102,11 +103,13 @@ fun CalendarScreen(
                 )
             }
             else -> {
-                val groups = uiState.entries
-                    .mapNotNull { entry -> parseEntryDate(entry.Date)?.let { it to entry } }
-                    .sortedBy { it.first.time }
-                    .groupBy { Calendar.getInstance().apply { time = it.first }.let(::dayKey) }
-                    .toSortedMap()
+                val groups = remember(uiState.entries) {
+                    uiState.entries
+                        .mapNotNull { entry -> parseEntryDate(entry.Date)?.let { it to entry } }
+                        .sortedBy { it.first.time }
+                        .groupBy { Calendar.getInstance().apply { time = it.first }.let(::dayKey) }
+                        .toSortedMap()
+                }
 
                 LazyColumn(
                     state = listState,

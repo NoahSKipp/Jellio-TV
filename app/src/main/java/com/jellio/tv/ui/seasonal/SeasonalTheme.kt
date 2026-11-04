@@ -54,8 +54,6 @@ fun inRange(month: Int, day: Int, range: SeasonalRangeDto?): Boolean {
     return if (start <= end) now in start..end else now >= start || now <= end
 }
 
-val SUPPORTED_SEASONAL_THEMES: Set<String> = SEASONAL_THEMES.keys
-
 fun activeSeasonalTheme(calendar: Calendar, config: ClientConfigDto?): String? {
     if (config == null || !config.SeasonalEffectsEnabled) return null
     val month = calendar.get(Calendar.MONTH) + 1

@@ -8,6 +8,7 @@ import com.jellio.tv.data.model.ProfileDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.session.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +27,6 @@ data class ProfileUiState(
     val isEditingBio: Boolean = false,
     val bioDraft: String = "",
     val isSavingBio: Boolean = false,
-    val bannerBustToken: Long = 0L,
 )
 
 @HiltViewModel
@@ -37,6 +37,7 @@ class ProfileViewModel @Inject constructor(
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     private var loadedFor: String? = null
+    private var fetchJob: Job? = null
 
     fun load(session: Session, targetUserId: String?) {
         val resolvedUserId = targetUserId ?: session.userId
@@ -50,7 +51,12 @@ class ProfileViewModel @Inject constructor(
         load(session, targetUserId)
     }
 
-    private fun fetch(session: Session, userId: String) = viewModelScope.launch {
+    private fun fetch(session: Session, userId: String) {
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch { fetchNow(session, userId) }
+    }
+
+    private suspend fun fetchNow(session: Session, userId: String) {
         _uiState.value = ProfileUiState(isLoading = true)
         runCatching {
             coroutineScope {
@@ -68,6 +74,7 @@ class ProfileViewModel @Inject constructor(
                 isOwner = userId == session.userId,
             )
         }.onFailure { err ->
+            if (err is kotlinx.coroutines.CancellationException) throw err
             _uiState.value = ProfileUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("profile_load_error"))
         }
     }

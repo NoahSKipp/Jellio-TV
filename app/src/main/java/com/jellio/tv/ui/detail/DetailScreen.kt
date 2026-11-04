@@ -106,6 +106,7 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -161,7 +162,7 @@ fun DetailScreen(
     val playButtonFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     LaunchedEffect(itemId) { viewModel.load(session, itemId) }
-    androidx.compose.runtime.DisposableEffect(itemId) { onDispose { viewModel.onScreenHidden(itemId) } }
+    androidx.compose.runtime.DisposableEffect(itemId) { onDispose { viewModel.onScreenHidden() } }
     LaunchedEffect(uiState.item?.Id) {
         if (uiState.item != null) {
             listState.scrollToItem(0)
@@ -812,16 +813,29 @@ private fun SeasonsSection(
     // The episode the row was brought to, or the user took over first; saveable
     // so the row does not jump again when this section scrolls back into view.
     var settledFor by rememberSaveable { mutableStateOf<String?>(null) }
+    // Bumped on each season the user picks, so the episode row starts at its first card.
+    var manualSeasonSwitches by remember { mutableIntStateOf(0) }
     Column(modifier = Modifier.padding(top = 16.dp)) {
         Text(text = com.jellio.tv.ui.i18n.string("detail_episodes"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         if (state.seasons.isNotEmpty()) {
-            LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val seasonsListState = rememberLazyListState()
+            LaunchedEffect(state.selectedSeasonId, state.seasons) {
+                val idx = state.seasons.indexOfFirst { it.Id == state.selectedSeasonId }
+                if (idx < 0) return@LaunchedEffect
+                val laidOut = snapshotFlow { seasonsListState.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
+                val fullyVisible = laidOut.let { info ->
+                    info.visibleItemsInfo.any { it.index == idx && it.offset >= info.viewportStartOffset && it.offset + it.size <= info.viewportEndOffset }
+                }
+                if (!fullyVisible) seasonsListState.scrollToItem(idx)
+            }
+            LazyRow(state = seasonsListState, contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(state.seasons, key = { it.Id }) { season ->
                     val selected = season.Id == state.selectedSeasonId
                     Surface(
                         onClick = {
                             settledFor = currentEpisodeId
                             onSelectSeason(season.Id)
+                            manualSeasonSwitches++
                         },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                         colors = ClickableSurfaceDefaults.colors(
@@ -853,6 +867,9 @@ private fun SeasonsSection(
                 // Offset 0 lands the card on the start padding, where focus parks a card.
                 episodesListState.scrollToItem(idx)
                 settledFor = currentEpisodeId
+            }
+            LaunchedEffect(manualSeasonSwitches) {
+                if (manualSeasonSwitches > 0) episodesListState.scrollToItem(0)
             }
             LazyRow(
                 state = episodesListState,
@@ -1056,13 +1073,14 @@ private fun CastRow(cast: List<PersonDto>, imageUrl: (String, String?, String, I
 
 @Composable
 private fun TrailersRow(trailers: List<TrailerDto>, onOpen: (String) -> Unit) {
+    val playable = remember(trailers) { trailers.mapNotNull { t -> t.Url?.takeIf { it.isNotEmpty() }?.let { t to it } } }
+    if (playable.isEmpty()) return
     Column(modifier = Modifier.padding(top = 24.dp)) {
         Text(text = com.jellio.tv.ui.i18n.string("detail_trailers"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
         val trailerCardWidth = 280.dp.scaled()
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                items(trailers) { trailer ->
-                    val url = trailer.Url ?: return@items
+                items(playable) { (trailer, url) ->
                     Surface(
                         onClick = { onOpen(url) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),

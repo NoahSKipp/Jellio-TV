@@ -45,9 +45,6 @@ private fun currentHour(): Int = Calendar.getInstance().get(Calendar.HOUR_OF_DAY
 
 private val TRENDING_ANIME_NAME = Regex("anilist.*trending|trending.*anilist", RegexOption.IGNORE_CASE)
 
-private const val ANIME_EMPTY_MESSAGE =
-    "No anime catalogs are configured on this server yet. Enable CreateCollection on an AniList catalog in Gelato to see it here."
-
 data class LibrarySortOption(val value: String, val label: String, val key: String = "")
 
 val LIBRARY_SORT_OPTIONS = listOf(
