@@ -87,8 +87,6 @@ fun SidebarNav(
     // it can't land on the rail behind it.
     focusable: Boolean = true,
     onFocusChange: (Boolean) -> Unit = {},
-    libraries: List<com.jellio.tv.data.model.BaseItemDto>? = null,
-    onLibrarySelect: ((com.jellio.tv.data.model.BaseItemDto) -> Unit)? = null,
     nowPlayingCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
@@ -96,11 +94,6 @@ fun SidebarNav(
     val visuallyExpanded = expanded && !forceCollapsed
     val homeFocusRequester = remember { FocusRequester() }
     val entryRoute = if (items.contains(selected)) selected else JellioRoute.Home()
-
-    LaunchedEffect(visuallyExpanded) {
-        if (!visuallyExpanded) {
-        }
-    }
 
     val width by animateDpAsState(
         targetValue = if (visuallyExpanded) SidebarExpandedWidth.scaled() else SidebarCollapsedWidth.scaled(),
@@ -161,7 +154,6 @@ fun SidebarNav(
     ) {
         items.forEach { route ->
             val isSelfProfile = route is JellioRoute.Profile && route.userId == null
-            val isLibrary = route is JellioRoute.Library
             val matchesSelected = (route == selected) || (route is JellioRoute.Home && selected is JellioRoute.Home)
             val isNowPlaying = route is JellioRoute.NowPlaying
 
@@ -174,13 +166,7 @@ fun SidebarNav(
                 isSelected = matchesSelected,
                 expanded = visuallyExpanded,
                 enabled = enabled,
-                onClick = {
-                    if (isLibrary && libraries?.isNotEmpty() == true) {
-                        onSelect(route)
-                    } else {
-                        onSelect(route)
-                    }
-                },
+                onClick = { onSelect(route) },
                 focusRequester = if (matchesSelected) restoreFocusRequester else null,
                 homeFocusRequester = if (route == entryRoute) homeFocusRequester else null,
                 height = itemHeight,

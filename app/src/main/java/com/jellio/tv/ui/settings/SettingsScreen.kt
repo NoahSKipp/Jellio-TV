@@ -118,6 +118,7 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import androidx.compose.ui.window.Dialog
@@ -787,9 +788,9 @@ fun SettingsScreen(
                                                 },
                                                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
                                                 colors = ClickableSurfaceDefaults.colors(
-                                                    containerColor = DangerColor.copy(alpha = 0.2f),
-                                                    contentColor = DangerColor,
-                                                    focusedContainerColor = DangerColor,
+                                                    containerColor = JellioDanger.copy(alpha = 0.2f),
+                                                    contentColor = JellioDanger,
+                                                    focusedContainerColor = JellioDanger,
                                                     focusedContentColor = Color.White,
                                                 ),
                                                 modifier = Modifier.weight(1f),
@@ -1961,7 +1962,6 @@ private fun SettingsCategoryItem(label: String, icon: ImageVector, selected: Boo
 
 private val CardBorder = Color.White.copy(alpha = 0.08f)
 private val CardBg = Color.White.copy(alpha = 0.035f)
-private val DangerColor = Color(0xFFFF6B81)
 
 // A grouped card like the web settings: an icon badge and title over
 // divided rows. form = true pads the body for fields and buttons.
@@ -2023,7 +2023,7 @@ private fun SettingsRowSurface(
     danger: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val accent = if (danger) DangerColor else JellioSecondary
+    val accent = if (danger) JellioDanger else JellioSecondary
     val activeCategoryFocus = LocalActiveCategoryFocus.current
     Surface(
         onClick = onClick,
@@ -2032,7 +2032,7 @@ private fun SettingsRowSurface(
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             contentColor = JellioText,
-            focusedContainerColor = if (danger) DangerColor.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f),
+            focusedContainerColor = if (danger) JellioDanger.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.08f),
             focusedContentColor = JellioText,
         ),
         border = ClickableSurfaceDefaults.border(
@@ -2072,9 +2072,9 @@ private fun SettingsActionRow(
     description: String? = null,
     danger: Boolean = false,
 ) {
-    val color = if (danger) DangerColor else JellioText
+    val color = if (danger) JellioDanger else JellioText
     SettingsRowSurface(onClick = onClick, modifier = modifier, danger = danger) {
-        Icon(imageVector = icon, contentDescription = null, tint = if (danger) DangerColor else JellioTextSecondary, modifier = Modifier.size(22.dp))
+        Icon(imageVector = icon, contentDescription = null, tint = if (danger) JellioDanger else JellioTextSecondary, modifier = Modifier.size(22.dp))
         SettingsRowText(label = label, description = description, color = color)
         if (!danger) {
             Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))

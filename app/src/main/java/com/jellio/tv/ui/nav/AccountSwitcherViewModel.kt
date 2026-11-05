@@ -93,7 +93,7 @@ class AccountSwitcherViewModel @Inject constructor(
                 is LoginResult.Success -> Unit
                 is LoginResult.Failure -> _uiState.value = _uiState.value.copy(
                     busyUserId = null,
-                    error = "Could not sign in as that user.",
+                    error = com.jellio.tv.ui.i18n.Strings.get("auth_switch_profile_error"),
                 )
             }
         }

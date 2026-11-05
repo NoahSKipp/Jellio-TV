@@ -93,9 +93,6 @@ fun watchActivityText(
     }
 }
 
-fun watchSummary(seasonNumber: Int?, episodeNumber: Int?): String =
-    com.jellio.tv.ui.i18n.seasonEpisodeTag(seasonNumber, episodeNumber)
-
 fun badgeActivityText(
     badgeName: String?,
     rarity: String?,

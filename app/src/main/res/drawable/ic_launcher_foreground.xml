@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Real port of jellio-mark-animated.svg's own static frame (the same
-     mark ic_jellio_mark.xml renders for the boot splash), scaled down
-     around the icon's own center so the full mark, corners included,
-     sits inside the adaptive icon's real safe zone rather than getting
-     clipped by whichever mask shape a launcher applies. -->
+<!-- Static frame of jellio-mark-animated.svg, scaled down so the whole
+     mark stays inside the adaptive icon safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -63,13 +60,7 @@
                     </gradient>
                     </aapt:attr>
             </path>
-            <!-- Real port of the animated svg's own jm-swim wrapper
-                 (transform-origin: 175px 200px, transform-box: view-box):
-                 a real pivot group of its own around the jellyfish's own
-                 static translate(58,113.5) scale(0.31) position, so
-                 jellio_mark_swim.xml's own translateX/Y/rotation animate as
-                 a real delta on top of that fixed position, not a
-                 replacement for it. -->
+            <!-- Pivot group of the svg's jm-swim wrapper. -->
             <group
                 android:name="jellio_mark_swim"
                 android:pivotX="175"

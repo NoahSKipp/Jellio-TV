@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.AvatarPresetDto
+import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.matchLanguageOption
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
@@ -13,10 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-data class SettingsUiState(
-    val removeFromWatchlistAfterWatching: Boolean = true,
-)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -42,9 +39,6 @@ class SettingsViewModel @Inject constructor(
     private val _customGenres = MutableStateFlow<List<com.jellio.tv.data.model.CustomGenreItem>>(emptyList())
     val customGenres: StateFlow<List<com.jellio.tv.data.model.CustomGenreItem>> = _customGenres.asStateFlow()
 
-    private val _genreSearchQuery = MutableStateFlow("")
-    val genreSearchQuery: StateFlow<String> = _genreSearchQuery.asStateFlow()
-
     private val _genreSearchResult = MutableStateFlow<com.jellio.tv.data.model.GenreSearchResultDto?>(null)
     val genreSearchResult: StateFlow<com.jellio.tv.data.model.GenreSearchResultDto?> = _genreSearchResult.asStateFlow()
 
@@ -60,9 +54,6 @@ class SettingsViewModel @Inject constructor(
     private val _subtitleLanguage = MutableStateFlow<String?>(null)
     val subtitleLanguage: StateFlow<String?> = _subtitleLanguage.asStateFlow()
 
-    private val _languageStatus = MutableStateFlow<String?>(null)
-    val languageStatus: StateFlow<String?> = _languageStatus.asStateFlow()
-
     private val _isUpdatingPassword = MutableStateFlow(false)
     val isUpdatingPassword: StateFlow<Boolean> = _isUpdatingPassword.asStateFlow()
 
@@ -72,9 +63,6 @@ class SettingsViewModel @Inject constructor(
     private val _passwordUpdateTick = MutableStateFlow(0)
     val passwordUpdateTick: StateFlow<Int> = _passwordUpdateTick.asStateFlow()
 
-    private val _sleepTimerStatusText = MutableStateFlow("No active playback session.")
-    val sleepTimerStatusText: StateFlow<String> = _sleepTimerStatusText.asStateFlow()
-
     private val _sleepTimerActive = MutableStateFlow(false)
     val sleepTimerActive: StateFlow<Boolean> = _sleepTimerActive.asStateFlow()
 
@@ -83,9 +71,6 @@ class SettingsViewModel @Inject constructor(
 
     private val _showAvatarPicker = MutableStateFlow(false)
     val showAvatarPicker: StateFlow<Boolean> = _showAvatarPicker.asStateFlow()
-
-    private val _isLoadingAvatarPresets = MutableStateFlow(false)
-    val isLoadingAvatarPresets: StateFlow<Boolean> = _isLoadingAvatarPresets.asStateFlow()
 
     private val _avatarPresets = MutableStateFlow<List<AvatarPresetDto>>(emptyList())
     val avatarPresets: StateFlow<List<AvatarPresetDto>> = _avatarPresets.asStateFlow()
@@ -109,7 +94,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = repository.getSleepTimerStatus() ?: return@launch
             _sleepTimerActive.value = result.Active
-            _sleepTimerStatusText.value = if (result.Active) "A sleep timer is running." else "No sleep timer is running."
         }
     }
 
@@ -125,7 +109,7 @@ class SettingsViewModel @Inject constructor(
             val user = runCatching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
             user.Configuration?.let { configuration ->
                 _audioLanguage.value = matchLanguageOption(configuration.AudioLanguagePreference)?.code
-                _subtitleLanguage.value = if (configuration.SubtitleMode.equals("None", ignoreCase = true) || configuration.SubtitleLanguagePreference == "off") "off" else matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
+                _subtitleLanguage.value = subtitleCode(configuration)
             }
         }
         viewModelScope.launch {
@@ -163,23 +147,21 @@ class SettingsViewModel @Inject constructor(
         saveLanguagePreferences(session, _audioLanguage.value, code)
     }
 
+    private fun subtitleCode(configuration: UserConfigurationDto): String? =
+        if (configuration.SubtitleMode.equals("None", ignoreCase = true) || configuration.SubtitleLanguagePreference == "off") "off"
+        else matchLanguageOption(configuration.SubtitleLanguagePreference)?.code
+
     private fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
         viewModelScope.launch {
-            _languageStatus.value = "Saving…"
             val saved = runCatching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
                 .onFailure { android.util.Log.w("JellioSettings", "language save reported an error", it) }
                 .isSuccess
-            if (saved) {
-                _languageStatus.value = "Saved, takes effect the next time you start playback."
-                return@launch
-            }
+            if (saved) return@launch
             val stored = runCatching { repository.getUserFresh(session.userId).Configuration }.getOrNull()
             if (stored != null) {
                 _audioLanguage.value = matchLanguageOption(stored.AudioLanguagePreference)?.code
-                _subtitleLanguage.value = matchLanguageOption(stored.SubtitleLanguagePreference)?.code
+                _subtitleLanguage.value = subtitleCode(stored)
             }
-            val matches = stored != null && _audioLanguage.value == audio && _subtitleLanguage.value == subtitle
-            _languageStatus.value = if (matches) com.jellio.tv.ui.i18n.Strings.get("settings_saved_next_playback") else com.jellio.tv.ui.i18n.Strings.get("settings_save_lang_error")
         }
     }
 
@@ -190,13 +172,13 @@ class SettingsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _isUpdatingPassword.value = true
-            _passwordStatus.value = "Updating…"
+            _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_updating_password")
             try {
                 repository.updatePassword(session.userId, currentPassword, newPassword)
-                _passwordStatus.value = "Password updated."
+                _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_password_updated")
                 _passwordUpdateTick.value += 1
             } catch (err: Exception) {
-                _passwordStatus.value = "Could not update password. Check your current password."
+                _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_password_update_failed")
             } finally {
                 _isUpdatingPassword.value = false
             }
@@ -208,7 +190,6 @@ class SettingsViewModel @Inject constructor(
             _isCancellingSleepTimer.value = true
             try {
                 repository.cancelSleepTimer()
-                _sleepTimerStatusText.value = "Sleep timer cancelled."
                 _sleepTimerActive.value = false
             } finally {
                 _isCancellingSleepTimer.value = false
@@ -221,7 +202,6 @@ class SettingsViewModel @Inject constructor(
         _avatarPickerStatus.value = null
         _avatarBusyKey.value = null
         viewModelScope.launch {
-            _isLoadingAvatarPresets.value = true
             try {
                 val presets = repository.getAvatarPresets()
                 _avatarPresets.value = presets
@@ -230,8 +210,6 @@ class SettingsViewModel @Inject constructor(
                 }
             } catch (err: Exception) {
                 _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_load_avatars_error")
-            } finally {
-                _isLoadingAvatarPresets.value = false
             }
         }
     }
@@ -364,7 +342,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun searchGenre(query: String) {
-        _genreSearchQuery.value = query
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
             _genreSearchResult.value = null
@@ -383,7 +360,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _customGenres.value = recommendationPreferences.addCustomGenre(userId, item)
             _genreSearchResult.value = null
-            _genreSearchQuery.value = ""
             syncRecommendationsToServer()
         }
     }
