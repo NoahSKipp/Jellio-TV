@@ -31,6 +31,8 @@ import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
+import com.jellio.tv.ui.common.filterReleasedItems
+import com.jellio.tv.ui.common.isUnreleasedItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +72,7 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
     }
 }
 // Overview so Home's showcase can describe a title without asking again.
-private const val ITEM_FIELDS = "PrimaryImageAspectRatio,BackdropImageTags,Overview"
+private const val ITEM_FIELDS = "PrimaryImageAspectRatio,ProductionYear,PremiereDate,EndDate,CommunityRating,BackdropImageTags,Overview"
 
 internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
@@ -458,11 +460,13 @@ class JellioRepository @Inject constructor(
         api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items
 
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> {
-        val items = api.getNextUp(userId, limit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks", enableResumable = false).Items
-        seedPreviews(items)
+        val fetchLimit = maxOf(limit * 2, 40)
+        val items = api.getNextUp(userId, fetchLimit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks,PremiereDate,EndDate", enableResumable = false).Items
+        val released = filterReleasedItems(items)
+        seedPreviews(released)
         val hidden = runCatching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
-        if (hidden.isEmpty()) return items
-        return items.filterNot { hidden.contains(it.SeriesId) }
+        val filtered = if (hidden.isEmpty()) released else released.filterNot { hidden.contains(it.SeriesId) }
+        return filtered.take(limit)
     }
 
     suspend fun hideSeriesFromNextUp(seriesId: String) {
@@ -470,8 +474,8 @@ class JellioRepository @Inject constructor(
     }
 
     suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? =
-        api.getNextUp(userId, limit = 1, fields = "PrimaryImageAspectRatio,RunTimeTicks", seriesId = seriesId)
-            .Items.firstOrNull()
+        api.getNextUp(userId, limit = 5, fields = "PrimaryImageAspectRatio,RunTimeTicks,PremiereDate,EndDate", seriesId = seriesId)
+            .Items.firstOrNull { !isUnreleasedItem(it) }
 
     suspend fun getHeroCandidates(userId: String, limit: Int = 8, parentId: String? = null): List<BaseItemDto> =
         api.getItems(
@@ -877,7 +881,7 @@ class JellioRepository @Inject constructor(
     suspend fun getEpisodes(seriesId: String, userId: String, seasonId: String): List<BaseItemDto> =
         cache.get("episodes:$seriesId:$seasonId", SHORT_CACHE_TTL_MS) {
             withRetry {
-                api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio").Items
+                api.getEpisodes(seriesId, userId, seasonId, fields = "Overview,PrimaryImageAspectRatio,PremiereDate,EndDate").Items
             }
         }.also {
             seedPreviews(it)
@@ -892,13 +896,17 @@ class JellioRepository @Inject constructor(
         if (seasonId != null) {
             val episodes = getEpisodes(seriesId, userId, seasonId)
             val index = episodes.indexOfFirst { it.Id == item.Id }
-            if (index != -1 && index + 1 < episodes.size) return episodes[index + 1]
+            if (index != -1 && index + 1 < episodes.size) {
+                val next = episodes[index + 1]
+                return if (isUnreleasedItem(next)) null else next
+            }
         }
         val seasons = getSeasons(seriesId, userId)
         val seasonIndex = seasons.indexOfFirst { it.Id == seasonId }
         val nextSeason = if (seasonIndex != -1) seasons.getOrNull(seasonIndex + 1) else null
         nextSeason ?: return null
-        return getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull()
+        val next = getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull() ?: return null
+        return if (isUnreleasedItem(next)) null else next
     }
 
     suspend fun getIntroSkipperSegments(itemId: String): IntroSkipperSegmentsDto? =
@@ -914,7 +922,10 @@ class JellioRepository @Inject constructor(
             val seasons = getSeasons(seriesId, userId)
             val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
             val firstSeason = ordered.firstOrNull()
-            firstSeason?.let { getEpisodes(seriesId, userId, it.Id).firstOrNull() }
+            firstSeason?.let {
+                val eps = getEpisodes(seriesId, userId, it.Id)
+                eps.firstOrNull { ep -> !isUnreleasedItem(ep) } ?: eps.firstOrNull()
+            }
         } catch (err: Exception) {
             null
         } ?: return null

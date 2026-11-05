@@ -8,6 +8,7 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.isUnreleasedItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -103,7 +104,7 @@ class DetailViewModel @Inject constructor(
             }
             // The stream lookup does not wait for the details when the type is already known.
             var streamsStarted = false
-            if (preloaded?.Type == "Movie" || preloaded?.Type == "Episode") {
+            if ((preloaded?.Type == "Movie" || preloaded?.Type == "Episode") && !isUnreleasedItem(preloaded)) {
                 lookForStreams(session, itemId)
                 streamsStarted = true
             }
@@ -133,7 +134,7 @@ class DetailViewModel @Inject constructor(
                     isWatched = item.UserData?.Played ?: false,
                 )
 
-                if (!streamsStarted && (item.Type == "Movie" || item.Type == "Episode")) lookForStreams(session, item.Id)
+                if (!streamsStarted && (item.Type == "Movie" || item.Type == "Episode") && !isUnreleasedItem(item)) lookForStreams(session, item.Id)
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     viewModelScope.launch {
@@ -190,7 +191,9 @@ class DetailViewModel @Inject constructor(
         // The episode Play will start: its details and streams load now, so
         // pressing Play starts right away.
         repository.preloadDetails(target.episode.Id)
-        repository.prefetchStreams(target.episode.Id)
+        if (!isUnreleasedItem(target.episode)) {
+            repository.prefetchStreams(target.episode.Id)
+        }
         return target.episode
     }
 
@@ -257,6 +260,7 @@ class DetailViewModel @Inject constructor(
             kotlinx.coroutines.delay(1_000)
             val target = resolvePlayTarget() ?: return@launch
             if (target.Type != "Movie" && target.Type != "Episode") return@launch
+            if (isUnreleasedItem(target)) return@launch
             if (!playPrefetched.add(target.Id)) return@launch
             val remembered = if (streamPreferences.isRememberEnabled()) streamPreferences.rememberedMediaSourceId(target.Id) else null
             repository.prefetchPlayback(session.userId, target.Id, remembered, target.UserData?.PlaybackPositionTicks ?: 0)

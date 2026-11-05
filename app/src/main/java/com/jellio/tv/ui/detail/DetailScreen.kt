@@ -89,8 +89,12 @@ import com.jellio.tv.data.model.TrailerDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
+import com.jellio.tv.ui.common.episodeReleaseLabel
+import com.jellio.tv.ui.common.isUnreleasedItem
+import com.jellio.tv.ui.common.seasonEpisodeReleaseLabels
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioRarityLegendary
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -454,12 +458,18 @@ private fun DetailHero(
             }
 
             Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                val epReleaseLabel = if (item.Type == "Episode") episodeReleaseLabel(item) else null
+                if (epReleaseLabel != null) {
+                    Text(text = epReleaseLabel, color = JellioRarityLegendary, fontWeight = FontWeight.SemiBold)
+                }
                 val year = if (item.Type == "Episode") {
                     formatPremiereDate(item.PremiereDate) ?: item.ProductionYear?.toString()
                 } else {
                     item.ProductionYear?.toString()
                 }
-                year?.let { Text(text = it, color = JellioTextSecondary) }
+                if (year != null && (epReleaseLabel == null || year != epReleaseLabel)) {
+                    Text(text = year, color = JellioTextSecondary)
+                }
                 formatRuntime(item.RunTimeTicks).takeIf { it.isNotEmpty() }?.let { Text(text = it, color = JellioTextSecondary) }
                 item.OfficialRating?.let { Text(text = it, color = JellioTextSecondary) }
                 // TMDB's score, labelled like the cards.
@@ -686,6 +696,7 @@ private fun SeasonsSection(
             }
         }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
+            val releaseLabels = remember(state.selectedSeasonEpisodes) { seasonEpisodeReleaseLabels(state.selectedSeasonEpisodes) }
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -694,9 +705,14 @@ private fun SeasonsSection(
                     EpisodeCard(
                         episode = episode,
                         imageUrl = imageUrl,
+                        releaseLabel = releaseLabels[episode.Id],
                         onClick = { onEpisodeClick(episode.Id) },
                         onOptionsClick = { onEpisodeOptions(episode) },
-                        onFocused = { onEpisodeFocused(episode.Id) },
+                        onFocused = {
+                            if (releaseLabels[episode.Id] == null) {
+                                onEpisodeFocused(episode.Id)
+                            }
+                        },
                     )
                 }
             }
@@ -711,6 +727,7 @@ private fun EpisodeCard(
     onClick: () -> Unit,
     onOptionsClick: () -> Unit,
     onFocused: () -> Unit = {},
+    releaseLabel: String? = null,
 ) {
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
@@ -759,6 +776,20 @@ private fun EpisodeCard(
                         com.jellio.tv.ui.home.RatingChip(
                             rating = rating,
                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        )
+                    }
+                    if (!releaseLabel.isNullOrEmpty()) {
+                        Text(
+                            text = releaseLabel,
+                            color = JellioRarityLegendary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(8.dp)
+                                .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
                         )
                     }
                     if (episode.UserData?.Played == true) {
