@@ -301,7 +301,8 @@ class HomeViewModel @Inject constructor(
                         getRecentlyCompleted = { limit -> repository.getRecentlyCompleted(session.userId, limit) },
                         getNextUp = { limit -> repository.getNextUp(session.userId, limit) },
                         getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
-                        getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit) },
+                        getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit).filterNot { isAnime(it) } },
+                        getGenreItemsPage = { genre, start, size -> repository.getGenreItemsPage(session.userId, null, "Movie,Series", genre, start, size).filterNot { isAnime(it) } },
                     )
                     val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
                     val isCommunityEnabled = recommendationPreferences.isCommunityRowEnabled(session.userId)

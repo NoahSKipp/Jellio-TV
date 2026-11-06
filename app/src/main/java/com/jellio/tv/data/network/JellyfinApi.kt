@@ -429,6 +429,8 @@ interface JellyfinApi {
         @Query("types") types: String,
         @Query("parentId") parentId: String? = null,
         @Query("limit") limit: Int = 20,
+        @Query("startIndex") startIndex: Int? = null,
+        @Query("enableVirtual") enableVirtual: Boolean? = true,
     ): ItemsResultDto
 
     @GET("Jellio/community/users")

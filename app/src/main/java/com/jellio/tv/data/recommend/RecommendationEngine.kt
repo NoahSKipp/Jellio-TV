@@ -42,6 +42,7 @@ data class RecommendationDataSource(
     val getNextUp: suspend (limit: Int) -> List<BaseItemDto>,
     val getRecommendationCandidates: suspend (seed: BaseItemDto, limit: Int) -> List<CandidateEntry>,
     val getGenreItems: suspend (genre: String, limit: Int) -> List<BaseItemDto>,
+    val getGenreItemsPage: (suspend (genre: String, startIndex: Int, limit: Int) -> List<BaseItemDto>)? = null,
 )
 
 private fun notPlayed(item: BaseItemDto): Boolean = item.UserData?.Played != true
@@ -197,7 +198,12 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
         val items = runCatching {
             dedupe(source.getGenreItems(genre, ROW_SIZE).filter(::notPlayed), exclude)
         }.getOrDefault(emptyList())
-        if (items.isNotEmpty()) rows.add(HomeSection(Strings.get("home_top_picks"), items))
+        if (items.isNotEmpty()) {
+            val fetchPage: (suspend (Int, Int) -> List<BaseItemDto>)? = source.getGenreItemsPage?.let { pager ->
+                { start, size -> pager(genre, start, size).filter(::notPlayed) }
+            }
+            rows.add(HomeSection(Strings.get("home_top_picks"), items, fetchPage = fetchPage))
+        }
     }
     return rows
 }

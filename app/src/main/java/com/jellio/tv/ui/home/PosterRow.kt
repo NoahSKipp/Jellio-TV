@@ -15,16 +15,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -36,6 +42,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -43,6 +50,7 @@ import com.jellio.tv.ui.theme.scaled
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec
+import kotlinx.coroutines.launch
 
 @Composable
 fun PosterRow(
@@ -65,13 +73,74 @@ fun PosterRow(
     restoreItemId: String? = null,
     onFocusRestored: () -> Unit = {},
 ) {
-    val rowItems = remember(section.items) { section.items.distinctBy { it.Id }.take(20) }
-    if (rowItems.isEmpty()) return
+    val fetchPage = section.fetchPage
+    val coroutineScope = rememberCoroutineScope()
+    var isLoading by remember(section.key, section.items) { mutableStateOf(false) }
+    var isExhausted by remember(section.key, section.items) { mutableStateOf(false) }
+
+    val currentItems = remember(section.key, section.items) {
+        if (fetchPage != null) {
+            mutableStateListOf<BaseItemDto>().apply {
+                addAll(section.items.distinctBy { it.Id })
+            }
+        } else null
+    }
+
+    val staticItems = remember(section.items) {
+        if (fetchPage == null) section.items.distinctBy { it.Id }.take(20) else null
+    }
+
+    val displayItems: List<BaseItemDto> = currentItems ?: staticItems ?: emptyList()
+    if (displayItems.isEmpty()) return
+
+    fun loadMore() {
+        if (fetchPage == null || currentItems == null || isExhausted || isLoading) return
+        isLoading = true
+        coroutineScope.launch {
+            try {
+                val startIndex = currentItems.size
+                val newItems = fetchPage(startIndex, 20)
+                if (newItems.isEmpty()) {
+                    isExhausted = true
+                } else {
+                    val existingIds = currentItems.map { it.Id }.toHashSet()
+                    val existingKeys = currentItems.map { titleKey(it) }.toHashSet()
+                    val toAdd = newItems.filter { item ->
+                        existingIds.add(item.Id) && existingKeys.add(titleKey(item))
+                    }
+                    if (toAdd.isNotEmpty()) {
+                        currentItems.addAll(toAdd)
+                    }
+                    if (newItems.size < 20 || toAdd.isEmpty()) {
+                        isExhausted = true
+                    }
+                }
+            } catch (_: Exception) {
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
         RowTitle(text = section.title)
         val firstCard = remember { androidx.compose.ui.focus.FocusRequester() }
         val rowState = rememberTvRowState()
         ReportRowScrolling(rowState)
+
+        if (fetchPage != null && currentItems != null) {
+            LaunchedEffect(rowState, section.key) {
+                snapshotFlow {
+                    val lastVisible = rowState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    lastVisible to currentItems.size
+                }.collect { (lastVisible, size) ->
+                    if (!isExhausted && !isLoading && lastVisible >= size - 4) {
+                        loadMore()
+                    }
+                }
+            }
+        }
+
         CompositionLocalProvider(LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(
                 state = rowState,
@@ -80,7 +149,7 @@ fun PosterRow(
                 modifier = (if (rowFocusRequester != null) Modifier.focusRequester(rowFocusRequester) else Modifier)
                     .rowEntry(firstCard),
             ) {
-                items(rowItems, key = { it.Id }, contentType = { "poster_card" }) { item ->
+                itemsIndexed(displayItems, key = { _, item -> item.Id }, contentType = { _, _ -> "poster_card" }) { index, item ->
                     val onCardClick = remember(item, onItemClick) { { onItemClick(item) } }
                     val onCardOptions = remember(item, onItemOptions) { onItemOptions?.let { opts -> { opts(item) } } }
                     val restoreHere = item.Id == restoreItemId
@@ -91,7 +160,7 @@ fun PosterRow(
                             onFocusRestored()
                         }
                     }
-                    RowEntryTarget(if (item.Id == rowItems.first().Id) firstCard else null) {
+                    RowEntryTarget(if (index == 0) firstCard else null) {
                         PosterCard(
                             modifier = if (restoreRequester != null) Modifier.focusRequester(restoreRequester) else Modifier,
                             item = item,
@@ -100,14 +169,20 @@ fun PosterRow(
                             onOptionsClick = onCardOptions,
                             userImageUrl = userImageUrl,
                             canExpand = true,
-                            onFocus = onItemFocus,
+                            onFocus = { focusedItem ->
+                                onItemFocus?.invoke(focusedItem)
+                                if (fetchPage != null && index >= displayItems.size - 4) {
+                                    loadMore()
+                                }
+                            },
                             progress = progress,
                             isRemoving = removingItemId == item.Id,
                             onShatterFinished = { onShatterFinished(item) },
                         )
                     }
                 }
-                if (onTitleClick != null && (section.items.size > 20 || section.fetchAll != null)) {
+                val showExpandButton = onTitleClick != null && (fetchPage != null || section.items.size > 20 || section.fetchAll != null)
+                if (showExpandButton) {
                     item {
                         RowExpandButton(onClick = onTitleClick, height = (PosterWidth * 1.5f).scaled())
                     }

@@ -620,33 +620,51 @@ class JellioRepository @Inject constructor(
 
     // One page of a genre, for grids that keep loading as they are scrolled.
     suspend fun getGenreItemsPage(userId: String, parentId: String?, itemType: String, genre: String, startIndex: Int, limit: Int): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            parentId = parentId,
-            includeItemTypes = itemType,
-            recursive = true,
-            limit = limit,
-            startIndex = startIndex,
-            genres = genre,
-            sortBy = "CommunityRating",
-            sortOrder = "Descending",
-            fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
-        ).Items
+        distinctTitles(
+            runCatching {
+                api.getCachedGenreItems(
+                    genre = genre,
+                    types = itemType,
+                    parentId = parentId,
+                    limit = limit,
+                    startIndex = startIndex,
+                    enableVirtual = true,
+                ).Items
+            }.getOrNull() ?: api.getItems(
+                userId = userId,
+                parentId = parentId,
+                includeItemTypes = itemType,
+                recursive = true,
+                limit = limit,
+                startIndex = startIndex,
+                genres = genre,
+                sortBy = "CommunityRating",
+                sortOrder = "Descending",
+                fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
+            ).Items,
+        )
 
     private suspend fun fetchGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int): List<BaseItemDto> =
         distinctTitles(
-            runCatching { api.getCachedGenreItems(genre, itemType, parentId, limit).Items }.getOrNull()
-                ?: api.getItems(
-            userId = userId,
-            parentId = parentId,
-            includeItemTypes = itemType,
-            recursive = true,
-            limit = limit,
-            genres = genre,
-            sortBy = "CommunityRating",
-            sortOrder = "Descending",
-            fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
-        ).Items,
+            runCatching {
+                api.getCachedGenreItems(
+                    genre = genre,
+                    types = itemType,
+                    parentId = parentId,
+                    limit = limit,
+                    enableVirtual = true,
+                ).Items
+            }.getOrNull() ?: api.getItems(
+                userId = userId,
+                parentId = parentId,
+                includeItemTypes = itemType,
+                recursive = true,
+                limit = limit,
+                genres = genre,
+                sortBy = "CommunityRating",
+                sortOrder = "Descending",
+                fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
+            ).Items,
         )
 
     private val showcaseCache = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
