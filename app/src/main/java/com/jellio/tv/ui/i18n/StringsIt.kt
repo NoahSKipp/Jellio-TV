@@ -915,5 +915,16 @@ internal object StringsIt {
         m["player_skip_intro"] = "Salta intro"
         m["player_skip_credits"] = "Salta titoli di coda"
         m["player_skip"] = "Salta"
+        m["player_failover_failed"] = "Quello stream non ha funzionato"
+        m["player_failover_slow_transcode"] = "Il server non è riuscito a ricodificare quello stream abbastanza in fretta"
+        m["player_failover_none_worked"] = "Nessuno degli stream ha funzionato"
+        m["player_failover_none_worked_many"] = "Sono stati provati {0} stream per questo titolo e nessuno è partito. Riprova più tardi, oppure scegline uno da Cambia stream nella pagina del titolo."
+        m["player_failover_no_other"] = "Questo stream non è riproducibile e non ce n'è un altro da provare. Riprova più tardi."
+        m["player_start_over_failed"] = "Impossibile ricominciare: {0}"
+        m["player_dialogue_boost_enabled"] = "Ottimizzazione dialoghi attivata (modalità notte con compressione dinamica)"
+        m["player_dialogue_boost_disabled"] = "Ottimizzazione dialoghi disattivata"
+        m["player_subtitle_image"] = "immagine"
+        m["player_subtitle_image_slow"] = "lento: impresso nel video"
+        m["player_scrub_hint"] = "◀ ▶ per scorrere"
     }
 }

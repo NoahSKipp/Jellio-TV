@@ -915,5 +915,16 @@ internal object StringsPl {
         m["player_skip_intro"] = "Pomiń czołówkę"
         m["player_skip_credits"] = "Pomiń napisy końcowe"
         m["player_skip"] = "Pomiń"
+        m["player_failover_failed"] = "Ten strumień nie zadziałał"
+        m["player_failover_slow_transcode"] = "Serwer nie zdążył ponownie zakodować tego strumienia"
+        m["player_failover_none_worked"] = "Żaden ze strumieni nie zadziałał"
+        m["player_failover_none_worked_many"] = "Wypróbowane strumienie dla tego tytułu: {0}. Żaden się nie odtworzył. Spróbuj później lub wybierz jeden w Zmień źródło na stronie tytułu."
+        m["player_failover_no_other"] = "Nie udało się odtworzyć tego strumienia i nie ma innego do wypróbowania. Spróbuj później."
+        m["player_start_over_failed"] = "Nie można rozpocząć od nowa: {0}"
+        m["player_dialogue_boost_enabled"] = "Wzmocnienie dialogów włączone (tryb nocny z kompresją dynamiki)"
+        m["player_dialogue_boost_disabled"] = "Wzmocnienie dialogów wyłączone"
+        m["player_subtitle_image"] = "obraz"
+        m["player_subtitle_image_slow"] = "wolne: wypalane w obrazie"
+        m["player_scrub_hint"] = "◀ ▶ aby przewijać"
     }
 }

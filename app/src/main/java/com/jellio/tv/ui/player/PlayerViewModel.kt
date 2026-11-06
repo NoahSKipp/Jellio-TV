@@ -354,14 +354,13 @@ class PlayerViewModel @Inject constructor(
                 error = if (listFailed != null) {
                     com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_title")
                 } else {
-                    "None of the streams worked"
+                    Strings.get("player_failover_none_worked")
                 },
                 errorDetail = when {
                     listFailed?.kind == "timeout" -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_timeout")
                     listFailed != null -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_error")
-                    triedSourceIds.size > 1 ->
-                        "${triedSourceIds.size} streams were tried for this title and none of them played. Try again later, or pick one from Change stream on the title's page."
-                    else -> "This stream couldn't be played and there's no other one to try. Try again later."
+                    triedSourceIds.size > 1 -> Strings.format("player_failover_none_worked_many", triedSourceIds.size)
+                    else -> Strings.get("player_failover_no_other")
                 },
                 failoverRetry = listFailed != null,
                 title = state.title,
@@ -515,6 +514,8 @@ class PlayerViewModel @Inject constructor(
         this.itemId = itemId
         this.mediaSourceIdParam = mediaSourceId
         this.playbackSession = session
+        // Drops an episode list still on its way for the previous title.
+        episodeRequest++
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
@@ -582,7 +583,7 @@ class PlayerViewModel @Inject constructor(
                     PlayStartTrace.mark(itemId, "audio renegotiated", "index=$preferredAudio")
                 }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
-                    "S${item.ParentIndexNumber} E${item.IndexNumber} · "
+                    com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) + " · "
                 } else {
                     ""
                 }
@@ -661,8 +662,9 @@ class PlayerViewModel @Inject constructor(
                     reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
                 )
 
+                // Children of this load: a newer load or leaving cancels them.
                 if (item.Type == "Episode") {
-                    viewModelScope.launch {
+                    launch {
                         val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
@@ -670,9 +672,9 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                viewModelScope.launch { loadSkipSegments(session, itemId, item.RunTimeTicks) }
+                launch { loadSkipSegments(session, itemId, item.RunTimeTicks) }
 
-                viewModelScope.launch {
+                launch {
                     val status = repository.getSleepTimerStatus()
                     if (status?.Active == true) {
                         val endMs = parseSleepTimerEndTimeMs(status.EndTimeUtc)
@@ -682,7 +684,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
-                viewModelScope.launch {
+                launch {
                     val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "player") }.getOrNull()
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
@@ -692,7 +694,7 @@ class PlayerViewModel @Inject constructor(
                 val seriesId = item.SeriesId
                 if (isEpisode && seriesId != null) {
                     _uiState.value = _uiState.value.copy(seriesId = seriesId)
-                    viewModelScope.launch {
+                    launch {
                         val seasons = runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList())
                         if (seasons.isNotEmpty()) {
                             val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
@@ -704,6 +706,8 @@ class PlayerViewModel @Inject constructor(
                         }
                     }
                 }
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Exception) {
                 // A retry that the server can't even start moves on too, and
                 // so does a chosen stream whose stored link expired.
@@ -758,11 +762,20 @@ class PlayerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(skipSegments = usable, skipSegmentsResolved = resolved)
     }
 
+    // The episode's own still, else the show's thumb from its own item.
+    private fun episodeThumbnailUrl(session: Session, episode: BaseItemDto): String? {
+        episode.ImageTags?.get("Primary")?.let {
+            return repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken)
+        }
+        val parentTag = episode.ParentThumbImageTag ?: return null
+        val parentId = episode.ParentThumbItemId ?: return null
+        return repository.imageUrl(session.serverAddress, parentId, parentTag, "Thumb", 400, session.accessToken)
+    }
+
     private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {
-        val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
-        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken) }
+        val thumbnailUrl = episodeThumbnailUrl(session, episode)
         val title = if (episode.IndexNumber != null && episode.ParentIndexNumber != null) {
-            "S${episode.ParentIndexNumber} E${episode.IndexNumber} · ${episode.Name.orEmpty()}"
+            com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) + " · " + episode.Name.orEmpty()
         } else {
             episode.Name.orEmpty()
         }
@@ -810,7 +823,7 @@ class PlayerViewModel @Inject constructor(
             year = item.ProductionYear?.toString(),
             officialRating = item.OfficialRating,
             isEpisode = isEpisode,
-            episodeCode = if (isEpisode && hasEpisodeCode) "S${item.ParentIndexNumber} E${item.IndexNumber}" else null,
+            episodeCode = if (isEpisode && hasEpisodeCode) com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) else null,
             episodeTitle = if (isEpisode) item.Name else null,
             overview = item.Overview,
         )
@@ -845,7 +858,7 @@ class PlayerViewModel @Inject constructor(
                     if (err is IllegalStateException) {
                         com.jellio.tv.ui.i18n.Strings.get("player_start_over_unavailable")
                     } else {
-                        "Could not start over: ${err.message ?: err}"
+                        Strings.format("player_start_over_failed", err.message ?: err.toString())
                     },
                 )
             }
@@ -884,7 +897,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun imageSubtitleSuffix(): String =
-        if (VideoTranscodePolicy.avoiding) " (slow: burns into video)" else " (image)"
+        " (" + Strings.get(if (VideoTranscodePolicy.avoiding) "player_subtitle_image_slow" else "player_subtitle_image") + ")"
 
     private var audioLanguagePreference: String? = null
 
@@ -997,7 +1010,7 @@ class PlayerViewModel @Inject constructor(
 
     fun switchAudioTrack(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
-        val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: "audio"
+        val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: Strings.get("tv_audio")
         if (_uiState.value.directPlay && currentSource?.let { repository.canDirectPlay(it, streamIndex) } != false) {
             _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
             showToast(com.jellio.tv.ui.i18n.Strings.format("tv_audio_label", label))
@@ -1163,8 +1176,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun buildEpisodePanelEntry(session: Session, episode: BaseItemDto): EpisodePanelEntry {
-        val thumbTag = episode.ImageTags?.get("Primary") ?: episode.ParentThumbImageTag
-        val thumbnailUrl = thumbTag?.let { repository.imageUrl(session.serverAddress, episode.Id, it, "Primary", 400, session.accessToken) }
+        val thumbnailUrl = episodeThumbnailUrl(session, episode)
         val hasCode = episode.ParentIndexNumber != null && episode.IndexNumber != null
         return EpisodePanelEntry(
             itemId = episode.Id,

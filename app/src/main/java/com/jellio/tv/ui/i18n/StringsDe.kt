@@ -915,5 +915,16 @@ internal object StringsDe {
         m["player_skip_intro"] = "Intro überspringen"
         m["player_skip_credits"] = "Abspann überspringen"
         m["player_skip"] = "Überspringen"
+        m["player_failover_failed"] = "Dieser Stream hat nicht funktioniert"
+        m["player_failover_slow_transcode"] = "Der Server konnte diesen Stream nicht schnell genug neu kodieren"
+        m["player_failover_none_worked"] = "Keiner der Streams hat funktioniert"
+        m["player_failover_none_worked_many"] = "Für diesen Titel wurden {0} Streams versucht, keiner davon lief. Versuch es später noch einmal oder wähle auf der Seite des Titels unter Stream wechseln einen aus."
+        m["player_failover_no_other"] = "Dieser Stream konnte nicht abgespielt werden und es gibt keinen anderen zum Ausprobieren. Versuch es später noch einmal."
+        m["player_start_over_failed"] = "Neustart fehlgeschlagen: {0}"
+        m["player_dialogue_boost_enabled"] = "Dialoganhebung eingeschaltet (Nachtmodus mit Dynamikkompression)"
+        m["player_dialogue_boost_disabled"] = "Dialoganhebung ausgeschaltet"
+        m["player_subtitle_image"] = "Bild"
+        m["player_subtitle_image_slow"] = "langsam: wird ins Bild eingebrannt"
+        m["player_scrub_hint"] = "◀ ▶ zum Spulen"
     }
 }

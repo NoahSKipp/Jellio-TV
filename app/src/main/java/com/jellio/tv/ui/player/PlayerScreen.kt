@@ -242,7 +242,7 @@ fun PlayerScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize()) {
                 uiState.pauseInfo?.art?.let { com.jellio.tv.ui.common.TitleArtBackdrop(it, Modifier.fillMaxSize()) }
                 PlaybackErrorPanel(
-                    problem = PlaybackProblem(uiState.error ?: "Couldn't start playback", uiState.errorDetail.orEmpty()),
+                    problem = PlaybackProblem(uiState.error ?: com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_title"), uiState.errorDetail.orEmpty()),
                     onBack = onBack,
                     onRetry = if (uiState.failoverRetry) {
                         { viewModel.retryFailover(session) }
@@ -365,7 +365,7 @@ internal fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
         ) {
             com.jellio.tv.ui.common.ScreenSpinner()
             Text(
-                text = if (notice.slowTranscode) "The server couldn't re-encode that stream fast enough" else "That stream didn't work",
+                text = com.jellio.tv.ui.i18n.Strings.get(if (notice.slowTranscode) "player_failover_slow_transcode" else "player_failover_failed"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(top = 18.dp),
@@ -638,6 +638,9 @@ internal fun PlayerSurface(
     val currentSwitchSettled by androidx.compose.runtime.rememberUpdatedState(onSwitchSettled)
     val currentSwitchingTo by androidx.compose.runtime.rememberUpdatedState(switchingTo)
     val currentSwitchingLoaded by androidx.compose.runtime.rememberUpdatedState(switchingLoaded)
+    // Both arrive after the player is built; the position loop must see them.
+    val currentUpNextInfo by androidx.compose.runtime.rememberUpdatedState(upNextInfo)
+    val currentSkipSegments by androidx.compose.runtime.rememberUpdatedState(skipSegments)
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var holdSeekTargetMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
     var holdSeekDeltaMs by remember(streamUrl) { mutableLongStateOf(0L) }
@@ -771,11 +774,7 @@ internal fun PlayerSurface(
                         seekToReal(targetMs)
                     }
                 }
-                "nexttrack" -> {
-                    episodes.firstOrNull { it.itemId != currentItemId }?.let {
-                        onPlayNext(it.itemId)
-                    }
-                }
+                "nexttrack" -> currentUpNextInfo?.let { onPlayNext(it.itemId) }
             }
         }
     }
@@ -864,7 +863,7 @@ internal fun PlayerSurface(
         if (syncPlay.publishQueue(currentItemId, startPositionTicks).isSuccess) {
             // A party waits for everyone, counts down, then starts the group.
             if (!groupWatch.party.published(currentItemId)) unpauseAfterPublish = true
-            groupWatch.announceStarted(currentItemId, title.ifBlank { "something" })
+            groupWatch.announceStarted(currentItemId, title.ifBlank { com.jellio.tv.ui.i18n.Strings.get("tv_something") })
         } else {
             publishedQueue = false
         }
@@ -894,11 +893,11 @@ internal fun PlayerSurface(
     }
     var seekedToResume by remember(player) { mutableStateOf(directPlay && startPositionTicks > 0) }
     var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
-    var upNextShown by remember(streamUrl) { mutableStateOf(false) }
-    var upNextDismissed by remember(streamUrl) { mutableStateOf(false) }
-    var upNextCountdown by remember(streamUrl) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
     // Per episode, not per stream: a seek that reloads a transcode must
-    // not bring a dismissed prompt back.
+    // not bring a shown or dismissed card or prompt back.
+    var upNextShown by remember(currentItemId) { mutableStateOf(false) }
+    var upNextDismissed by remember(currentItemId) { mutableStateOf(false) }
+    var upNextCountdown by remember(currentItemId) { mutableStateOf(UPNEXT_COUNTDOWN_SECONDS) }
     var dismissedSkipKind by remember(currentItemId) { mutableStateOf<SkipKind?>(null) }
     var nearEndUpNextDismissed by remember(currentItemId) { mutableStateOf(false) }
     var nearEndUpNextAnnounced by remember(currentItemId) { mutableStateOf(false) }
@@ -1107,8 +1106,8 @@ internal fun PlayerSurface(
             if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9 && !looksLikePlaceholder(durationMs, expectedRuntimeMs)) {
                 onMarkRealWatchComplete()
             }
-            if (upNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
-                if (shouldShowUpNextNow(skipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
+            if (currentUpNextInfo != null && !upNextShown && !upNextDismissed && durationMs > 0) {
+                if (shouldShowUpNextNow(currentSkipSegments, positionMs / 1000.0, durationMs / 1000.0)) {
                     upNextShown = true
                     onUpNextShown()
                     // The episode sleep timer counts this boundary; on the
@@ -1545,7 +1544,7 @@ internal fun PlayerSurface(
             BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                PulsingTitle(text = title.ifBlank { "Loading" })
+                PulsingTitle(text = title.ifBlank { com.jellio.tv.ui.i18n.Strings.get("tv_loading") })
             }
         }
 
@@ -1683,7 +1682,7 @@ internal fun PlayerSurface(
                 onToggleDialogueBoost = {
                     val next = !PlayerPrefs.dialogueBoost
                     PlayerPrefs.setDialogueBoost(playerContext, next)
-                    onShowToast(if (next) "Dialogue Boost enabled (night mode dynamic compression)" else "Dialogue Boost disabled")
+                    onShowToast(com.jellio.tv.ui.i18n.Strings.get(if (next) "player_dialogue_boost_enabled" else "player_dialogue_boost_disabled"))
                 },
                 audioDelayMs = audioDelayMs,
                 onAudioDelay = { ms ->

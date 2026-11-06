@@ -915,5 +915,16 @@ internal object StringsEn {
         m["player_skip_intro"] = "Skip Intro"
         m["player_skip_credits"] = "Skip Credits"
         m["player_skip"] = "Skip"
+        m["player_failover_failed"] = "That stream didn't work"
+        m["player_failover_slow_transcode"] = "The server couldn't re-encode that stream fast enough"
+        m["player_failover_none_worked"] = "None of the streams worked"
+        m["player_failover_none_worked_many"] = "{0} streams were tried for this title and none of them played. Try again later, or pick one from Change stream on the title's page."
+        m["player_failover_no_other"] = "This stream couldn't be played and there's no other one to try. Try again later."
+        m["player_start_over_failed"] = "Could not start over: {0}"
+        m["player_dialogue_boost_enabled"] = "Dialogue Boost enabled (night mode dynamic compression)"
+        m["player_dialogue_boost_disabled"] = "Dialogue Boost disabled"
+        m["player_subtitle_image"] = "image"
+        m["player_subtitle_image_slow"] = "slow: burns into video"
+        m["player_scrub_hint"] = "◀ ▶ to scrub"
     }
 }

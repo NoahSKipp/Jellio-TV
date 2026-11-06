@@ -1328,7 +1328,7 @@ private fun drawerPartyItemTitle(item: PartyItemDto?): String? {
     item ?: return null
     if (item.Type == "Episode" && item.SeriesName != null) {
         val code = if (item.SeasonNumber != null && item.EpisodeNumber != null) {
-            " S${item.SeasonNumber}E${item.EpisodeNumber}"
+            " " + com.jellio.tv.ui.i18n.seasonEpisodeTag(item.SeasonNumber, item.EpisodeNumber)
         } else {
             ""
         }

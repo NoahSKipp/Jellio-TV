@@ -915,5 +915,16 @@ internal object StringsEs {
         m["player_skip_intro"] = "Omitir intro"
         m["player_skip_credits"] = "Omitir créditos"
         m["player_skip"] = "Omitir"
+        m["player_failover_failed"] = "Ese stream no funcionó"
+        m["player_failover_slow_transcode"] = "El servidor no pudo recodificar ese stream lo bastante rápido"
+        m["player_failover_none_worked"] = "Ninguno de los streams funcionó"
+        m["player_failover_none_worked_many"] = "Se probaron {0} streams para este título y ninguno se reprodujo. Inténtalo más tarde o elige uno en Cambiar stream en la página del título."
+        m["player_failover_no_other"] = "Este stream no se pudo reproducir y no hay otro que probar. Inténtalo más tarde."
+        m["player_start_over_failed"] = "No se pudo reiniciar: {0}"
+        m["player_dialogue_boost_enabled"] = "Realce de diálogo activado (modo noche con compresión dinámica)"
+        m["player_dialogue_boost_disabled"] = "Realce de diálogo desactivado"
+        m["player_subtitle_image"] = "imagen"
+        m["player_subtitle_image_slow"] = "lento: se incrusta en el vídeo"
+        m["player_scrub_hint"] = "◀ ▶ para avanzar o retroceder"
     }
 }

@@ -394,7 +394,7 @@ internal fun SeekBar(
             Text(text = " / " + com.jellio.tv.ui.common.formatPlaybackTime(durationMs), color = JellioTextSecondary)
             if (focused && target == null) {
                 Text(
-                    text = "   ◀ ▶ to scrub",
+                    text = "   " + com.jellio.tv.ui.i18n.Strings.get("player_scrub_hint"),
                     color = JellioTextSecondary,
                     style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.CenterVertically),

@@ -915,5 +915,16 @@ internal object StringsFr {
         m["player_skip_intro"] = "Passer l'intro"
         m["player_skip_credits"] = "Passer le générique"
         m["player_skip"] = "Passer"
+        m["player_failover_failed"] = "Ce flux n'a pas fonctionné"
+        m["player_failover_slow_transcode"] = "Le serveur n'a pas pu réencoder ce flux assez vite"
+        m["player_failover_none_worked"] = "Aucun des flux n'a fonctionné"
+        m["player_failover_none_worked_many"] = "{0} flux ont été essayés pour ce titre et aucun n'a pu être lu. Réessaie plus tard, ou choisis-en un via Changer de flux sur la page du titre."
+        m["player_failover_no_other"] = "Ce flux n'a pas pu être lu et il n'y en a pas d'autre à essayer. Réessaie plus tard."
+        m["player_start_over_failed"] = "Impossible de recommencer : {0}"
+        m["player_dialogue_boost_enabled"] = "Amélioration des dialogues activée (mode nuit avec compression dynamique)"
+        m["player_dialogue_boost_disabled"] = "Amélioration des dialogues désactivée"
+        m["player_subtitle_image"] = "image"
+        m["player_subtitle_image_slow"] = "lent : incrusté dans la vidéo"
+        m["player_scrub_hint"] = "◀ ▶ pour naviguer"
     }
 }

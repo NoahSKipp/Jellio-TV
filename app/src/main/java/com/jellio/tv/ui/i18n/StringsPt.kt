@@ -915,5 +915,16 @@ internal object StringsPt {
         m["player_skip_intro"] = "Pular abertura"
         m["player_skip_credits"] = "Pular créditos"
         m["player_skip"] = "Pular"
+        m["player_failover_failed"] = "Esse stream não funcionou"
+        m["player_failover_slow_transcode"] = "O servidor não conseguiu recodificar esse stream rápido o suficiente"
+        m["player_failover_none_worked"] = "Nenhum dos streams funcionou"
+        m["player_failover_none_worked_many"] = "Foram tentados {0} streams para este título e nenhum foi reproduzido. Tente de novo mais tarde ou escolha um em Alterar stream na página do título."
+        m["player_failover_no_other"] = "Este stream não pôde ser reproduzido e não há outro para tentar. Tente de novo mais tarde."
+        m["player_start_over_failed"] = "Não foi possível recomeçar: {0}"
+        m["player_dialogue_boost_enabled"] = "Aprimoramento de diálogo ativado (modo noturno com compressão dinâmica)"
+        m["player_dialogue_boost_disabled"] = "Aprimoramento de diálogo desativado"
+        m["player_subtitle_image"] = "imagem"
+        m["player_subtitle_image_slow"] = "lento: gravado no vídeo"
+        m["player_scrub_hint"] = "◀ ▶ para avançar ou voltar"
     }
 }

@@ -133,11 +133,14 @@ class LivePlayerViewModel @Inject constructor(
             } catch (err: com.jellio.tv.data.StreamLinkException) {
                 Log.w(TAG, "link ${channel.id} failed: ${err.code}")
                 report(channel, ok = false, reason = err.code)
+                if (stopped || _uiState.value.channel?.id != channel.id) return@launch
                 _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(com.jellio.tv.ui.i18n.Strings.get(streamLinkErrorKey(err.code))))
                 return@launch
             } catch (err: Exception) {
                 Log.w(TAG, "open ${channel.id} failed: ${err.javaClass.simpleName}")
                 if (countsAsChannelFailure(err.message)) report(channel, ok = false, reason = err.message ?: err.javaClass.simpleName)
+                // Zapped away or left meanwhile: the newer channel keeps its status.
+                if (stopped || _uiState.value.channel?.id != channel.id) return@launch
                 _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(describeOpenFailure(err.message)))
                 return@launch
             } ?: return@launch
