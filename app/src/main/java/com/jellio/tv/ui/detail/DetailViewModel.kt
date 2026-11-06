@@ -8,7 +8,10 @@ import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.isPendingTodayRelease
+import com.jellio.tv.ui.common.isReleasedToday
 import com.jellio.tv.ui.common.isUnreleasedItem
+import com.jellio.tv.ui.common.markTodayItemHasStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -52,6 +55,7 @@ data class DetailUiState(
     val detailsRetrying: Boolean = false,
     // Every attempt failed; what is shown stays and Retry asks again.
     val detailsFailed: Boolean = false,
+    val streamVerifiedTick: Int = 0,
 )
 
 data class TitleLoadingArtInfo(val art: List<com.jellio.tv.ui.common.ArtCandidate>, val logoUrl: String?, val title: String)
@@ -104,7 +108,7 @@ class DetailViewModel @Inject constructor(
             }
             // The stream lookup does not wait for the details when the type is already known.
             var streamsStarted = false
-            if ((preloaded?.Type == "Movie" || preloaded?.Type == "Episode") && !isUnreleasedItem(preloaded)) {
+            if ((preloaded?.Type == "Movie" || preloaded?.Type == "Episode") && (!isUnreleasedItem(preloaded) || isReleasedToday(preloaded))) {
                 lookForStreams(session, itemId)
                 streamsStarted = true
             }
@@ -134,7 +138,7 @@ class DetailViewModel @Inject constructor(
                     isWatched = item.UserData?.Played ?: false,
                 )
 
-                if (!streamsStarted && (item.Type == "Movie" || item.Type == "Episode") && !isUnreleasedItem(item)) lookForStreams(session, item.Id)
+                if (!streamsStarted && (item.Type == "Movie" || item.Type == "Episode") && (!isUnreleasedItem(item) || isReleasedToday(item))) lookForStreams(session, item.Id)
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     viewModelScope.launch {
@@ -223,6 +227,9 @@ class DetailViewModel @Inject constructor(
             selectedSeasonId = seasonId,
             selectedSeasonEpisodes = known ?: if (showing) _uiState.value.selectedSeasonEpisodes else emptyList(),
         )
+        if (known != null) {
+            checkTodayEpisodeStreams(session, known)
+        }
         viewModelScope.launch {
             val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
             if (_uiState.value.selectedSeasonId != seasonId) return@launch
@@ -235,6 +242,20 @@ class DetailViewModel @Inject constructor(
             if (_uiState.value.selectedSeasonId == seasonId) {
                 repository.seedPreviews(episodes)
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
+                checkTodayEpisodeStreams(session, episodes)
+            }
+        }
+    }
+
+    private fun checkTodayEpisodeStreams(session: Session, episodes: List<BaseItemDto>) {
+        val todayEpisodes = episodes.filter { isPendingTodayRelease(it) && !isUnreleasedItem(it) }
+        if (todayEpisodes.isEmpty()) return
+        viewModelScope.launch {
+            val results = todayEpisodes.map { ep ->
+                async { repository.hasValidStreamForTodayItem(session.userId, ep) }
+            }.awaitAll()
+            if (results.any { it }) {
+                _uiState.value = _uiState.value.copy(streamVerifiedTick = _uiState.value.streamVerifiedTick + 1)
             }
         }
     }
@@ -318,9 +339,15 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
             if (_uiState.value.item?.Id != itemId) return@launch
+            val currentItem = _uiState.value.item
+            if (currentItem?.Type == "Episode" && isReleasedToday(currentItem)) {
+                val hasStream = !sources.getOrNull().isNullOrEmpty()
+                markTodayItemHasStream(itemId, hasStream)
+            }
             warmSecondSource(session, itemId, sources.getOrNull().orEmpty(), openedAt)
             _uiState.value = _uiState.value.copy(
                 findingStreams = false,
+                streamVerifiedTick = _uiState.value.streamVerifiedTick + 1,
                 streamStatus = when {
                     sources.isFailure -> com.jellio.tv.ui.i18n.Strings.get("stream_load_error")
                     sources.getOrNull().isNullOrEmpty() -> com.jellio.tv.ui.i18n.Strings.get("stream_none_found")

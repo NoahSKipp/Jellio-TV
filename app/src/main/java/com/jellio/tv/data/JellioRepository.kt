@@ -34,7 +34,10 @@ import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
 import com.jellio.tv.ui.common.filterReleasedItems
+import com.jellio.tv.ui.common.isReleasedToday
+import com.jellio.tv.ui.common.isTodayItemStreamVerified
 import com.jellio.tv.ui.common.isUnreleasedItem
+import com.jellio.tv.ui.common.markTodayItemHasStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -198,6 +201,7 @@ class JellioRepository @Inject constructor(
     private val prefetchSlots = java.util.concurrent.Semaphore(1)
     // Titles the server said are already warm.
     private val knownWarm = ConcurrentHashMap.newKeySet<String>()
+    private val emptyTodayStreamCheckAt = ConcurrentHashMap<String, Long>()
 
     fun clearCache() {
         cache.clear()
@@ -480,10 +484,49 @@ class JellioRepository @Inject constructor(
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
         api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items
 
+    suspend fun hasValidStreamForTodayItem(userId: String, item: BaseItemDto): Boolean {
+        if (!isReleasedToday(item)) return true
+        if (isUnreleasedItem(item)) return false
+        if (isTodayItemStreamVerified(item.Id)) return true
+        val lastEmptyAt = emptyTodayStreamCheckAt[item.Id]
+        if (lastEmptyAt != null && System.currentTimeMillis() - lastEmptyAt < 120_000L) {
+            return false
+        }
+        val sources = runCatching {
+            getMediaSources(userId, item.Id, reason = "today release check")
+        }.getOrDefault(emptyList())
+        val hasValid = sources.isNotEmpty()
+        markTodayItemHasStream(item.Id, hasValid)
+        if (!hasValid) {
+            emptyTodayStreamCheckAt[item.Id] = System.currentTimeMillis()
+        } else {
+            emptyTodayStreamCheckAt.remove(item.Id)
+        }
+        return hasValid
+    }
+
+    private suspend fun filterReadyToWatchItems(userId: String, items: List<BaseItemDto>): List<BaseItemDto> = coroutineScope {
+        val released = filterReleasedItems(items)
+        if (released.none { isReleasedToday(it) }) {
+            return@coroutineScope released
+        }
+        val checked = released.map { item ->
+            if (isReleasedToday(item)) {
+                async { if (hasValidStreamForTodayItem(userId, item)) item else null }
+            } else {
+                null
+            }
+        }
+        val results = checked.mapIndexed { index, deferred ->
+            if (deferred != null) deferred.await() else released[index]
+        }
+        results.filterNotNull()
+    }
+
     suspend fun getNextUp(userId: String, limit: Int = 20): List<BaseItemDto> {
         val fetchLimit = maxOf(limit * 2, 40)
         val items = api.getNextUp(userId, fetchLimit, fields = "$ITEM_FIELDS,Genres,People,RunTimeTicks,PremiereDate,EndDate", enableResumable = false).Items
-        val released = filterReleasedItems(items)
+        val released = filterReadyToWatchItems(userId, items)
         seedPreviews(released)
         val hidden = runCatching { api.getHiddenNextUpSeries() }.getOrDefault(emptyList())
         val filtered = if (hidden.isEmpty()) released else released.filterNot { hidden.contains(it.SeriesId) }
@@ -494,9 +537,10 @@ class JellioRepository @Inject constructor(
         api.hideSeriesFromNextUp(seriesId)
     }
 
-    suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? =
-        api.getNextUp(userId, limit = 5, fields = "PrimaryImageAspectRatio,RunTimeTicks,PremiereDate,EndDate", seriesId = seriesId)
-            .Items.firstOrNull { !isUnreleasedItem(it) }
+    suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? {
+        val items = api.getNextUp(userId, limit = 5, fields = "PrimaryImageAspectRatio,RunTimeTicks,PremiereDate,EndDate", seriesId = seriesId).Items
+        return filterReadyToWatchItems(userId, items).firstOrNull()
+    }
 
     suspend fun getHeroCandidates(userId: String, limit: Int = 8, parentId: String? = null): List<BaseItemDto> =
         api.getItems(
@@ -925,7 +969,7 @@ class JellioRepository @Inject constructor(
             val index = episodes.indexOfFirst { it.Id == item.Id }
             if (index != -1 && index + 1 < episodes.size) {
                 val next = episodes[index + 1]
-                return if (isUnreleasedItem(next)) null else next
+                return if (isUnreleasedItem(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
             }
         }
         val seasons = getSeasons(seriesId, userId)
@@ -933,7 +977,7 @@ class JellioRepository @Inject constructor(
         val nextSeason = if (seasonIndex != -1) seasons.getOrNull(seasonIndex + 1) else null
         nextSeason ?: return null
         val next = getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull() ?: return null
-        return if (isUnreleasedItem(next)) null else next
+        return if (isUnreleasedItem(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
     }
 
     suspend fun getIntroSkipperSegments(itemId: String): IntroSkipperSegmentsDto? =
@@ -951,7 +995,7 @@ class JellioRepository @Inject constructor(
             val firstSeason = ordered.firstOrNull()
             firstSeason?.let {
                 val eps = getEpisodes(seriesId, userId, it.Id)
-                eps.firstOrNull { ep -> !isUnreleasedItem(ep) } ?: eps.firstOrNull()
+                eps.firstOrNull { ep -> !isUnreleasedItem(ep) && (!isReleasedToday(ep) || hasValidStreamForTodayItem(userId, ep)) } ?: eps.firstOrNull()
             }
         } catch (err: Exception) {
             null

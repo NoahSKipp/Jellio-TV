@@ -202,7 +202,7 @@ internal fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier)
                     if (details.isNotEmpty()) {
                         Text(text = details.joinToString("  •  "), color = JellioTextSecondary, fontSize = 17.sp)
                     }
-                    info.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
+                    info.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeSize = 15.dp) }
                 }
             }
             if (info.isEpisode) {
@@ -453,7 +453,7 @@ internal fun EndScreen(
                         if (details.isNotEmpty()) {
                             Text(text = details.joinToString("  ·  "), color = JellioTextSecondary)
                         }
-                        info?.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
+                        info?.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeSize = 15.dp) }
                     }
                 }
                 info?.overview?.takeIf { it.isNotBlank() }?.let {

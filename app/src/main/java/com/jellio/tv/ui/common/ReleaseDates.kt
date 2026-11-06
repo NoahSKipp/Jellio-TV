@@ -11,7 +11,21 @@ import java.util.TimeZone
 
 private val ISO_DATE_PREFIX = Regex("^(\\d{4})-(\\d{2})-(\\d{2})")
 
-private data class ParsedUtcDay(val year: Int, val epochMs: Long)
+private val verifiedTodayStreamIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+fun markTodayItemHasStream(itemId: String?, hasStream: Boolean) {
+    if (itemId.isNullOrBlank()) return
+    if (hasStream) verifiedTodayStreamIds.add(itemId) else verifiedTodayStreamIds.remove(itemId)
+}
+
+fun isTodayItemStreamVerified(itemId: String?): Boolean =
+    !itemId.isNullOrBlank() && verifiedTodayStreamIds.contains(itemId)
+
+fun clearVerifiedTodayStreamIds() {
+    verifiedTodayStreamIds.clear()
+}
+
+private data class ParsedUtcDay(val year: Int, val epochMs: Long, val exactEpochMs: Long? = null)
 
 private fun parseUtcDay(raw: String?): ParsedUtcDay? {
     if (raw.isNullOrBlank()) return null
@@ -25,7 +39,14 @@ private fun parseUtcDay(raw: String?): ParsedUtcDay? {
         set(year, month - 1, day, 0, 0, 0)
         set(Calendar.MILLISECOND, 0)
     }
-    return ParsedUtcDay(year, cal.timeInMillis)
+    val trimmed = raw.trim()
+    val exact = runCatching {
+        java.time.OffsetDateTime.parse(trimmed).toInstant().toEpochMilli()
+    }.recoverCatching {
+        java.time.Instant.parse(trimmed).toEpochMilli()
+    }.getOrNull()
+    val exactEpochMs = if (exact != null && exact != cal.timeInMillis) exact else null
+    return ParsedUtcDay(year, cal.timeInMillis, exactEpochMs)
 }
 
 private fun utcMidnightMs(nowMs: Long): Long {
@@ -45,13 +66,32 @@ fun isUnreleasedItem(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()
     if (!item.PremiereDate.isNullOrBlank()) {
         val parsed = parseUtcDay(item.PremiereDate) ?: return false
         if (parsed.year >= 9000) return true
-        return parsed.epochMs > todayUtcMs
+        if (parsed.epochMs > todayUtcMs) return true
+        if (parsed.epochMs == todayUtcMs && parsed.exactEpochMs != null && parsed.exactEpochMs > nowMs) return true
+        return false
     }
     if (!item.EndDate.isNullOrBlank()) {
         val parsed = parseUtcDay(item.EndDate) ?: return false
-        return parsed.year >= 9000 || parsed.epochMs > todayUtcMs
+        if (parsed.year >= 9000) return true
+        if (parsed.epochMs > todayUtcMs) return true
+        if (parsed.epochMs == todayUtcMs && parsed.exactEpochMs != null && parsed.exactEpochMs > nowMs) return true
+        return false
     }
     return false
+}
+
+fun isReleasedToday(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
+    if (item.UserData?.Played == true || (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L) return false
+    val todayUtcMs = utcMidnightMs(nowMs)
+    val dateStr = if (!item.PremiereDate.isNullOrBlank()) item.PremiereDate else item.EndDate
+    if (dateStr.isNullOrBlank()) return false
+    val parsed = parseUtcDay(dateStr) ?: return false
+    if (parsed.year >= 9000) return false
+    return parsed.epochMs == todayUtcMs
+}
+
+fun isPendingTodayRelease(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
+    return isReleasedToday(item, nowMs) && !isTodayItemStreamVerified(item.Id)
 }
 
 fun episodeReleaseLabel(
@@ -59,7 +99,7 @@ fun episodeReleaseLabel(
     nowMs: Long = System.currentTimeMillis(),
     locale: Locale = displayLocale(),
 ): String? {
-    if (!isUnreleasedItem(item, nowMs)) return null
+    if (!isUnreleasedItem(item, nowMs) && !isPendingTodayRelease(item, nowMs)) return null
     val todayUtcMs = utcMidnightMs(nowMs)
     if (!item.PremiereDate.isNullOrBlank()) {
         val parsed = parseUtcDay(item.PremiereDate)

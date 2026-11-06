@@ -471,7 +471,7 @@ private fun DetailHero(
                 formatRuntime(item.RunTimeTicks).takeIf { it.isNotEmpty() }?.let { Text(text = it, color = JellioTextSecondary) }
                 item.OfficialRating?.let { Text(text = it, color = JellioTextSecondary) }
                 // TMDB's score, labelled like the cards.
-                item.CommunityRating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeFontSize = 10.sp) }
+                item.CommunityRating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeSize = 15.dp) }
             }
 
             MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))
@@ -694,7 +694,7 @@ private fun SeasonsSection(
             }
         }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
-            val releaseLabels = remember(state.selectedSeasonEpisodes) { seasonEpisodeReleaseLabels(state.selectedSeasonEpisodes) }
+            val releaseLabels = remember(state.selectedSeasonEpisodes, state.streamVerifiedTick) { seasonEpisodeReleaseLabels(state.selectedSeasonEpisodes) }
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),

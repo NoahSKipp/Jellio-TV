@@ -112,7 +112,8 @@ val CHANGELOG_RELEASES = listOf(
         features = listOf(
             ChangelogFeature(Icons.Filled.Tv, "Instant Watchlist Updates and Auto-Removal", "Removing an item from your Watchlist via the options menu now regenerates the row immediately. Plus, watched movies and completed ended shows are automatically removed from your Watchlist when enabled in Settings > Playback."),
             ChangelogFeature(Icons.Filled.Translate, "Complete Localization", "Full localization across all seven display languages: navigation libraries like Movies, Shows, and Anime, achievement badges, catalog and genre rows, release date badges, feed filters, profile stats, playback error messages, and locale-aware date and time formatting."),
-            ChangelogFeature(Icons.Filled.Event, "Next Up and Unreleased Episodes", "Next Up now skips episodes that have not aired yet, so a show you are caught up on waits until the new episode is out. Unreleased episodes on a show's page carry the same orange release badge as Coming Soon (such as Tomorrow, In 5 days, or Coming soon) so you can see when they air before trying to play them."),
+            ChangelogFeature(Icons.Filled.Event, "Next Up and Unreleased Episodes", "Next Up now skips episodes that have not aired yet, so a show you are caught up on waits until the new episode is out. Episodes releasing today are held back from Next Up and badged as Today on the show and season page until their air time passes and at least one valid stream is available. Unreleased episodes on a show's page carry the same orange release badge as Coming Soon (such as Today, Tomorrow, In 5 days, or Coming soon) so you can see when they air before trying to play them."),
+            ChangelogFeature(Icons.Filled.Tv, "TMDB Logo on Ratings", "Ratings on the home showcase, cards, title pages, and player overlays now display the official TMDB logo like Jellio Web."),
         ),
     ),
     ChangelogRelease(

@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,17 +34,21 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.jellio.tv.R
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioText
@@ -55,9 +61,6 @@ data class ShowcaseInfo(val item: BaseItemDto, val series: BaseItemDto?)
 
 private const val TICKS_PER_MINUTE = 10_000_000L * 60L
 private const val SHOWCASE_SETTLE_MS = 350L
-private val TmdbDark = Color(0xFF0D253F)
-private val TmdbGreen = Color(0xFF90CEA1)
-private val TmdbBlue = Color(0xFF01B4E4)
 
 // Top of Home: the focused card's backdrop on the right, fading into the
 // background towards the left where its logo, details and overview sit.
@@ -296,15 +299,20 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
         }
         if (rating != null && rating > 0) {
             if (parts.isNotEmpty()) MetaDot()
-            TmdbBadge()
-            Text(
-                text = String.format(Locale.US, "%.1f", rating),
-                color = JellioTextSecondary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                softWrap = false,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TmdbBadge(size = 15.dp)
+                Text(
+                    text = String.format(Locale.US, "%.1f", rating),
+                    color = JellioTextSecondary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
     }
 }
@@ -316,17 +324,20 @@ private fun MetaDot() {
 
 // Ratings here are TMDB's (Gelato imports them), same badge Jellio Web shows.
 @Composable
-internal fun TmdbBadge(fontSize: androidx.compose.ui.unit.TextUnit = 10.sp) {
-    Text(
-        text = "TMDB",
-        color = TmdbDark,
-        fontSize = fontSize,
-        fontWeight = FontWeight.ExtraBold,
-        maxLines = 1,
-        softWrap = false,
-        modifier = Modifier
-            .background(Brush.horizontalGradient(listOf(TmdbGreen, TmdbBlue)), RoundedCornerShape(3.dp))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+internal fun TmdbBadge(
+    modifier: Modifier = Modifier,
+    size: Dp? = null,
+    fontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
+    tint: Color = Color.White,
+) {
+    val resolvedSize = size ?: with(LocalDensity.current) {
+        if (fontSize <= 10.sp) (fontSize * 1.5f).toDp() else fontSize.toDp()
+    }
+    Image(
+        painter = painterResource(R.drawable.ic_tmdb_logo),
+        contentDescription = "TMDB",
+        colorFilter = ColorFilter.tint(tint),
+        modifier = modifier.size(resolvedSize),
     )
 }
 

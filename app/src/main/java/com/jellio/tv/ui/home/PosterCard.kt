@@ -50,8 +50,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
@@ -504,15 +506,23 @@ internal fun RatingChip(
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     badgeFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
+    badgeSize: Dp? = null,
 ) {
+    val resolvedBadgeSize = badgeSize ?: with(LocalDensity.current) {
+        if (badgeFontSize != 8.sp) {
+            if (badgeFontSize <= 10.sp) (badgeFontSize * 1.5f).toDp() else badgeFontSize.toDp()
+        } else {
+            fontSize.toDp()
+        }
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = modifier
             .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
-            .padding(start = 5.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
-        TmdbBadge(fontSize = badgeFontSize)
+        TmdbBadge(size = resolvedBadgeSize, fontSize = badgeFontSize)
         Text(
             // No TMDB rating yet: a dash, so every card shows the same chip.
             text = rating?.takeIf { it > 0.0 }?.let { String.format(Locale.US, "%.1f", it) } ?: "–",
