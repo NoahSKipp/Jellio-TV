@@ -70,7 +70,7 @@ fun PersonScreen(
                 Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
             uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "Could not load this person", color = JellioTextSecondary)
+                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.Strings.get("person_load_error"), color = JellioTextSecondary)
             }
             uiState.person != null -> {
                 val person = uiState.person!!

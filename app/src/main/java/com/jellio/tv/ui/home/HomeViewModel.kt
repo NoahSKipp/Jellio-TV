@@ -76,7 +76,7 @@ private data class SeasonalSpec(
 
 // Matches Jellio Web runtime/seasonalRecommendations.js SEASONS_SPEC:
 // Maps active theme to its seasonal title, genres, and holiday terms.
-private val SEASONS_SPEC = mapOf(
+private fun seasonsSpec(): Map<String, SeasonalSpec> = mapOf(
     "halloween" to SeasonalSpec(
         title = com.jellio.tv.ui.i18n.Strings.get("seasons_halloween"),
         genres = listOf("Horror", "Mystery"),
@@ -102,17 +102,14 @@ private val SEASONS_SPEC = mapOf(
 // Catalogs worth leading with, in this order. Anything unlisted keeps
 // its own alphabetical order behind them.
 private val LEAD = listOf("trending", "popular", "top rated", "new releases")
-private val GENERIC_NAME = Regex("^(trending|popular|top rated)$", RegexOption.IGNORE_CASE)
 
 private fun leadIndex(name: String?): Int {
     val index = LEAD.indexOf((name ?: "").lowercase())
     return if (index == -1) LEAD.size else index
 }
 
-private fun titleFor(name: String?, kind: String): String {
-    if (name == null || !GENERIC_NAME.matches(name)) return name ?: ""
-    return if (kind == "tvshows") "$name Shows" else "$name Movies"
-}
+private fun titleFor(name: String?, kind: String): String =
+    com.jellio.tv.ui.i18n.catalogDisplayName(name, kind)
 
 private const val HOME_BACKGROUND_RETRIES = 3
 private const val HOME_RETRY_DELAY_MS = 20_000L
@@ -157,8 +154,9 @@ class HomeViewModel @Inject constructor(
     }
 
     fun load(session: Session) {
-        val isReturningVisit = loadedForUserId == session.userId
-        loadedForUserId = session.userId
+        val loadKey = "${session.userId}:${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}"
+        val isReturningVisit = loadedForUserId == loadKey
+        loadedForUserId = loadKey
         homeRetryJob?.cancel()
         failedFetches.set(0)
         viewModelScope.launch {
@@ -227,8 +225,9 @@ class HomeViewModel @Inject constructor(
                     val config = configDeferred.await()
 
                     val activeTheme = activeSeasonalTheme(Calendar.getInstance(), config)
-                    val seasonalDeferred = if (activeTheme != null && SEASONS_SPEC.containsKey(activeTheme)) {
-                        val spec = SEASONS_SPEC.getValue(activeTheme)
+                    val seasons = seasonsSpec()
+                    val seasonalDeferred = if (activeTheme != null && seasons.containsKey(activeTheme)) {
+                        val spec = seasons.getValue(activeTheme)
                         async {
                             runCatching {
                                 val raw = repository.getSeasonalItems(session.userId, spec.genres, spec.searchTerms, 60)
@@ -658,7 +657,7 @@ class HomeViewModel @Inject constructor(
         }
         if (deduped.isEmpty()) return null
         return HomeSection(
-            title = entry.genre,
+            title = com.jellio.tv.ui.i18n.genreDisplayName(entry.genre),
             items = deduped,
             fetchAll = { repository.getGenreItems(userId, null, "Movie,Series", entry.genre, ROW_LIST_LIMIT).filterNot { isAnime(it) } },
             fetchPage = { start, size -> repository.getGenreItemsPage(userId, null, "Movie,Series", entry.genre, start, size).filterNot { isAnime(it) } },

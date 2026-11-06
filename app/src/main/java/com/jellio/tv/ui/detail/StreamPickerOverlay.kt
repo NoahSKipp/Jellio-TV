@@ -676,7 +676,7 @@ internal fun SourceCard(
                 )
             }
             Text(
-                text = (source.Name ?: "Source").substringBefore('\n'),
+                text = (source.Name ?: com.jellio.tv.ui.i18n.Strings.get("detail_streams")).substringBefore('\n'),
                 color = JellioText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -697,7 +697,7 @@ internal fun SourceCard(
                 Text(text = tags.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
             }
             val languageNames = sourceAudioLanguages(source)
-                .mapNotNull { code -> languageName(code).takeIf { it != "Unknown" } }
+                .mapNotNull { code -> languageName(code).takeIf { it != "Unknown" && it != com.jellio.tv.ui.i18n.Strings.get("lang_unknown") } }
                 .distinct()
             if (languageNames.isNotEmpty()) {
                 Text(text = languageNames.joinToString(" · "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))

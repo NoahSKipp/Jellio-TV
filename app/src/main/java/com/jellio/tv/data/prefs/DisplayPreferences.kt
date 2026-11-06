@@ -15,6 +15,9 @@ enum class AppLanguage(val code: String, val label: String, val nativeName: Stri
     POLISH("pl", "Polish", "Polski", "pl-PL"),
     PORTUGUESE("pt", "Portuguese", "Português", "pt-BR");
 
+    val locale: java.util.Locale
+        get() = java.util.Locale.forLanguageTag(localeTag)
+
     companion object {
         fun fromCode(code: String?): AppLanguage =
             entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: ENGLISH
@@ -62,5 +65,9 @@ object DisplayPreferences {
             .edit()
             .putString(KEY_DISPLAY_LANGUAGE, language.code)
             .apply()
+    }
+
+    internal fun setDisplayLanguageForTest(language: AppLanguage) {
+        displayLanguage = language
     }
 }

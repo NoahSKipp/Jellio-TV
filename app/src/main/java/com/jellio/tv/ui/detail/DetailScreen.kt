@@ -109,10 +109,8 @@ private val HeroHeight = 480.dp
 
 private fun formatRuntime(ticks: Long?): String {
     if (ticks == null || ticks <= 0) return ""
-    val minutes = (ticks / 600000000L).toInt()
-    val hours = minutes / 60
-    val mins = minutes % 60
-    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+    val totalMinutes = (ticks / 600000000L).toInt()
+    return com.jellio.tv.ui.i18n.formatDurationMinutes(totalMinutes)
 }
 
 private val PREMIERE_DATE_FORMATS = listOf(
@@ -127,7 +125,7 @@ private fun formatPremiereDate(raw: String?): String? {
         val parser = SimpleDateFormat(pattern, Locale.US)
         parser.timeZone = TimeZone.getTimeZone("UTC")
         val date = runCatching { parser.parse(raw) }.getOrNull() ?: continue
-        return DateFormat.getDateInstance(DateFormat.SHORT).format(date)
+        return DateFormat.getDateInstance(DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(date)
     }
     return null
 }
@@ -439,7 +437,7 @@ private fun DetailHero(
 
             val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
             val titleText = if (item.Type == "Episode" && hasEpisodeCode) {
-                "S${item.ParentIndexNumber} E${item.IndexNumber} \u00B7 ${com.jellio.tv.ui.i18n.episodeDisplayName(item.Name, item.IndexNumber)}"
+                "${com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber)} \u00B7 ${com.jellio.tv.ui.i18n.episodeDisplayName(item.Name, item.IndexNumber)}"
             } else {
                 item.Name.orEmpty()
             }
@@ -765,7 +763,7 @@ private fun EpisodeCard(
                     }
                     episode.IndexNumber?.let {
                         Text(
-                            text = "E$it",
+                            text = com.jellio.tv.ui.i18n.seasonEpisodeTag(null, it),
                             color = JellioText,
                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
                                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),

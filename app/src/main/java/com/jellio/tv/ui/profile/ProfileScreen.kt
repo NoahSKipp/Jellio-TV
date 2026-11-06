@@ -258,7 +258,7 @@ private fun BioSection(
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = com.jellio.tv.ui.common.primaryButtonColors(),
                 ) {
-                    Text(text = if (isSaving) "Saving..." else "Save", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get(if (isSaving) "profile_saving" else "profile_save"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onCancel,
@@ -287,10 +287,10 @@ private fun Modifier.clickableIfOwner(isOwner: Boolean, onClick: () -> Unit): Mo
 @Composable
 private fun StatsRow(movies: Int, episodes: Int, total: Int, bestBinge: Int) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 8.dp)) {
-        StatTile("Movies", movies.toString(), Modifier.weight(1f))
-        StatTile("Episodes", episodes.toString(), Modifier.weight(1f))
-        StatTile("Total watched", total.toString(), Modifier.weight(1f))
-        StatTile("Best binge", bestBinge.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_movies"), movies.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_episodes"), episodes.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_total_watched"), total.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_best_binge"), bestBinge.toString(), Modifier.weight(1f))
     }
 }
 
@@ -339,11 +339,11 @@ private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
         ) {
             Icon(
                 if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
-                contentDescription = badge.Description,
+                contentDescription = com.jellio.tv.ui.i18n.badgeDisplayDescription(badge.Id, badge.Description),
                 tint = if (badge.Unlocked) color else JellioTextSecondary,
             )
             Text(
-                text = badge.Name ?: "",
+                text = com.jellio.tv.ui.i18n.badgeDisplayName(badge.Id, badge.Name),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

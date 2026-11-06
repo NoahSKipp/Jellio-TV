@@ -212,7 +212,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
         val normalized = resolveServerAddress(serverAddress).getOrElse {
-            return LoginResult.Failure(it.message ?: "Could not reach that server")
+            return LoginResult.Failure(it.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
         }
         return try {
             val result = api.authenticateByName(AuthenticateByNameRequest(username, password))
@@ -221,7 +221,7 @@ class JellioRepository @Inject constructor(
             rememberUser(normalized, result.User.Id, result.AccessToken, result.User.Name, result.User.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure(err.message ?: "Could not reach that server")
+            LoginResult.Failure(err.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
         }
     }
 
@@ -249,7 +249,7 @@ class JellioRepository @Inject constructor(
     suspend fun quickSignIn(serverAddress: String, userId: String): LoginResult {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         val entry = rememberedUsersStore.getRememberedUsers(normalized)[userId]
-            ?: return LoginResult.Failure("No remembered sign-in for this profile")
+            ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_no_remembered_signin"))
         sessionManager.saveServerAddress(normalized)
         return try {
             val authorization = com.jellio.tv.data.network.buildEmbyAuthorizationHeader(
@@ -266,12 +266,12 @@ class JellioRepository @Inject constructor(
             // Only a token the server actually rejects is forgotten.
             if (err.code() == 401 || err.code() == 403) {
                 rememberedUsersStore.forgetUser(normalized, userId)
-                LoginResult.Failure("That saved sign-in no longer works. Sign in again.")
+                LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_saved_signin_expired"))
             } else {
-                LoginResult.Failure("Could not switch to that profile right now.")
+                LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_switch_profile_error"))
             }
         } catch (err: Exception) {
-            LoginResult.Failure("Could not reach the server. Try again.")
+            LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_server_try_again"))
         }
     }
 
@@ -301,16 +301,16 @@ class JellioRepository @Inject constructor(
         return try {
             val redeemed = api.redeemPasswordResetPin(ForgotPasswordPinRequest(pin))
             if (!redeemed.Success) {
-                return LoginResult.Failure("That reset code is invalid or has expired.")
+                return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_code_invalid"))
             }
             val loginResult = connectAndLogin(serverAddress, username, "")
             if (loginResult is LoginResult.Failure) return loginResult
             val userId = sessionManager.sessionFlow.first()?.userId
-                ?: return LoginResult.Failure("Could not finish resetting your password.")
+                ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_finish_error"))
             updatePassword(userId, "", newPassword)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure("Could not reset the password. Try again.")
+            LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_try_again"))
         }
     }
 
@@ -333,7 +333,7 @@ class JellioRepository @Inject constructor(
         val tvView = views.firstOrNull { it.CollectionType == "tvshows" }
         val realAnimeView = views.firstOrNull { ANIME_VIEW_NAME.containsMatchIn(it.Name ?: "") }
 
-        val animeEntry = realAnimeView ?: tvView?.copy(Name = "Anime")
+        val animeEntry = realAnimeView ?: tvView?.copy(Name = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"))
         val liveTvView = views.firstOrNull { it.CollectionType == "livetv" }
 
         return listOfNotNull(moviesView, tvView, animeEntry, liveTvView)
@@ -1355,17 +1355,17 @@ class JellioRepository @Inject constructor(
     suspend fun authenticateWithQuickConnect(serverAddress: String, secret: String): LoginResult {
         return try {
             val normalized = resolveServerAddress(serverAddress).getOrElse {
-                return LoginResult.Failure(it.message ?: "Could not reach that server")
+                return LoginResult.Failure(it.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
             }
             val result = api.authenticateWithQuickConnect(com.jellio.tv.data.model.QuickConnectAuthBody(secret))
-            val user = result.User ?: return LoginResult.Failure("Invalid user response from server")
-            val token = result.AccessToken ?: return LoginResult.Failure("Missing access token")
+            val user = result.User ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_invalid_user_response"))
+            val token = result.AccessToken ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_missing_token"))
             clearCache()
             sessionManager.saveSession(normalized, token, user.Id, user.Name)
             rememberUser(normalized, user.Id, token, user.Name, user.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure(err.message ?: "Quick Connect authentication failed")
+            LoginResult.Failure(err.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_quick_connect_failed"))
         }
     }
 

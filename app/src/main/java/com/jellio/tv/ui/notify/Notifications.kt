@@ -52,26 +52,26 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
 // The same lines components/notifications.js's messageFor/subtitleFor show.
 private fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.format("live_link_dead_notice", n.Name.orEmpty())
-    "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.get("live_link_removed_notice").replace("{name}", n.Name.orEmpty()).replace("{days}", n.Detail.orEmpty())
+    "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.format("live_link_removed_notice", n.Name.orEmpty(), n.Detail.orEmpty())
     "announcement" -> n.Name.orEmpty()
-    "party_scheduled" -> com.jellio.tv.ui.i18n.Strings.format("party_notice_scheduled", n.Detail ?: "Someone", n.Name.orEmpty(), partyNoticeWhen(n.Date))
+    "party_scheduled" -> com.jellio.tv.ui.i18n.Strings.format("party_notice_scheduled", n.Detail ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), n.Name.orEmpty(), partyNoticeWhen(n.Date))
     "party_starting" -> com.jellio.tv.ui.i18n.Strings.format("party_notice_starting", n.Name.orEmpty())
-    "episode" -> n.Name.orEmpty() + (n.Detail?.let { " $it" } ?: "") + " is out now"
-    else -> n.Name.orEmpty() + " is available to watch"
+    "episode" -> com.jellio.tv.ui.i18n.Strings.format("notify_out_now", (n.Name ?: com.jellio.tv.ui.i18n.Strings.get("notify_new_item")) + (n.Detail?.let { " $it" } ?: ""))
+    else -> com.jellio.tv.ui.i18n.Strings.format("notify_available_to_watch", n.Name ?: com.jellio.tv.ui.i18n.Strings.get("notify_new_item"))
 }
 
 private fun partyNoticeWhen(date: String?): String {
     val at = com.jellio.tv.data.syncplay.PartyManager.parseTime(date) ?: return ""
-    return java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(at))
+    return java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(java.util.Date(at))
 }
 
 private fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
     "streamlink" -> com.jellio.tv.ui.i18n.Strings.get("live_link_dead_sub")
     "streamlink_removed" -> com.jellio.tv.ui.i18n.Strings.get("live_link_section")
-    "announcement" -> "From the server"
+    "announcement" -> com.jellio.tv.ui.i18n.Strings.get("notify_from_server")
     "party_scheduled", "party_starting" -> com.jellio.tv.ui.i18n.Strings.get("party_notice_sub")
-    "episode" -> "New episode"
-    else -> "Now streaming"
+    "episode" -> com.jellio.tv.ui.i18n.Strings.get("calendar_new_episode")
+    else -> com.jellio.tv.ui.i18n.Strings.get("notify_now_streaming")
 }
 
 // The notification drawer from Jellio's sidebar, for the TV: Group Watch

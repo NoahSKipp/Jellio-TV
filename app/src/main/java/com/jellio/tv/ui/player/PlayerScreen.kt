@@ -920,7 +920,7 @@ internal fun PlayerSurface(
             ) {
                 if (mediaLoadData.trackType != C.TRACK_TYPE_TEXT || wasCanceled) return
                 val status = (error as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
-                onShowToast(if (status != null) "Subtitles couldn't load (server said $status)" else "Subtitles couldn't load")
+                onShowToast(if (status != null) com.jellio.tv.ui.i18n.Strings.format("player_subtitles_load_error_status", status) else com.jellio.tv.ui.i18n.Strings.get("player_subtitles_load_error"))
             }
         }
         player.addAnalyticsListener(loadErrors)

@@ -1,20 +1,24 @@
 package com.jellio.tv.data.model
 
-data class SubtitleSizeOption(val value: String, val label: String, val rem: Float)
+data class SubtitleSizeOption(val value: String, val label: String, val rem: Float, val key: String = "subtitle_size_$value") {
+    val displayName: String get() = if (key.isNotEmpty()) com.jellio.tv.ui.i18n.Strings.get(key) else label
+}
 
-data class SubtitleBackgroundOption(val value: String, val label: String)
+data class SubtitleBackgroundOption(val value: String, val label: String, val key: String = "subtitle_bg_$value") {
+    val displayName: String get() = if (key.isNotEmpty()) com.jellio.tv.ui.i18n.Strings.get(key) else label
+}
 
 val SUBTITLE_SIZES = listOf(
-    SubtitleSizeOption("small", "Small", 1f),
-    SubtitleSizeOption("medium", "Medium", 1.3f),
-    SubtitleSizeOption("large", "Large", 1.7f),
-    SubtitleSizeOption("xlarge", "Extra large", 2.1f),
+    SubtitleSizeOption("small", "Small", 1f, "subtitle_size_small"),
+    SubtitleSizeOption("medium", "Medium", 1.3f, "subtitle_size_medium"),
+    SubtitleSizeOption("large", "Large", 1.7f, "subtitle_size_large"),
+    SubtitleSizeOption("xlarge", "Extra large", 2.1f, "subtitle_size_xlarge"),
 )
 
 val SUBTITLE_BACKGROUNDS = listOf(
-    SubtitleBackgroundOption("none", "None"),
-    SubtitleBackgroundOption("semi", "Semi"),
-    SubtitleBackgroundOption("solid", "Solid"),
+    SubtitleBackgroundOption("none", "None", "subtitle_bg_none"),
+    SubtitleBackgroundOption("semi", "Semi", "subtitle_bg_semi"),
+    SubtitleBackgroundOption("solid", "Solid", "subtitle_bg_solid"),
 )
 
 data class SubtitleStyle(

@@ -73,7 +73,7 @@ private val accent = Color(0xFFFF9800)
 // A big channel list shows this many rows until a search narrows it.
 private const val PLAYLIST_PREVIEW = 120
 
-internal fun formatClock(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
+internal fun formatClock(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(Date(ms))
 
 internal fun languageLabel(language: String): String {
     val code = mapOf(

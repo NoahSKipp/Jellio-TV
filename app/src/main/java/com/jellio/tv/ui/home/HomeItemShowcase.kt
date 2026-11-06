@@ -251,7 +251,7 @@ private fun ShowcaseLogo(
 // "S1 E3 • Episode name" in place of the type.
 @Composable
 private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpisode: Boolean) {
-    val parts = remember(details, series) {
+    val parts = remember(details, series, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
         buildList {
             if (isEpisode) {
                 val label = episodeLabel(details)
@@ -261,13 +261,13 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
                 when (details.Type?.lowercase(Locale.US)) {
                     "movie" -> add(com.jellio.tv.ui.i18n.Strings.get("search_filter_movies"))
                     "series" -> add(com.jellio.tv.ui.i18n.Strings.get("nav_shows"))
-                    "boxset" -> add("Collection")
+                    "boxset" -> add(com.jellio.tv.ui.i18n.Strings.get("detail_collection"))
                 }
             }
             (details.Genres?.firstOrNull() ?: series?.Genres?.firstOrNull())?.takeIf { it.isNotBlank() }?.let { add(com.jellio.tv.ui.i18n.genreDisplayName(it)) }
             details.RunTimeTicks?.let { ticks ->
-                val minutes = ticks / TICKS_PER_MINUTE
-                if (minutes > 0) add(if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m")
+                val minutes = (ticks / TICKS_PER_MINUTE).toInt()
+                if (minutes > 0) add(com.jellio.tv.ui.i18n.formatDurationMinutes(minutes))
             }
             val year = details.ProductionYear?.toString() ?: details.PremiereDate?.take(4)
             if (!year.isNullOrBlank()) {

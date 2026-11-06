@@ -182,7 +182,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun sourceLabel(source: com.jellio.tv.data.model.MediaSourceDto): String =
-        source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: "another stream"
+        source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: com.jellio.tv.ui.i18n.Strings.get("player_another_stream")
 
     private fun streamLanguage(): String? =
         preferredStreamLanguage(audioLanguagePreference, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code)
@@ -587,10 +587,11 @@ class PlayerViewModel @Inject constructor(
                     if (VideoTranscodePolicy.blocking) {
                         _uiState.value = PlayerUiState(
                             isLoading = false,
-                            error = "This stream can't be played here",
-                            errorDetail = "It needs the server to re-encode the video (" +
-                                classification.reasons.joinToString(", ") { TranscodeReason.describe(it) } +
-                                "), which is turned off on this server, and no other stream for it can be played as is.",
+                            error = com.jellio.tv.ui.i18n.Strings.get("player_stream_unplayable_title"),
+                            errorDetail = com.jellio.tv.ui.i18n.Strings.format(
+                                "player_stream_unplayable_transcode_off",
+                                classification.reasons.joinToString(", ") { TranscodeReason.describe(it) },
+                            ),
                             title = _uiState.value.title,
                             pauseInfo = _uiState.value.pauseInfo,
                         )
@@ -796,7 +797,7 @@ class PlayerViewModel @Inject constructor(
             } catch (err: Exception) {
                 showToast(
                     if (err is IllegalStateException) {
-                        "Could not start over, that stream is no longer available."
+                        com.jellio.tv.ui.i18n.Strings.get("player_start_over_unavailable")
                     } else {
                         "Could not start over: ${err.message ?: err}"
                     },
@@ -817,7 +818,7 @@ class PlayerViewModel @Inject constructor(
                 // Block: an image subtitle would make the server re-encode the video.
                 if (!isText && VideoTranscodePolicy.blocking) return@mapNotNull null
                 val index = stream.Index ?: return@mapNotNull null
-                val label = stream.DisplayTitle ?: stream.Language ?: "Subtitle"
+                val label = stream.DisplayTitle ?: stream.Language ?: com.jellio.tv.ui.i18n.Strings.get("player_subtitle_fallback")
                 val url = if (isText) {
                     runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
                 } else {
@@ -854,7 +855,7 @@ class PlayerViewModel @Inject constructor(
         }
 
     private fun audioStreamLabel(stream: MediaStreamDto): String {
-        val language = stream.Language?.uppercase() ?: stream.DisplayTitle ?: "Unknown"
+        val language = stream.Language?.uppercase() ?: stream.DisplayTitle ?: com.jellio.tv.ui.i18n.Strings.get("lang_unknown")
         val parts = listOfNotNull(
             stream.Codec?.uppercase()?.takeIf { it.isNotEmpty() },
             stream.ChannelLayout?.takeIf { it.isNotEmpty() },
@@ -910,7 +911,7 @@ class PlayerViewModel @Inject constructor(
     fun selectBurnedInSubtitle(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val requestedLabel = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == streamIndex }
-            ?.label?.removeSuffix(imageSubtitleSuffix()) ?: "subtitle"
+            ?.label?.removeSuffix(imageSubtitleSuffix()) ?: com.jellio.tv.ui.i18n.Strings.get("player_subtitle_fallback")
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSwitchingSubtitle = true)
             try {
@@ -939,9 +940,9 @@ class PlayerViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isSwitchingSubtitle = false)
                 showToast(
                     if (err is IllegalStateException) {
-                        "That subtitle track is no longer available."
+                        com.jellio.tv.ui.i18n.Strings.get("player_subtitle_unavailable")
                     } else {
-                        "Subtitle switch failed: ${err.message ?: err}"
+                        com.jellio.tv.ui.i18n.Strings.format("player_subtitle_switch_failed", err.message ?: "")
                     },
                 )
             }
@@ -990,9 +991,9 @@ class PlayerViewModel @Inject constructor(
             } catch (err: Exception) {
                 showToast(
                     if (err is IllegalStateException) {
-                        "That audio track is no longer available."
+                        com.jellio.tv.ui.i18n.Strings.get("player_audio_unavailable")
                     } else {
-                        "Audio switch failed: ${err.message ?: err}"
+                        com.jellio.tv.ui.i18n.Strings.format("player_audio_switch_failed", err.message ?: "")
                     },
                 )
             }
@@ -1087,9 +1088,9 @@ class PlayerViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(switchingTo = null, switchingLoaded = false)
                 showToast(
                     if (err is IllegalStateException) {
-                        "That stream is no longer available."
+                        com.jellio.tv.ui.i18n.Strings.get("player_stream_unavailable")
                     } else {
-                        "Could not switch streams. Check your connection and try again."
+                        com.jellio.tv.ui.i18n.Strings.get("player_stream_switch_failed")
                     },
                 )
             }
@@ -1123,7 +1124,7 @@ class PlayerViewModel @Inject constructor(
             itemId = episode.Id,
             title = episode.Name.orEmpty(),
             thumbnailUrl = thumbnailUrl,
-            episodeCode = if (hasCode) "S${episode.ParentIndexNumber} E${episode.IndexNumber}" else null,
+            episodeCode = if (hasCode) com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) else null,
             rating = episode.CommunityRating?.let { "%.1f".format(it) },
             overview = episode.Overview,
         )

@@ -191,7 +191,7 @@ fun SearchScreen(
                         val title = when (row.Kind) {
                             "similar" -> com.jellio.tv.ui.i18n.formatString("search_suggest_similar", answer.MatchedTitle ?: uiState.query)
                             "person" -> com.jellio.tv.ui.i18n.formatString("search_suggest_person", row.Name ?: "")
-                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", row.Name ?: "")
+                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", com.jellio.tv.ui.i18n.genreDisplayName(row.Name ?: ""))
                         }
                         com.jellio.tv.ui.home.PosterRow(
                             section = com.jellio.tv.ui.home.HomeSection(title = title, items = row.Items),

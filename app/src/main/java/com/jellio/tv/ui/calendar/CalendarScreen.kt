@@ -62,15 +62,15 @@ private fun dateHeading(date: Date): String {
     val target = Calendar.getInstance().apply { time = date }
     val diffDays = dayKey(target) - dayKey(today)
     return when {
-        diffDays == 0 -> "Today"
-        diffDays == 1 -> "Tomorrow"
-        else -> SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(date)
+        diffDays == 0 -> com.jellio.tv.ui.i18n.Strings.get("calendar_today")
+        diffDays == 1 -> com.jellio.tv.ui.i18n.Strings.get("calendar_tomorrow")
+        else -> SimpleDateFormat("EEEE, MMMM d", com.jellio.tv.ui.i18n.displayLocale()).format(date)
     }
 }
 
 private fun kindLabel(entry: CalendarEntryDto): String =
     if (entry.Kind == "episode") {
-        if (!entry.Detail.isNullOrEmpty()) "New episode · ${entry.Detail}" else "New episode"
+        if (!entry.Detail.isNullOrEmpty()) com.jellio.tv.ui.i18n.Strings.format("calendar_new_episode_detail", entry.Detail) else com.jellio.tv.ui.i18n.Strings.get("calendar_new_episode")
     } else {
         com.jellio.tv.ui.i18n.Strings.get("calendar_digital_release")
     }

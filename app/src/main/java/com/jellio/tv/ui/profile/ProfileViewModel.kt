@@ -68,7 +68,7 @@ class ProfileViewModel @Inject constructor(
                 isOwner = userId == session.userId,
             )
         }.onFailure { err ->
-            _uiState.value = ProfileUiState(isLoading = false, error = err.message ?: "Could not load this profile.")
+            _uiState.value = ProfileUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("profile_load_error"))
         }
     }
 

@@ -117,7 +117,7 @@ fun HomeScreen(
     }
     var editMode by remember { mutableStateOf(false) }
 
-    LaunchedEffect(session.userId) {
+    LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
         viewModel.load(session)
     }
     LaunchedEffect(editMode) { onEditModeChange(editMode) }
@@ -432,7 +432,7 @@ private fun HomeRowEditorBar(
                 enabled = true,
                 active = hidden,
                 onClick = onToggleHidden,
-                contentDescription = if (hidden) "Show row" else "Hide row",
+                contentDescription = com.jellio.tv.ui.i18n.Strings.get(if (hidden) "row_show" else "row_hide"),
             )
         }
     }

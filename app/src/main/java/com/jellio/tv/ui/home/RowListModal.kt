@@ -126,9 +126,9 @@ fun RowListModal(
             )
             Text(
                 text = when {
-                    isLoadingRest -> "${displayedItems.size} titles, loading more…"
-                    !exhausted -> "${displayedItems.size}+ titles"
-                    else -> "${displayedItems.size} titles"
+                    isLoadingRest -> com.jellio.tv.ui.i18n.Strings.format("row_titles_loading_more", displayedItems.size)
+                    !exhausted -> com.jellio.tv.ui.i18n.Strings.format("row_titles_plus", displayedItems.size)
+                    else -> com.jellio.tv.ui.i18n.Strings.format("row_titles_count", displayedItems.size)
                 },
                 color = JellioTextSecondary,
                 style = MaterialTheme.typography.bodySmall,

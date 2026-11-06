@@ -39,7 +39,7 @@ class PersonViewModel @Inject constructor(
                 val filmography = runCatching { repository.getPersonFilmography(session.userId, personId) }.getOrDefault(emptyList())
                 _uiState.value = _uiState.value.copy(filmography = filmography)
             } catch (err: Exception) {
-                _uiState.value = PersonUiState(isLoading = false, error = err.message ?: "Could not load this person")
+                _uiState.value = PersonUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("person_load_error"))
             }
         }
     }

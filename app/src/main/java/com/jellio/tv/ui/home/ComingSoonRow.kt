@@ -60,10 +60,10 @@ private fun comingSoonDateLabel(entry: CalendarEntryDto): String {
     val date = parseEntryDate(entry.Date) ?: return ""
     val diffDays = ((date.time - System.currentTimeMillis()) / (24 * 60 * 60 * 1000)).toInt()
     return when {
-        diffDays <= 0 -> "Today"
-        diffDays == 1 -> "Tomorrow"
-        diffDays < 7 -> "In $diffDays days"
-        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
+        diffDays <= 0 -> com.jellio.tv.ui.i18n.Strings.get("calendar_today")
+        diffDays == 1 -> com.jellio.tv.ui.i18n.Strings.get("calendar_tomorrow")
+        diffDays < 7 -> com.jellio.tv.ui.i18n.Strings.format("coming_soon_in_days", diffDays)
+        else -> SimpleDateFormat("MMM d", com.jellio.tv.ui.i18n.displayLocale()).format(date)
     }
 }
 
@@ -104,6 +104,9 @@ fun ComingSoonRow(
             ) {
                 items(entries, key = { it.ItemId + (it.Date ?: "") }) { entry ->
                     RowEntryTarget(if (entry == entries.first()) firstCard else null) {
+                        val badge = androidx.compose.runtime.remember(entry.Date, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
+                            comingSoonDateLabel(entry)
+                        }
                         val item = items[entry.ItemId.replace("-", "").lowercase()]
                         if (item != null && itemImageUrl != null) {
                             PosterCard(
@@ -111,7 +114,7 @@ fun ComingSoonRow(
                                 imageUrl = itemImageUrl,
                                 onClick = { onItemClick(entry.ItemId) },
                                 onFocus = onItemFocus,
-                                badge = comingSoonDateLabel(entry),
+                                badge = badge,
                                 onOptionsClick = onItemOptions?.let { { it(entry) } },
                             )
                         } else {
@@ -136,6 +139,9 @@ private fun ComingSoonCard(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val badge = androidx.compose.runtime.remember(entry.Date, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
+        comingSoonDateLabel(entry)
+    }
     // Same size as the poster rows so the row lines up with the others.
     val cardWidth = PosterWidth.scaled()
     Surface(
@@ -160,7 +166,7 @@ private fun ComingSoonCard(
                     .background(JellioBg.copy(alpha = 0.85f), RoundedCornerShape(999.dp)),
             ) {
                 Text(
-                    text = comingSoonDateLabel(entry),
+                    text = badge,
                     color = com.jellio.tv.ui.theme.JellioRarityLegendary,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

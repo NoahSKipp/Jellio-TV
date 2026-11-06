@@ -149,7 +149,7 @@ class GroupWatchViewModel @Inject constructor(
             // whatever is on screen; Join waits in Group Watch and Notifications.
             notify(
                 com.jellio.tv.ui.i18n.Strings.get("groupwatch_invite_title"),
-                com.jellio.tv.ui.i18n.Strings.format("party_invite_toast", invite.FromUserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), invite.GroupName ?: "Group Watch"),
+                com.jellio.tv.ui.i18n.Strings.format("party_invite_toast", invite.FromUserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), invite.GroupName ?: com.jellio.tv.ui.i18n.Strings.get("tv_group_watch")),
                 INVITE_NOTICE_MS,
             )
         }
@@ -272,7 +272,7 @@ class GroupWatchViewModel @Inject constructor(
     fun announceStarted(itemId: String, name: String) {
         val group = syncPlay.group.value ?: return
         viewModelScope.launch {
-            runCatching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody("The group started watching $name", itemId)) }
+            runCatching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody(com.jellio.tv.ui.i18n.Strings.format("gw_group_started_watching", name), itemId)) }
         }
     }
 
@@ -469,7 +469,7 @@ private fun partyItemTitle(item: com.jellio.tv.data.model.PartyItemDto?): String
 
 private fun partyWhen(startsAt: String?): String {
     val at = com.jellio.tv.data.syncplay.PartyManager.parseTime(startsAt) ?: return ""
-    val clock = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(at))
+    val clock = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(java.util.Date(at))
     val minutes = (at - System.currentTimeMillis()) / 60_000L
     val relative = when {
         minutes <= 0 -> com.jellio.tv.ui.i18n.Strings.get("party_due_now")
@@ -669,7 +669,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                 }
                 list.Live.forEach { live ->
                     PartyCard(
-                        title = live.GroupName ?: "Group Watch",
+                        title = live.GroupName ?: com.jellio.tv.ui.i18n.Strings.get("tv_group_watch"),
                         item = live.Item,
                         lines = liveLines(live),
                         session = session,
@@ -684,7 +684,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                 list.Scheduled.forEach { planned ->
                     val going = if (planned.Going.isEmpty()) "" else com.jellio.tv.ui.i18n.Strings.format("party_going_count", planned.Going.size)
                     PartyCard(
-                        title = planned.Name ?: "Watch party",
+                        title = planned.Name ?: com.jellio.tv.ui.i18n.Strings.get("party_title"),
                         item = planned.Item,
                         lines = listOf(
                             partyWhen(planned.StartsAt),
@@ -700,7 +700,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                                 GroupButton(
                                     label = com.jellio.tv.ui.i18n.Strings.get("party_start_now"),
                                     primary = true,
-                                    onClick = { viewModel.startScheduled(planned, "$userName's group") },
+                                    onClick = { viewModel.startScheduled(planned, com.jellio.tv.ui.i18n.Strings.format("gw_users_group", userName)) },
                                 )
                             }
                             if (!planned.IsHost) {
@@ -721,7 +721,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                 groups.forEach { candidate ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Column(modifier = Modifier.weight(1f, fill = false)) {
-                            Text(text = candidate.GroupName ?: "Group Watch", color = JellioText)
+                            Text(text = candidate.GroupName ?: com.jellio.tv.ui.i18n.Strings.get("tv_group_watch"), color = JellioText)
                             Text(text = candidate.Participants.joinToString(", "), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
                         }
                         GroupButton(label = com.jellio.tv.ui.i18n.string("gw_join"), primary = true, onClick = { viewModel.join(candidate.GroupId) })
@@ -737,7 +737,7 @@ fun GroupWatchPanelContent(userName: String, session: Session? = null, viewModel
                             creating = true
                             createError = null
                             scope.launch {
-                                createError = viewModel.create("$userName's group")
+                                createError = viewModel.create(com.jellio.tv.ui.i18n.Strings.format("gw_users_group", userName))
                                 creating = false
                                 refreshKey++
                             }
@@ -782,7 +782,7 @@ fun InviteRow(invite: com.jellio.tv.data.model.GroupWatchInviteDto, onJoin: () -
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(modifier = Modifier.weight(1f, fill = false)) {
             Text(text = com.jellio.tv.ui.i18n.Strings.format("tv_invited_you", invite.FromUserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone")), color = JellioText)
-            Text(text = invite.GroupName ?: "Group Watch", color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(text = invite.GroupName ?: com.jellio.tv.ui.i18n.Strings.get("tv_group_watch"), color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
         }
         GroupButton(label = com.jellio.tv.ui.i18n.string("gw_join"), primary = true, onClick = onJoin)
         GroupButton(label = com.jellio.tv.ui.i18n.string("action_dismiss"), onClick = onDismiss)

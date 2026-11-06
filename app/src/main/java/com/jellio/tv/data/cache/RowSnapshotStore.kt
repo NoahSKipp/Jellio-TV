@@ -127,7 +127,7 @@ class RowSnapshotStore @Inject constructor(
     private val serviceAdapter by lazy { moshi.adapter(ServiceSnapshot::class.java) }
 
     suspend fun loadHomeSnapshot(userId: String): HomeSnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "home_${sanitizeKey(userId)}.json")
+        val file = File(cacheDir, "home_${sanitizeKey(userId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         if (!file.exists()) return@withContext null
         runCatching {
             val json = file.readText()
@@ -136,7 +136,7 @@ class RowSnapshotStore @Inject constructor(
     }
 
     suspend fun saveHomeSnapshot(userId: String, snapshot: HomeSnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "home_${sanitizeKey(userId)}.json")
+        val file = File(cacheDir, "home_${sanitizeKey(userId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         runCatching {
             val json = homeAdapter.toJson(snapshot)
             file.writeText(json)
@@ -144,7 +144,7 @@ class RowSnapshotStore @Inject constructor(
     }
 
     suspend fun loadLibrarySnapshot(userId: String, libraryId: String): LibrarySnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}.json")
+        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         if (!file.exists()) return@withContext null
         runCatching {
             val json = file.readText()
@@ -153,7 +153,7 @@ class RowSnapshotStore @Inject constructor(
     }
 
     suspend fun saveLibrarySnapshot(userId: String, libraryId: String, snapshot: LibrarySnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}.json")
+        val file = File(cacheDir, "library_${sanitizeKey(userId)}_${sanitizeKey(libraryId)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         runCatching {
             val json = libraryAdapter.toJson(snapshot)
             file.writeText(json)
@@ -161,13 +161,13 @@ class RowSnapshotStore @Inject constructor(
     }
 
     suspend fun loadServiceSnapshot(userId: String, serviceName: String): ServiceSnapshot? = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}.json")
+        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         if (!file.exists()) return@withContext null
         runCatching { serviceAdapter.fromJson(file.readText()) }.getOrNull()
     }
 
     suspend fun saveServiceSnapshot(userId: String, serviceName: String, snapshot: ServiceSnapshot) = withContext(Dispatchers.IO) {
-        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}.json")
+        val file = File(cacheDir, "service_${sanitizeKey(userId)}_${sanitizeKey(serviceName)}_${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}.json")
         runCatching { file.writeText(serviceAdapter.toJson(snapshot)) }
     }
 

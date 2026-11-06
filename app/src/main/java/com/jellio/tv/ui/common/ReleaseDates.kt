@@ -1,6 +1,8 @@
 package com.jellio.tv.ui.common
 
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.ui.i18n.displayLocale
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -55,7 +57,7 @@ fun isUnreleasedItem(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()
 fun episodeReleaseLabel(
     item: BaseItemDto,
     nowMs: Long = System.currentTimeMillis(),
-    locale: Locale = Locale.getDefault(),
+    locale: Locale = displayLocale(),
 ): String? {
     if (!isUnreleasedItem(item, nowMs)) return null
     val todayUtcMs = utcMidnightMs(nowMs)
@@ -64,16 +66,16 @@ fun episodeReleaseLabel(
         if (parsed != null && parsed.year < 9000) {
             val diffDays = ((parsed.epochMs - todayUtcMs) / (24L * 60L * 60L * 1000L)).toInt()
             return when {
-                diffDays <= 0 -> "Today"
-                diffDays == 1 -> "Tomorrow"
-                diffDays < 7 -> "In $diffDays days"
+                diffDays <= 0 -> Strings.get("calendar_today")
+                diffDays == 1 -> Strings.get("calendar_tomorrow")
+                diffDays < 7 -> Strings.format("coming_soon_in_days", diffDays)
                 else -> SimpleDateFormat("MMM d", locale).apply {
                     timeZone = TimeZone.getTimeZone("UTC")
                 }.format(Date(parsed.epochMs))
             }
         }
     }
-    return "Coming soon"
+    return Strings.get("coming_soon_badge")
 }
 
 fun filterReleasedItems(items: List<BaseItemDto>, nowMs: Long = System.currentTimeMillis()): List<BaseItemDto> {
@@ -83,7 +85,7 @@ fun filterReleasedItems(items: List<BaseItemDto>, nowMs: Long = System.currentTi
 fun seasonEpisodeReleaseLabels(
     episodes: List<BaseItemDto>,
     nowMs: Long = System.currentTimeMillis(),
-    locale: Locale = Locale.getDefault(),
+    locale: Locale = displayLocale(),
 ): Map<String, String> {
     val result = LinkedHashMap<String, String>()
     var seenUnreleased = false
@@ -98,7 +100,7 @@ fun seasonEpisodeReleaseLabels(
             (ep.UserData?.PlaybackPositionTicks ?: 0L) <= 0L &&
             (ep.RunTimeTicks ?: 0L) <= 0L
         ) {
-            result[ep.Id] = "Coming soon"
+            result[ep.Id] = Strings.get("coming_soon_badge")
         }
     }
     return result

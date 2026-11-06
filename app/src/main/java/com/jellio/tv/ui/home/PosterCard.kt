@@ -193,7 +193,7 @@ internal fun episodeLabel(item: BaseItemDto): String {
     if (!item.Type.equals("Episode", ignoreCase = true)) return ""
     val season = item.ParentIndexNumber ?: return ""
     val episode = item.IndexNumber ?: return ""
-    return "S$season E$episode"
+    return com.jellio.tv.ui.i18n.seasonEpisodeTag(season, episode)
 }
 
 private fun remainingLabel(item: BaseItemDto): String {
@@ -201,7 +201,7 @@ private fun remainingLabel(item: BaseItemDto): String {
     val posTicks = item.UserData?.PlaybackPositionTicks ?: return ""
     if (runTicks <= 0 || posTicks <= 0 || posTicks >= runTicks) return ""
     val minutes = Math.round((runTicks - posTicks).toDouble() / TICKS_PER_MINUTE)
-    return if (minutes > 0) "${minutes}m left" else ""
+    return if (minutes > 0) com.jellio.tv.ui.i18n.Strings.format("card_minutes_left", minutes) else ""
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -569,7 +569,7 @@ fun CardOptionsMenu(
                 onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_continue"), it, danger = true)) }
             }
             upNext -> {
-                onGoToDetails?.let { add(MenuAction("Go to details", it)) }
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("card_go_to_details"), it)) }
                 // Jellyfin can't hide one episode from Next Up; marking it
                 // played is what drops it off the row.
                 onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_up_next"), it, danger = true)) }

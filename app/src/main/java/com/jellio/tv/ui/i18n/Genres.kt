@@ -57,26 +57,156 @@ object Genres {
     }
 }
 
+fun displayLocale(): java.util.Locale = DisplayPreferences.displayLanguage.locale
+
+fun libraryDisplayName(name: String?, collectionType: String? = null): String {
+    val trimmed = name?.trim()
+    if (trimmed.isNullOrBlank()) {
+        return when (collectionType?.lowercase()) {
+            "movies" -> Strings.get("nav_movies")
+            "tvshows" -> Strings.get("nav_shows")
+            "books" -> Strings.get("nav_books")
+            "music" -> Strings.get("nav_music")
+            "boxsets" -> Strings.get("detail_collection")
+            else -> Strings.get("library_default_title")
+        }
+    }
+    val lower = trimmed.lowercase()
+    if (lower == "anime") return Strings.get("library_anime_title")
+    if (lower in setOf("movies", "movie", "films", "film", "filme", "películas", "peliculas", "filmy", "filmes")) return Strings.get("nav_movies")
+    if (lower in setOf("shows", "tv shows", "tv", "series", "tv series", "serien", "séries", "seriale", "serie tv", "programas")) return Strings.get("nav_shows")
+    if (lower in setOf("books", "book", "bücher", "libros", "livres", "libri", "książki", "livros")) return Strings.get("nav_books")
+    if (lower == "manga") return Strings.get("nav_manga")
+    if (lower in setOf("audiobooks", "audiobook", "hörbücher", "audiolibros", "livres audio", "audiolibri", "audiobooki", "audiolivros")) return Strings.get("nav_audiobooks")
+    if (lower in setOf("music", "musik", "música", "musique", "musica", "muzyka")) return Strings.get("nav_music")
+    if (lower in setOf("collections", "collection", "boxsets", "box sets")) return Strings.get("detail_collection")
+    if (lower == "library") return Strings.get("library_default_title")
+    return name
+}
+
+fun catalogDisplayName(name: String?, kind: String? = null, service: String? = null): String {
+    val raw = name?.trim().orEmpty()
+    if (service != null && (raw.isEmpty() || raw.equals(service, ignoreCase = true))) {
+        return if (kind == "tvshows") Strings.format("service_shows_on", service) else Strings.format("service_movies_on", service)
+    }
+    val lower = raw.lowercase()
+    return when {
+        lower == "trending movies" || (lower == "trending" && kind == "movies") ->
+            Strings.get("catalog_trending_movies")
+        lower in setOf("trending shows", "trending tv shows", "trending series") || (lower == "trending" && kind == "tvshows") ->
+            Strings.get("catalog_trending_shows")
+        lower == "popular movies" || (lower == "popular" && kind == "movies") ->
+            Strings.get("catalog_popular_movies")
+        lower in setOf("popular shows", "popular tv shows", "popular series") || (lower == "popular" && kind == "tvshows") ->
+            Strings.get("catalog_popular_shows")
+        lower in setOf("top rated movies", "top-rated movies") || (lower in setOf("top rated", "top-rated") && kind == "movies") ->
+            Strings.get("catalog_top_rated_movies")
+        lower in setOf("top rated shows", "top-rated shows", "top rated tv shows", "top rated series") || (lower in setOf("top rated", "top-rated") && kind == "tvshows") ->
+            Strings.get("catalog_top_rated_shows")
+        lower in setOf("new releases movies", "new movies") || (lower == "new releases" && kind == "movies") ->
+            Strings.get("catalog_new_movies")
+        lower in setOf("new releases shows", "new shows", "new series") || (lower == "new releases" && kind == "tvshows") ->
+            Strings.get("catalog_new_shows")
+        lower == "trending" ->
+            Strings.get("catalog_trending")
+        lower == "popular" ->
+            Strings.get("catalog_popular")
+        lower in setOf("top rated", "top-rated") ->
+            Strings.get("catalog_top_rated")
+        lower == "new releases" ->
+            Strings.get("catalog_new_releases")
+        lower.startsWith("shows on ") ->
+            Strings.format("service_shows_on", raw.substring("shows on ".length).trim())
+        lower.startsWith("movies on ") ->
+            Strings.format("service_movies_on", raw.substring("movies on ".length).trim())
+        kind == "tvshows" && !lower.contains("show") && !lower.contains("serie") ->
+            Strings.format("catalog_named_shows", raw)
+        kind == "movies" && !lower.contains("movie") && !lower.contains("film") ->
+            Strings.format("catalog_named_movies", raw)
+        else -> raw
+    }
+}
+
+private val badgeNameKeyByEnglishName: Map<String, String> by lazy {
+    StringsEn.MAP.filterKeys { it.startsWith("badge_name_") }
+        .entries.associate { it.value.trim().lowercase() to it.key }
+}
+
+fun badgeDisplayName(id: String?, fallback: String? = null): String {
+    if (!id.isNullOrBlank()) {
+        val key = "badge_name_" + id.trim().lowercase().replace('-', '_')
+        val table = Strings.tableFor(DisplayPreferences.displayLanguage)
+        table[key]?.let { return it }
+        StringsEn.MAP[key]?.let { return it }
+    }
+    if (!fallback.isNullOrBlank()) {
+        val key = badgeNameKeyByEnglishName[fallback.trim().lowercase()]
+        if (key != null) return Strings.get(key)
+        return fallback
+    }
+    return id ?: ""
+}
+
+private val badgeDescKeyByEnglishDesc: Map<String, String> by lazy {
+    StringsEn.MAP.filterKeys { it.startsWith("badge_desc_") }
+        .entries.associate { it.value.trim().lowercase() to it.key }
+}
+
+fun badgeDisplayDescription(id: String?, fallback: String? = null): String {
+    if (!id.isNullOrBlank()) {
+        val key = "badge_desc_" + id.trim().lowercase().replace('-', '_')
+        val table = Strings.tableFor(DisplayPreferences.displayLanguage)
+        table[key]?.let { return it }
+        StringsEn.MAP[key]?.let { return it }
+    }
+    if (!fallback.isNullOrBlank()) {
+        val key = badgeDescKeyByEnglishDesc[fallback.trim().lowercase()]
+        if (key != null) return Strings.get(key)
+        return fallback
+    }
+    return ""
+}
+
+fun formatDurationMinutes(minutes: Int): String {
+    if (minutes >= 60) {
+        val h = minutes / 60
+        val m = minutes % 60
+        return if (m > 0) Strings.format("duration_hours_minutes", h, m) else Strings.format("duration_hours", h)
+    } else {
+        return Strings.format("duration_minutes", minutes)
+    }
+}
+
+fun seasonEpisodeTag(season: Int?, episode: Int?): String {
+    return when {
+        season != null && episode != null -> Strings.format("tag_season_episode", season, episode)
+        episode != null -> Strings.format("tag_episode", episode)
+        season != null -> seasonDisplayName(season, null)
+        else -> ""
+    }
+}
+
 fun genreDisplayName(genre: String?): String = Genres.translate(genre)
 
-fun seasonDisplayName(season: BaseItemDto): String {
-    val index = season.IndexNumber
-    if (index != null && index > 0) {
-        return Strings.format("detail_season_number", index)
+fun seasonDisplayName(seasonNumber: Int?, name: String? = null): String {
+    if (seasonNumber != null && seasonNumber > 0) {
+        return Strings.format("detail_season_number", seasonNumber)
     }
-    val name = season.Name.orEmpty().trim()
-    val match = Regex("""(?i)^Season\s+(\d+)$""").matchEntire(name)
+    val raw = name.orEmpty().trim()
+    val match = Regex("""(?i)^Season\s+(\d+)$""").matchEntire(raw)
     if (match != null) {
         val num = match.groupValues[1].toIntOrNull()
         if (num != null) {
             return Strings.format("detail_season_number", num)
         }
     }
-    if (index == 0 || name.contains("special", ignoreCase = true)) {
+    if (seasonNumber == 0 || raw.contains("special", ignoreCase = true)) {
         return Strings.get("detail_specials").ifEmpty { "Specials" }
     }
-    return name
+    return raw
 }
+
+fun seasonDisplayName(season: BaseItemDto): String = seasonDisplayName(season.IndexNumber, season.Name)
 
 fun episodeDisplayName(name: String?, indexNumber: Int? = null): String {
     val raw = name.orEmpty().trim()

@@ -134,7 +134,7 @@ class SearchViewModel @Inject constructor(
                     val nothing = _uiState.value.results.isEmpty()
                     _uiState.value = _uiState.value.copy(
                         isSearching = false,
-                        error = if (nothing && failures >= 3) "Could not load search results. Check your connection and try again." else null,
+                        error = if (nothing && failures >= 3) com.jellio.tv.ui.i18n.Strings.get("search_network_error") else null,
                     )
                     if (nothing && failures < 3) {
                         viewModelScope.launch {

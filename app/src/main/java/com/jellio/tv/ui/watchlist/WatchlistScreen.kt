@@ -63,10 +63,10 @@ fun WatchlistScreen(
                     )
                 }
                 if (uiState.movies.isNotEmpty()) {
-                    item { PosterRow(section = HomeSection("Movies", uiState.movies), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
+                    item { PosterRow(section = HomeSection(com.jellio.tv.ui.i18n.Strings.get("nav_movies"), uiState.movies), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
                 if (uiState.series.isNotEmpty()) {
-                    item { PosterRow(section = HomeSection("Shows", uiState.series), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
+                    item { PosterRow(section = HomeSection(com.jellio.tv.ui.i18n.Strings.get("nav_shows"), uiState.series), imageUrl = imageUrl, onItemClick = onItemClick, onItemOptions = openItemOptions) }
                 }
             }
         }

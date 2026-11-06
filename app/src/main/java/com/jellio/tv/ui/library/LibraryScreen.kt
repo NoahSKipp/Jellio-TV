@@ -88,7 +88,9 @@ fun LibraryScreen(
             onToggleWatched = { viewModel.toggleWatched(session, it) },
         )
 
-        LaunchedEffect(Unit) { viewModel.load(session, library) }
+        LaunchedEffect(session.userId, library.Id, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
+            viewModel.load(session, library)
+        }
         LaunchedEffect(listState) {
             snapshotFlow { listState.isScrollInProgress }.collect { com.jellio.tv.ui.perf.ScrollActivity.scrolling = it }
         }
@@ -154,7 +156,7 @@ fun LibraryScreen(
                     ) {
                         item(key = "header") {
                             LibraryHeader(
-                                title = uiState.title,
+                                title = uiState.title.ifEmpty { com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType) },
                                 showFilters = uiState.genreOptions.isNotEmpty() || uiState.mainRow != null,
                                 genres = uiState.genreOptions,
                                 selectedSort = uiState.selectedSort,

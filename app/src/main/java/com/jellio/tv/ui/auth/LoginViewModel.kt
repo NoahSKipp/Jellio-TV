@@ -99,7 +99,7 @@ class LoginViewModel @Inject constructor(
 
     fun submitServerAddress(serverAddress: String) {
         if (serverAddress.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "Enter your server address")
+            _uiState.value = _uiState.value.copy(error = com.jellio.tv.ui.i18n.Strings.get("auth_enter_server"))
             return
         }
         viewModelScope.launch {
@@ -181,7 +181,7 @@ class LoginViewModel @Inject constructor(
 
     fun requestPasswordReset(username: String) {
         if (username.isBlank()) {
-            _uiState.value = _uiState.value.copy(resetStatus = "Enter your username.")
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_enter_username"))
             return
         }
         viewModelScope.launch {
@@ -192,25 +192,25 @@ class LoginViewModel @Inject constructor(
                     mode = LoginMode.FORGOT_PIN,
                     forgotPasswordUsername = username,
                     isRequestingReset = false,
-                    resetStatus = "If that account exists, a reset code has been emailed to it. Enter it below with a new password.",
+                    resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_reset_code_sent"),
                 )
             } else {
-                _uiState.value.copy(isRequestingReset = false, resetStatus = "Could not request a reset code. Try again later.")
+                _uiState.value.copy(isRequestingReset = false, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_reset_request_error"))
             }
         }
     }
 
     fun redeemPasswordReset(pin: String, newPassword: String, confirmPassword: String) {
         if (pin.isBlank() || newPassword.isBlank()) {
-            _uiState.value = _uiState.value.copy(resetStatus = "Enter the reset code and a new password.")
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_enter_code_and_password"))
             return
         }
         if (newPassword != confirmPassword) {
-            _uiState.value = _uiState.value.copy(resetStatus = "New passwords do not match.")
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("settings_passwords_mismatch"))
             return
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = "Resetting…")
+            _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_resetting"))
             when (val result = repository.redeemPasswordReset(_uiState.value.serverAddress, _uiState.value.forgotPasswordUsername, pin, newPassword)) {
                 is LoginResult.Success -> Unit
                 is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isRedeemingReset = false, resetStatus = result.message)
@@ -256,7 +256,7 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
             if (result == null || result.Code.isNullOrBlank() || result.Secret.isNullOrBlank()) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Could not start Quick Connect. Make sure Quick Connect is enabled on your Jellyfin server.",
+                    error = com.jellio.tv.ui.i18n.Strings.get("auth_quick_connect_start_error"),
                 )
                 return@launch
             }

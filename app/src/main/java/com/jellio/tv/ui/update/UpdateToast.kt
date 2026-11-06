@@ -92,7 +92,7 @@ fun UpdateToast(
                     colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     modifier = Modifier.focusRequester(downloadFocusRequester),
                 ) {
-                    Text(text = if (downloading) "Downloading..." else "Download", modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.ui.i18n.Strings.get(if (downloading) "update_downloading" else "update_download"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         }

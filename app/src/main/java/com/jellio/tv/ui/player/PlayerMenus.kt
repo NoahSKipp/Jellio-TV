@@ -221,7 +221,7 @@ internal fun ReactMenu(replyTo: com.jellio.tv.data.model.GroupWatchMessageDto?, 
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 140.dp)) {
         if (replyTo != null) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("party_replying_to", replyTo.UserName ?: "Someone", replyTo.Text),
+                text = com.jellio.tv.ui.i18n.Strings.format("party_replying_to", replyTo.UserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), replyTo.Text),
                 color = JellioTextSecondary,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -640,7 +640,7 @@ internal fun SourcePanel(
                 if (showQualities) {
                     item(key = "qualities") {
                         FilterChipRow(
-                            chips = listOf<Pair<String?, String>>(null to "All") + qualities.map { it to it },
+                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + qualities.map { it to it },
                             selected = selectedQuality,
                             onSelect = { selectedQuality = it },
                             chipFocusRequesters = qualityFocus,
@@ -651,7 +651,9 @@ internal fun SourcePanel(
                 }
                 item(key = "count") {
                     Text(
-                        text = if (filtered.isEmpty()) "No streams match these filters" else "${filtered.size} stream${if (filtered.size == 1) "" else "s"}",
+                        text = if (filtered.isEmpty()) com.jellio.tv.ui.i18n.Strings.get("player_streams_none_match")
+                        else if (filtered.size == 1) com.jellio.tv.ui.i18n.Strings.format("player_streams_count_one", filtered.size)
+                        else com.jellio.tv.ui.i18n.Strings.format("player_streams_count_many", filtered.size),
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 8.dp),
                     )

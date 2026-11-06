@@ -670,7 +670,7 @@ private fun LanguagePickerOverlay(
                     )
                 }
                 items(LANGUAGE_OPTIONS) { option: LanguageOption ->
-                    LanguagePickerRow(label = option.name, isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
+                    LanguagePickerRow(label = com.jellio.tv.data.model.languageName(option.code), isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
                 }
             }
         }
@@ -1066,7 +1066,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     ),
                 ) {
                     Text(
-                        text = if (updateState.downloading) "Downloading..." else "Install",
+                        text = com.jellio.tv.ui.i18n.Strings.get(if (updateState.downloading) "update_downloading" else "update_install"),
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }

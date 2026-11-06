@@ -5,9 +5,9 @@ import com.jellio.tv.data.prefs.AppLanguage
 import com.jellio.tv.data.prefs.DisplayPreferences
 
 object Strings {
-    private val NAMED_PLACEHOLDER = Regex("\\{([a-z]+)\\}")
+    private val NAMED_PLACEHOLDER = Regex("\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}")
 
-    private fun mapFor(lang: AppLanguage): Map<String, String> = when (lang) {
+    fun tableFor(lang: AppLanguage): Map<String, String> = when (lang) {
         AppLanguage.ENGLISH -> StringsEn.MAP
         AppLanguage.GERMAN -> StringsDe.MAP
         AppLanguage.SPANISH -> StringsEs.MAP
@@ -17,32 +17,41 @@ object Strings {
         AppLanguage.PORTUGUESE -> StringsPt.MAP
     }
 
+    private fun mapFor(lang: AppLanguage): Map<String, String> = tableFor(lang)
+
     fun get(key: String): String {
         val lang = DisplayPreferences.displayLanguage
-        val current = mapFor(lang)[key]
+        val current = tableFor(lang)[key]
         if (current != null) return current
         return StringsEn.MAP[key] ?: key
     }
 
     fun format(key: String, vararg args: Any): String {
         val template = get(key)
+        if (args.isEmpty()) return template
         var result = template
+        var usedBracePlaceholder = false
         for (i in args.indices) {
-            result = result.replace("{$i}", args[i].toString())
-        }
-        val namedTokens = listOf("name", "title", "service", "count", "seconds", "genre", "status", "target")
-        for (token in namedTokens) {
-            if (result.contains("{$token}") && args.isNotEmpty()) {
-                result = result.replace("{$token}", args[0].toString())
+            val token = "{$i}"
+            if (result.contains(token)) {
+                result = result.replace(token, args[i].toString())
+                usedBracePlaceholder = true
             }
         }
-        // Any other {word} placeholders take the remaining arguments in order.
-        var next = 0
+        // Replace any {word} named placeholders in order of first appearance.
+        val assignedIndices = mutableMapOf<String, Int>()
+        var nextIndex = 0
         result = NAMED_PLACEHOLDER.replace(result) { match ->
-            if (next < args.size) args[next++].toString() else match.value
+            usedBracePlaceholder = true
+            val tokenName = match.groupValues[1]
+            val argIndex = assignedIndices.getOrPut(tokenName) { nextIndex++ }
+            if (argIndex < args.size) args[argIndex].toString() else match.value
+        }
+        if (usedBracePlaceholder && !template.contains('%')) {
+            return result
         }
         return runCatching {
-            String.format(result, *args)
+            String.format(DisplayPreferences.displayLanguage.locale, result, *args)
         }.getOrDefault(result)
     }
 }

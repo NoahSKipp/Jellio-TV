@@ -91,7 +91,9 @@ fun ServiceScreen(
     val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
     val onCardFocus = remember { { item: BaseItemDto -> highlightedItem.value = item } }
 
-    LaunchedEffect(serviceName) { viewModel.load(session, serviceName) }
+    LaunchedEffect(serviceName, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
+        viewModel.load(session, serviceName)
+    }
     // Once, when the first row arrives: rows keep arriving after that.
     LaunchedEffect(uiState.rows.isNotEmpty()) {
         if (uiState.rows.isNotEmpty()) runCatching { contentFocusRequester.requestFocus() }

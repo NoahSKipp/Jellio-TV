@@ -67,9 +67,5 @@ fun groupByService(items: List<BaseItemDto>): Map<String, List<BaseItemDto>> {
     return groups
 }
 
-fun rowTitle(collection: BaseItemDto, service: String, kind: String): String {
-    if (!(collection.Name ?: "").equals(service, ignoreCase = true)) {
-        return collection.Name ?: ""
-    }
-    return if (kind == "tvshows") "Shows on $service" else "Movies on $service"
-}
+fun rowTitle(collection: BaseItemDto, service: String, kind: String): String =
+    com.jellio.tv.ui.i18n.catalogDisplayName(collection.Name, kind, service)

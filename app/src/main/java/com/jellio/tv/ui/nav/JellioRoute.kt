@@ -76,7 +76,7 @@ fun JellioRoute.label(): String = when (this) {
     JellioRoute.Calendar -> com.jellio.tv.ui.i18n.Strings.get("nav_calendar")
     JellioRoute.Library -> com.jellio.tv.ui.i18n.Strings.get("nav_library")
     JellioRoute.Feed -> com.jellio.tv.ui.i18n.Strings.get("nav_feed")
-    is JellioRoute.LibraryTab -> name
+    is JellioRoute.LibraryTab -> com.jellio.tv.ui.i18n.libraryDisplayName(name, collectionType)
     JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
     JellioRoute.LiveTv -> com.jellio.tv.ui.i18n.Strings.get("nav_live_tv")
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""

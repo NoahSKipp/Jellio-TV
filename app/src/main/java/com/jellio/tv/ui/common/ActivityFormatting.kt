@@ -90,9 +90,17 @@ fun watchActivityText(
     }
 }
 
-fun badgeActivityText(badgeName: String?, rarity: String?): AnnotatedString = buildAnnotatedString {
+fun watchSummary(seasonNumber: Int?, episodeNumber: Int?): String =
+    com.jellio.tv.ui.i18n.seasonEpisodeTag(seasonNumber, episodeNumber)
+
+fun badgeActivityText(
+    badgeName: String?,
+    rarity: String?,
+    badgeId: String? = null,
+): AnnotatedString = buildAnnotatedString {
+    val localizedBadge = com.jellio.tv.ui.i18n.badgeDisplayName(badgeId, badgeName)
     append(com.jellio.tv.ui.i18n.Strings.get("activity_unlocked") + " ")
     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = rarityColor(rarity))) {
-        append(badgeName ?: "")
+        append(localizedBadge)
     }
 }

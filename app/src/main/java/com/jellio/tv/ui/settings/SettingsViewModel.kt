@@ -149,13 +149,13 @@ class SettingsViewModel @Inject constructor(
                 _subtitleLanguage.value = matchLanguageOption(stored.SubtitleLanguagePreference)?.code
             }
             val matches = stored != null && _audioLanguage.value == audio && _subtitleLanguage.value == subtitle
-            _languageStatus.value = if (matches) "Saved, takes effect the next time you start playback." else "Could not save language preferences."
+            _languageStatus.value = if (matches) com.jellio.tv.ui.i18n.Strings.get("settings_saved_next_playback") else com.jellio.tv.ui.i18n.Strings.get("settings_save_lang_error")
         }
     }
 
     fun updatePassword(session: Session, currentPassword: String, newPassword: String, confirmPassword: String) {
         if (newPassword.isEmpty() || newPassword != confirmPassword) {
-            _passwordStatus.value = "New passwords do not match."
+            _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_passwords_mismatch")
             return
         }
         viewModelScope.launch {
@@ -196,10 +196,10 @@ class SettingsViewModel @Inject constructor(
                 val presets = repository.getAvatarPresets()
                 _avatarPresets.value = presets
                 if (presets.isEmpty()) {
-                    _avatarPickerStatus.value = "No preset avatars are available on this server, upload your own instead."
+                    _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_no_preset_avatars")
                 }
             } catch (err: Exception) {
-                _avatarPickerStatus.value = "Could not load avatars."
+                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_load_avatars_error")
             } finally {
                 _isLoadingAvatarPresets.value = false
             }
@@ -217,13 +217,13 @@ class SettingsViewModel @Inject constructor(
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {
             _avatarBusyKey.value = presetId
-            _avatarPickerStatus.value = "Setting avatar…"
+            _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_setting_avatar")
             try {
                 repository.setUserAvatarFromPreset(session.userId, presetId)
-                _avatarPickerStatus.value = "Avatar updated."
+                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_avatar_updated")
                 _showAvatarPicker.value = false
             } catch (err: Exception) {
-                _avatarPickerStatus.value = "Could not set that avatar."
+                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_set_avatar_error")
                 _avatarBusyKey.value = null
             }
         }
@@ -233,13 +233,13 @@ class SettingsViewModel @Inject constructor(
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {
             _avatarBusyKey.value = "upload"
-            _avatarPickerStatus.value = "Setting avatar…"
+            _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_setting_avatar")
             try {
                 repository.setUserAvatarFromBytes(session.userId, bytes, contentType)
-                _avatarPickerStatus.value = "Avatar updated."
+                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_avatar_updated")
                 _showAvatarPicker.value = false
             } catch (err: Exception) {
-                _avatarPickerStatus.value = "Could not upload that picture."
+                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_set_avatar_error")
                 _avatarBusyKey.value = null
             }
         }

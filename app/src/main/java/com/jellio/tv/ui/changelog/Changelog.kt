@@ -110,6 +110,7 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 0.67.3",
         features = listOf(
+            ChangelogFeature(Icons.Filled.Translate, "Complete Localization", "Full localization across all seven display languages: navigation libraries like Movies, Shows, and Anime, achievement badges, catalog and genre rows, release date badges, feed filters, profile stats, playback error messages, and locale-aware date and time formatting."),
             ChangelogFeature(Icons.Filled.Event, "Next Up and Unreleased Episodes", "Next Up now skips episodes that have not aired yet, so a show you are caught up on waits until the new episode is out. Unreleased episodes on a show's page carry the same orange release badge as Coming Soon (such as Tomorrow, In 5 days, or Coming soon) so you can see when they air before trying to play them."),
         ),
     ),
@@ -2190,7 +2191,7 @@ fun ChangelogPopup(
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = "Previous Versions (" + previousReleases.size + ")",
+                                text = com.jellio.tv.ui.i18n.Strings.format("changelog_previous_versions", previousReleases.size),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             )
                             Icon(
@@ -2304,7 +2305,7 @@ fun ChangelogPopup(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Continue",
+                        text = com.jellio.tv.ui.i18n.Strings.get("changelog_continue"),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     )
                 }

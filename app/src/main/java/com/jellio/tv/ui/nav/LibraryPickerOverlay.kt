@@ -107,7 +107,7 @@ fun LibraryPickerOverlay(
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = library.Name ?: "Library",
+                            text = com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType),
                             style = MaterialTheme.typography.titleSmall,
                             color = JellioText,
                         )

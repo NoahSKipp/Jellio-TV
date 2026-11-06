@@ -62,7 +62,7 @@ class AccountSwitcherViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(busyUserId = userId, error = null)
             val result = kotlinx.coroutines.withTimeoutOrNull(QUICK_SIGN_IN_TIMEOUT_MS) {
                 repository.quickSignIn(session.serverAddress, userId)
-            } ?: LoginResult.Failure("The server took too long to answer. Try again.")
+            } ?: LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_server_timeout"))
             when (result) {
                 is LoginResult.Success -> _uiState.value = _uiState.value.copy(busyUserId = null)
                 is LoginResult.Failure -> {

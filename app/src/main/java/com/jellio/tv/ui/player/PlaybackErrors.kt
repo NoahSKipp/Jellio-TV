@@ -46,20 +46,20 @@ data class PlaybackProblem(val title: String, val detail: String)
 
 private fun httpProblem(code: Int): PlaybackProblem = when (code) {
     401, 403 -> PlaybackProblem(
-        "You can't play this title",
-        "Your account doesn't have access to it, or your session has expired. Sign out and back in, or ask the server's admin.",
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_forbidden_title"),
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_forbidden_desc"),
     )
     404, 410 -> PlaybackProblem(
-        "This title isn't available",
-        "The server couldn't find this stream any more. It may have been removed or moved.",
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_not_found_title"),
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_not_found_desc"),
     )
     in 500..599 -> PlaybackProblem(
-        "The server couldn't start this stream",
-        "Jellyfin ran into a problem getting this title ready (error $code). Try again, or pick a different source from the title's page.",
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_5xx_title"),
+        com.jellio.tv.ui.i18n.Strings.format("playback_err_5xx_desc", code),
     )
     else -> PlaybackProblem(
-        "This stream didn't load",
-        "The server answered with error $code. Try again, or pick a different source from the title's page.",
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_http_title"),
+        com.jellio.tv.ui.i18n.Strings.format("playback_err_http_desc", code),
     )
 }
 
@@ -72,12 +72,12 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
             is HttpException -> return httpProblem(cause.code())
             is HttpDataSource.InvalidResponseCodeException -> return httpProblem(cause.responseCode)
             is UnknownHostException -> return PlaybackProblem(
-                "Can't reach your server",
-                "Check that this TV is online and that the Jellyfin server is running, then try again.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_desc"),
             )
             is SocketTimeoutException -> return PlaybackProblem(
-                "The server took too long to answer",
-                "It may be busy preparing the stream. Try again in a moment.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_timeout_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_timeout_desc"),
             )
         }
         cause = cause.cause
@@ -86,40 +86,40 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
         return when (error.errorCode) {
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> PlaybackProblem(
-                "The connection to the server dropped",
-                "Check this TV's network connection, then try again.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_connection_dropped_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_connection_dropped_desc"),
             )
             PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
             PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> PlaybackProblem(
-                "This TV can't play this video",
-                "Its format is more than this device can decode. Pick a different source from the title's page, or try a lower quality one.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_decode_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_decode_desc"),
             )
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> PlaybackProblem(
-                "This stream couldn't be read",
-                "The file looks damaged or in a format this player doesn't support. Try a different source.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_read_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_read_desc"),
             )
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> httpProblem(500)
             else -> PlaybackProblem(
-                "Playback stopped",
-                "Something went wrong while playing this title. Try again, or pick a different source.",
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_stopped_title"),
+                com.jellio.tv.ui.i18n.Strings.get("playback_err_stopped_desc"),
             )
         }
     }
     if (error is IOException) {
         return PlaybackProblem(
-            "Can't reach your server",
-            "Check that this TV is online and that the Jellyfin server is running, then try again.",
+            com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_title"),
+            com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_desc"),
         )
     }
     return PlaybackProblem(
-        "Couldn't start playback",
-        "Something went wrong getting this title ready. Try again, or pick a different source.",
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_title"),
+        com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_desc"),
     )
 }
 
