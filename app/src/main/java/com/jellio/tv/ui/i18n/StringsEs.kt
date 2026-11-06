@@ -314,6 +314,8 @@ internal object StringsEs {
         m["settings_private_profile_desc"] = "Tu foto de perfil y banner siguen visibles. Las insignias y la actividad se ocultan a otros usuarios."
         m["settings_remember_stream"] = "Recordar elección de fuente"
         m["settings_remember_stream_desc"] = "Selecciona automáticamente tu grupo de lanzamiento o calidad preferidos"
+        m["settings_remove_watchlist_watched"] = "Quitar de Mi lista después de ver"
+        m["settings_remove_watchlist_watched_desc"] = "Quita automáticamente de tu lista las películas y las series finalizadas que hayas completado"
         m["settings_seasonal_animations"] = "Animaciones estacionales: "
         m["settings_seasonal_animations_desc"] = "Reducido redibuja con menos frecuencia y mantiene los menús más fluidos en dispositivos más lentos. "
         m["settings_seasonal_device_tier"] = "Este dispositivo: "
@@ -398,6 +400,7 @@ internal object StringsEs {
         m["time_yesterday"] = "Ayer"
         m["update_available_title"] = "Actualización disponible"
         m["watchlist_empty"] = "Aún no hay nada en tu lista."
+        m["toast_watchlist_error"] = "No se pudo actualizar la lista"
     }
 
     private fun fillLive(m: HashMap<String, String>) {

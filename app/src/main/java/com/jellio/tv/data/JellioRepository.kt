@@ -25,7 +25,9 @@ import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
+import com.jellio.tv.data.model.WatchlistAutoRemoveRequest
 import com.jellio.tv.data.network.JellyfinApi
+import com.jellio.tv.data.prefs.WatchlistPreferences
 import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
@@ -41,6 +43,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -75,7 +80,7 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,ProductionYear,PremiereDate,EndDate,CommunityRating,BackdropImageTags,Overview"
 
 internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
-    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags"
+    "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags,Status,EndDate"
 private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks,PremiereDate,CommunityRating,BackdropImageTags," +
     "ParentBackdropItemId,ParentBackdropImageTags"
 
@@ -160,8 +165,24 @@ class JellioRepository @Inject constructor(
     internal val api: JellyfinApi,
     internal val sessionManager: SessionManager,
     private val rememberedUsersStore: RememberedUsersStore,
+    private val watchlistPreferences: WatchlistPreferences,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
+
+    private val _lastAutoRemovedWatchlistIds = MutableStateFlow<Set<String>>(emptySet())
+    val lastAutoRemovedWatchlistIds: StateFlow<Set<String>> = _lastAutoRemovedWatchlistIds.asStateFlow()
+
+    fun isRemoveFromWatchlistAfterWatchingEnabled(): Boolean =
+        watchlistPreferences.isRemoveFromWatchlistAfterWatchingEnabled()
+
+    suspend fun setRemoveFromWatchlistAfterWatching(enabled: Boolean) {
+        watchlistPreferences.removeFromWatchlistAfterWatching = enabled
+        runCatching { api.setWatchlistAutoRemove(WatchlistAutoRemoveRequest(enabled)) }
+    }
+
+    fun syncRemoveFromWatchlistAfterWatching(enabled: Boolean) {
+        watchlistPreferences.removeFromWatchlistAfterWatching = enabled
+    }
 
     // One device id on every request, so Jellyfin lists a single device and session per TV.
     val deviceId: String get() = sessionManager.getCachedDeviceId()
@@ -701,7 +722,13 @@ class JellioRepository @Inject constructor(
                 limit = limit,
                 filters = "IsFavorite",
                 fields = ITEM_FIELDS,
-            ).Items
+            ).Items.map {
+                if (it.UserData?.IsFavorite != true) {
+                    it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = true))
+                } else {
+                    it
+                }
+            }
         }
 
     suspend fun getItemDetails(userId: String, itemId: String, forPlayer: Boolean = false): BaseItemDto =
@@ -1101,7 +1128,132 @@ class JellioRepository @Inject constructor(
     suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto {
         val result = if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
         cache.clear()
+        if (played) {
+            runCatching { maybeRemoveFromWatchlistAfterWatching(userId, itemId) }
+        }
         return result
+    }
+
+    private suspend fun isItemWatchlisted(userId: String, item: BaseItemDto): Boolean {
+        if (item.UserData?.IsFavorite == true) return true
+        val watchlistItems = runCatching { getWatchlistItems(userId) }.getOrNull()
+        return watchlistItems?.any { it.Id == item.Id } == true
+    }
+
+    suspend fun maybeRemoveFromWatchlistAfterWatching(userId: String, itemId: String): Set<String> {
+        if (!isRemoveFromWatchlistAfterWatchingEnabled()) return emptySet()
+        val item = runCatching { getItemDetails(userId, itemId) }.getOrNull() ?: return emptySet()
+        val removedIds = mutableSetOf<String>()
+
+        when (item.Type) {
+            "Movie" -> {
+                if (isMovieWatchlistRemovalEligible(item, isItemWatchlisted(userId, item))) {
+                    runCatching { api.removeFavorite(userId, item.Id) }
+                    cache.invalidatePrefix("watchlist:$userId:")
+                    removedIds.add(item.Id)
+                }
+            }
+            "Episode" -> {
+                if (isItemWatchlisted(userId, item)) {
+                    runCatching { api.removeFavorite(userId, item.Id) }
+                    cache.invalidatePrefix("watchlist:$userId:")
+                    removedIds.add(item.Id)
+                }
+                val seriesId = item.SeriesId
+                if (!seriesId.isNullOrBlank()) {
+                    val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
+                    val isSeriesFavorite = series?.let { isItemWatchlisted(userId, it) } ?: false
+                    if (series != null && series.Status.equals("Ended", ignoreCase = true) && isSeriesFavorite) {
+                        val allEpisodes = runCatching {
+                            api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
+                        }.getOrElse {
+                            val seasons = runCatching { getSeasons(userId, seriesId) }.getOrDefault(emptyList())
+                            seasons.flatMap { season ->
+                                runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
+                            }
+                        }
+                        if (isSeriesWatchlistRemovalEligible(
+                            series = series,
+                            episodes = allEpisodes,
+                            watchedItemId = itemId,
+                            isFavorite = isSeriesFavorite,
+                        )) {
+                            runCatching { api.removeFavorite(userId, seriesId) }
+                            cache.invalidatePrefix("watchlist:$userId:")
+                            removedIds.add(seriesId)
+                        }
+                    }
+                }
+            }
+            "Series" -> {
+                val isSeriesFavorite = isItemWatchlisted(userId, item)
+                if (isSeriesFavorite && item.Status.equals("Ended", ignoreCase = true)) {
+                    val allEpisodes = runCatching {
+                        api.getEpisodes(item.Id, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
+                    }.getOrElse {
+                        val seasons = runCatching { getSeasons(userId, item.Id) }.getOrDefault(emptyList())
+                        seasons.flatMap { season ->
+                            runCatching { getEpisodes(item.Id, userId, season.Id) }.getOrDefault(emptyList())
+                        }
+                    }
+                    if (isSeriesWatchlistRemovalEligible(
+                        series = item,
+                        episodes = allEpisodes,
+                        watchedItemId = itemId,
+                        isFavorite = isSeriesFavorite,
+                    )) {
+                        runCatching { api.removeFavorite(userId, item.Id) }
+                        cache.invalidatePrefix("watchlist:$userId:")
+                        removedIds.add(item.Id)
+                    }
+                }
+            }
+            "Season" -> {
+                if (isItemWatchlisted(userId, item)) {
+                    val seasonEpisodes = runCatching {
+                        api.getEpisodes(item.SeriesId ?: "", userId, seasonId = item.Id, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
+                    }.getOrDefault(emptyList())
+                    if (seasonEpisodes.isNotEmpty() &&
+                        seasonEpisodes.none { isUnreleasedItem(it) } &&
+                        seasonEpisodes.all { it.Id == itemId || it.UserData?.Played == true }
+                    ) {
+                        runCatching { api.removeFavorite(userId, item.Id) }
+                        cache.invalidatePrefix("watchlist:$userId:")
+                        removedIds.add(item.Id)
+                    }
+                }
+                val seriesId = item.SeriesId
+                if (!seriesId.isNullOrBlank()) {
+                    val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
+                    val isSeriesFavorite = series?.let { isItemWatchlisted(userId, it) } ?: false
+                    if (series != null && series.Status.equals("Ended", ignoreCase = true) && isSeriesFavorite) {
+                        val allEpisodes = runCatching {
+                            api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
+                        }.getOrElse {
+                            val seasons = runCatching { getSeasons(userId, seriesId) }.getOrDefault(emptyList())
+                            seasons.flatMap { season ->
+                                runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
+                            }
+                        }
+                        if (isSeriesWatchlistRemovalEligible(
+                            series = series,
+                            episodes = allEpisodes,
+                            watchedItemId = itemId,
+                            isFavorite = isSeriesFavorite,
+                        )) {
+                            runCatching { api.removeFavorite(userId, seriesId) }
+                            cache.invalidatePrefix("watchlist:$userId:")
+                            removedIds.add(seriesId)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (removedIds.isNotEmpty()) {
+            _lastAutoRemovedWatchlistIds.value = removedIds
+        }
+        return removedIds
     }
 
     suspend fun clearResumePosition(userId: String, itemId: String): UserItemDataDto {
@@ -1263,7 +1415,11 @@ class JellioRepository @Inject constructor(
         api.setProfileBio(SetBioRequest(bio))
     }
 
-    suspend fun getProfileSettings(): ProfileDto = api.getProfileSettings()
+    suspend fun getProfileSettings(): ProfileDto = api.getProfileSettings().also { profile ->
+        syncRemoveFromWatchlistAfterWatching(profile.RemoveFromWatchlistAfterWatching)
+    }
+
+    suspend fun getMyProfile(): ProfileDto = getProfileSettings()
 
     suspend fun setProfilePrivacy(isPrivate: Boolean) {
         api.setProfilePrivacy(SetPrivacyRequest(isPrivate))

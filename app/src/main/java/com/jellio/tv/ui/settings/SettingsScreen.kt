@@ -144,6 +144,7 @@ fun SettingsScreen(
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
     val rememberStream by viewModel.rememberStream.collectAsState()
+    val removeFromWatchlistAfterWatching by viewModel.removeFromWatchlistAfterWatching.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
     val subtitleLanguage by viewModel.subtitleLanguage.collectAsState()
     var openField by remember { mutableStateOf<LanguageField?>(null) }
@@ -260,6 +261,13 @@ fun SettingsScreen(
                         description = string("settings_remember_stream_desc"),
                         checked = rememberStream,
                         onToggle = { viewModel.setRememberStream(!rememberStream) },
+                    )
+                    SettingsDivider()
+                    SettingsToggleRow(
+                        label = string("settings_remove_watchlist_watched"),
+                        description = string("settings_remove_watchlist_watched_desc"),
+                        checked = removeFromWatchlistAfterWatching,
+                        onToggle = { viewModel.setRemoveFromWatchlistAfterWatching(!removeFromWatchlistAfterWatching) },
                     )
                     val playerContext = LocalContext.current
                     SettingsDivider()

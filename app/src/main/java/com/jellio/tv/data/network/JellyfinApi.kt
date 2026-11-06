@@ -28,6 +28,7 @@ import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
+import com.jellio.tv.data.model.WatchlistAutoRemoveRequest
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.http.Body
@@ -147,7 +148,7 @@ interface JellyfinApi {
     suspend fun getEpisodes(
         @Path("seriesId") seriesId: String,
         @Query("userId") userId: String,
-        @Query("seasonId") seasonId: String,
+        @Query("seasonId") seasonId: String? = null,
         @Query("Fields") fields: String? = null,
     ): ItemsResultDto
 
@@ -477,6 +478,9 @@ interface JellyfinApi {
 
     @GET("Jellio/profile/settings")
     suspend fun getProfileSettings(): ProfileDto
+
+    @POST("Jellio/profile/watchlist-auto-remove")
+    suspend fun setWatchlistAutoRemove(@Body request: WatchlistAutoRemoveRequest)
 
     @POST("Jellio/profile/bio")
     suspend fun setProfileBio(@Body body: SetBioRequest)

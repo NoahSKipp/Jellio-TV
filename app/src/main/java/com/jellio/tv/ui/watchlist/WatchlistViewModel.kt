@@ -51,9 +51,26 @@ class WatchlistViewModel @Inject constructor(
     }
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
-        viewModelScope.launch {
-            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
-            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+        val currentlyFavorite = item.UserData?.IsFavorite ?: true
+        val willBeFavorite = !currentlyFavorite
+        if (!willBeFavorite) {
+            val before = _uiState.value
+            removeItem(item.Id)
+            viewModelScope.launch {
+                val res = runCatching { repository.toggleFavorite(session.userId, item) }
+                if (res.isFailure || res.getOrNull() == true) {
+                    _uiState.value = before
+                }
+            }
+        } else {
+            viewModelScope.launch {
+                val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+                if (!newValue) {
+                    removeItem(item.Id)
+                } else {
+                    updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
+                }
+            }
         }
     }
 
@@ -61,7 +78,11 @@ class WatchlistViewModel @Inject constructor(
         val next = !(item.UserData?.Played ?: false)
         viewModelScope.launch {
             val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
-            updateItem(item.Id) { it.copy(UserData = updated) }
+            if (next && (updated.IsFavorite == false || item.Id in repository.lastAutoRemovedWatchlistIds.value)) {
+                removeItem(item.Id)
+            } else {
+                updateItem(item.Id) { it.copy(UserData = updated) }
+            }
         }
     }
 

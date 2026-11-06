@@ -14,6 +14,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class SettingsUiState(
+    val removeFromWatchlistAfterWatching: Boolean = true,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -83,6 +87,9 @@ class SettingsViewModel @Inject constructor(
     private val _isPrivate = MutableStateFlow(false)
     val isPrivate: StateFlow<Boolean> = _isPrivate.asStateFlow()
 
+    private val _removeFromWatchlistAfterWatching = MutableStateFlow(true)
+    val removeFromWatchlistAfterWatching: StateFlow<Boolean> = _removeFromWatchlistAfterWatching.asStateFlow()
+
     private var loadedUserId: String? = null
 
     init {
@@ -110,8 +117,19 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            _removeFromWatchlistAfterWatching.value = repository.isRemoveFromWatchlistAfterWatchingEnabled()
             val settings = runCatching { repository.getProfileSettings() }.getOrNull() ?: return@launch
             _isPrivate.value = settings.IsPrivate
+            _removeFromWatchlistAfterWatching.value = settings.RemoveFromWatchlistAfterWatching
+        }
+    }
+
+    fun setRemoveFromWatchlistAfterWatching(enabled: Boolean) {
+        val previous = _removeFromWatchlistAfterWatching.value
+        _removeFromWatchlistAfterWatching.value = enabled
+        viewModelScope.launch {
+            runCatching { repository.setRemoveFromWatchlistAfterWatching(enabled) }
+                .onFailure { _removeFromWatchlistAfterWatching.value = previous }
         }
     }
 

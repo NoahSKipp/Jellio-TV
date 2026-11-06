@@ -128,6 +128,27 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    fun clearToast() {
+        _toastMessage.value = null
+    }
+
+    private fun persistCurrentSnapshot(userId: String) {
+        val state = _uiState.value
+        viewModelScope.launch {
+            rowSnapshotStore.saveHomeSnapshot(
+                userId,
+                HomeSnapshot(
+                    greeting = state.greeting,
+                    heroItems = state.heroItems,
+                    rows = state.rows.map { it.toCachedRowDto() },
+                ),
+            )
+        }
+    }
+
     private var loadedForUserId: String? = null
 
     private val failedFetches = java.util.concurrent.atomic.AtomicInteger()
@@ -294,7 +315,17 @@ class HomeViewModel @Inject constructor(
                     var finished = false
 
                     fun assembled(): List<HomeRow> = buildList {
-                        addAll(topRows)
+                        val topRowKeys = setOf("continue-watching", "up-next", "watchlist-movies", "watchlist-shows", "coming-soon", "studio-hubs")
+                        val currentTop = _uiState.value.rows.filter { it.key in topRowKeys }.ifEmpty { topRows }
+                        val filteredTop = currentTop.mapNotNull { row ->
+                            if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
+                                val remaining = row.section.items.filterNot { removedFromWatchlist.containsKey(it.Id) }
+                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                            } else {
+                                row
+                            }
+                        }
+                        addAll(filteredTop)
                         val topPicksTitle = com.jellio.tv.ui.i18n.Strings.get("home_top_picks")
                         val (topPicks, perTitle) = recommendationRows.partition { it.title == topPicksTitle }
                         topPicks.forEach { add(PosterHomeRow(it)) }
@@ -441,24 +472,155 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
-        viewModelScope.launch {
-            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
-            updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
-            if (newValue) removedFromWatchlist.remove(item.Id) else removedFromWatchlist[item.Id] = true
-            // Taken off the watchlist: it leaves the watchlist rows too.
-            if (!newValue) {
-                val state = _uiState.value
-                _uiState.value = state.copy(
-                    rows = state.rows.map { row ->
-                        if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
-                            row.copy(section = row.section.copy(items = row.section.items.filterNot { it.Id == item.Id }))
+        val currentlyFavorite = item.UserData?.IsFavorite == true || _uiState.value.rows.any { row ->
+            row is PosterHomeRow && row.section.key.startsWith("watchlist") && row.section.items.any { it.Id == item.Id }
+        }
+        val willBeFavorite = !currentlyFavorite
+        val beforeState = _uiState.value
+
+        if (!willBeFavorite) {
+            removedFromWatchlist[item.Id] = true
+            val updatedHero = beforeState.heroItems.map {
+                if (it.Id == item.Id) it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = false)) else it
+            }
+            val updatedRows = beforeState.rows.mapNotNull { row ->
+                when {
+                    row is PosterHomeRow && row.section.key.startsWith("watchlist") -> {
+                        val remaining = row.section.items.filterNot { it.Id == item.Id }
+                        if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                    }
+                    row is PosterHomeRow -> {
+                        if (row.section.items.any { it.Id == item.Id }) {
+                            row.copy(section = row.section.copy(items = row.section.items.map {
+                                if (it.Id == item.Id) it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = false)) else it
+                            }))
                         } else {
                             row
                         }
-                    },
-                )
+                    }
+                    else -> row
+                }
+            }
+            _uiState.value = beforeState.copy(rows = updatedRows, heroItems = updatedHero)
+            persistCurrentSnapshot(session.userId)
+
+            viewModelScope.launch {
+                val res = runCatching { repository.toggleFavorite(session.userId, item) }
+                if (res.isFailure || res.getOrNull() == true) {
+                    removedFromWatchlist.remove(item.Id)
+                    _uiState.value = beforeState
+                    persistCurrentSnapshot(session.userId)
+                    _toastMessage.value = com.jellio.tv.ui.i18n.Strings.get("toast_watchlist_error")
+                }
+            }
+        } else {
+            removedFromWatchlist.remove(item.Id)
+            val updatedItem = item.copy(UserData = (item.UserData ?: UserItemDataDto()).copy(IsFavorite = true))
+            val updatedHero = beforeState.heroItems.map { if (it.Id == item.Id) updatedItem else it }
+            var updatedRows = beforeState.rows.map { row ->
+                if (row is PosterHomeRow && row.section.items.any { it.Id == item.Id }) {
+                    row.copy(section = row.section.copy(items = row.section.items.map { if (it.Id == item.Id) updatedItem else it }))
+                } else {
+                    row
+                }
+            }
+            val isSeries = item.Type == "Series" || item.SeriesId != null
+            val rowKey = if (isSeries) "watchlist-shows" else "watchlist-movies"
+            val rowTitleKey = if (isSeries) "home_watchlist_shows" else "home_watchlist_movies"
+            val existingRow = updatedRows.firstOrNull { it.key == rowKey } as? PosterHomeRow
+            if (existingRow != null) {
+                val newItems = listOf(updatedItem) + existingRow.section.items.filterNot { it.Id == item.Id }
+                updatedRows = updatedRows.map { if (it.key == rowKey) existingRow.copy(section = existingRow.section.copy(items = newItems)) else it }
+            } else {
+                val newRow = PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get(rowTitleKey), listOf(updatedItem), key = rowKey))
+                updatedRows = insertWatchlistRow(updatedRows, newRow)
+            }
+            _uiState.value = beforeState.copy(rows = updatedRows, heroItems = updatedHero)
+            persistCurrentSnapshot(session.userId)
+
+            viewModelScope.launch {
+                val res = runCatching { repository.toggleFavorite(session.userId, item) }
+                if (res.isFailure || res.getOrNull() == false) {
+                    _uiState.value = beforeState
+                    persistCurrentSnapshot(session.userId)
+                    _toastMessage.value = com.jellio.tv.ui.i18n.Strings.get("toast_watchlist_error")
+                } else {
+                    runCatching {
+                        val fresh = repository.getWatchlistItems(session.userId).filter { !removedFromWatchlist.containsKey(it.Id) }
+                        val movies = fresh.filter { it.Type == "Movie" }
+                        val series = fresh.filter { it.Type == "Series" }
+                        updateWatchlistRows(movies, series)
+                        persistCurrentSnapshot(session.userId)
+                    }
+                }
             }
         }
+    }
+
+    private fun insertWatchlistRow(rows: List<HomeRow>, newRow: PosterHomeRow): List<HomeRow> {
+        val key = newRow.section.key
+        val targetIndex = if (key == "watchlist-movies") {
+            val upNextIdx = rows.indexOfFirst { it.key == "up-next" }
+            if (upNextIdx >= 0) upNextIdx + 1 else {
+                val cwIdx = rows.indexOfFirst { it.key == "continue-watching" }
+                if (cwIdx >= 0) cwIdx + 1 else 0
+            }
+        } else {
+            val wmIdx = rows.indexOfFirst { it.key == "watchlist-movies" }
+            if (wmIdx >= 0) wmIdx + 1 else {
+                val upNextIdx = rows.indexOfFirst { it.key == "up-next" }
+                if (upNextIdx >= 0) upNextIdx + 1 else {
+                    val cwIdx = rows.indexOfFirst { it.key == "continue-watching" }
+                    if (cwIdx >= 0) cwIdx + 1 else 0
+                }
+            }
+        }
+        val result = rows.toMutableList()
+        result.add(targetIndex.coerceAtMost(result.size), newRow)
+        return result
+    }
+
+    private fun updateWatchlistRows(movies: List<BaseItemDto>, series: List<BaseItemDto>) {
+        val state = _uiState.value
+        var updatedRows = state.rows
+        if (movies.isNotEmpty()) {
+            val movieRow = PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_movies"), movies, key = "watchlist-movies"))
+            if (updatedRows.any { it.key == "watchlist-movies" }) {
+                updatedRows = updatedRows.map { if (it.key == "watchlist-movies") movieRow else it }
+            } else {
+                updatedRows = insertWatchlistRow(updatedRows, movieRow)
+            }
+        } else {
+            updatedRows = updatedRows.filterNot { it.key == "watchlist-movies" }
+        }
+        if (series.isNotEmpty()) {
+            val seriesRow = PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_watchlist_shows"), series, key = "watchlist-shows"))
+            if (updatedRows.any { it.key == "watchlist-shows" }) {
+                updatedRows = updatedRows.map { if (it.key == "watchlist-shows") seriesRow else it }
+            } else {
+                updatedRows = insertWatchlistRow(updatedRows, seriesRow)
+            }
+        } else {
+            updatedRows = updatedRows.filterNot { it.key == "watchlist-shows" }
+        }
+        _uiState.value = state.copy(rows = updatedRows)
+    }
+
+    private fun handleAutoRemovedWatchlist(userId: String) {
+        val autoRemoved = repository.lastAutoRemovedWatchlistIds.value
+        if (autoRemoved.isEmpty()) return
+        autoRemoved.forEach { removedFromWatchlist[it] = true }
+        val state = _uiState.value
+        val updatedRows = state.rows.mapNotNull { row ->
+            if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
+                val remaining = row.section.items.filterNot { autoRemoved.contains(it.Id) }
+                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+            } else {
+                row
+            }
+        }
+        _uiState.value = state.copy(rows = updatedRows)
+        persistCurrentSnapshot(userId)
     }
 
     fun toggleWatched(session: Session, item: BaseItemDto) {
@@ -466,6 +628,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = updated) }
+            if (next) {
+                handleAutoRemovedWatchlist(session.userId)
+            }
         }
     }
 
@@ -487,6 +652,7 @@ class HomeViewModel @Inject constructor(
         removeItemFromRows(item.Id)
         viewModelScope.launch {
             runCatching { repository.setPlayed(session.userId, item.Id, true) }
+                .onSuccess { handleAutoRemovedWatchlist(session.userId) }
                 .onFailure { _uiState.value = _uiState.value.copy(rows = before) }
         }
     }
@@ -540,6 +706,7 @@ class HomeViewModel @Inject constructor(
                     }
                 },
             )
+            handleAutoRemovedWatchlist(session.userId)
         }
     }
 

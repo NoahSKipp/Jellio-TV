@@ -63,6 +63,7 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.TvBringIntoViewSpec
 import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -98,6 +99,26 @@ fun HomeScreen(
     }
     val scope = rememberCoroutineScope()
     val highlightedItem = remember { mutableStateOf<BaseItemDto?>(null) }
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    LaunchedEffect(toastMessage) {
+        if (toastMessage != null) {
+            kotlinx.coroutines.delay(3000L)
+            viewModel.clearToast()
+        }
+    }
+    LaunchedEffect(uiState.rows) {
+        val current = highlightedItem.value ?: return@LaunchedEffect
+        val stillExists = uiState.rows.any { row ->
+            when (row) {
+                is PosterHomeRow -> row.section.items.any { it.Id == current.Id }
+                is ComingSoonHomeRow -> row.items.containsKey(current.Id) || row.entries.any { it.ItemId == current.Id }
+                else -> false
+            }
+        }
+        if (!stillExists) {
+            highlightedItem.value = uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
+        }
+    }
     // The last focused card (row key and item id), kept across visits to a
     // title's page so coming back puts focus right where it was.
     var lastFocus by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
@@ -291,8 +312,14 @@ fun HomeScreen(
             val item = target.item
             val continueWatching = target.row.section.key == "continue-watching"
             val upNext = target.row.section.key == "up-next"
+            val isWatchlistRow = target.row.section.key.startsWith("watchlist")
+            val itemWithFavorite = if (isWatchlistRow && item.UserData?.IsFavorite != true) {
+                item.copy(UserData = (item.UserData ?: com.jellio.tv.data.model.UserItemDataDto()).copy(IsFavorite = true))
+            } else {
+                item
+            }
             CardOptionsMenu(
-                item = item,
+                item = itemWithFavorite,
                 continueWatching = continueWatching,
                 upNext = upNext,
                 onGoToDetails = if (continueWatching || upNext) { { onItemClick(item) } } else null,
@@ -308,8 +335,19 @@ fun HomeScreen(
                 },
                 onRemoveFromRow = if (continueWatching || upNext) { { removingTarget = item.Id to false } } else null,
                 onRemoveShowFromRow = if (upNext && item.SeriesId != null) { { removingTarget = item.Id to true } } else null,
-                onToggleWatchlist = if (!continueWatching && !upNext) { { viewModel.toggleWatchlist(session, item) } } else null,
-                onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, item) } } else null,
+                onToggleWatchlist = if (!continueWatching && !upNext) {
+                    {
+                        viewModel.toggleWatchlist(session, itemWithFavorite)
+                        if (highlightedItem.value?.Id == item.Id && isWatchlistRow) {
+                            val remainingInRow = target.row.section.items.filterNot { it.Id == item.Id }
+                            val nextItem = remainingInRow.firstOrNull() ?: uiState.rows.firstNotNullOfOrNull {
+                                (it as? PosterHomeRow)?.section?.items?.firstOrNull { candidate -> candidate.Id != item.Id }
+                            }
+                            highlightedItem.value = nextItem
+                        }
+                    }
+                } else null,
+                onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, itemWithFavorite) } } else null,
                 onDismiss = { cardMenuTarget = null },
             )
         }
@@ -334,6 +372,22 @@ fun HomeScreen(
                 fetchAll = section.fetchAll,
                 fetchPage = section.fetchPage,
             )
+        }
+
+        toastMessage?.let { msg ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp)
+                    .background(JellioBgElevated, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = msg,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = JellioText,
+                )
+            }
         }
     }
 }

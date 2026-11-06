@@ -564,7 +564,11 @@ data class ClientConfigDto(
 data class ProfileDto(
     val IsPrivate: Boolean = false,
     val Bio: String? = null,
+    val RemoveFromWatchlistAfterWatching: Boolean = true,
 )
+
+@JsonClass(generateAdapter = true)
+data class WatchlistAutoRemoveRequest(val RemoveFromWatchlistAfterWatching: Boolean)
 
 @JsonClass(generateAdapter = true)
 data class GroupedActivityEntryDto(

@@ -314,6 +314,8 @@ internal object StringsEn {
         m["settings_private_profile_desc"] = "Your profile picture and banner stay visible. Achievement badges and activity are hidden from other users."
         m["settings_remember_stream"] = "Remember stream choice"
         m["settings_remember_stream_desc"] = "Automatically pick your preferred release group or quality"
+        m["settings_remove_watchlist_watched"] = "Remove from Watchlist after watching"
+        m["settings_remove_watchlist_watched_desc"] = "Automatically remove movies and completed ended shows from your Watchlist once watched"
         m["settings_seasonal_animations"] = "Seasonal animations: "
         m["settings_seasonal_animations_desc"] = "Reduced redraws less often and keeps menus smoother on slower devices. "
         m["settings_seasonal_device_tier"] = "This device: "
@@ -398,6 +400,7 @@ internal object StringsEn {
         m["time_yesterday"] = "Yesterday"
         m["update_available_title"] = "Update available"
         m["watchlist_empty"] = "Nothing on your Watchlist yet."
+        m["toast_watchlist_error"] = "Could not update Watchlist"
     }
 
     private fun fillLive(m: HashMap<String, String>) {

@@ -284,7 +284,11 @@ class DetailViewModel @Inject constructor(
         val next = !_uiState.value.isWatched
         viewModelScope.launch {
             val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull()
-            _uiState.value = _uiState.value.copy(isWatched = updated?.Played ?: next)
+            val wasAutoRemoved = item.Id in repository.lastAutoRemovedWatchlistIds.value
+            _uiState.value = _uiState.value.copy(
+                isWatched = updated?.Played ?: next,
+                isWatchlisted = if (wasAutoRemoved) false else _uiState.value.isWatchlisted,
+            )
         }
     }
 
@@ -367,6 +371,7 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val updated = runCatching { repository.setPlayed(session.userId, episode.Id, next) }.getOrNull()
             applyEpisodeUpdate(episode.Id, updated)
+            checkAutoRemovedWatchlist()
         }
     }
 
@@ -380,6 +385,7 @@ class DetailViewModel @Inject constructor(
                 async { prev.Id to runCatching { repository.setPlayed(session.userId, prev.Id, true) }.getOrNull() }
             }.awaitAll()
             applyEpisodeUpdates(updates)
+            checkAutoRemovedWatchlist()
         }
     }
 
@@ -390,6 +396,14 @@ class DetailViewModel @Inject constructor(
                 async { ep.Id to runCatching { repository.setPlayed(session.userId, ep.Id, true) }.getOrNull() }
             }.awaitAll()
             applyEpisodeUpdates(updates)
+            checkAutoRemovedWatchlist()
+        }
+    }
+
+    private fun checkAutoRemovedWatchlist() {
+        val currentItemId = _uiState.value.item?.Id
+        if (currentItemId != null && currentItemId in repository.lastAutoRemovedWatchlistIds.value) {
+            _uiState.value = _uiState.value.copy(isWatchlisted = false)
         }
     }
 
