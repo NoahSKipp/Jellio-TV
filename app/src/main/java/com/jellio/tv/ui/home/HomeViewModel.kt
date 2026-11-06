@@ -214,7 +214,7 @@ class HomeViewModel @Inject constructor(
                         continueWatching.filter { it.Type == "Movie" || it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT).map { it.Id },
                     )
                     // Anime stays in the Anime library: out of the hero, Coming
-                    // Soon and (through exclude below) every discovery row.
+                    // Soon and (through recExclude and catalog/genre filtering below) every discovery row.
                     animeIds = animeIdsDeferred.await()
                     // Home has no banner carousel any more, its showcase follows focus.
                     val heroCandidates = emptyList<BaseItemDto>()
@@ -304,7 +304,8 @@ class HomeViewModel @Inject constructor(
                         getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit).filterNot { isAnime(it) } },
                         getGenreItemsPage = { genre, start, size -> repository.getGenreItemsPage(session.userId, null, "Movie,Series", genre, start, size).filterNot { isAnime(it) } },
                     )
-                    val exclude = mutableSetOf<String>().apply { addAll(animeIds) }
+                    val recExclude = mutableSetOf<String>().apply { addAll(animeIds) }
+                    val catalogAndGenreDeduplicator = SlidingRowDeduplicator(windowSize = 2, viewportLimit = 6)
                     val isCommunityEnabled = recommendationPreferences.isCommunityRowEnabled(session.userId)
                     val communityExcluded = recommendationPreferences.getCommunityExcludedUsers(session.userId).toList()
 
@@ -367,7 +368,7 @@ class HomeViewModel @Inject constructor(
                     }
 
                     val recommendationJob = async {
-                        val recs = orEmptyOnFailure { buildRecommendationRows(recommendationSource, exclude) }
+                        val recs = orEmptyOnFailure { buildRecommendationRows(recommendationSource, recExclude) }
                         recommendationRows = recs.map { it.copy(key = "rec:${it.title}") }
                         val picks = (recs.firstOrNull { it.title == com.jellio.tv.ui.i18n.Strings.get("home_top_picks") } ?: recs.firstOrNull())?.items
                         if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
@@ -377,8 +378,8 @@ class HomeViewModel @Inject constructor(
                     val seasonalJob = seasonalDeferred?.let { pending ->
                         async {
                             val (title, rawItems) = pending.await() ?: return@async
-                            val eligible = rawItems.filter { it.UserData?.Played != true && !exclude.contains(it.Id) }
-                            eligible.forEach { exclude.add(it.Id) }
+                            val eligible = rawItems.filter { it.UserData?.Played != true && !recExclude.contains(it.Id) }
+                            eligible.forEach { recExclude.add(it.Id) }
                             if (eligible.isNotEmpty()) {
                                 seasonalSection = HomeSection(title = title, items = eligible.take(24), key = "seasonal:$activeTheme")
                                 publish()
@@ -389,9 +390,9 @@ class HomeViewModel @Inject constructor(
                     val catalogJobs = chooseCatalogs(collections).mapIndexed { index, collection ->
                         async {
                             val kind = repository.collectionKind(collection)
-                            val items = orEmptyOnFailure { repository.getCollectionItems(session.userId, collection.Id, kind, CATALOG_ROW_LIMIT) }
+                            val items = orEmptyOnFailure { repository.getCollectionItems(session.userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.filterNot { isAnime(it) }
                             val entry = CatalogRowEntry(title = titleFor(collection.Name, kind), items = items, collectionId = collection.Id, kind = kind)
-                            catalogSection(session.userId, entry, exclude)?.let {
+                            catalogSection(session.userId, entry, catalogAndGenreDeduplicator)?.let {
                                 catalogSections[index] = it
                                 publish()
                             }
@@ -402,8 +403,8 @@ class HomeViewModel @Inject constructor(
                         val genres = orEmptyOnFailure { chooseGenres(session.userId) }
                         genres.mapIndexed { index, genre ->
                             async {
-                                val items = orEmptyOnFailure { repository.getGenreItems(session.userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }
-                                genreSection(session.userId, GenreRowEntry(genre = genre, items = items), exclude)?.let {
+                                val items = orEmptyOnFailure { repository.getGenreItems(session.userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.filterNot { isAnime(it) }
+                                genreSection(session.userId, GenreRowEntry(genre = genre, items = items), catalogAndGenreDeduplicator)?.let {
                                     genreSections[index] = it
                                     publish()
                                 }
@@ -785,14 +786,9 @@ class HomeViewModel @Inject constructor(
         return usable.take(MAX_CATALOG_ROWS)
     }
 
-    // One catalog row once its items arrive: titles a row already on
-    // screen shows are left out, in the order rows arrive.
-    private fun catalogSection(userId: String, entry: CatalogRowEntry, exclude: MutableSet<String>): HomeSection? {
-        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }.take(ROW_DISPLAY_LIMIT)
-        deduped.forEach { item ->
-            exclude.add(item.Id)
-            exclude.add(titleKey(item))
-        }
+    // One catalog row once its items arrive: deduplicated using sliding row window.
+    private fun catalogSection(userId: String, entry: CatalogRowEntry, deduplicator: SlidingRowDeduplicator): HomeSection? {
+        val deduped = deduplicator.dedupe(entry.items, ROW_DISPLAY_LIMIT)
         if (deduped.isEmpty()) return null
         return HomeSection(
             title = entry.title,
@@ -817,12 +813,8 @@ class HomeViewModel @Inject constructor(
         return if (selected.isNotEmpty()) selected else repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
     }
 
-    private fun genreSection(userId: String, entry: GenreRowEntry, exclude: MutableSet<String>): HomeSection? {
-        val deduped = entry.items.filter { !exclude.contains(it.Id) && !exclude.contains(titleKey(it)) }.take(ROW_DISPLAY_LIMIT)
-        deduped.forEach { item ->
-            exclude.add(item.Id)
-            exclude.add(titleKey(item))
-        }
+    private fun genreSection(userId: String, entry: GenreRowEntry, deduplicator: SlidingRowDeduplicator): HomeSection? {
+        val deduped = deduplicator.dedupe(entry.items, ROW_DISPLAY_LIMIT)
         if (deduped.isEmpty()) return null
         return HomeSection(
             title = com.jellio.tv.ui.i18n.genreDisplayName(entry.genre),
@@ -831,6 +823,45 @@ class HomeViewModel @Inject constructor(
             fetchPage = { start, size -> repository.getGenreItemsPage(userId, null, "Movie,Series", entry.genre, start, size).filterNot { isAnime(it) } },
             key = "genre:${entry.genre}",
         )
+    }
+}
+
+internal class SlidingRowDeduplicator(
+    private val windowSize: Int = 2,
+    private val viewportLimit: Int = 6,
+) {
+    private val recentRows = ArrayDeque<Set<String>>()
+
+    @Synchronized
+    fun dedupe(items: List<BaseItemDto>, limit: Int = 20): List<BaseItemDto> {
+        val windowSeen = recentRows.flatten().toSet()
+        val rowSeen = mutableSetOf<String>()
+        val kept = mutableListOf<BaseItemDto>()
+
+        for (item in items) {
+            val id = item.Id
+            val title = titleKey(item)
+            if (rowSeen.contains(id) || rowSeen.contains(title)) continue
+
+            // For the first viewportLimit items, avoid items seen in the last windowSize rows
+            if (kept.size < viewportLimit && (windowSeen.contains(id) || windowSeen.contains(title))) {
+                continue
+            }
+
+            rowSeen.add(id)
+            rowSeen.add(title)
+            kept.add(item)
+            if (kept.size >= limit) break
+        }
+
+        if (kept.isNotEmpty()) {
+            recentRows.addLast(rowSeen)
+            while (recentRows.size > windowSize) {
+                recentRows.removeFirst()
+            }
+        }
+
+        return kept
     }
 }
 
