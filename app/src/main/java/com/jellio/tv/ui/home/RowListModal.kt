@@ -54,7 +54,7 @@ fun RowListModal(
     var isLoadingRest by remember(items) { mutableStateOf(fetchAll != null || fetchPage != null) }
     // Paged rows load ROW_PAGE_SIZE titles at a time, the next page once the
     // focus nears the end, until the server runs out.
-    var nextStart by remember(items) { mutableStateOf(0) }
+    var nextStart by remember(items) { mutableStateOf(items.size) }
     var exhausted by remember(items) { mutableStateOf(fetchPage == null) }
     var columns by remember { mutableStateOf(1) }
     var initialFocusRequested by remember(items) { mutableStateOf(false) }
@@ -71,16 +71,20 @@ fun RowListModal(
             isLoadingRest = false
             return
         }
-        nextStart = start + ROW_PAGE_SIZE
-        if (result.size < ROW_PAGE_SIZE / 2) exhausted = true
+        nextStart = start + result.size
         val existingIds = displayedItems.mapTo(hashSetOf()) { it.Id }
         val fresh = result.filterNot { it.Id in existingIds }
+        if (result.isEmpty() || (result.size < 5 && fresh.isEmpty())) {
+            exhausted = true
+        }
         if (fresh.isNotEmpty()) displayedItems = displayedItems + fresh
         isLoadingRest = false
     }
     LaunchedEffect(items, fetchPage) {
         if (fetchPage == null) return@LaunchedEffect
-        loadNextPage()
+        if (displayedItems.isEmpty()) {
+            loadNextPage()
+        }
         // Keep loading while the focus sits within two rows of the end.
         androidx.compose.runtime.snapshotFlow {
             val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
