@@ -1811,6 +1811,10 @@ class JellioRepository @Inject constructor(
         }
     }
 
+    suspend fun reportCapabilities(): Result<Unit> = runCatching {
+        api.postCapabilities(com.jellio.tv.data.model.ClientCapabilitiesDto())
+    }
+
     fun imageUrl(
         serverAddress: String,
         itemId: String,

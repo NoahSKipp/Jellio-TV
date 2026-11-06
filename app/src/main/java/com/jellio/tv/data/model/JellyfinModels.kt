@@ -256,6 +256,28 @@ data class PlaybackReportRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class ClientCapabilitiesDto(
+    val PlayableMediaTypes: List<String> = listOf("Video", "Audio"),
+    val SupportedCommands: List<String> = listOf(
+        "Play",
+        "Playstate",
+        "PlayNext",
+        "GeneralCommand",
+        "VolumeUp",
+        "VolumeDown",
+        "Mute",
+        "Unmute",
+        "ToggleMute",
+        "SetVolume",
+        "SetAudioStreamIndex",
+        "SetSubtitleStreamIndex",
+        "DisplayMessage",
+    ),
+    val SupportsMediaControl: Boolean = true,
+    val SupportsPersistentIdentifier: Boolean = true,
+)
+
+@JsonClass(generateAdapter = true)
 data class ForgotPasswordRequest(val EnteredUsername: String)
 
 @JsonClass(generateAdapter = true)

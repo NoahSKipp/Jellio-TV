@@ -156,6 +156,7 @@ class PlayerViewModel @Inject constructor(
     private val subtitleStylePreferences: SubtitleStylePreferences,
     private val syncPlay: com.jellio.tv.data.syncplay.SyncPlayManager,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
+    val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
 ) : ViewModel() {
     val deviceId: String get() = repository.deviceId
 
@@ -469,7 +470,13 @@ class PlayerViewModel @Inject constructor(
         load(session, id, mediaSourceIdParam)
     }
 
-    fun load(session: Session, itemId: String, mediaSourceId: String?, fromFailover: Boolean = false) {
+    fun load(
+        session: Session,
+        itemId: String,
+        mediaSourceId: String?,
+        fromFailover: Boolean = false,
+        startPositionTicks: Long? = null,
+    ) {
         val key = itemId + "|" + mediaSourceId
         if (!fromFailover && loadedItemId == key) return
         loadedItemId = key
@@ -517,7 +524,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
                 val preview = if (prewarmed == null) repository.previewItem(itemId) else null
-                val earlyTicks = preview?.UserData?.PlaybackPositionTicks
+                val earlyTicks = startPositionTicks ?: preview?.UserData?.PlaybackPositionTicks
                 var targetFrom = "fresh"
                 val earlyTarget = if (earlyTicks != null) {
                     async {
@@ -539,9 +546,9 @@ class PlayerViewModel @Inject constructor(
                     pauseInfo = buildPauseOverlayInfo(session, item, isEpisode),
                 )
                 // Following the group into its title starts where the group is,
-                // not at this account's own resume point.
+                // not at this account's own resume point. Remote cast commands can also specify start position.
                 val groupTarget = syncPlay.target.value?.takeIf { com.jellio.tv.data.syncplay.SyncPlayManager.sameId(it.itemId, itemId) }
-                val startTicks = groupTarget?.startPositionTicks ?: item.UserData?.PlaybackPositionTicks ?: 0
+                val startTicks = startPositionTicks ?: groupTarget?.startPositionTicks ?: item.UserData?.PlaybackPositionTicks ?: 0
                 val audioPreference = prewarmed?.audioPreference ?: earlyAudio?.await() ?: repository.getAudioLanguagePreference(session.userId)
                 audioLanguagePreference = audioPreference
                 var target = prewarmed?.target?.also { targetFrom = "prewarmed" }

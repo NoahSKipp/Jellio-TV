@@ -214,12 +214,15 @@ fun PlayerScreen(
     onBack: () -> Unit,
     onPlayNext: (String) -> Unit,
     modifier: Modifier = Modifier,
+    startPositionTicks: Long? = null,
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val subtitleStyle by viewModel.subtitleStyle.collectAsState()
 
-    LaunchedEffect(itemId, mediaSourceId) { viewModel.load(session, itemId, mediaSourceId) }
+    LaunchedEffect(itemId, mediaSourceId, startPositionTicks) {
+        viewModel.load(session, itemId, mediaSourceId, startPositionTicks = startPositionTicks)
+    }
     val failover by viewModel.failover.collectAsState()
     DisposableEffect(Unit) {
         PlayerPresence.active = true
@@ -322,6 +325,7 @@ fun PlayerScreen(
                 onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
                 onPlaceholder = { sign -> viewModel.placeholderDetected(session, sign) },
                 onPlaybackStarted = { viewModel.failoverPlaying() },
+                remoteControlManager = viewModel.remoteControlManager,
             )
         }
         failover?.let { notice ->
@@ -439,6 +443,7 @@ internal fun PlayerSurface(
     onStreamFailed: (String) -> Unit = {},
     onPlaceholder: (PlaceholderSign) -> Unit = {},
     onPlaybackStarted: () -> Unit = {},
+    remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager? = null,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -736,6 +741,57 @@ internal fun PlayerSurface(
                     seekToReal(reportedMs)
                 }
                 "Stop" -> player.pause()
+            }
+        }
+    }
+
+    LaunchedEffect(player, remoteControlManager) {
+        val manager = remoteControlManager ?: return@LaunchedEffect
+        manager.playstateCommands.collectLatest { command ->
+            when (command.command.lowercase()) {
+                "pause" -> player.pause()
+                "unpause" -> player.play()
+                "playpause" -> if (player.isPlaying) player.pause() else player.play()
+                "stop" -> onBack()
+                "seek" -> {
+                    if (command.seekPositionTicks != null) {
+                        val targetMs = command.seekPositionTicks / TICKS_PER_MS
+                        seekToReal(targetMs)
+                    }
+                }
+                "nexttrack" -> {
+                    episodes.firstOrNull { it.itemId != currentItemId }?.let {
+                        onPlayNext(it.itemId)
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(player, remoteControlManager) {
+        val manager = remoteControlManager ?: return@LaunchedEffect
+        manager.generalCommands.collectLatest { command ->
+            when (command.name.lowercase()) {
+                "volumeup" -> {
+                    player.volume = (player.volume + 0.1f).coerceAtMost(1f)
+                }
+                "volumedown" -> {
+                    player.volume = (player.volume - 0.1f).coerceAtLeast(0f)
+                }
+                "mute" -> {
+                    player.volume = 0f
+                }
+                "unmute" -> {
+                    player.volume = 1f
+                }
+                "togglemute" -> {
+                    player.volume = if (player.volume > 0f) 0f else 1f
+                }
+                "setvolume" -> {
+                    command.arguments["Volume"]?.toFloatOrNull()?.let { v ->
+                        player.volume = (v / 100f).coerceIn(0f, 1f)
+                    }
+                }
             }
         }
     }

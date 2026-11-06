@@ -35,6 +35,7 @@ class AppViewModel @Inject constructor(
     private val repository: JellioRepository,
     private val streamPreferences: StreamPreferences,
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
+    val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
 ) : ViewModel() {
     val authState: StateFlow<AuthState> = repository.sessionFlow
         .map { session -> if (session != null) AuthState.LoggedIn(session) else AuthState.LoggedOut }
@@ -47,6 +48,7 @@ class AppViewModel @Inject constructor(
         viewModelScope.launch {
             authState.collectLatest { state ->
                 if (state is AuthState.LoggedIn) {
+                    launch { repository.reportCapabilities() }
                     // Right after an update or wake the network or server may not
                     // be ready yet; keep trying instead of leaving the menu empty.
                     var waitMs = 1_000L
