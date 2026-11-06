@@ -425,8 +425,10 @@ class PlayerViewModel @Inject constructor(
 
     private var loadedItemId: String? = null
     private var itemId: String? = null
+    private var currentItem: BaseItemDto? = null
     private var mediaSourceIdParam: String? = null
     private var playbackSession: Session? = null
+    private var hasCheckedPreviousEpisodes = false
     private var toastSeq = 0L
 
     fun showToast(message: String) {
@@ -494,10 +496,13 @@ class PlayerViewModel @Inject constructor(
             failingOver = false
             _failover.value = null
             hasCreditedRealWatch = false
+            hasCheckedPreviousEpisodes = false
+            currentItem = null
             lastReportedDurationSeconds = 0.0
         }
         this.itemId = itemId
         this.mediaSourceIdParam = mediaSourceId
+        this.playbackSession = session
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
@@ -536,6 +541,7 @@ class PlayerViewModel @Inject constructor(
                 }
                 val earlyAudio = if (prewarmed == null) async { runCatching { repository.getAudioLanguagePreference(session.userId) }.getOrNull() } else null
                 val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
+                currentItem = item
                 PlayStartTrace.mark(itemId, "details", if (prewarmed != null) "prewarmed" else "")
                 val isEpisode = item.Type == "Episode" && item.SeriesName != null
                 // The title's own backdrop and logo go up while the stream
@@ -1146,6 +1152,16 @@ class PlayerViewModel @Inject constructor(
 
     fun reportProgress(positionTicks: Long, isPaused: Boolean) {
         val id = itemId ?: return
+        if (!hasCheckedPreviousEpisodes && positionTicks >= 50_000_000L) {
+            hasCheckedPreviousEpisodes = true
+            val session = playbackSession
+            val item = currentItem
+            if (session != null && item != null && item.Type == "Episode") {
+                viewModelScope.launch(Dispatchers.IO) {
+                    repository.autoCompletePreviousEpisodesIfSkipped(session.userId, item)
+                }
+            }
+        }
         // Warmed from 70% on, late enough to still be fresh when Up Next
         // comes; the repository skips repeats for a few minutes.
         val expected = _uiState.value.expectedRuntimeMs
