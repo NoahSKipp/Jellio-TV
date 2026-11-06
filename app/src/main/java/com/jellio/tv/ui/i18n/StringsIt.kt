@@ -71,6 +71,8 @@ internal object StringsIt {
         m["detail_dislike"] = "Non mi piace"
         m["detail_episode_number"] = "Episodio %d"
         m["detail_episodes"] = "Episodi"
+        m["detail_all_episodes"] = "Tutti gli episodi"
+        m["detail_current_episode"] = "Episodio corrente"
         m["detail_fewer_actions"] = "Meno azioni"
         m["detail_like"] = "Mi piace"
         m["detail_load_error"] = "Impossibile caricare questo titolo"
@@ -164,6 +166,7 @@ internal object StringsIt {
         m["library_sort_top_rated"] = "I più votati"
         m["menu_add_watchlist"] = "Aggiungi alla lista"
         m["menu_go_to_details"] = "Vai ai dettagli"
+        m["menu_go_to_series"] = "Vai alla serie"
     }
 
     private fun fill2(m: HashMap<String, String>) {

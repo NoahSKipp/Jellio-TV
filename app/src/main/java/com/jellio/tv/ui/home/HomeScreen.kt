@@ -323,6 +323,9 @@ fun HomeScreen(
                 continueWatching = continueWatching,
                 upNext = upNext,
                 onGoToDetails = if (continueWatching || upNext) { { onItemClick(item) } } else null,
+                onGoToSeries = if ((continueWatching || upNext) && item.SeriesId != null) {
+                    { onItemClick(BaseItemDto(Id = item.SeriesId, Name = item.SeriesName, Type = "Series")) }
+                } else null,
                 onPlayManually = if (continueWatching) { { onPlayManually(item) } } else null,
                 onStartOver = if (continueWatching) {
                     {

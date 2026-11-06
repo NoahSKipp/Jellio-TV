@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -138,6 +139,7 @@ fun DetailScreen(
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
+    onNavigateToDetailReplace: (String) -> Unit = onNavigateToDetail,
     onNavigateToPerson: (String) -> Unit,
     onOpenStreamPicker: (BaseItemDto) -> Unit,
     onPlayDirect: (itemId: String, mediaSourceId: String?) -> Unit,
@@ -272,15 +274,17 @@ fun DetailScreen(
                             }
                         }
                     }
-                    if (item.Type == "Series") {
+                    val showSeasons = (item.Type == "Series" || (item.Type == "Episode" && item.SeriesId != null)) && uiState.seasons.isNotEmpty()
+                    if (showSeasons) {
                         item {
                             SeasonsSection(
                                 session = session,
-                                seriesId = item.Id,
+                                seriesId = item.SeriesId ?: item.Id,
                                 state = uiState,
                                 imageUrl = imageUrl,
-                                onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.Id, seasonId) },
-                                onEpisodeClick = onNavigateToDetail,
+                                currentEpisodeId = if (item.Type == "Episode") item.Id else null,
+                                onSelectSeason = { seasonId -> viewModel.selectSeason(session, item.SeriesId ?: item.Id, seasonId) },
+                                onEpisodeClick = if (item.Type == "Episode") onNavigateToDetailReplace else onNavigateToDetail,
                                 onEpisodeOptions = { episode -> episodeMenuTarget = episode },
                                 onEpisodeFocused = { episodeId -> viewModel.preloadEpisode(episodeId) },
                             )
@@ -428,10 +432,38 @@ private fun DetailHero(
             if (item.Type == "Episode" && item.SeriesId != null && item.SeriesName != null) {
                 Surface(
                     onClick = { onSeriesClick(item.SeriesId) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(6.dp)),
-                    colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent),
+                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                    colors = ClickableSurfaceDefaults.colors(
+                        containerColor = Color.White.copy(alpha = 0.08f),
+                        contentColor = JellioTextSecondary,
+                        focusedContainerColor = Color.White.copy(alpha = 0.25f),
+                        focusedContentColor = Color.White,
+                    ),
+                    border = ClickableSurfaceDefaults.border(
+                        focusedBorder = Border(
+                            border = BorderStroke(2.dp, Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                        ),
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+                    modifier = Modifier.padding(bottom = 6.dp),
                 ) {
-                    Text(text = item.SeriesName, color = JellioTextSecondary, style = MaterialTheme.typography.bodyLarge)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Tv,
+                            contentDescription = null,
+                            tint = JellioSecondary,
+                            modifier = Modifier.size(16.dp).padding(end = 6.dp),
+                        )
+                        Text(
+                            text = item.SeriesName,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
 
@@ -517,6 +549,30 @@ private fun DetailHero(
                     Row(modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null)
                         Text(text = state.playLabel, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+                if (item.Type == "Episode" && item.SeriesId != null) {
+                    Surface(
+                        onClick = { onSeriesClick(item.SeriesId) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.12f),
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White,
+                            focusedContentColor = JellioBg,
+                        ),
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, Color.White),
+                                shape = RoundedCornerShape(999.dp),
+                            ),
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Filled.Tv, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Text(text = com.jellio.tv.ui.i18n.string("detail_all_episodes"), modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
                 AnimatedVisibility(visible = actionsExpanded, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
@@ -661,6 +717,7 @@ private fun SeasonsSection(
     seriesId: String,
     state: DetailUiState,
     imageUrl: (String, String?, String, Int) -> String,
+    currentEpisodeId: String? = null,
     onSelectSeason: (String) -> Unit,
     onEpisodeClick: (String) -> Unit,
     onEpisodeOptions: (BaseItemDto) -> Unit,
@@ -704,6 +761,7 @@ private fun SeasonsSection(
                         episode = episode,
                         imageUrl = imageUrl,
                         releaseLabel = releaseLabels[episode.Id],
+                        isCurrent = currentEpisodeId != null && episode.Id == currentEpisodeId,
                         onClick = { onEpisodeClick(episode.Id) },
                         onOptionsClick = { onEpisodeOptions(episode) },
                         onFocused = {
@@ -726,6 +784,7 @@ private fun EpisodeCard(
     onOptionsClick: () -> Unit,
     onFocused: () -> Unit = {},
     releaseLabel: String? = null,
+    isCurrent: Boolean = false,
 ) {
     val thumbUrl = episode.ImageTags?.get("Primary")?.let { imageUrl(episode.Id, it, "Primary", 500) }
         ?: episode.ParentThumbImageTag?.let { tag -> episode.ParentThumbItemId?.let { id -> imageUrl(id, tag, "Thumb", 500) } }
@@ -747,6 +806,10 @@ private fun EpisodeCard(
                     border = BorderStroke(2.5.dp, Color.White),
                     shape = RoundedCornerShape(12.dp),
                 ),
+                border = if (isCurrent) Border(
+                    border = BorderStroke(1.5.dp, JellioSecondary.copy(alpha = 0.7f)),
+                    shape = RoundedCornerShape(12.dp),
+                ) else ClickableSurfaceDefaults.border().border,
             ),
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             modifier = Modifier
@@ -790,7 +853,21 @@ private fun EpisodeCard(
                                 .padding(horizontal = 10.dp, vertical = 4.dp),
                         )
                     }
-                    if (episode.UserData?.Played == true) {
+                    if (isCurrent) {
+                        Text(
+                            text = com.jellio.tv.ui.i18n.string("detail_current_episode"),
+                            color = JellioSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp)
+                                .background(JellioBg.copy(alpha = 0.9f), RoundedCornerShape(999.dp))
+                                .border(1.dp, JellioSecondary.copy(alpha = 0.8f), RoundedCornerShape(999.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    } else if (episode.UserData?.Played == true) {
                         Icon(
                             imageVector = Icons.Filled.Check,
                             contentDescription = null,

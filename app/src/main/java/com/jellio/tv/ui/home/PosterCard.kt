@@ -551,6 +551,7 @@ fun CardOptionsMenu(
     continueWatching: Boolean = false,
     upNext: Boolean = false,
     onGoToDetails: (() -> Unit)? = null,
+    onGoToSeries: (() -> Unit)? = null,
     onPlayManually: (() -> Unit)? = null,
     onStartOver: (() -> Unit)? = null,
     onRemoveFromRow: (() -> Unit)? = null,
@@ -571,12 +572,14 @@ fun CardOptionsMenu(
             }
             continueWatching -> {
                 onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
+                onGoToSeries?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_series"), it)) }
                 onPlayManually?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_play_manually"), it)) }
                 onStartOver?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_start_beginning"), it)) }
                 onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_continue"), it, danger = true)) }
             }
             upNext -> {
                 onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("card_go_to_details"), it)) }
+                onGoToSeries?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_series"), it)) }
                 // Jellyfin can't hide one episode from Next Up; marking it
                 // played is what drops it off the row.
                 onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_up_next"), it, danger = true)) }
