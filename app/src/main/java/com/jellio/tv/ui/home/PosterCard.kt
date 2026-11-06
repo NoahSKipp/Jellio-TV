@@ -506,15 +506,12 @@ internal fun RatingChip(
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     badgeFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
+    badgeWidth: Dp = 24.dp,
+    badgeHeight: Dp = 11.dp,
     badgeSize: Dp? = null,
 ) {
-    val resolvedBadgeSize = badgeSize ?: with(LocalDensity.current) {
-        if (badgeFontSize != 8.sp) {
-            if (badgeFontSize <= 10.sp) (badgeFontSize * 1.5f).toDp() else badgeFontSize.toDp()
-        } else {
-            fontSize.toDp()
-        }
-    }
+    val resolvedWidth = badgeSize?.let { it * 2.33f } ?: badgeWidth
+    val resolvedHeight = badgeSize ?: badgeHeight
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -522,10 +519,10 @@ internal fun RatingChip(
             .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
-        TmdbBadge(size = resolvedBadgeSize, fontSize = badgeFontSize)
+        TmdbBadge(width = resolvedWidth, height = resolvedHeight)
         Text(
             // No TMDB rating yet: a dash, so every card shows the same chip.
-            text = rating?.takeIf { it > 0.0 }?.let { String.format(Locale.US, "%.1f", it) } ?: "–",
+            text = rating?.takeIf { it > 0.0 }?.let { String.format(Locale.US, "%.1f", it) } ?: "-",
             color = JellioText,
             fontSize = fontSize,
             fontWeight = FontWeight.SemiBold,

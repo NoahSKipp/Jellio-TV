@@ -303,7 +303,7 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                TmdbBadge(size = 15.dp)
+                TmdbBadge(width = 28.dp, height = 12.dp)
                 Text(
                     text = String.format(Locale.US, "%.1f", rating),
                     color = JellioTextSecondary,
@@ -326,18 +326,19 @@ private fun MetaDot() {
 @Composable
 internal fun TmdbBadge(
     modifier: Modifier = Modifier,
+    width: Dp = 26.dp,
+    height: Dp = 11.dp,
     size: Dp? = null,
     fontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
-    tint: Color = Color.White,
+    tint: Color? = null,
 ) {
-    val resolvedSize = size ?: with(LocalDensity.current) {
-        if (fontSize <= 10.sp) (fontSize * 1.5f).toDp() else fontSize.toDp()
-    }
+    val finalWidth = size?.let { it * 2.33f } ?: width
+    val finalHeight = size ?: height
     Image(
         painter = painterResource(R.drawable.ic_tmdb_logo),
         contentDescription = "TMDB",
-        colorFilter = ColorFilter.tint(tint),
-        modifier = modifier.size(resolvedSize),
+        colorFilter = tint?.let { ColorFilter.tint(it) },
+        modifier = modifier.size(width = finalWidth, height = finalHeight),
     )
 }
 

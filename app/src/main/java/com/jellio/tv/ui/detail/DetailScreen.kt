@@ -471,7 +471,7 @@ private fun DetailHero(
                 formatRuntime(item.RunTimeTicks).takeIf { it.isNotEmpty() }?.let { Text(text = it, color = JellioTextSecondary) }
                 item.OfficialRating?.let { Text(text = it, color = JellioTextSecondary) }
                 // TMDB's score, labelled like the cards.
-                item.CommunityRating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeSize = 15.dp) }
+                item.CommunityRating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeWidth = 28.dp, badgeHeight = 12.dp) }
             }
 
             MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))

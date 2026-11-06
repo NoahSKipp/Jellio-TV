@@ -26,6 +26,8 @@ import javax.inject.Singleton
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
 private fun parseInstant(raw: String): Long = java.time.Instant.parse(raw).toEpochMilli()
 
+const val GOOGLE_TV_TOP_PICKS_SIZE = 6
+
 // What the last sync did, for Settings > About.
 data class WatchNextStatus(
     val at: Long,
@@ -295,8 +297,8 @@ class WatchNextSyncer @Inject constructor(
             runCatching {
                 val id = channelId(spec) ?: return@runCatching
                 context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
-                picks.take(CHANNEL_SIZE).forEachIndexed { index, item ->
-                    val program = toPreviewProgram(session, id, item, weight = CHANNEL_SIZE - index, overview = null) ?: return@forEachIndexed
+                picks.take(GOOGLE_TV_TOP_PICKS_SIZE).forEachIndexed { index, item ->
+                    val program = toPreviewProgram(session, id, item, weight = GOOGLE_TV_TOP_PICKS_SIZE - index, overview = null) ?: return@forEachIndexed
                     context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
                 }
             }.onFailure { Log.w(TAG, "top picks channel failed", it) }
@@ -399,7 +401,8 @@ class WatchNextSyncer @Inject constructor(
         }
         val shown = mutableSetOf<String>()
         CHANNELS.forEach { spec ->
-            val items = lists[spec.key]?.take(CHANNEL_SIZE) ?: return@forEach
+            val limit = if (spec.key == "picks") GOOGLE_TV_TOP_PICKS_SIZE else CHANNEL_SIZE
+            val items = lists[spec.key]?.take(limit) ?: return@forEach
             val id = channelId(spec) ?: return@forEach
             context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
             items.forEachIndexed { index, item ->
@@ -409,7 +412,7 @@ class WatchNextSyncer @Inject constructor(
                 shown += item.Id
             }
         }
-        Log.i(TAG, "channels: " + lists.entries.joinToString { it.key + " " + it.value.size.coerceAtMost(CHANNEL_SIZE) })
+        Log.i(TAG, "channels: " + lists.entries.joinToString { it.key + " " + it.value.size.coerceAtMost(if (it.key == "picks") GOOGLE_TV_TOP_PICKS_SIZE else CHANNEL_SIZE) })
         return shown
     }
 
@@ -445,10 +448,11 @@ class WatchNextSyncer @Inject constructor(
         return result
     }
 
-    private companion object {
+    companion object {
         const val TAG = "JellioWatchNext"
         const val MAX_ROWS = 5
         const val CHANNEL_SIZE = 15
+        const val GOOGLE_TV_TOP_PICKS_SIZE = 6
         private val CHANNELS = listOf(
             ChannelSpec("continue", "Continue Watching"),
             ChannelSpec("nextup", "Next Up"),
