@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -801,16 +802,25 @@ private fun EpisodeCard(
                 focusedContainerColor = Color.White.copy(alpha = 0.28f),
                 focusedContentColor = JellioText,
             ),
-            border = ClickableSurfaceDefaults.border(
-                focusedBorder = Border(
-                    border = BorderStroke(2.5.dp, Color.White),
-                    shape = RoundedCornerShape(12.dp),
-                ),
-                border = if (isCurrent) Border(
-                    border = BorderStroke(1.5.dp, JellioSecondary.copy(alpha = 0.7f)),
-                    shape = RoundedCornerShape(12.dp),
-                ) else ClickableSurfaceDefaults.border().border,
-            ),
+            border = if (isCurrent) {
+                ClickableSurfaceDefaults.border(
+                    border = Border(
+                        border = BorderStroke(1.5.dp, JellioSecondary.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                    focusedBorder = Border(
+                        border = BorderStroke(2.5.dp, Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                )
+            } else {
+                ClickableSurfaceDefaults.border(
+                    focusedBorder = Border(
+                        border = BorderStroke(2.5.dp, Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                    ),
+                )
+            },
             scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
             modifier = Modifier
                 .width(cardWidth)
