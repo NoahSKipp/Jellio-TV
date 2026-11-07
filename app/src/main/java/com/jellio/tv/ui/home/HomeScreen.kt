@@ -44,7 +44,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.jellio.tv.ui.common.dpadFastScroll
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRestorer
@@ -462,15 +461,8 @@ private fun HomeRowEditor(
                 onMoveDown = onMoveDown,
                 onToggleHidden = onToggleHidden,
             )
-        }
-        if (!hidden) {
-            Box(
-                modifier = Modifier
-                    .focusProperties { canFocus = !editMode }
-                    .let { if (editMode) it.alpha(0.45f) else it }
-            ) {
-                content()
-            }
+        } else if (!hidden) {
+            content()
         }
     }
 }

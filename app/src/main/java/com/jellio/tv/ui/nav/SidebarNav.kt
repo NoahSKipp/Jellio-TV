@@ -133,10 +133,13 @@ fun SidebarNav(
                 onFocusChange(state.hasFocus)
             }
             .focusProperties {
-                canFocus = focusable && enabled
                 onEnter = {
-                    if (requestedFocusDirection == FocusDirection.Left) {
-                        (restoreFocusRequester ?: homeFocusRequester).requestFocus()
+                    if (focusable && enabled) {
+                        if (requestedFocusDirection == FocusDirection.Left) {
+                            (restoreFocusRequester ?: homeFocusRequester).requestFocus()
+                        }
+                    } else {
+                        FocusRequester.Cancel
                     }
                 }
             }
