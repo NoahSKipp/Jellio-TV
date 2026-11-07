@@ -73,6 +73,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -280,7 +281,7 @@ fun DetailScreen(
                             }
                         }
                     }
-                    val showSeasons = (item.Type == "Series" || (item.Type == "Episode" && item.SeriesId != null)) && uiState.seasons.isNotEmpty()
+                    val showSeasons = (item.Type == "Series" || (item.Type == "Episode" && item.SeriesId != null)) && (uiState.seasons.isNotEmpty() || uiState.selectedSeasonEpisodes.isNotEmpty())
                     if (showSeasons) {
                         item {
                             SeasonsSection(
@@ -727,14 +728,46 @@ private fun IconActionButton(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
+    val popScale = remember { androidx.compose.animation.core.Animatable(1f) }
+    var initialized by remember { mutableStateOf(false) }
+    LaunchedEffect(active) {
+        if (!initialized) {
+            initialized = true
+            return@LaunchedEffect
+        }
+        popScale.snapTo(1.22f)
+        popScale.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+            ),
+        )
+    }
+    val containerColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (active) JellioSecondary else Color.White.copy(alpha = 0.1f),
+        label = "actionBtnContainer",
+    )
+    val contentColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (active) JellioBg else JellioText,
+        label = "actionBtnContent",
+    )
+    val focusedContainerColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (active) JellioSecondary else Color.White.copy(alpha = 0.35f),
+        label = "actionBtnFocusedContainer",
+    )
+    val focusedContentColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (active) JellioBg else Color.White,
+        label = "actionBtnFocusedContent",
+    )
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (active) JellioText.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.1f),
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.35f),
-            focusedContentColor = Color.White,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            focusedContainerColor = focusedContainerColor,
+            focusedContentColor = focusedContentColor,
         ),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(
@@ -743,7 +776,12 @@ private fun IconActionButton(
             ),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
-        modifier = Modifier.size(56.dp),
+        modifier = Modifier
+            .size(56.dp)
+            .graphicsLayer {
+                scaleX = popScale.value
+                scaleY = popScale.value
+            },
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(imageVector = icon, contentDescription = contentDescription)
@@ -763,36 +801,48 @@ private fun SeasonsSection(
     onEpisodeOptions: (BaseItemDto) -> Unit,
     onEpisodeFocused: (String) -> Unit,
 ) {
-    if (state.seasons.isEmpty()) return
+    if (state.seasons.isEmpty() && state.selectedSeasonEpisodes.isEmpty()) return
     Column(modifier = Modifier.padding(top = 16.dp)) {
         Text(text = com.jellio.tv.ui.i18n.string("detail_episodes"), style = MaterialTheme.typography.titleMedium, color = JellioText, modifier = Modifier.padding(start = 48.dp, bottom = 12.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(state.seasons, key = { it.Id }) { season ->
-                val selected = season.Id == state.selectedSeasonId
-                Surface(
-                    onClick = { onSelectSeason(season.Id) },
-                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = if (selected) JellioSecondary else JellioBgElevated,
-                        contentColor = if (selected) JellioBg else JellioText,
-                        focusedContainerColor = JellioSecondary,
-                        focusedContentColor = JellioBg,
-                    ),
-                    border = ClickableSurfaceDefaults.border(
-                        focusedBorder = Border(
-                            border = BorderStroke(2.dp, Color.White),
-                            shape = RoundedCornerShape(999.dp),
+        if (state.seasons.isNotEmpty()) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(state.seasons, key = { it.Id }) { season ->
+                    val selected = season.Id == state.selectedSeasonId
+                    Surface(
+                        onClick = { onSelectSeason(season.Id) },
+                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = if (selected) JellioSecondary else JellioBgElevated,
+                            contentColor = if (selected) JellioBg else JellioText,
+                            focusedContainerColor = JellioSecondary,
+                            focusedContentColor = JellioBg,
                         ),
-                    ),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
-                ) {
-                    Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                        border = ClickableSurfaceDefaults.border(
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, Color.White),
+                                shape = RoundedCornerShape(999.dp),
+                            ),
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                    ) {
+                        Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    }
                 }
             }
         }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             val releaseLabels = remember(state.selectedSeasonEpisodes, state.streamVerifiedTick) { seasonEpisodeReleaseLabels(state.selectedSeasonEpisodes) }
+            val episodesListState = rememberLazyListState()
+            LaunchedEffect(currentEpisodeId, state.selectedSeasonId, state.selectedSeasonEpisodes.size) {
+                if (currentEpisodeId != null && state.selectedSeasonEpisodes.isNotEmpty()) {
+                    val idx = state.selectedSeasonEpisodes.indexOfFirst { it.Id == currentEpisodeId }
+                    if (idx > 0) {
+                        episodesListState.scrollToItem(idx)
+                    }
+                }
+            }
             LazyRow(
+                state = episodesListState,
                 contentPadding = PaddingValues(horizontal = 48.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {

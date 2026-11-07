@@ -482,7 +482,7 @@ class JellioRepository @Inject constructor(
         ).Items
 
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
-        api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items
+        api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks").Items.also { seedPreviews(it) }
 
     suspend fun hasValidStreamForTodayItem(userId: String, item: BaseItemDto): Boolean {
         if (!isReleasedToday(item)) return true
@@ -808,17 +808,58 @@ class JellioRepository @Inject constructor(
 
     fun preloadDetails(itemId: String) {
         val now = System.currentTimeMillis()
-        if (preloaded[itemId]?.let { now - it.first < PRELOAD_TTL_MS } == true) return
+        val existing = preloaded[itemId]?.takeIf { now - it.first < PRELOAD_TTL_MS }?.second
+        if (existing != null) {
+            val seriesId = existing.SeriesId ?: existing.Id.takeIf { existing.Type == "Series" }
+            if (seriesId == null || recentSeasons(seriesId) != null) return
+        }
         if (!preloadSlots.tryAcquire()) return
         prefetchScope.launch {
             try {
                 val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
-                val item = fetchItemInfo(userId, itemId, DETAIL_FIELDS)
-                if (preloaded.size > 200) preloaded.clear()
-                preloaded[itemId] = System.currentTimeMillis() to item
+                val item = existing ?: fetchItemInfo(userId, itemId, DETAIL_FIELDS).also {
+                    if (preloaded.size > 200) preloaded.clear()
+                    preloaded[itemId] = System.currentTimeMillis() to it
+                    previews[it.Id] = it
+                }
+                if (item.Type == "Episode" && item.SeriesId != null) {
+                    coroutineScope {
+                        launch { runCatching { getSeasons(item.SeriesId, userId) } }
+                        if (item.SeasonId != null) {
+                            launch { runCatching { getEpisodes(item.SeriesId, userId, item.SeasonId) } }
+                        }
+                    }
+                } else if (item.Type == "Series") {
+                    val seasons = runCatching { getSeasons(item.Id, userId) }.getOrNull()
+                    val firstSeason = seasons?.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }?.firstOrNull()
+                    if (firstSeason != null) {
+                        runCatching { getEpisodes(item.Id, userId, firstSeason.Id) }
+                    }
+                }
             } catch (_: Exception) {
             } finally {
                 preloadSlots.release()
+            }
+        }
+    }
+
+    fun preloadEpisodeSeasonsInTurn(userId: String, episodes: List<BaseItemDto>) {
+        if (episodes.isEmpty()) return
+        prefetchScope.launch {
+            val seenSeasons = HashSet<String>()
+            for (ep in episodes) {
+                val seriesId = ep.SeriesId ?: continue
+                val seasonId = ep.SeasonId
+                val key = "$seriesId:${seasonId.orEmpty()}"
+                if (!seenSeasons.add(key)) continue
+                coroutineScope {
+                    if (recentSeasons(seriesId) == null) {
+                        launch { runCatching { getSeasons(seriesId, userId) } }
+                    }
+                    if (seasonId != null && recentEpisodes(seriesId, seasonId) == null) {
+                        launch { runCatching { getEpisodes(seriesId, userId, seasonId) } }
+                    }
+                }
             }
         }
     }
@@ -1546,7 +1587,7 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    suspend fun getCalendarEntries(): List<CalendarEntryDto> = api.getCalendarEntries()
+    suspend fun getCalendarEntries(): List<CalendarEntryDto> = withRetry { api.getCalendarEntries() }
 
     suspend fun getFeed(): List<FeedEntryDto> = api.getFeed()
 

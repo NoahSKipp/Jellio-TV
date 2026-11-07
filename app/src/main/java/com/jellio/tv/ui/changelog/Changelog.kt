@@ -106,6 +106,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Instant Action Button Feedback", "Watchlist, Mark as Watched, Like, and Dislike buttons now change color and animate immediately on click while syncing in the background."),
+            ChangelogFeature(Icons.Filled.Tv, "Faster Episode Selector Loading", "Episode detail pages now fetch current season episodes in parallel with seasons and pre-warm top Continue Watching and Up Next episode lists on Home."),
+            ChangelogFeature(Icons.Filled.Event, "Reliable Coming Soon Row", "Fixed Home row assembly so Coming Soon reliably appears on initial loads, background retries, and returning visits."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.3",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.3",

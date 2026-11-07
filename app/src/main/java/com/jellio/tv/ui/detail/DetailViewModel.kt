@@ -108,6 +108,7 @@ class DetailViewModel @Inject constructor(
         ratingTargetId = null
         val preview = repository.previewItem(itemId)
         val preloaded = repository.preloadedDetails(itemId) ?: preview
+        ratingTargetId = preloaded?.SeriesId ?: preloaded?.Id
         _uiState.value = if (preloaded != null) {
             DetailUiState(
                 isLoading = false,
@@ -117,6 +118,7 @@ class DetailViewModel @Inject constructor(
                 trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
                 isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
                 isWatched = preloaded.UserData?.Played ?: false,
+                likes = preloaded.UserData?.Likes,
             )
         } else {
             DetailUiState(
@@ -167,7 +169,7 @@ class DetailViewModel @Inject constructor(
                 ) { repository.getItemDetails(session.userId, itemId) }
                 if (loadedItemId != itemId) return@launch
                 android.util.Log.i("JellioDetail", "info for $itemId in ${System.currentTimeMillis() - started} ms" + if (preloaded != null) " (drawn from memory first)" else "")
-                ratingTargetId = item.Id
+                ratingTargetId = item.SeriesId ?: item.Id
                 // Updates the page in place, keeping seasons and stream state.
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -199,8 +201,10 @@ class DetailViewModel @Inject constructor(
                     loadSeasons(session, item.Id)
                     seriesPlayDeferred = viewModelScope.async { resolveSeriesPlay(session, item.Id) }
                 } else if (item.Type == "Episode" && item.SeriesId != null) {
-                    if (preloaded?.Type != "Episode" || _uiState.value.seasons.isEmpty()) {
+                    if (preloaded?.Type != "Episode" || (_uiState.value.seasons.isEmpty() && seasonsJob?.isActive != true)) {
                         loadSeasons(session, item.SeriesId, preferredSeasonId = item.SeasonId, preferredSeasonNumber = item.ParentIndexNumber)
+                    } else if (_uiState.value.selectedSeasonId == null && item.SeasonId != null) {
+                        selectSeason(session, item.SeriesId, item.SeasonId)
                     }
                 }
             } catch (err: kotlinx.coroutines.CancellationException) {
@@ -273,6 +277,9 @@ class DetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(seasons = seasons)
             pickSeason(seasons)?.let { selectSeason(session, seriesId, it.Id) }
         }
+        if (preferredSeasonId != null && _uiState.value.selectedSeasonId == null) {
+            selectSeason(session, seriesId, preferredSeasonId)
+        }
         seasonsJob?.cancel()
         seasonsJob = viewModelScope.launch {
             val seasons = ordered(runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
@@ -285,7 +292,9 @@ class DetailViewModel @Inject constructor(
             } else {
                 pickSeason(seasons)
             }
-            toSelect?.let { selectSeason(session, seriesId, it.Id) }
+            if (toSelect != null && (toSelect.Id != _uiState.value.selectedSeasonId || (_uiState.value.selectedSeasonEpisodes.isEmpty() && episodesJob?.isActive != true))) {
+                selectSeason(session, seriesId, toSelect.Id)
+            }
         }
     }
 
@@ -371,31 +380,87 @@ class DetailViewModel @Inject constructor(
 
     fun toggleWatchlist(session: Session) {
         val item = _uiState.value.item ?: return
+        val current = _uiState.value.isWatchlisted
+        val next = !current
+        val originalItem = item.copy(UserData = (item.UserData ?: UserItemDataDto()).copy(IsFavorite = current))
+        val updatedUserData = (item.UserData ?: UserItemDataDto()).copy(IsFavorite = next)
+        val updatedItem = item.copy(UserData = updatedUserData)
+        _uiState.value = _uiState.value.copy(isWatchlisted = next, item = updatedItem)
+        repository.seedPreviews(listOf(updatedItem))
         viewModelScope.launch {
-            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrDefault(_uiState.value.isWatchlisted)
-            _uiState.value = _uiState.value.copy(isWatchlisted = newValue)
+            runCatching { repository.toggleFavorite(session.userId, originalItem) }
+                .onSuccess { serverValue ->
+                    val curItem = _uiState.value.item
+                    val syncedItem = curItem?.copy(UserData = (curItem.UserData ?: UserItemDataDto()).copy(IsFavorite = serverValue))
+                    if (syncedItem != null) repository.seedPreviews(listOf(syncedItem))
+                    _uiState.value = _uiState.value.copy(isWatchlisted = serverValue, item = syncedItem ?: curItem)
+                }
+                .onFailure {
+                    val curItem = _uiState.value.item
+                    val revertedItem = curItem?.copy(UserData = (curItem.UserData ?: UserItemDataDto()).copy(IsFavorite = current))
+                    if (revertedItem != null) repository.seedPreviews(listOf(revertedItem))
+                    _uiState.value = _uiState.value.copy(isWatchlisted = current, item = revertedItem ?: curItem)
+                }
         }
     }
 
     fun toggleWatched(session: Session) {
         val item = _uiState.value.item ?: return
-        val next = !_uiState.value.isWatched
+        val current = _uiState.value.isWatched
+        val next = !current
+        val updatedUserData = (item.UserData ?: UserItemDataDto()).copy(Played = next)
+        val updatedItem = item.copy(UserData = updatedUserData)
+        _uiState.value = _uiState.value.copy(
+            isWatched = next,
+            item = updatedItem,
+            selectedSeasonEpisodes = _uiState.value.selectedSeasonEpisodes.map { ep ->
+                if (ep.Id == item.Id) ep.copy(UserData = (ep.UserData ?: UserItemDataDto()).copy(Played = next)) else ep
+            },
+        )
+        repository.seedPreviews(listOf(updatedItem))
         viewModelScope.launch {
-            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull()
-            val wasAutoRemoved = item.Id in repository.lastAutoRemovedWatchlistIds.value
-            _uiState.value = _uiState.value.copy(
-                isWatched = updated?.Played ?: next,
-                isWatchlisted = if (wasAutoRemoved) false else _uiState.value.isWatchlisted,
-            )
+            runCatching { repository.setPlayed(session.userId, item.Id, next) }
+                .onSuccess { updated ->
+                    val wasAutoRemoved = item.Id in repository.lastAutoRemovedWatchlistIds.value
+                    val curItem = _uiState.value.item
+                    val syncedItem = curItem?.copy(UserData = updated)
+                    if (syncedItem != null) repository.seedPreviews(listOf(syncedItem))
+                    _uiState.value = _uiState.value.copy(
+                        isWatched = updated.Played,
+                        isWatchlisted = if (wasAutoRemoved) false else _uiState.value.isWatchlisted,
+                        item = syncedItem ?: curItem,
+                    )
+                    applyEpisodeUpdate(item.Id, updated)
+                }
+                .onFailure {
+                    val curItem = _uiState.value.item
+                    val revertedItem = curItem?.copy(UserData = (curItem.UserData ?: UserItemDataDto()).copy(Played = current))
+                    if (revertedItem != null) repository.seedPreviews(listOf(revertedItem))
+                    _uiState.value = _uiState.value.copy(
+                        isWatched = current,
+                        item = revertedItem ?: curItem,
+                        selectedSeasonEpisodes = _uiState.value.selectedSeasonEpisodes.map { ep ->
+                            if (ep.Id == item.Id) ep.copy(UserData = (ep.UserData ?: UserItemDataDto()).copy(Played = current)) else ep
+                        },
+                    )
+                }
         }
     }
 
     fun setLike(session: Session, likes: Boolean) {
-        val targetId = ratingTargetId ?: return
-        val next = if (_uiState.value.likes == likes) null else likes
+        val targetId = ratingTargetId ?: _uiState.value.item?.let { it.SeriesId ?: it.Id } ?: return
+        ratingTargetId = targetId
+        val prev = _uiState.value.likes
+        val next = if (prev == likes) null else likes
+        _uiState.value = _uiState.value.copy(likes = next)
         viewModelScope.launch {
-            val updated = runCatching { repository.setRating(session.userId, targetId, next) }.getOrNull()
-            _uiState.value = _uiState.value.copy(likes = updated?.Likes ?: next)
+            runCatching { repository.setRating(session.userId, targetId, next) }
+                .onSuccess { updated ->
+                    _uiState.value = _uiState.value.copy(likes = updated.Likes ?: next)
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(likes = prev)
+                }
         }
     }
 
@@ -476,11 +541,26 @@ class DetailViewModel @Inject constructor(
     }
 
     fun toggleEpisodeWatched(session: Session, episode: BaseItemDto) {
-        val next = !(episode.UserData?.Played ?: false)
+        val prevPlayed = episode.UserData?.Played ?: false
+        val next = !prevPlayed
+        val optimisticData = (episode.UserData ?: UserItemDataDto()).copy(Played = next)
+        applyEpisodeUpdate(episode.Id, optimisticData)
+        if (_uiState.value.item?.Id == episode.Id) {
+            _uiState.value = _uiState.value.copy(isWatched = next)
+        }
         viewModelScope.launch {
-            val updated = runCatching { repository.setPlayed(session.userId, episode.Id, next) }.getOrNull()
-            applyEpisodeUpdate(episode.Id, updated)
-            checkAutoRemovedWatchlist()
+            runCatching { repository.setPlayed(session.userId, episode.Id, next) }
+                .onSuccess { updated ->
+                    applyEpisodeUpdate(episode.Id, updated)
+                    checkAutoRemovedWatchlist()
+                }
+                .onFailure {
+                    val revertedData = (episode.UserData ?: UserItemDataDto()).copy(Played = prevPlayed)
+                    applyEpisodeUpdate(episode.Id, revertedData)
+                    if (_uiState.value.item?.Id == episode.Id) {
+                        _uiState.value = _uiState.value.copy(isWatched = prevPlayed)
+                    }
+                }
         }
     }
 
@@ -489,10 +569,18 @@ class DetailViewModel @Inject constructor(
         val index = episodes.indexOfFirst { it.Id == episode.Id }
         if (index <= 0) return
         val previous = episodes.subList(0, index)
+        val prevMap = previous.associate { it.Id to (it.UserData ?: UserItemDataDto()) }
+        applyEpisodeUpdates(previous.map { it.Id to (it.UserData ?: UserItemDataDto()).copy(Played = true) })
+        if (_uiState.value.item?.Id in prevMap) {
+            _uiState.value = _uiState.value.copy(isWatched = true)
+        }
         viewModelScope.launch {
-            val updates = previous.map { prev ->
-                async { prev.Id to runCatching { repository.setPlayed(session.userId, prev.Id, true) }.getOrNull() }
+            val results = previous.map { prev ->
+                async { prev.Id to runCatching { repository.setPlayed(session.userId, prev.Id, true) } }
             }.awaitAll()
+            val updates = results.map { (id, res) ->
+                id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)
+            }
             applyEpisodeUpdates(updates)
             checkAutoRemovedWatchlist()
         }
@@ -500,10 +588,18 @@ class DetailViewModel @Inject constructor(
 
     fun markSeasonWatched(session: Session) {
         val episodes = _uiState.value.selectedSeasonEpisodes
+        val prevMap = episodes.associate { it.Id to (it.UserData ?: UserItemDataDto()) }
+        applyEpisodeUpdates(episodes.map { it.Id to (it.UserData ?: UserItemDataDto()).copy(Played = true) })
+        if (_uiState.value.item?.Id in prevMap) {
+            _uiState.value = _uiState.value.copy(isWatched = true)
+        }
         viewModelScope.launch {
-            val updates = episodes.map { ep ->
-                async { ep.Id to runCatching { repository.setPlayed(session.userId, ep.Id, true) }.getOrNull() }
+            val results = episodes.map { ep ->
+                async { ep.Id to runCatching { repository.setPlayed(session.userId, ep.Id, true) } }
             }.awaitAll()
+            val updates = results.map { (id, res) ->
+                id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)
+            }
             applyEpisodeUpdates(updates)
             checkAutoRemovedWatchlist()
         }
