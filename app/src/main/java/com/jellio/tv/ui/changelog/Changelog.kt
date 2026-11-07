@@ -106,6 +106,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tv, "Instant Detail Screen Reset", "Opening a new movie or series from any row now resets the detail screen synchronously and keys each destination cleanly so previous titles never linger during loading."),
+            ChangelogFeature(Icons.Filled.Sync, "Cancelled Stale Background Jobs", "Leaving a detail page or switching titles immediately cancels any in-flight stream lookups, season fetches, and source warmups from the previous item."),
+            ChangelogFeature(Icons.Filled.Speed, "Smoother D-Pad Focus Prefetching", "Increased card focus prefetch debounce to 900ms so navigating quickly across rows does not queue unnecessary server work."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.1",

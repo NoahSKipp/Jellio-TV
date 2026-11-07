@@ -474,34 +474,40 @@ private fun JellioTvApp(
                 onLaunchOnboarding = { showOnboarding = true },
                 modifier = Modifier.fillMaxSize(),
             )
-            is JellioRoute.Detail -> DetailScreen(
-                session = session,
-                itemId = current.itemId,
-                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                onBack = { routeStack = routeStack.dropLast(1) },
-                onNavigateToDetail = onNavigateToDetail,
-                onNavigateToDetailReplace = onNavigateToDetailReplace,
-                onNavigateToPerson = onNavigateToPerson,
-                onOpenStreamPicker = { item -> streamPickerItem = item },
-                onPlayDirect = onPlayDirect,
-                modifier = Modifier.fillMaxSize(),
-            )
-            is JellioRoute.Person -> PersonScreen(
-                session = session,
-                personId = current.personId,
-                imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                onBack = { routeStack = routeStack.dropLast(1) },
-                onItemClick = onNavigateToDetail,
-                modifier = Modifier.fillMaxSize(),
-            )
-            is JellioRoute.Service -> ServiceScreen(
-                session = session,
-                serviceName = current.name,
-                logoUrl = appViewModel.serviceLogoUrl(session, current.name),
-                imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
-                onItemClick = { item -> onNavigateToDetail(item.Id) },
-                modifier = Modifier.fillMaxSize(),
-            )
+            is JellioRoute.Detail -> androidx.compose.runtime.key(current.itemId) {
+                DetailScreen(
+                    session = session,
+                    itemId = current.itemId,
+                    imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                    onBack = { routeStack = routeStack.dropLast(1) },
+                    onNavigateToDetail = onNavigateToDetail,
+                    onNavigateToDetailReplace = onNavigateToDetailReplace,
+                    onNavigateToPerson = onNavigateToPerson,
+                    onOpenStreamPicker = { item -> streamPickerItem = item },
+                    onPlayDirect = onPlayDirect,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            is JellioRoute.Person -> androidx.compose.runtime.key(current.personId) {
+                PersonScreen(
+                    session = session,
+                    personId = current.personId,
+                    imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
+                    onBack = { routeStack = routeStack.dropLast(1) },
+                    onItemClick = onNavigateToDetail,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            is JellioRoute.Service -> androidx.compose.runtime.key(current.name) {
+                ServiceScreen(
+                    session = session,
+                    serviceName = current.name,
+                    logoUrl = appViewModel.serviceLogoUrl(session, current.name),
+                    imageUrl = { item, imageType, maxWidth -> appViewModel.imageUrl(session, item, imageType, maxWidth) },
+                    onItemClick = { item -> onNavigateToDetail(item.Id) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             is JellioRoute.Player -> PlayerScreen(
                 session = session,
                 itemId = current.itemId,
