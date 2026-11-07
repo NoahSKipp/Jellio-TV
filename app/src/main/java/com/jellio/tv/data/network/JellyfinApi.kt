@@ -436,6 +436,11 @@ interface JellyfinApi {
         @Query("enableVirtual") enableVirtual: Boolean? = true,
     ): ItemsResultDto
 
+    @GET("Jellio/genres/search")
+    suspend fun searchGenreOrCategory(
+        @Query("query") query: String,
+    ): com.jellio.tv.data.model.GenreSearchResultDto
+
     @GET("Jellio/community/users")
     suspend fun getCommunityUsers(): List<com.jellio.tv.data.model.CommunityUserDto>
 

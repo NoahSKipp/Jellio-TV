@@ -85,6 +85,7 @@ fun HomeScreen(
     onPlay: (BaseItemDto) -> Unit,
     onPlayManually: (BaseItemDto) -> Unit,
     modifier: Modifier = Modifier,
+    initialEditMode: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -136,7 +137,7 @@ fun HomeScreen(
             if (session.accessToken.isNotEmpty()) "$withTag&ApiKey=${session.accessToken}&api_key=${session.accessToken}" else withTag
         }
     }
-    var editMode by remember { mutableStateOf(false) }
+    var editMode by remember(initialEditMode) { mutableStateOf(initialEditMode) }
 
     LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
         viewModel.load(session)
@@ -286,16 +287,6 @@ fun HomeScreen(
                                     )
                                     is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                                 }
-                            }
-                        }
-                        if (!editMode) {
-                            item(key = "customize_bar_bottom") {
-                                HomeCustomizeBar(
-                                    editMode = false,
-                                    onToggleEdit = { editMode = true },
-                                    onReset = { viewModel.resetCustomization() },
-                                    modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 32.dp),
-                                )
                             }
                         }
                         // Rows still loading below the ones already shown.

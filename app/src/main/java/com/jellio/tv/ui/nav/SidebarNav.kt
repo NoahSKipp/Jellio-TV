@@ -91,7 +91,7 @@ fun SidebarNav(
     var expanded by remember { mutableStateOf(false) }
     val visuallyExpanded = expanded && !forceCollapsed
     val homeFocusRequester = remember { FocusRequester() }
-    val entryRoute = if (items.contains(selected)) selected else JellioRoute.Home
+    val entryRoute = if (items.contains(selected)) selected else JellioRoute.Home()
 
     LaunchedEffect(visuallyExpanded) {
         if (!visuallyExpanded) {

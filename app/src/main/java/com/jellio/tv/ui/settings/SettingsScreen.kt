@@ -24,6 +24,9 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MovieFilter
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.layout.ContentScale
@@ -137,6 +140,7 @@ fun SettingsScreen(
     session: Session,
     onLogout: () -> Unit,
     onViewProfile: () -> Unit,
+    onCustomizeHome: () -> Unit = {},
     onShowChangelog: () -> Unit = {},
     onLaunchOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -167,7 +171,7 @@ fun SettingsScreen(
     val contentFocus = remember { FocusRequester() }
     var contentHasFocus by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
-        Column(modifier = Modifier.width(280.dp)) {
+        Column(modifier = Modifier.width(310.dp)) {
             Text(text = string("settings_title"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -370,6 +374,24 @@ fun SettingsScreen(
                     val excludedUsers by viewModel.excludedUserIds.collectAsState()
                     val allGenres by viewModel.allGenres.collectAsState()
                     val selectedGenres by viewModel.selectedGenres.collectAsState()
+                    val customGenres by viewModel.customGenres.collectAsState()
+                    val genreSearchResult by viewModel.genreSearchResult.collectAsState()
+                    val genreSearching by viewModel.genreSearching.collectAsState()
+                    var customGenreInput by remember { mutableStateOf("") }
+                    var customGenreFeedback by remember { mutableStateOf<String?>(null) }
+
+                    SettingsSection(
+                        title = string("home_customize"),
+                        icon = Icons.Filled.Tune,
+                        description = string("settings_customize_home_desc"),
+                    ) {
+                        SettingsActionRow(
+                            label = string("home_customize"),
+                            icon = Icons.Filled.Tune,
+                            description = string("settings_customize_home_desc"),
+                            onClick = onCustomizeHome,
+                        )
+                    }
 
                     SettingsSection(
                         title = string("home_community_watching"),
@@ -464,6 +486,156 @@ fun SettingsScreen(
                                             color = if (isSelected) JellioSecondary else JellioText,
                                         )
                                         SettingsSwitch(checked = isSelected)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    SettingsSection(
+                        title = string("settings_custom_genres_title"),
+                        icon = Icons.Filled.Category,
+                        description = string("settings_custom_genres_desc"),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                JellioTextField(
+                                    value = customGenreInput,
+                                    onValueChange = {
+                                        customGenreInput = it
+                                        customGenreFeedback = null
+                                    },
+                                    label = string("settings_custom_genres_search"),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Surface(
+                                    onClick = {
+                                        val query = customGenreInput.trim()
+                                        if (query.isBlank()) return@Surface
+                                        val inStandard = allGenres.any { it.equals(query, ignoreCase = true) }
+                                        if (inStandard) {
+                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.get("settings_custom_genres_exists")
+                                            return@Surface
+                                        }
+                                        val inCustom = customGenres.any { it.name.equals(query, ignoreCase = true) }
+                                        if (inCustom) {
+                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.get("settings_custom_genres_exists")
+                                            return@Surface
+                                        }
+                                        viewModel.searchGenre(query)
+                                    },
+                                    shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                                    colors = ClickableSurfaceDefaults.colors(
+                                        containerColor = JellioSecondary,
+                                        contentColor = JellioBg,
+                                    ),
+                                ) {
+                                    Text(
+                                        text = if (genreSearching) string("status_loading") else string("action_search"),
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    )
+                                }
+                            }
+
+                            customGenreFeedback?.let {
+                                Text(
+                                    text = it,
+                                    color = JellioSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+
+                            if (genreSearchResult != null) {
+                                val res = genreSearchResult!!
+                                if (res.Found && !res.Name.isNullOrBlank()) {
+                                    val displayName = res.Name
+                                    val isAlreadyStandard = res.IsStandard || allGenres.any { it.equals(displayName, ignoreCase = true) }
+                                    val isAlreadyCustom = customGenres.any { it.name.equals(displayName, ignoreCase = true) }
+
+                                    Column(modifier = Modifier.padding(top = 12.dp)) {
+                                        Text(
+                                            text = if (isAlreadyStandard || isAlreadyCustom) {
+                                                string("settings_custom_genres_exists")
+                                            } else {
+                                                formatString("settings_custom_genres_found", displayName)
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isAlreadyStandard || isAlreadyCustom) JellioTextSecondary else JellioSecondary,
+                                        )
+                                        if (!isAlreadyStandard && !isAlreadyCustom) {
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Surface(
+                                                onClick = {
+                                                    viewModel.addCustomGenre(
+                                                        session.userId,
+                                                        com.jellio.tv.data.model.CustomGenreItem(name = displayName, category = res.Category, enabled = true)
+                                                    )
+                                                    customGenreInput = ""
+                                                    customGenreFeedback = null
+                                                },
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = JellioSecondary,
+                                                    contentColor = JellioBg,
+                                                ),
+                                            ) {
+                                                Text(
+                                                    text = formatString("settings_custom_genres_add_btn", displayName),
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else if (!genreSearching && customGenreInput.isNotBlank()) {
+                                    Text(
+                                        text = string("settings_custom_genres_not_found"),
+                                        color = JellioTextSecondary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
+                                }
+                            }
+
+                            if (customGenres.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = string("settings_custom_genres_added"),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = JellioText,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                                customGenres.forEach { custom ->
+                                    SettingsRowSurface(onClick = { viewModel.toggleCustomGenre(session.userId, custom.name) }) {
+                                        SettingsRowText(
+                                            label = custom.name,
+                                            description = if (custom.enabled) string("settings_genres_included") else string("settings_genres_excluded"),
+                                            color = if (custom.enabled) JellioSecondary else JellioText,
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SettingsSwitch(checked = custom.enabled)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Surface(
+                                                onClick = { viewModel.removeCustomGenre(session.userId, custom.name) },
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = Color.White.copy(alpha = 0.08f),
+                                                    contentColor = Color.Red.copy(alpha = 0.8f),
+                                                ),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.DeleteOutline,
+                                                    contentDescription = string("settings_custom_genres_remove"),
+                                                    modifier = Modifier.padding(6.dp).size(18.dp),
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

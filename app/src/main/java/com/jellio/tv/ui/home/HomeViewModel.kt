@@ -867,7 +867,19 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun chooseGenres(userId: String): List<String> {
         val selected = recommendationPreferences.getSelectedGenres(userId)
-        return if (selected.isNotEmpty()) selected else repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
+        val custom = recommendationPreferences.getCustomGenres(userId).filter { it.enabled }.map { it.name }
+        val base = if (selected.isNotEmpty()) selected else repository.discoverGenres(userId, null, "Movie,Series", GENRE_ROWS)
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<String>()
+        for (g in base) {
+            val key = g.trim().lowercase()
+            if (key.isNotEmpty() && seen.add(key)) result.add(g)
+        }
+        for (g in custom) {
+            val key = g.trim().lowercase()
+            if (key.isNotEmpty() && seen.add(key)) result.add(g)
+        }
+        return result
     }
 
     private fun genreSection(userId: String, entry: GenreRowEntry, deduplicator: SlidingRowDeduplicator): HomeSection? {

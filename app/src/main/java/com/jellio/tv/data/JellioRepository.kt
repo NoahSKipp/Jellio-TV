@@ -614,6 +614,9 @@ class JellioRepository @Inject constructor(
             .mapNotNull { it.Name?.trim()?.ifBlank { null } }
             .distinct()
 
+    suspend fun searchGenreOrCategory(query: String): com.jellio.tv.data.model.GenreSearchResultDto? =
+        runCatching { api.searchGenreOrCategory(query) }.getOrNull()
+
     // From the server's few-minute cache of the row, else asked directly.
     suspend fun getGenreItems(userId: String, parentId: String?, itemType: String, genre: String, limit: Int = 20): List<BaseItemDto> =
         cachedUnlessEmpty("genre:$userId:$parentId:$itemType:$genre:$limit") { fetchGenreItems(userId, parentId, itemType, genre, limit) }

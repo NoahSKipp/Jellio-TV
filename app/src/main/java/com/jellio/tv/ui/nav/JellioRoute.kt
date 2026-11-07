@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 private val ANIME_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 sealed interface JellioRoute {
     data class Profile(val userId: String? = null) : JellioRoute
-    data object Home : JellioRoute
+    data class Home(val editMode: Boolean = false) : JellioRoute
     data object Search : JellioRoute
     data object Watchlist : JellioRoute
     data object Calendar : JellioRoute
@@ -33,7 +33,7 @@ sealed interface JellioRoute {
 
 fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<JellioRoute> = buildList {
     add(JellioRoute.Profile())
-    add(JellioRoute.Home)
+    add(JellioRoute.Home())
     add(JellioRoute.Search)
     libraries.forEach { library ->
         if (library.CollectionType == "livetv") add(JellioRoute.LiveTv)
@@ -44,7 +44,7 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
 
 fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Profile -> Icons.Filled.AccountCircle
-    JellioRoute.Home -> Icons.Filled.Home
+    is JellioRoute.Home -> Icons.Filled.Home
     JellioRoute.Search -> SearchIconVector
     JellioRoute.Watchlist -> Icons.Filled.BookmarkAdd
     JellioRoute.Calendar -> Icons.Filled.CalendarMonth
@@ -70,7 +70,7 @@ fun JellioRoute.iconScale(): Float = when (this) {
 
 fun JellioRoute.label(): String = when (this) {
     is JellioRoute.Profile -> com.jellio.tv.ui.i18n.Strings.get("nav_profile")
-    JellioRoute.Home -> com.jellio.tv.ui.i18n.Strings.get("nav_home")
+    is JellioRoute.Home -> com.jellio.tv.ui.i18n.Strings.get("nav_home")
     JellioRoute.Search -> com.jellio.tv.ui.i18n.Strings.get("nav_search")
     JellioRoute.Watchlist -> com.jellio.tv.ui.i18n.Strings.get("nav_watchlist")
     JellioRoute.Calendar -> com.jellio.tv.ui.i18n.Strings.get("nav_calendar")

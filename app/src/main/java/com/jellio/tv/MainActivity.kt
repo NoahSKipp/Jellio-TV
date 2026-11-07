@@ -247,7 +247,7 @@ private fun JellioTvApp(
     remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
 ) {
-    var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home)) }
+    var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home())) }
     // Home keeps its scroll positions and focused card while a title's page is open.
     val screenStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val route = routeStack.last()
@@ -398,7 +398,7 @@ private fun JellioTvApp(
                 onUserClick = { userId -> push(JellioRoute.Profile(userId)) },
                 modifier = Modifier.fillMaxSize(),
             )
-            JellioRoute.Home -> screenStates.SaveableStateProvider("home") {
+            is JellioRoute.Home -> screenStates.SaveableStateProvider("home") {
                 HomeScreen(
                 session = session,
                 imageUrl = memoizedImageUrl,
@@ -417,6 +417,7 @@ private fun JellioTvApp(
                         }
                     }
                 },
+                initialEditMode = current.editMode,
                 modifier = Modifier.fillMaxSize(),
             )
             }
@@ -467,6 +468,9 @@ private fun JellioTvApp(
                 session = session,
                 onLogout = { appViewModel.logout() },
                 onViewProfile = { push(JellioRoute.Profile()) },
+                onCustomizeHome = {
+                    routeStack = listOf(JellioRoute.Home(editMode = true))
+                },
                 onShowChangelog = {
                     changelogReleaseToDisplay = com.jellio.tv.ui.changelog.CURRENT_CHANGELOG
                     showChangelog = true

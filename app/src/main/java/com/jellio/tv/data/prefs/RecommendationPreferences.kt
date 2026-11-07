@@ -24,10 +24,13 @@ class RecommendationPreferences @Inject constructor(
 ) {
     private val listStringType = Types.newParameterizedType(List::class.java, String::class.java)
     private val stringListAdapter = moshi.adapter<List<String>>(listStringType)
+    private val customGenreListType = Types.newParameterizedType(List::class.java, com.jellio.tv.data.model.CustomGenreItem::class.java)
+    private val customGenreListAdapter = moshi.adapter<List<com.jellio.tv.data.model.CustomGenreItem>>(customGenreListType)
 
     private fun communityEnabledKey(userId: String) = booleanPreferencesKey("community_row_enabled_$userId")
     private fun excludedUsersKey(userId: String) = stringPreferencesKey("community_excluded_users_$userId")
     private fun selectedGenresKey(userId: String) = stringPreferencesKey("selected_genres_$userId")
+    private fun customGenresKey(userId: String) = stringPreferencesKey("custom_genres_$userId")
 
     suspend fun isCommunityRowEnabled(userId: String): Boolean =
         context.recommendationPrefsDataStore.data.map { it[communityEnabledKey(userId)] ?: true }.first()
@@ -79,6 +82,43 @@ class RecommendationPreferences @Inject constructor(
             current.add(genre)
         }
         setSelectedGenres(userId, current)
+        return current
+    }
+
+    suspend fun getCustomGenres(userId: String): List<com.jellio.tv.data.model.CustomGenreItem> {
+        val raw = context.recommendationPrefsDataStore.data.map { it[customGenresKey(userId)] }.first() ?: return emptyList()
+        return runCatching { customGenreListAdapter.fromJson(raw) }.getOrNull() ?: emptyList()
+    }
+
+    suspend fun setCustomGenres(userId: String, genres: List<com.jellio.tv.data.model.CustomGenreItem>) {
+        context.recommendationPrefsDataStore.edit {
+            it[customGenresKey(userId)] = customGenreListAdapter.toJson(genres)
+        }
+    }
+
+    suspend fun addCustomGenre(userId: String, genre: com.jellio.tv.data.model.CustomGenreItem): List<com.jellio.tv.data.model.CustomGenreItem> {
+        val current = getCustomGenres(userId).toMutableList()
+        val index = current.indexOfFirst { it.name.trim().equals(genre.name.trim(), ignoreCase = true) }
+        if (index >= 0) {
+            current[index] = genre
+        } else {
+            current.add(genre)
+        }
+        setCustomGenres(userId, current)
+        return current
+    }
+
+    suspend fun removeCustomGenre(userId: String, name: String): List<com.jellio.tv.data.model.CustomGenreItem> {
+        val current = getCustomGenres(userId).filterNot { it.name.trim().equals(name.trim(), ignoreCase = true) }
+        setCustomGenres(userId, current)
+        return current
+    }
+
+    suspend fun toggleCustomGenre(userId: String, name: String): List<com.jellio.tv.data.model.CustomGenreItem> {
+        val current = getCustomGenres(userId).map {
+            if (it.name.trim().equals(name.trim(), ignoreCase = true)) it.copy(enabled = !it.enabled) else it
+        }
+        setCustomGenres(userId, current)
         return current
     }
 }
