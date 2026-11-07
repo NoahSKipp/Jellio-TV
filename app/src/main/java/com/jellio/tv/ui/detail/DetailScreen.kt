@@ -2,6 +2,7 @@ package com.jellio.tv.ui.detail
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -553,6 +554,7 @@ private fun DetailHero(
                     }
                 }
                 if (item.Type == "Episode" && item.SeriesId != null) {
+                    val allEpisodesText = com.jellio.tv.ui.i18n.string("detail_all_episodes")
                     Surface(
                         onClick = { onSeriesClick(item.SeriesId) },
                         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
@@ -570,9 +572,27 @@ private fun DetailHero(
                         ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
-                        Row(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Filled.Tv, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Text(text = com.jellio.tv.ui.i18n.string("detail_all_episodes"), modifier = Modifier.padding(start = 8.dp))
+                        Row(
+                            modifier = Modifier
+                                .animateContentSize()
+                                .padding(horizontal = if (actionsExpanded) 16.dp else 24.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Tv,
+                                contentDescription = allEpisodesText,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            AnimatedVisibility(
+                                visible = !actionsExpanded,
+                                enter = fadeIn() + expandHorizontally(),
+                                exit = fadeOut() + shrinkHorizontally(),
+                            ) {
+                                Text(
+                                    text = allEpisodesText,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
+                            }
                         }
                     }
                 }

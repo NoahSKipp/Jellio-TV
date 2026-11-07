@@ -642,6 +642,9 @@ internal fun PlayerSurface(
     val currentSubtitleLanguage by androidx.compose.runtime.rememberUpdatedState(selectedSubtitleLanguage)
     val currentAudioIndex by androidx.compose.runtime.rememberUpdatedState(selectedAudioStreamIndex)
     val currentAudioTracks by androidx.compose.runtime.rememberUpdatedState(audioTracks)
+    val currentSwitchSettled by androidx.compose.runtime.rememberUpdatedState(onSwitchSettled)
+    val currentSwitchingTo by androidx.compose.runtime.rememberUpdatedState(switchingTo)
+    val currentSwitchingLoaded by androidx.compose.runtime.rememberUpdatedState(switchingLoaded)
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
     var holdSeekTargetMs by remember { mutableStateOf<Long?>(null) }
     var holdSeekDeltaMs by remember { mutableLongStateOf(0L) }
@@ -933,12 +936,15 @@ internal fun PlayerSurface(
                 if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
                 if (placeholderWatch.firstFrameAt == 0L) placeholderWatch.firstFrameAt = System.currentTimeMillis()
                 PlayStartTrace.end("first frame")
-                if (switchingTo != null && switchingLoaded) {
-                    onSwitchSettled()
+                if (currentSwitchingTo != null) {
+                    currentSwitchSettled()
                 }
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                if (playing && currentSwitchingTo != null) {
+                    currentSwitchSettled()
+                }
             }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_SEEK) bufferWatch.lastSeekAt = System.currentTimeMillis()
@@ -1515,15 +1521,15 @@ internal fun PlayerSurface(
         if (switchingTo != null) {
             LaunchedEffect(switchingTo, switchingLoaded, player) {
                 if (!switchingLoaded) return@LaunchedEffect
-                withTimeoutOrNull(6000L) {
+                withTimeoutOrNull(4000L) {
                     androidx.compose.runtime.snapshotFlow {
                         val playing = isPlaying || player.isPlaying
                         val ready = !isBuffering || player.playbackState == Player.STATE_READY
                         playing && ready
                     }.first { it }
                 }
-                delay(250)
-                onSwitchSettled()
+                delay(200)
+                currentSwitchSettled()
             }
             SwitchingCard(
                 label = switchingTo,
