@@ -102,16 +102,29 @@ class DetailViewModel @Inject constructor(
         ownerItemId != null && loadedItemId == ownerItemId && (loadedItemId == seriesId || _uiState.value.item?.SeriesId == seriesId)
 
     fun load(session: Session, itemId: String) {
-        if (loadedItemId == itemId && _uiState.value.item?.Id == itemId) return
+        if (loadedItemId == itemId && !_uiState.value.isLoading && _uiState.value.item?.Id == itemId && !_uiState.value.detailsFailed) return
         cancelActiveWork()
         loadedItemId = itemId
         ratingTargetId = null
         val preview = repository.previewItem(itemId)
-        _uiState.value = DetailUiState(
-            isLoading = true,
-            item = preview,
-            loadingArt = preview?.let { loadingArt(session, it) },
-        )
+        val preloaded = repository.preloadedDetails(itemId) ?: preview
+        _uiState.value = if (preloaded != null) {
+            DetailUiState(
+                isLoading = false,
+                item = preloaded,
+                loadingArt = loadingArt(session, preloaded),
+                cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
+                trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
+                isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
+                isWatched = preloaded.UserData?.Played ?: false,
+            )
+        } else {
+            DetailUiState(
+                isLoading = true,
+                item = null,
+                loadingArt = preview?.let { loadingArt(session, it) },
+            )
+        }
         loadInternal(session, itemId)
     }
 
@@ -128,23 +141,7 @@ class DetailViewModel @Inject constructor(
         seriesPlayDeferred = null
         loadJob = viewModelScope.launch {
             if (loadedItemId != itemId) return@launch
-            // The player's loader, with art from the row the title was
-            // picked in, until the full details arrive.
-            val preview = repository.previewItem(itemId)
-            val preloaded = repository.preloadedDetails(itemId) ?: preview
-            if (loadedItemId != itemId) return@launch
-            _uiState.value = if (preloaded != null) {
-                DetailUiState(
-                    isLoading = false,
-                    item = preloaded,
-                    cast = preloaded.People?.filter { it.Type == "Actor" }?.take(20) ?: emptyList(),
-                    trailers = preloaded.RemoteTrailers?.filter { !it.Url.isNullOrEmpty() } ?: emptyList(),
-                    isWatchlisted = preloaded.UserData?.IsFavorite ?: false,
-                    isWatched = preloaded.UserData?.Played ?: false,
-                )
-            } else {
-                DetailUiState(isLoading = true, loadingArt = preview?.let { loadingArt(session, it) })
-            }
+            val preloaded = _uiState.value.item?.takeIf { it.Id == itemId }
             // The stream lookup does not wait for the details when the type is already known.
             var streamsStarted = false
             if ((preloaded?.Type == "Movie" || preloaded?.Type == "Episode") && (!isUnreleasedItem(preloaded) || isReleasedToday(preloaded))) {
@@ -214,7 +211,7 @@ class DetailViewModel @Inject constructor(
                 // A page already drawn from memory stays up, with a Retry.
                 val currentItem = _uiState.value.item?.takeIf { it.Id == itemId }
                 if (currentItem != null) {
-                    _uiState.value = _uiState.value.copy(item = currentItem, detailsRetrying = false, detailsFailed = true)
+                    _uiState.value = _uiState.value.copy(isLoading = false, item = currentItem, detailsRetrying = false, detailsFailed = true)
                 } else {
                     _uiState.value = DetailUiState(isLoading = false, item = null, error = com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
                 }
@@ -406,13 +403,12 @@ class DetailViewModel @Inject constructor(
     // same lookup (the repository shares it and caches the answer).
     private var secondSourceJob: kotlinx.coroutines.Job? = null
 
-    // Leaving the page cancels active jobs and resets state unless another item has already taken over.
+    // Leaving the page cancels active warmups.
     fun onScreenHidden(itemId: String? = null) {
-        if (itemId != null && loadedItemId != null && loadedItemId != itemId) return
-        cancelActiveWork()
-        loadedItemId = null
-        ratingTargetId = null
-        _uiState.value = DetailUiState()
+        secondSourceJob?.cancel()
+        secondSourceJob = null
+        playPrefetchJob?.cancel()
+        playPrefetchJob = null
     }
 
     private fun lookForStreams(session: Session, itemId: String) {

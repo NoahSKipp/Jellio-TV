@@ -869,8 +869,12 @@ class JellioRepository @Inject constructor(
 
     private suspend fun fetchItemInfo(userId: String, itemId: String, fields: String?): BaseItemDto =
         withRetry {
-            runCatching { api.getItemsByIds(userId, itemId, fields).Items.firstOrNull() }.getOrNull()
-                ?: api.getItem(userId, itemId, fields)
+            runCatching {
+                api.getItemsByIds(userId, itemId, fields).Items.firstOrNull {
+                    it.Id.equals(itemId, ignoreCase = true) ||
+                        it.Id.replace("-", "").equals(itemId.replace("-", ""), ignoreCase = true)
+                }
+            }.getOrNull() ?: api.getItem(userId, itemId, fields)
         }
 
     suspend fun getPerson(userId: String, personId: String): BaseItemDto = fetchItemInfo(userId, personId, null)
