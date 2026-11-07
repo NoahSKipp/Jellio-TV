@@ -32,135 +32,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.roundToInt
-
-data class SubtitleTrackUiState(
-    val streamIndex: Int,
-    val label: String,
-    val isTextBased: Boolean,
-    val url: String?,
-    val language: String? = null,
-    val isExternal: Boolean = false,
-    val embeddedTextOrdinal: Int = -1,
-)
-
-data class PauseOverlayInfo(
-    val art: List<com.jellio.tv.ui.common.ArtCandidate>,
-    val logoUrl: String?,
-    val title: String,
-    val rating: Double?,
-    val year: String?,
-    val officialRating: String?,
-    val isEpisode: Boolean,
-    val episodeCode: String?,
-    val episodeTitle: String?,
-    val overview: String?,
-) {
-    val backdropUrl: String? get() = art.firstOrNull { !it.blurred }?.url
-}
-
-data class UpNextInfo(
-    val itemId: String,
-    val thumbnailUrl: String?,
-    val title: String,
-    val overview: String? = null,
-    val seriesName: String? = null,
-    val episodeName: String = "",
-    val episodeCode: String? = null,
-)
-
-data class EpisodePanelEntry(
-    val itemId: String,
-    val title: String,
-    val thumbnailUrl: String?,
-    val episodeCode: String?,
-    val rating: String?,
-    val overview: String?,
-)
-
-data class AudioTrackUiState(
-    val streamIndex: Int,
-    val label: String,
-    val language: String? = null,
-)
-
-enum class SkipKind { INTRO, CREDITS }
-
-data class SkipSegment(
-    val kind: SkipKind,
-    val targetSeconds: Double,
-) {
-    val eyebrow: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_eyebrow_intro" else "player_skip_eyebrow_credits")
-    val label: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_intro" else "player_skip_credits")
-}
-
-fun activeSkipSegment(segments: SkipSegments?, currentSeconds: Double): SkipSegment? {
-    segments ?: return null
-    val intro = segments.intro
-    if (intro != null && intro.end > 0 && currentSeconds >= intro.start && currentSeconds < intro.end) {
-        return SkipSegment(SkipKind.INTRO, intro.end)
-    }
-    val credits = segments.credits
-    if (credits != null && credits.end > 0 && currentSeconds >= credits.start && currentSeconds < credits.end) {
-        return SkipSegment(SkipKind.CREDITS, credits.end)
-    }
-    return null
-}
-
-// Shown while an automatic retry loads: which attempt this is and the
-// stream being tried.
-data class FailoverNotice(val attempt: Int, val sourceLabel: String, val slowTranscode: Boolean = false)
-
-data class PlayerUiState(
-    // The title's runtime, to spot a placeholder clip far shorter than it.
-    val expectedRuntimeMs: Long = 0,
-    val isLoading: Boolean = true,
-    val error: String? = null,
-    val errorDetail: String? = null,
-    // The list of other streams could not be loaded; OK tries again.
-    val failoverRetry: Boolean = false,
-    val streamUrl: String? = null,
-    val mediaSourceId: String? = null,
-    val startPositionTicks: Long = 0,
-    val resumePercent: Int? = null,
-    val title: String = "",
-    val subtitle: String = "",
-    // Poster shown by the system media controls (Google Home, the phone's remote).
-    val artworkUrl: String? = null,
-    // The video's frame rate, for matching the TV's refresh rate.
-    val videoFrameRate: Float? = null,
-    val subtitleTracks: List<SubtitleTrackUiState> = emptyList(),
-    val selectedSubtitleIndex: Int? = null,
-    val isSwitchingSubtitle: Boolean = false,
-    val audioTracks: List<AudioTrackUiState> = emptyList(),
-    val selectedAudioStreamIndex: Int? = null,
-    val defaultAudioStreamIndex: Int? = null,
-    val directPlay: Boolean = false,
-    // The server is re-encoding this stream's video (Video transcode
-    // policy Avoid or Block): give up on it sooner when no picture comes.
-    val reencodingVideo: Boolean = false,
-    val pauseInfo: PauseOverlayInfo? = null,
-    val upNextInfo: UpNextInfo? = null,
-    val skipSegments: SkipSegments? = null,
-    // Every skip data source has answered; until then a missing credits
-    // range may still arrive.
-    val skipSegmentsResolved: Boolean = false,
-    val sleepTimerEndTimeMs: Long? = null,
-    val sourceOptions: List<MediaSourceDto> = emptyList(),
-    val seriesId: String? = null,
-    val seasons: List<BaseItemDto> = emptyList(),
-    val selectedSeasonId: String? = null,
-    val episodes: List<EpisodePanelEntry> = emptyList(),
-    val isLoadingEpisodes: Boolean = false,
-    val toastMessage: String? = null,
-    // Set while another stream is being fetched and started, so the screen
-    // can say so until it actually plays.
-    val switchingTo: String? = null,
-    val switchingLoaded: Boolean = false,
-    val toastId: Long = 0L,
-)
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -189,13 +65,17 @@ class PlayerViewModel @Inject constructor(
         _failover.value = null
     }
 
+    // The retry in progress, so Stop or leaving the player ends it.
+    private var failoverJob: kotlinx.coroutines.Job? = null
+
     fun stopFailover() {
+        failoverJob?.cancel()
         _failover.value = null
         failingOver = true
     }
 
     private fun sourceLabel(source: com.jellio.tv.data.model.MediaSourceDto): String =
-        source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: com.jellio.tv.ui.i18n.Strings.get("player_another_stream")
+        source.Name?.lineSequence()?.firstOrNull()?.trim()?.ifEmpty { null } ?: Strings.get("player_another_stream")
 
     private fun streamLanguage(): String? =
         preferredStreamLanguage(audioLanguagePreference, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code)
@@ -234,7 +114,7 @@ class PlayerViewModel @Inject constructor(
                 sourceLabel = sourceLabel(source),
                 slowTranscode = false,
             )
-            viewModelScope.launch {
+            failoverJob = viewModelScope.launch {
                 val target = runCatching {
                     repository.resolvePlayback(
                         userId = session.userId,
@@ -245,6 +125,7 @@ class PlayerViewModel @Inject constructor(
                         forceTranscode = true,
                     )
                 }.getOrNull()
+                ensureActive()
                 if (target != null) {
                     val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, target.startPositionTicks)
                     _uiState.value = _uiState.value.copy(
@@ -263,7 +144,7 @@ class PlayerViewModel @Inject constructor(
         failingOver = true
         android.util.Log.w("JellioPlayer", "stream failed ($reason), trying the next one")
         val remuxFailed = !state.directPlay && reason == "error before the first frame"
-        viewModelScope.launch {
+        failoverJob = viewModelScope.launch {
             var loaded: FailoverLoad<com.jellio.tv.data.model.MediaSourceDto>? = null
             if (remuxFailed && sourceId != null) {
                 loaded = repository.getFailoverSources(session.userId, id, fresh = notReady)
@@ -282,6 +163,7 @@ class PlayerViewModel @Inject constructor(
                             forceDirectPlay = true,
                         )
                     }.getOrNull()
+                    ensureActive()
                     if (target != null) {
                         _uiState.value = _uiState.value.copy(
                             streamUrl = target.streamUrl,
@@ -316,7 +198,7 @@ class PlayerViewModel @Inject constructor(
         if (failingOver) return
         failingOver = true
         _uiState.value = pending.state.copy(isLoading = true, error = null, errorDetail = null, failoverRetry = false)
-        viewModelScope.launch { chooseNextStream(session, pending, null) }
+        failoverJob = viewModelScope.launch { chooseNextStream(session, pending, null) }
     }
 
     private suspend fun chooseNextStream(
@@ -329,6 +211,7 @@ class PlayerViewModel @Inject constructor(
         val language = failoverLanguage ?: streamLanguage()
         failoverLanguage = language
         val loaded = preloaded ?: repository.getFailoverSources(session.userId, id, fresh = pending.freshList)
+        currentCoroutineContext().ensureActive()
         // Avoid and Block try streams whose video can be copied first;
         // Block never falls back to one the server would re-encode.
         val policy = VideoTranscodePolicy
@@ -352,13 +235,13 @@ class PlayerViewModel @Inject constructor(
             _uiState.value = PlayerUiState(
                 isLoading = false,
                 error = if (listFailed != null) {
-                    com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_title")
+                    Strings.get("tv_failover_list_title")
                 } else {
                     Strings.get("player_failover_none_worked")
                 },
                 errorDetail = when {
-                    listFailed?.kind == "timeout" -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_timeout")
-                    listFailed != null -> com.jellio.tv.ui.i18n.Strings.get("tv_failover_list_error")
+                    listFailed?.kind == "timeout" -> Strings.get("tv_failover_list_timeout")
+                    listFailed != null -> Strings.get("tv_failover_list_error")
                     triedSourceIds.size > 1 -> Strings.format("player_failover_none_worked_many", triedSourceIds.size)
                     else -> Strings.get("player_failover_no_other")
                 },
@@ -470,6 +353,8 @@ class PlayerViewModel @Inject constructor(
     private var loadJob: kotlinx.coroutines.Job? = null
 
     fun onScreenDisposed() {
+        failoverJob?.cancel()
+        failoverJob = null
         loadJob?.cancel()
         loadJob = null
         loadedItemId = null
@@ -613,8 +498,8 @@ class PlayerViewModel @Inject constructor(
                     if (VideoTranscodePolicy.blocking) {
                         _uiState.value = PlayerUiState(
                             isLoading = false,
-                            error = com.jellio.tv.ui.i18n.Strings.get("player_stream_unplayable_title"),
-                            errorDetail = com.jellio.tv.ui.i18n.Strings.format(
+                            error = Strings.get("player_stream_unplayable_title"),
+                            errorDetail = Strings.format(
                                 "player_stream_unplayable_transcode_off",
                                 classification.reasons.joinToString(", ") { TranscodeReason.describe(it) },
                             ),
@@ -628,7 +513,7 @@ class PlayerViewModel @Inject constructor(
                 currentSource = target.mediaSource
                 PlayStartTrace.mark(itemId, "stream url ready")
                 val expectedRuntimeMs = (item.RunTimeTicks ?: 0L) / 10_000
-                val subtitleTracks = buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                val subtitleTracks = subtitleTracksFor(itemId, target)
                 subtitleSeriesId = if (isEpisode) item.SeriesId else null
                 val initialSubtitle = initialSubtitleIndex(
                     subtitleTracks,
@@ -840,7 +725,7 @@ class PlayerViewModel @Inject constructor(
                     0,
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                val subtitleTracks = subtitleTracksFor(id, target)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
@@ -856,7 +741,7 @@ class PlayerViewModel @Inject constructor(
             } catch (err: Exception) {
                 showToast(
                     if (err is IllegalStateException) {
-                        com.jellio.tv.ui.i18n.Strings.get("player_start_over_unavailable")
+                        Strings.get("player_start_over_unavailable")
                     } else {
                         Strings.format("player_start_over_failed", err.message ?: err.toString())
                     },
@@ -864,6 +749,10 @@ class PlayerViewModel @Inject constructor(
             }
         }
     }
+
+    // A transcode's subtitles are timed from where its encode started.
+    private suspend fun subtitleTracksFor(itemId: String, target: PlaybackTarget): List<SubtitleTrackUiState> =
+        buildSubtitleTracks(itemId, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
 
     private suspend fun buildSubtitleTracks(itemId: String, mediaSource: MediaSourceDto, offsetTicks: Long = 0): List<SubtitleTrackUiState> {
         val resolvedMediaSourceId = mediaSource.Id ?: itemId
@@ -877,7 +766,7 @@ class PlayerViewModel @Inject constructor(
                 // Block: an image subtitle would make the server re-encode the video.
                 if (!isText && VideoTranscodePolicy.blocking) return@mapNotNull null
                 val index = stream.Index ?: return@mapNotNull null
-                val label = stream.DisplayTitle ?: stream.Language ?: com.jellio.tv.ui.i18n.Strings.get("player_subtitle_fallback")
+                val label = stream.DisplayTitle ?: stream.Language ?: Strings.get("player_subtitle_fallback")
                 val url = if (isText) {
                     runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
                 } else {
@@ -914,7 +803,7 @@ class PlayerViewModel @Inject constructor(
         }
 
     private fun audioStreamLabel(stream: MediaStreamDto): String {
-        val language = stream.Language?.uppercase() ?: stream.DisplayTitle ?: com.jellio.tv.ui.i18n.Strings.get("lang_unknown")
+        val language = stream.Language?.uppercase() ?: stream.DisplayTitle ?: Strings.get("lang_unknown")
         val parts = listOfNotNull(
             stream.Codec?.uppercase()?.takeIf { it.isNotEmpty() },
             stream.ChannelLayout?.takeIf { it.isNotEmpty() },
@@ -957,22 +846,11 @@ class PlayerViewModel @Inject constructor(
         return text.firstOrNull { sameLanguage(it.language, language) }?.streamIndex
     }
 
-    private fun sameLanguage(a: String?, b: String?): Boolean {
-        if (a.isNullOrBlank() || b.isNullOrBlank()) return false
-        if (a.equals(b, ignoreCase = true)) return true
-        fun short(code: String): String = runCatching { java.util.Locale.forLanguageTag(code).language }.getOrDefault(code).lowercase()
-        val left = short(a)
-        val right = short(b)
-        return left.isNotEmpty() && left == right ||
-            runCatching { java.util.Locale(a).isO3Language.equals(java.util.Locale(b).isO3Language, ignoreCase = true) }.getOrDefault(false)
-    }
-
     fun selectBurnedInSubtitle(session: Session, streamIndex: Int, currentPositionTicks: Long) {
         val id = itemId ?: return
         val requestedLabel = _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == streamIndex }
-            ?.label?.removeSuffix(imageSubtitleSuffix()) ?: com.jellio.tv.ui.i18n.Strings.get("player_subtitle_fallback")
+            ?.label?.removeSuffix(imageSubtitleSuffix()) ?: Strings.get("player_subtitle_fallback")
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSwitchingSubtitle = true)
             try {
                 val target = repository.resolvePlayback(
                     session.userId,
@@ -982,9 +860,8 @@ class PlayerViewModel @Inject constructor(
                     burnInSubtitleStreamIndex = streamIndex,
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                val subtitleTracks = subtitleTracksFor(id, target)
                 _uiState.value = _uiState.value.copy(
-                    isSwitchingSubtitle = false,
                     streamUrl = target.streamUrl,
                     mediaSourceId = target.mediaSource.Id,
                     startPositionTicks = target.startPositionTicks,
@@ -994,14 +871,13 @@ class PlayerViewModel @Inject constructor(
                     directPlay = target.directPlay,
                 )
                 rememberSubtitleChoice(streamIndex)
-                showToast(com.jellio.tv.ui.i18n.Strings.format("tv_requested_burned_in", requestedLabel))
+                showToast(Strings.format("tv_requested_burned_in", requestedLabel))
             } catch (err: Exception) {
-                _uiState.value = _uiState.value.copy(isSwitchingSubtitle = false)
                 showToast(
                     if (err is IllegalStateException) {
-                        com.jellio.tv.ui.i18n.Strings.get("player_subtitle_unavailable")
+                        Strings.get("player_subtitle_unavailable")
                     } else {
-                        com.jellio.tv.ui.i18n.Strings.format("player_subtitle_switch_failed", err.message ?: "")
+                        Strings.format("player_subtitle_switch_failed", err.message ?: "")
                     },
                 )
             }
@@ -1013,16 +889,14 @@ class PlayerViewModel @Inject constructor(
         val label = _uiState.value.audioTracks.firstOrNull { it.streamIndex == streamIndex }?.label ?: Strings.get("tv_audio")
         if (_uiState.value.directPlay && currentSource?.let { repository.canDirectPlay(it, streamIndex) } != false) {
             _uiState.value = _uiState.value.copy(selectedAudioStreamIndex = streamIndex)
-            showToast(com.jellio.tv.ui.i18n.Strings.format("tv_audio_label", label))
+            showToast(Strings.format("tv_audio_label", label))
             return
         }
-        showToast(com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", label))
+        showToast(Strings.format("tv_switching_to", label))
         viewModelScope.launch {
             try {
                 val currentSubIndex = _uiState.value.selectedSubtitleIndex
-                val isBurnedIn = currentSubIndex != null &&
-                    _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == currentSubIndex }?.isTextBased == false
-                val burnInSub = if (isBurnedIn) currentSubIndex else null
+                val burnInSub = burnedInSubtitleIndex()
 
                 val target = repository.resolvePlayback(
                     session.userId,
@@ -1032,7 +906,7 @@ class PlayerViewModel @Inject constructor(
                     burnInSubtitleStreamIndex = burnInSub,
                     audioStreamIndex = streamIndex,
                 )
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                val subtitleTracks = subtitleTracksFor(id, target)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
@@ -1046,32 +920,35 @@ class PlayerViewModel @Inject constructor(
                     defaultAudioStreamIndex = target.mediaSource.DefaultAudioStreamIndex,
                     directPlay = target.directPlay,
                 )
-                showToast(com.jellio.tv.ui.i18n.Strings.format("tv_requested_reloading", label))
+                showToast(Strings.format("tv_requested_reloading", label))
             } catch (err: Exception) {
                 showToast(
                     if (err is IllegalStateException) {
-                        com.jellio.tv.ui.i18n.Strings.get("player_audio_unavailable")
+                        Strings.get("player_audio_unavailable")
                     } else {
-                        com.jellio.tv.ui.i18n.Strings.format("player_audio_switch_failed", err.message ?: "")
+                        Strings.format("player_audio_switch_failed", err.message ?: "")
                     },
                 )
             }
         }
     }
 
+    // The picked subtitle when it is an image one the server burns in.
+    private fun burnedInSubtitleIndex(): Int? {
+        val index = _uiState.value.selectedSubtitleIndex ?: return null
+        return index.takeIf { _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == index }?.isTextBased == false }
+    }
+
     fun reloadAt(session: Session, positionTicks: Long) {
         val id = itemId ?: return
         viewModelScope.launch {
             try {
-                val currentSubIndex = _uiState.value.selectedSubtitleIndex
-                val isBurnedIn = currentSubIndex != null &&
-                    _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == currentSubIndex }?.isTextBased == false
                 val target = repository.resolvePlayback(
                     session.userId,
                     id,
                     mediaSourceIdParam,
                     positionTicks,
-                    burnInSubtitleStreamIndex = if (isBurnedIn) currentSubIndex else null,
+                    burnInSubtitleStreamIndex = burnedInSubtitleIndex(),
                     audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
                 )
                 _uiState.value = _uiState.value.copy(
@@ -1079,10 +956,10 @@ class PlayerViewModel @Inject constructor(
                     startPositionTicks = target.startPositionTicks,
                     resumePercent = null,
                     directPlay = target.directPlay,
-                    subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks),
+                    subtitleTracks = subtitleTracksFor(id, target),
                 )
             } catch (err: Exception) {
-                showToast(com.jellio.tv.ui.i18n.Strings.get("tv_seek_failed"))
+                showToast(Strings.get("tv_seek_failed"))
             }
         }
     }
@@ -1127,7 +1004,7 @@ class PlayerViewModel @Inject constructor(
                 )
                 mediaSourceIdParam = target.mediaSource.Id
                 currentSource = target.mediaSource
-                val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, if (target.directPlay) 0L else target.startPositionTicks)
+                val subtitleTracks = subtitleTracksFor(id, target)
                 val audioTracks = buildAudioTracks(target.mediaSource)
                 _uiState.value = _uiState.value.copy(
                     streamUrl = target.streamUrl,
@@ -1147,9 +1024,9 @@ class PlayerViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(switchingTo = null, switchingLoaded = false)
                 showToast(
                     if (err is IllegalStateException) {
-                        com.jellio.tv.ui.i18n.Strings.get("player_stream_unavailable")
+                        Strings.get("player_stream_unavailable")
                     } else {
-                        com.jellio.tv.ui.i18n.Strings.get("player_stream_switch_failed")
+                        Strings.get("player_stream_switch_failed")
                     },
                 )
             }
@@ -1165,13 +1042,13 @@ class PlayerViewModel @Inject constructor(
 
     fun loadSeasonEpisodes(session: Session, seriesId: String, seasonId: String) {
         val request = ++episodeRequest
-        _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId, isLoadingEpisodes = true)
+        _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId)
         viewModelScope.launch {
             val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }
                 .getOrDefault(emptyList())
                 .map { buildEpisodePanelEntry(session, it) }
             if (request != episodeRequest) return@launch
-            _uiState.value = _uiState.value.copy(episodes = episodes, isLoadingEpisodes = false)
+            _uiState.value = _uiState.value.copy(episodes = episodes)
         }
     }
 
@@ -1299,13 +1176,4 @@ class PlayerViewModel @Inject constructor(
 private fun parseSleepTimerEndTimeMs(endTimeUtc: String?): Long? {
     endTimeUtc ?: return null
     return runCatching { java.time.Instant.parse(endTimeUtc).toEpochMilli() }.getOrNull()
-}
-
-// "ger", "deu", "de" and "German" all mean the same language: compared as
-// ISO 639-2 codes so the server's and the player's spellings match.
-internal fun normalizeLanguage(code: String?): String? {
-    val raw = code?.trim()?.lowercase()?.ifBlank { null } ?: return null
-    val aliases = mapOf("ger" to "deu", "fre" to "fra", "dut" to "nld", "chi" to "zho", "cze" to "ces", "gre" to "ell", "per" to "fas", "rum" to "ron", "slo" to "slk", "wel" to "cym", "arm" to "hye", "baq" to "eus", "geo" to "kat", "ice" to "isl", "mac" to "mkd", "may" to "msa", "bur" to "mya", "alb" to "sqi", "tib" to "bod")
-    aliases[raw]?.let { return it }
-    return runCatching { java.util.Locale.forLanguageTag(raw.substringBefore('-')).isO3Language }.getOrNull()?.ifBlank { null } ?: raw
 }

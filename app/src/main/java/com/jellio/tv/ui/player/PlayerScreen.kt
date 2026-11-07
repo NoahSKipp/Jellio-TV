@@ -1,56 +1,18 @@
 package com.jellio.tv.ui.player
 
+import com.jellio.tv.ui.i18n.Strings
 import android.net.Uri
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
@@ -64,37 +26,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.AudioAttributes
@@ -103,7 +45,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -111,93 +52,24 @@ import androidx.media3.session.MediaSession
 import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import android.content.Context
-import androidx.activity.ComponentActivity
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
-import androidx.media3.ui.SubtitleView
-import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Icon
-import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.playback.SkipSegments
 import com.jellio.tv.data.model.MediaSourceDto
-import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
-import com.jellio.tv.data.model.SUBTITLE_SIZES
-import com.jellio.tv.data.model.SUBTITLE_COLORS
-import com.jellio.tv.data.model.SUBTITLE_EDGES
 import com.jellio.tv.data.model.SUBTITLE_POSITIONS
 import com.jellio.tv.data.model.SubtitleStyle
-import com.jellio.tv.data.model.subtitleBackgroundOption
-import com.jellio.tv.data.model.subtitleSizeOption
 import com.jellio.tv.data.session.Session
-import com.jellio.tv.ui.detail.FilterChipRow
-import com.jellio.tv.ui.detail.QUALITY_ORDER
-import com.jellio.tv.ui.detail.SourceCard
-import com.jellio.tv.ui.detail.sourceAudioLanguages
-import com.jellio.tv.ui.detail.sourceQuality
-import com.jellio.tv.data.model.languageName
-import com.jellio.tv.ui.theme.JellioBg
-import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
-import com.jellio.tv.ui.theme.JellioText
-import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withTimeoutOrNull
-
-internal const val SEEK_STEP_MS = 10_000L
-internal const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
-internal const val CONTROLS_HIDE_DELAY_MS = 4_000L
-// Paused this long with nothing open, the controls give way to the
-// "You're watching" screen (NuvioTV does the same).
-internal const val PAUSE_OVERLAY_DELAY_MS = 5_000L
-internal const val TOAST_DURATION_MS = 4_000L
-internal const val TICKS_PER_MS = 10_000L
-// Further apart than this from the group, a play or pause also seeks.
-internal const val SYNC_DRIFT_MS = 1_500L
-internal const val START_TIMEOUT_MS = 25_000L
-internal const val SIDELOADED_SUBTITLE_PREFIX = "jellio-sub-"
-internal const val REENCODE_START_TIMEOUT_MS = 12_000L
-// How long Play Next counts down on the Up Next card and end screen.
-internal const val UPNEXT_COUNTDOWN_SECONDS = 15
-
-internal val PLAYBACK_SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
-
-internal fun seekTarget(positionMs: Long, deltaMs: Long, durationMs: Long): Long {
-    val target = (positionMs + deltaMs).coerceAtLeast(0L)
-    return if (durationMs > 0) target.coerceAtMost(durationMs) else target
-}
-
-internal data class SeekFlash(val target: Long, val totalMs: Long, val stamp: Long)
-
-internal fun formatSpeed(speed: Float): String {
-    val whole = speed.toInt()
-    return if (speed == whole.toFloat()) "${whole}x" else "${speed}x"
-}
-
-internal val SLEEP_TIMER_OPTIONS = listOf(15, 30, 45, 60, 90)
-
-// screens/player.js's EPISODE_SLEEP_TIMER_OPTIONS: stop after this many
-// episodes instead of after some minutes.
-internal val EPISODE_SLEEP_TIMER_OPTIONS = listOf(1, 2, 3, 5)
-
-// Episodes left before the episode sleep timer stops playback. Lives
-// outside the player screen because each next episode opens a fresh one.
-internal object EpisodeSleepTimer {
-    var remaining by androidx.compose.runtime.mutableStateOf<Int?>(null)
-}
 
 @Composable
 fun PlayerScreen(
@@ -242,7 +114,7 @@ fun PlayerScreen(
             uiState.error != null -> Box(Modifier.fillMaxSize()) {
                 uiState.pauseInfo?.art?.let { com.jellio.tv.ui.common.TitleArtBackdrop(it, Modifier.fillMaxSize()) }
                 PlaybackErrorPanel(
-                    problem = PlaybackProblem(uiState.error ?: com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_title"), uiState.errorDetail.orEmpty()),
+                    problem = PlaybackProblem(uiState.error ?: Strings.get("playback_err_cant_start_title"), uiState.errorDetail.orEmpty()),
                     onBack = onBack,
                     onRetry = if (uiState.failoverRetry) {
                         { viewModel.retryFailover(session) }
@@ -335,50 +207,6 @@ fun PlayerScreen(
                     onBack()
                 },
             )
-        }
-    }
-}
-
-// Shown while an automatic retry loads, over the player and its controls:
-// what happened, which attempt this is, and Stop to give up.
-@Composable
-internal fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
-    val stopFocus = remember { FocusRequester() }
-    LaunchedEffect(notice) {
-        delay(150)
-        runCatching { stopFocus.requestFocus() }
-    }
-    BackHandler(onBack = onStop)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.75f))
-            .onKeyEvent { event -> event.key != Key.Back && event.key != Key.DirectionCenter && event.key != Key.Enter },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .widthIn(max = 560.dp)
-                .background(JellioBgElevated, RoundedCornerShape(16.dp))
-                .padding(horizontal = 32.dp, vertical = 28.dp),
-        ) {
-            com.jellio.tv.ui.common.ScreenSpinner()
-            Text(
-                text = com.jellio.tv.ui.i18n.Strings.get(if (notice.slowTranscode) "player_failover_slow_transcode" else "player_failover_failed"),
-                color = JellioText,
-                style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 18.dp),
-            )
-            Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("tv_trying_next_source", notice.attempt, notice.sourceLabel),
-                color = JellioTextSecondary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("action_stop"), onClick = onStop, modifier = Modifier.padding(top = 20.dp).focusRequester(stopFocus))
         }
     }
 }
@@ -589,24 +417,19 @@ internal fun PlayerSurface(
         }
     }
 
-    val playerContext = LocalContext.current
-    var loudnessEnhancer by remember { mutableStateOf<android.media.audiofx.LoudnessEnhancer?>(null) }
     DisposableEffect(player, PlayerPrefs.dialogueBoost) {
         val sessionId = player.audioSessionId
-        if (sessionId != C.AUDIO_SESSION_ID_UNSET && PlayerPrefs.dialogueBoost) {
-            try {
-                loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(sessionId).apply {
+        val loudnessEnhancer = if (sessionId != C.AUDIO_SESSION_ID_UNSET && PlayerPrefs.dialogueBoost) {
+            runCatching {
+                android.media.audiofx.LoudnessEnhancer(sessionId).apply {
                     setTargetGain(600)
                     enabled = true
                 }
-            } catch (_: Exception) {}
+            }.getOrNull()
+        } else {
+            null
         }
-        onDispose {
-            try {
-                loudnessEnhancer?.release()
-            } catch (_: Exception) {}
-            loudnessEnhancer = null
-        }
+        onDispose { runCatching { loudnessEnhancer?.release() } }
     }
 
     DisposableEffect(player) {
@@ -711,6 +534,18 @@ internal fun PlayerSurface(
             syncScope.launch { syncPlay.requestSeek(targetMs.coerceAtLeast(0L) * TICKS_PER_MS) }
         } else {
             seekToReal(targetMs)
+        }
+    }
+
+    // A held seek key let go: jump there and play on if the hold paused it.
+    fun releaseHoldSeek(target: Long) {
+        userSeek(target)
+        holdSeekTargetMs = null
+        holdSeekDeltaMs = 0L
+        holdSeekKey = null
+        if (wasPlayingBeforeHold) {
+            if (syncPlaylistItemId == null && directPlay) player.play()
+            wasPlayingBeforeHold = false
         }
     }
 
@@ -863,7 +698,7 @@ internal fun PlayerSurface(
         if (syncPlay.publishQueue(currentItemId, startPositionTicks).isSuccess) {
             // A party waits for everyone, counts down, then starts the group.
             if (!groupWatch.party.published(currentItemId)) unpauseAfterPublish = true
-            groupWatch.announceStarted(currentItemId, title.ifBlank { com.jellio.tv.ui.i18n.Strings.get("tv_something") })
+            groupWatch.announceStarted(currentItemId, title.ifBlank { Strings.get("tv_something") })
         } else {
             publishedQueue = false
         }
@@ -918,7 +753,7 @@ internal fun PlayerSurface(
         bufferScope.launch {
             if (!onBufferSwitch(ticks)) {
                 bufferWatch.snooze(System.currentTimeMillis(), 10 * 60_000L)
-                onShowToast(com.jellio.tv.ui.i18n.Strings.get("player_buffer_no_other"))
+                onShowToast(Strings.get("player_buffer_no_other"))
             }
         }
     }
@@ -998,7 +833,7 @@ internal fun PlayerSurface(
                     tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO || it.type == C.TRACK_TYPE_AUDIO }
                 ) {
                     subtitleMissingReported = true
-                    onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_subtitle_not_in_stream"))
+                    onShowToast(Strings.get("tv_subtitle_not_in_stream"))
                 }
                 if (directPlay) {
                     selectAudioTrack(player, currentAudioTracks, currentAudioIndex, defaultAudioStreamIndex)
@@ -1018,7 +853,7 @@ internal fun PlayerSurface(
             ) {
                 if (mediaLoadData.trackType != C.TRACK_TYPE_TEXT || wasCanceled) return
                 val status = (error as? androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException)?.responseCode
-                onShowToast(if (status != null) com.jellio.tv.ui.i18n.Strings.format("player_subtitles_load_error_status", status) else com.jellio.tv.ui.i18n.Strings.get("player_subtitles_load_error"))
+                onShowToast(if (status != null) Strings.format("player_subtitles_load_error_status", status) else Strings.get("player_subtitles_load_error"))
             }
         }
         player.addAnalyticsListener(loadErrors)
@@ -1112,14 +947,9 @@ internal fun PlayerSurface(
                     onUpNextShown()
                     // The episode sleep timer counts this boundary; on the
                     // last one there's no Up Next, playback stops at the end.
-                    EpisodeSleepTimer.remaining?.let { left ->
-                        if (left <= 1) {
-                            EpisodeSleepTimer.remaining = null
-                            upNextDismissed = true
-                            stopAtEnd = true
-                        } else {
-                            EpisodeSleepTimer.remaining = left - 1
-                        }
+                    if (EpisodeSleepTimer.countEpisode()) {
+                        upNextDismissed = true
+                        stopAtEnd = true
                     }
                     onReportRealDuration(positionMs / 1000.0)
                     onMarkRealWatchComplete()
@@ -1176,14 +1006,7 @@ internal fun PlayerSurface(
         // No credits data, so the card never counted this episode toward
         // an episode sleep timer: count it here.
         if (!stopAtEnd && upNextInfo != null && !upNextShown) {
-            EpisodeSleepTimer.remaining?.let { left ->
-                if (left <= 1) {
-                    EpisodeSleepTimer.remaining = null
-                    stopAtEnd = true
-                } else {
-                    EpisodeSleepTimer.remaining = left - 1
-                }
-            }
+            if (EpisodeSleepTimer.countEpisode()) stopAtEnd = true
         }
         if (stopAtEnd) onBack()
     }
@@ -1234,7 +1057,17 @@ internal fun PlayerSurface(
 
     val pausedByViewer = pauseInfo != null && hasReportedStart && !playWhenReadyState && !showResumePrompt && !isEnded
     val menuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel || showReactMenu
-    val anyMenuOpen = menuOpen
+    fun closeOpenMenu() {
+        when {
+            showReactMenu -> showReactMenu = false
+            showSubtitleMenu -> showSubtitleMenu = false
+            showSpeedMenu -> showSpeedMenu = false
+            showSleepMenu -> showSleepMenu = false
+            showAudioMenu -> showAudioMenu = false
+            showSourcePanel -> showSourcePanel = false
+            showEpisodesPanel -> showEpisodesPanel = false
+        }
+    }
     var pauseOverlayVisible by remember { mutableStateOf(false) }
     // The key that took the pause screen away, so its key up only does that.
     var pauseOverlayDismissKey by remember { mutableStateOf<Key?>(null) }
@@ -1258,7 +1091,7 @@ internal fun PlayerSurface(
         derivedStateOf { shouldShowNearEndUpNext(skipSegments, skipSegmentsResolved, positionMs / 1000.0, durationMs / 1000.0) }
     }
     // Anything that owns the screen or the remote keeps both prompts away.
-    val promptsBlocked = showEndScreen || upNextCardVisible || anyMenuOpen || bufferPromptVisible ||
+    val promptsBlocked = showEndScreen || upNextCardVisible || menuOpen || bufferPromptVisible ||
         showResumePrompt || catchUpOpen || exoError != null || pauseOverlayVisible
     val skipPromptVisible = activeSkip != null && activeSkip.kind != dismissedSkipKind && !promptsBlocked &&
         !(upNextInfo != null && upNextShown && !upNextDismissed)
@@ -1315,7 +1148,7 @@ internal fun PlayerSurface(
                 val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
 
                 if (event.type == KeyEventType.KeyDown) {
-                    val noOverlayOpen = !showEndScreen && !upNextCardVisible && !anyMenuOpen &&
+                    val noOverlayOpen = !showEndScreen && !upNextCardVisible && !menuOpen &&
                         !bufferPromptVisible && !showResumePrompt && !catchUpOpen && exoError == null &&
                         (!promptOwnsRemote || isMedia)
                     if (isSeekKey && (!controlsVisible || isMedia) && noOverlayOpen) {
@@ -1356,17 +1189,7 @@ internal fun PlayerSurface(
                 }
 
                 if (event.type != KeyEventType.KeyUp) return@onKeyEvent false
-                if (!isSeekKey && holdSeekTargetMs != null) {
-                    val target = holdSeekTargetMs!!
-                    userSeek(target)
-                    holdSeekTargetMs = null
-                    holdSeekDeltaMs = 0L
-                    holdSeekKey = null
-                    if (wasPlayingBeforeHold) {
-                        if (syncPlaylistItemId == null && directPlay) player.play()
-                        wasPlayingBeforeHold = false
-                    }
-                }
+                if (!isSeekKey) holdSeekTargetMs?.let { releaseHoldSeek(it) }
                 if (pauseOverlayDismissKey == event.key) {
                     pauseOverlayDismissKey = null
                     when (event.key) {
@@ -1399,54 +1222,9 @@ internal fun PlayerSurface(
                         else -> Unit
                     }
                 }
-                if (showReactMenu) {
-                    if (event.key == Key.Back) {
-                        showReactMenu = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showSubtitleMenu) {
-                    if (event.key == Key.Back) {
-                        showSubtitleMenu = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showSpeedMenu) {
-                    if (event.key == Key.Back) {
-                        showSpeedMenu = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showSleepMenu) {
-                    if (event.key == Key.Back) {
-                        showSleepMenu = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showAudioMenu) {
-                    if (event.key == Key.Back) {
-                        showAudioMenu = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showSourcePanel) {
-                    if (event.key == Key.Back) {
-                        showSourcePanel = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
-                }
-                if (showEpisodesPanel) {
-                    if (event.key == Key.Back) {
-                        showEpisodesPanel = false
-                        return@onKeyEvent true
-                    }
-                    return@onKeyEvent false
+                if (menuOpen) {
+                    if (event.key == Key.Back) closeOpenMenu()
+                    return@onKeyEvent event.key == Key.Back
                 }
                 if (bufferPromptVisible) {
                     if (event.key == Key.Back) {
@@ -1469,18 +1247,9 @@ internal fun PlayerSurface(
                         true
                     }
                     Key.DirectionLeft, Key.DirectionRight, Key.MediaRewind, Key.MediaFastForward -> {
-                        if (holdSeekTargetMs != null) {
-                            // Finished holding down - seek and resume
-                            val target = holdSeekTargetMs!!
-                            userSeek(target)
+                        holdSeekTargetMs?.let { target ->
                             seekFlash = SeekFlash(target, holdSeekDeltaMs, System.nanoTime())
-                            holdSeekTargetMs = null
-                            holdSeekDeltaMs = 0L
-                            holdSeekKey = null
-                            if (wasPlayingBeforeHold) {
-                                if (syncPlaylistItemId == null && directPlay) player.play()
-                                wasPlayingBeforeHold = false
-                            }
+                            releaseHoldSeek(target)
                             return@onKeyEvent true
                         }
                         if (controlsVisible && !isMedia) return@onKeyEvent false
@@ -1544,56 +1313,20 @@ internal fun PlayerSurface(
             BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                PulsingTitle(text = title.ifBlank { com.jellio.tv.ui.i18n.Strings.get("tv_loading") })
+                PulsingTitle(text = title.ifBlank { Strings.get("tv_loading") })
             }
         }
 
         // The quick-jump badge: shown for a moment after the last press,
         // adding up repeated presses (+30s after three).
         seekFlash?.let { flash ->
-            val isHolding = holdSeekTargetMs != null
-            if (!isHolding) {
-                LaunchedEffect(flash.stamp) {
-                    delay(1200)
-                    seekFlash = null
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(JellioBgElevated.copy(alpha = 0.92f))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
-            ) {
-                val totalSeconds = flash.totalMs / 1000
-                val sign = if (totalSeconds >= 0) "+" else "-"
-                val absSec = kotlin.math.abs(totalSeconds)
-                val deltaText = if (absSec >= 60) {
-                    val m = absSec / 60
-                    val s = absSec % 60
-                    if (s > 0) "$sign${m}m ${s}s" else "$sign${m}m"
-                } else {
-                    "$sign${absSec}s"
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isHolding) {
-                        Icon(
-                            imageVector = if (flash.totalMs >= 0) Icons.Filled.FastForward else Icons.Filled.FastRewind,
-                            contentDescription = null,
-                            tint = JellioSecondary,
-                            modifier = Modifier.size(20.dp).padding(end = 8.dp),
-                        )
-                    }
-                    Text(
-                        text = "$deltaText  ·  ${com.jellio.tv.ui.common.formatPlaybackTime(flash.target)}" +
-                            if (shownDurationMs > 0) " / " + com.jellio.tv.ui.common.formatPlaybackTime(shownDurationMs) else "",
-                        color = JellioText,
-                        style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
-                    )
-                }
-            }
+            SeekFlashBadge(
+                flash = flash,
+                holding = holdSeekTargetMs != null,
+                durationMs = shownDurationMs,
+                onExpired = { seekFlash = null },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
 
         // Switching streams: shown until the new stream has buffered and plays.
@@ -1613,7 +1346,7 @@ internal fun PlayerSurface(
             }
             SwitchingCard(
                 label = switchingTo,
-                step = com.jellio.tv.ui.i18n.Strings.get(if (switchingLoaded) "player_switch_loading" else "player_switch_connecting"),
+                step = Strings.get(if (switchingLoaded) "player_switch_loading" else "player_switch_connecting"),
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -1623,7 +1356,7 @@ internal fun PlayerSurface(
                 title = title,
                 subtitle = subtitle,
                 isPlaying = isPlaying,
-                enabled = !anyMenuOpen,
+                enabled = !menuOpen,
                 positionMs = { positionMs },
                 durationMs = shownDurationMs,
                 hasSubtitleTracks = subtitleTracks.isNotEmpty(),
@@ -1681,14 +1414,14 @@ internal fun PlayerSurface(
                 },
                 onToggleDialogueBoost = {
                     val next = !PlayerPrefs.dialogueBoost
-                    PlayerPrefs.setDialogueBoost(playerContext, next)
-                    onShowToast(com.jellio.tv.ui.i18n.Strings.get(if (next) "player_dialogue_boost_enabled" else "player_dialogue_boost_disabled"))
+                    PlayerPrefs.setDialogueBoost(context, next)
+                    onShowToast(Strings.get(if (next) "player_dialogue_boost_enabled" else "player_dialogue_boost_disabled"))
                 },
                 audioDelayMs = audioDelayMs,
                 onAudioDelay = { ms ->
                     audioDelayMs = ms
                     syncDelays.audioMs = ms
-                    PlayerPrefs.setAudioDelay(playerContext, ms)
+                    PlayerPrefs.setAudioDelay(context, ms)
                     // The first offset adds the sync layer, which needs a reload.
                     if (!syncDelays.wrapped && ms != 0) subtitleResyncSeq++
                 },
@@ -1704,7 +1437,7 @@ internal fun PlayerSurface(
                     showSourcePanel = false
                     onSelectSource(source, realPositionMs() * TICKS_PER_MS)
                 },
-                onBlocked = { onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_transcode_blocked")) },
+                onBlocked = { onShowToast(Strings.get("tv_transcode_blocked")) },
                 onDismiss = { showSourcePanel = false },
             )
         }
@@ -1748,7 +1481,7 @@ internal fun PlayerSurface(
                     showSleepMenu = false
                     if (sleepTimerEndTimeMs != null) onCancelSleepTimer()
                     EpisodeSleepTimer.remaining = count
-                    onShowToast(if (count == 1) com.jellio.tv.ui.i18n.Strings.get("player_this_episode") else com.jellio.tv.ui.i18n.Strings.format("player_stop_episodes", count))
+                    onShowToast(if (count == 1) Strings.get("player_this_episode") else Strings.format("player_stop_episodes", count))
                 },
                 onCancel = {
                     showSleepMenu = false
@@ -1767,14 +1500,14 @@ internal fun PlayerSurface(
                 autoSkippedTo = segment.targetSeconds
                 dismissedSkipKind = SkipKind.INTRO
                 userSeek((segment.targetSeconds * 1000).toLong())
-                onShowToast(com.jellio.tv.ui.i18n.Strings.get("tv_skipped_intro"))
+                onShowToast(Strings.get("tv_skipped_intro"))
             }
         }
         if (skipPromptVisible && activeSkip != null) {
             PlayerPrompt(
                 eyebrow = activeSkip.eyebrow,
                 title = activeSkip.label,
-                actionLabel = com.jellio.tv.ui.i18n.Strings.get("player_skip"),
+                actionLabel = Strings.get("player_skip"),
                 actionIcon = Icons.Filled.SkipNext,
                 onAction = { userSeek((activeSkip.targetSeconds * 1000).toLong()) },
                 onDismiss = { dismissPrompt() },
@@ -1785,18 +1518,16 @@ internal fun PlayerSurface(
         }
         if (nearEndUpNextVisible && upNextInfo != null) {
             PlayerPrompt(
-                eyebrow = com.jellio.tv.ui.i18n.Strings.get("player_up_next"),
+                eyebrow = Strings.get("player_up_next"),
                 title = upNextInfo.episodeName.ifBlank { upNextInfo.title },
                 detail = listOfNotNull(upNextInfo.episodeCode, upNextInfo.seriesName).joinToString("  ·  "),
                 thumbnailUrl = upNextInfo.thumbnailUrl,
-                actionLabel = com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
+                actionLabel = Strings.get("player_play_next_episode"),
                 actionIcon = Icons.Filled.PlayArrow,
                 onAction = {
                     // This episode counts toward an episode sleep timer as
                     // if it had played to the end.
-                    EpisodeSleepTimer.remaining?.let { left ->
-                        EpisodeSleepTimer.remaining = if (left <= 1) null else left - 1
-                    }
+                    EpisodeSleepTimer.countEpisode()
                     onPlayNext(upNextInfo.itemId)
                 },
                 onDismiss = { dismissPrompt() },
@@ -1876,7 +1607,6 @@ internal fun PlayerSurface(
         }
 
         if (bufferPromptVisible) {
-            val promptContext = LocalContext.current
             BufferSwitchPrompt(
                 onSwitch = { switchForBuffering() },
                 onKeep = {
@@ -1884,7 +1614,7 @@ internal fun PlayerSurface(
                     bufferWatch.snooze(System.currentTimeMillis(), 10 * 60_000L)
                 },
                 onAlways = {
-                    PlayerPrefs.setBufferSwitch(promptContext, "auto")
+                    PlayerPrefs.setBufferSwitch(context, "auto")
                     switchForBuffering()
                 },
             )

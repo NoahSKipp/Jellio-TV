@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.live
 
+import com.jellio.tv.ui.i18n.Strings
 import com.jellio.tv.data.model.LiveChannelDto
 import com.jellio.tv.data.model.LiveProgramDto
 import kotlinx.coroutines.sync.Mutex
@@ -221,10 +222,10 @@ fun describeOpenFailure(message: String?): String {
     val text = message.orEmpty().lowercase()
     return when {
         TUNER_BUSY.containsMatchIn(text) ->
-            com.jellio.tv.ui.i18n.Strings.get("live_tuners_busy")
+            Strings.get("live_tuners_busy")
         TIMED_OUT.containsMatchIn(text) ->
-            com.jellio.tv.ui.i18n.Strings.get("live_open_timeout")
-        else -> com.jellio.tv.ui.i18n.Strings.get("live_open_failed")
+            Strings.get("live_open_timeout")
+        else -> Strings.get("live_open_failed")
     }
 }
 

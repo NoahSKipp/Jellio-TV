@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.player
 
 import com.jellio.tv.data.playback.SkipSegments
+import com.jellio.tv.ui.i18n.Strings
 
 // How long before the end an episode without credits data offers its next one.
 internal const val NEAR_END_UP_NEXT_SECONDS = 30.0
@@ -28,4 +29,27 @@ internal fun shouldShowNearEndUpNext(
     if (!segmentsResolved || segments?.credits != null) return false
     if (durationSeconds <= NEAR_END_UP_NEXT_SECONDS * 2) return false
     return currentSeconds >= durationSeconds - NEAR_END_UP_NEXT_SECONDS && currentSeconds < durationSeconds
+}
+
+enum class SkipKind { INTRO, CREDITS }
+
+data class SkipSegment(
+    val kind: SkipKind,
+    val targetSeconds: Double,
+) {
+    val eyebrow: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_eyebrow_intro" else "player_skip_eyebrow_credits")
+    val label: String get() = Strings.get(if (kind == SkipKind.INTRO) "player_skip_intro" else "player_skip_credits")
+}
+
+fun activeSkipSegment(segments: SkipSegments?, currentSeconds: Double): SkipSegment? {
+    segments ?: return null
+    val intro = segments.intro
+    if (intro != null && intro.end > 0 && currentSeconds >= intro.start && currentSeconds < intro.end) {
+        return SkipSegment(SkipKind.INTRO, intro.end)
+    }
+    val credits = segments.credits
+    if (credits != null && credits.end > 0 && currentSeconds >= credits.start && currentSeconds < credits.end) {
+        return SkipSegment(SkipKind.CREDITS, credits.end)
+    }
+    return null
 }

@@ -1,61 +1,34 @@
 package com.jellio.tv.ui.player
 
-import android.net.Uri
+import com.jellio.tv.ui.i18n.Strings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,24 +40,13 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -92,64 +54,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
-import com.jellio.tv.data.network.APP_VERSION
-import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
-import android.content.Context
-import androidx.activity.ComponentActivity
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.audio.AudioCapabilities
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.ui.CaptionStyleCompat
-import androidx.media3.ui.PlayerView
-import androidx.media3.ui.SubtitleView
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
-import com.jellio.tv.data.model.MediaSourceDto
-import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
-import com.jellio.tv.data.model.SUBTITLE_SIZES
-import com.jellio.tv.data.model.SUBTITLE_COLORS
-import com.jellio.tv.data.model.SUBTITLE_EDGES
-import com.jellio.tv.data.model.SUBTITLE_POSITIONS
-import com.jellio.tv.data.model.SubtitleStyle
-import com.jellio.tv.data.model.subtitleBackgroundOption
-import com.jellio.tv.data.model.subtitleSizeOption
-import com.jellio.tv.data.session.Session
-import com.jellio.tv.ui.detail.FilterChipRow
-import com.jellio.tv.ui.detail.QUALITY_ORDER
-import com.jellio.tv.ui.detail.SourceCard
-import com.jellio.tv.ui.detail.sourceAudioLanguages
-import com.jellio.tv.ui.detail.sourceQuality
-import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.isActive
 
 @Composable
 internal fun BufferingOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier) {
@@ -174,7 +89,7 @@ internal fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier)
                 .padding(start = 48.dp, end = 96.dp, bottom = 72.dp)
                 .widthIn(max = 720.dp),
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_youre_watching"), color = JellioTextSecondary, fontSize = 17.sp)
+            Text(text = Strings.get("player_youre_watching"), color = JellioTextSecondary, fontSize = 17.sp)
             Spacer(modifier = Modifier.height(10.dp))
             var logoFailed by remember(info.logoUrl) { mutableStateOf(false) }
             if (info.logoUrl != null && !logoFailed) {
@@ -233,6 +148,97 @@ internal fun PauseOverlay(info: PauseOverlayInfo, modifier: Modifier = Modifier)
     }
 }
 
+// Shown while an automatic retry loads, over the player and its controls:
+// what happened, which attempt this is, and Stop to give up.
+@Composable
+internal fun FailoverOverlay(notice: FailoverNotice, onStop: () -> Unit) {
+    val stopFocus = remember { FocusRequester() }
+    LaunchedEffect(notice) {
+        delay(150)
+        runCatching { stopFocus.requestFocus() }
+    }
+    BackHandler(onBack = onStop)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.75f))
+            .onKeyEvent { event -> event.key != Key.Back && event.key != Key.DirectionCenter && event.key != Key.Enter },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .background(JellioBgElevated, RoundedCornerShape(16.dp))
+                .padding(horizontal = 32.dp, vertical = 28.dp),
+        ) {
+            com.jellio.tv.ui.common.ScreenSpinner()
+            Text(
+                text = Strings.get(if (notice.slowTranscode) "player_failover_slow_transcode" else "player_failover_failed"),
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(top = 18.dp),
+            )
+            Text(
+                text = Strings.format("tv_trying_next_source", notice.attempt, notice.sourceLabel),
+                color = JellioTextSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            EndScreenButton(label = Strings.get("action_stop"), onClick = onStop, modifier = Modifier.padding(top = 20.dp).focusRequester(stopFocus))
+        }
+    }
+}
+
+// The quick-jump badge; gone a moment after the last press unless a key
+// is still held.
+@Composable
+internal fun SeekFlashBadge(
+    flash: SeekFlash,
+    holding: Boolean,
+    durationMs: Long,
+    onExpired: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!holding) {
+        LaunchedEffect(flash.stamp) {
+            delay(1200)
+            onExpired()
+        }
+    }
+    Box(
+        modifier = modifier
+            .padding(top = 48.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(JellioBgElevated.copy(alpha = 0.92f))
+            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (holding) {
+                Icon(
+                    imageVector = if (flash.totalMs >= 0) {
+                        Icons.Filled.FastForward
+                    } else {
+                        Icons.Filled.FastRewind
+                    },
+                    contentDescription = null,
+                    tint = JellioSecondary,
+                    modifier = Modifier.size(20.dp).padding(end = 8.dp),
+                )
+            }
+            Text(
+                text = "${formatSeekDelta(flash.totalMs)}  ·  ${com.jellio.tv.ui.common.formatPlaybackTime(flash.target)}" +
+                    if (durationMs > 0) " / " + com.jellio.tv.ui.common.formatPlaybackTime(durationMs) else "",
+                color = JellioText,
+                style = androidx.tv.material3.MaterialTheme.typography.titleSmall,
+            )
+        }
+    }
+}
+
 @Composable
 internal fun PauseClock(modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -276,7 +282,7 @@ internal fun UpNextOverlay(
             )
         }
         Column(modifier = Modifier.padding(start = 16.dp)) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_next_episode"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
+            Text(text = Strings.get("player_next_episode"), color = JellioTextSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelSmall)
             Text(
                 text = info.title,
                 color = JellioText,
@@ -297,7 +303,7 @@ internal fun UpNextOverlay(
                     ),
                     modifier = Modifier.focusRequester(playFocus),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.format("player_play_now_countdown", secondsRemaining), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = Strings.format("player_play_now_countdown", secondsRemaining), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onDismiss,
@@ -315,7 +321,7 @@ internal fun UpNextOverlay(
                         )
                     ),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("notifications_dismiss"), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                    Text(text = Strings.get("notifications_dismiss"), maxLines = 1, softWrap = false, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
             }
         }
@@ -379,7 +385,7 @@ internal fun EndScreen(
             modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 760.dp),
         ) {
             if (next != null) {
-                Text(text = com.jellio.tv.ui.i18n.Strings.get("player_up_next").uppercase(), color = JellioSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
+                Text(text = Strings.get("player_up_next").uppercase(), color = JellioSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
                 next.seriesName?.let {
                     Text(text = it, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                 }
@@ -416,7 +422,7 @@ internal fun EndScreen(
                         modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get("action_done").uppercase(),
+                        text = Strings.get("action_done").uppercase(),
                         color = JellioSecondary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -463,17 +469,17 @@ internal fun EndScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 28.dp)) {
                 if (next != null) {
                     EndScreenButton(
-                        label = if (countdown != null && countdown > 0) com.jellio.tv.ui.i18n.Strings.format("player_play_next_episode_countdown", countdown) else com.jellio.tv.ui.i18n.Strings.get("player_play_next_episode"),
+                        label = if (countdown != null && countdown > 0) Strings.format("player_play_next_episode_countdown", countdown) else Strings.get("player_play_next_episode"),
                         primary = true,
                         icon = Icons.Filled.PlayArrow,
                         onClick = armed(onPlayNext),
                         modifier = Modifier.focusRequester(firstFocus),
                     )
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay))
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
+                    EndScreenButton(label = Strings.get("player_replay"), icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay))
+                    EndScreenButton(label = Strings.get("player_back_to_show"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
                 } else {
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay), modifier = Modifier.focusRequester(firstFocus))
-                    EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
+                    EndScreenButton(label = Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay), modifier = Modifier.focusRequester(firstFocus))
+                    EndScreenButton(label = Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
                 }
             }
         }
@@ -583,7 +589,7 @@ internal fun PlayerPrompt(
                     icon = actionIcon,
                     modifier = Modifier.focusRequester(actionFocus),
                 )
-                EndScreenButton(label = com.jellio.tv.ui.i18n.Strings.get("action_dismiss"), onClick = onDismiss)
+                EndScreenButton(label = Strings.get("action_dismiss"), onClick = onDismiss)
             }
         }
     }
@@ -601,13 +607,13 @@ internal fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit
             modifier = Modifier.background(JellioBgElevated, RoundedCornerShape(16.dp)).padding(horizontal = 32.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_resume_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = Strings.get("player_resume_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             // Where it picks up, then how much of it that is.
             val at = resumeTicks / TICKS_PER_MS / 1000
             val atLabel = if (at >= 3600) "%d:%02d:%02d".format(at / 3600, (at % 3600) / 60, at % 60) else "%d:%02d".format(at / 60, at % 60)
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("stream_resume_from", atLabel) +
-                    (percent?.let { " · " + com.jellio.tv.ui.i18n.Strings.format("player_percent_watched", it) } ?: ""),
+                text = Strings.format("stream_resume_from", atLabel) +
+                    (percent?.let { " · " + Strings.format("player_percent_watched", it) } ?: ""),
                 color = JellioTextSecondary,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -624,7 +630,7 @@ internal fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit
                     ),
                     modifier = Modifier.focusRequester(resumeFocusRequester),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_resume"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    Text(text = Strings.get("player_resume"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
                 Surface(
                     onClick = onRestart,
@@ -642,7 +648,7 @@ internal fun ResumePrompt(percent: Int?, resumeTicks: Long, onResume: () -> Unit
                         )
                     ),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_start_over"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    Text(text = Strings.get("player_start_over"), modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
             }
         }
@@ -673,7 +679,7 @@ internal fun SwitchingCard(label: String, step: String, modifier: Modifier = Mod
         }
         Column {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("tv_switching_to", label),
+                text = Strings.format("tv_switching_to", label),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 maxLines = 1,
@@ -705,7 +711,7 @@ internal fun BufferSwitchPrompt(onSwitch: () -> Unit, onKeep: () -> Unit, onAlwa
                 .padding(horizontal = 28.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = Strings.get("player_buffer_prompt"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     onClick = onSwitch,
@@ -714,13 +720,13 @@ internal fun BufferSwitchPrompt(onSwitch: () -> Unit, onKeep: () -> Unit, onAlwa
                     border = border,
                     modifier = Modifier.focusRequester(switchFocusRequester),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_switch"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                    Text(text = Strings.get("player_buffer_switch"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
                 }
                 Surface(onClick = onKeep, shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)), colors = secondary, border = border) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_keep"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                    Text(text = Strings.get("player_buffer_keep"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
                 }
                 Surface(onClick = onAlways, shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)), colors = secondary, border = border) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("player_buffer_always"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
+                    Text(text = Strings.get("player_buffer_always"), modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp))
                 }
             }
         }

@@ -84,7 +84,6 @@ import com.jellio.tv.data.model.LivePartyDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.model.PartiesDto
 import com.jellio.tv.data.model.PartyItemDto
-import com.jellio.tv.data.model.ScheduledPartyDto
 import com.jellio.tv.data.model.SyncPlayGroupDto
 import com.jellio.tv.data.nowplaying.NowPlayingManager
 import com.jellio.tv.data.session.Session
@@ -145,10 +144,11 @@ fun NowPlayingDrawer(
     BackHandler(onBack = onDismiss)
 
     LaunchedEffect(Unit) { notificationsViewModel.load() }
+    val refreshNowPlaying by androidx.compose.runtime.rememberUpdatedState(onRefreshNowPlaying)
     LaunchedEffect(Unit) {
         while (isActive) {
             delay(4000L)
-            onRefreshNowPlaying()
+            refreshNowPlaying()
         }
     }
 

@@ -1,14 +1,11 @@
 package com.jellio.tv.ui.player
 
-import android.net.Uri
+import com.jellio.tv.ui.i18n.Strings
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,44 +15,21 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.ClosedCaption
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,63 +42,32 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
-import com.jellio.tv.data.network.APP_VERSION
-import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
-import android.content.Context
-import androidx.activity.ComponentActivity
 import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.audio.AudioCapabilities
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.ui.CaptionStyleCompat
-import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
 import com.jellio.tv.data.model.SUBTITLE_SIZES
@@ -134,7 +77,6 @@ import com.jellio.tv.data.model.SUBTITLE_POSITIONS
 import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.subtitleBackgroundOption
 import com.jellio.tv.data.model.subtitleSizeOption
-import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.detail.FilterChipRow
 import com.jellio.tv.ui.detail.QUALITY_ORDER
 import com.jellio.tv.ui.detail.SourceCard
@@ -147,8 +89,6 @@ import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 
 // Speed drawer matching SubtitleMenu and AudioMenu right drawers.
@@ -181,7 +121,7 @@ internal fun SpeedMenu(selectedSpeed: Float, onSelect: (Float) -> Unit, onDismis
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_playback_speed"),
+                text = Strings.get("tv_playback_speed"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -221,7 +161,7 @@ internal fun ReactMenu(replyTo: com.jellio.tv.data.model.GroupWatchMessageDto?, 
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 140.dp)) {
         if (replyTo != null) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("party_replying_to", replyTo.UserName ?: com.jellio.tv.ui.i18n.Strings.get("tv_someone"), replyTo.Text),
+                text = Strings.format("party_replying_to", replyTo.UserName ?: Strings.get("tv_someone"), replyTo.Text),
                 color = JellioTextSecondary,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -272,19 +212,19 @@ internal fun CatchUpPrompt(groupAtTicks: Long, onFollow: () -> Unit, onSolo: () 
                 .padding(horizontal = 28.dp, vertical = 22.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("party_catchup_title", com.jellio.tv.ui.common.formatPlaybackTime(groupAtTicks / TICKS_PER_MS)),
+                text = Strings.format("party_catchup_title", com.jellio.tv.ui.common.formatPlaybackTime(groupAtTicks / TICKS_PER_MS)),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 com.jellio.tv.ui.groupwatch.GroupButton(
-                    label = com.jellio.tv.ui.i18n.Strings.get("party_catchup_join"),
+                    label = Strings.get("party_catchup_join"),
                     primary = true,
                     onClick = onFollow,
                     modifier = Modifier.focusRequester(first),
                 )
-                com.jellio.tv.ui.groupwatch.GroupButton(label = com.jellio.tv.ui.i18n.Strings.get("party_catchup_solo"), onClick = onSolo)
+                com.jellio.tv.ui.groupwatch.GroupButton(label = Strings.get("party_catchup_solo"), onClick = onSolo)
             }
         }
     }
@@ -334,7 +274,7 @@ internal fun SleepMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_sleep_timer"),
+                text = Strings.get("tv_sleep_timer"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -342,7 +282,7 @@ internal fun SleepMenu(
             LazyColumn {
                 item {
                     SubtitleMenuRow(
-                        label = com.jellio.tv.ui.i18n.Strings.get("settings_sleep_timer_cancel"),
+                        label = Strings.get("settings_sleep_timer_cancel"),
                         isSelected = false,
                         onClick = {
                             onCancel()
@@ -351,10 +291,10 @@ internal fun SleepMenu(
                         modifier = Modifier.focusRequester(firstItemFocusRequester),
                     )
                 }
-                item { SleepMenuHeading(if (minutesActive) com.jellio.tv.ui.i18n.Strings.get("player_stop_after") + " (" + com.jellio.tv.ui.i18n.Strings.get("state_on") + ")" else com.jellio.tv.ui.i18n.Strings.get("player_stop_after")) }
+                item { SleepMenuHeading(if (minutesActive) Strings.get("player_stop_after") + " (" + Strings.get("state_on") + ")" else Strings.get("player_stop_after")) }
                 items(SLEEP_TIMER_OPTIONS) { minutes ->
                     SubtitleMenuRow(
-                        label = com.jellio.tv.ui.i18n.Strings.format("player_minutes_short", minutes),
+                        label = Strings.format("player_minutes_short", minutes),
                         isSelected = false,
                         onClick = {
                             onSelect(minutes)
@@ -362,10 +302,10 @@ internal fun SleepMenu(
                         },
                     )
                 }
-                item { SleepMenuHeading(com.jellio.tv.ui.i18n.Strings.get("player_or_stop_after")) }
+                item { SleepMenuHeading(Strings.get("player_or_stop_after")) }
                 items(EPISODE_SLEEP_TIMER_OPTIONS) { count ->
                     SubtitleMenuRow(
-                        label = if (count == 1) com.jellio.tv.ui.i18n.Strings.get("player_this_episode") else com.jellio.tv.ui.i18n.Strings.format("player_stop_episodes", count),
+                        label = if (count == 1) Strings.get("player_this_episode") else Strings.format("player_stop_episodes", count),
                         isSelected = activeEpisodes == count,
                         onClick = {
                             onSelectEpisodes(count)
@@ -514,7 +454,7 @@ internal fun AudioMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_audio"),
+                text = Strings.get("tv_audio"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -548,12 +488,12 @@ internal fun AudioMenu(
                 )
             }
             SubtitleMenuRow(
-                label = com.jellio.tv.ui.i18n.Strings.format("player_dialogue_boost", if (PlayerPrefs.dialogueBoost) com.jellio.tv.ui.i18n.Strings.get("state_on") else com.jellio.tv.ui.i18n.Strings.get("state_off")),
+                label = Strings.format("player_dialogue_boost", if (PlayerPrefs.dialogueBoost) Strings.get("state_on") else Strings.get("state_off")),
                 isSelected = PlayerPrefs.dialogueBoost,
                 onClick = onToggleDialogueBoost,
             )
             SyncAdjustRow(
-                label = com.jellio.tv.ui.i18n.Strings.get("player_audio_sync"),
+                label = Strings.get("player_audio_sync"),
                 valueMs = audioDelayMs,
                 stepMs = 50,
                 onChange = onAudioDelay,
@@ -626,7 +566,7 @@ internal fun SourcePanel(
                 .background(JellioBgElevated)
                 .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("detail_streams"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = Strings.get("detail_streams"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(top = 4.dp),
@@ -634,7 +574,7 @@ internal fun SourcePanel(
                 if (showEditions) {
                     item(key = "editions") {
                         FilterChipRow(
-                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + editions.map { it to it },
+                            chips = listOf<Pair<String?, String>>(null to Strings.get("filter_all")) + editions.map { it to it },
                             selected = selectedEdition,
                             onSelect = { selectedEdition = it },
                             chipFocusRequesters = editionFocus,
@@ -645,7 +585,7 @@ internal fun SourcePanel(
                 if (showLanguages) {
                     item(key = "languages") {
                         FilterChipRow(
-                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + languages.map { it to languageName(it) },
+                            chips = listOf<Pair<String?, String>>(null to Strings.get("filter_all")) + languages.map { it to languageName(it) },
                             selected = selectedLanguage,
                             onSelect = { selectedLanguage = it },
                             chipFocusRequesters = languageFocus,
@@ -657,7 +597,7 @@ internal fun SourcePanel(
                 if (showQualities) {
                     item(key = "qualities") {
                         FilterChipRow(
-                            chips = listOf<Pair<String?, String>>(null to com.jellio.tv.ui.i18n.Strings.get("filter_all")) + qualities.map { it to it },
+                            chips = listOf<Pair<String?, String>>(null to Strings.get("filter_all")) + qualities.map { it to it },
                             selected = selectedQuality,
                             onSelect = { selectedQuality = it },
                             chipFocusRequesters = qualityFocus,
@@ -668,9 +608,9 @@ internal fun SourcePanel(
                 }
                 item(key = "count") {
                     Text(
-                        text = if (filtered.isEmpty()) com.jellio.tv.ui.i18n.Strings.get("player_streams_none_match")
-                        else if (filtered.size == 1) com.jellio.tv.ui.i18n.Strings.format("player_streams_count_one", filtered.size)
-                        else com.jellio.tv.ui.i18n.Strings.format("player_streams_count_many", filtered.size),
+                        text = if (filtered.isEmpty()) Strings.get("player_streams_none_match")
+                        else if (filtered.size == 1) Strings.format("player_streams_count_one", filtered.size)
+                        else Strings.format("player_streams_count_many", filtered.size),
                         color = JellioTextSecondary,
                         modifier = Modifier.padding(top = 8.dp),
                     )
@@ -739,7 +679,7 @@ internal fun EpisodesPanel(
                 .background(JellioBgElevated)
                 .padding(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 48.dp),
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("detail_episodes"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
+            Text(text = Strings.get("detail_episodes"), color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium)
             LazyRow(
                 state = seasonRowState,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -888,7 +828,7 @@ internal fun SubtitleMenu(
                 .padding(vertical = 48.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_subtitles"),
+                text = Strings.get("tv_subtitles"),
                 color = JellioText,
                 style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
@@ -897,7 +837,7 @@ internal fun SubtitleMenu(
             LazyColumn {
                 item {
                     SubtitleMenuRow(
-                        label = com.jellio.tv.ui.i18n.Strings.get("state_off"),
+                        label = Strings.get("state_off"),
                         isSelected = selectedIndex == null,
                         onClick = { onSelect(null) },
                         modifier = Modifier.focusRequester(firstFocusRequester),
@@ -909,7 +849,7 @@ internal fun SubtitleMenu(
                 item {
                     SubtitleStyleGroup(
                         label = com.jellio.tv.ui.i18n.string("player_subtitle_size"),
-                        options = SUBTITLE_SIZES.map { it.value to com.jellio.tv.ui.i18n.Strings.get("subtitle_size_" + it.value) },
+                        options = SUBTITLE_SIZES.map { it.value to Strings.get("subtitle_size_" + it.value) },
                         selected = subtitleStyle.size,
                         onSelect = onSetSubtitleSize,
                     )
@@ -917,31 +857,31 @@ internal fun SubtitleMenu(
                 item {
                     SubtitleStyleGroup(
                         label = com.jellio.tv.ui.i18n.string("player_subtitle_bg"),
-                        options = SUBTITLE_BACKGROUNDS.map { it.value to com.jellio.tv.ui.i18n.Strings.get("subtitle_bg_" + it.value) },
+                        options = SUBTITLE_BACKGROUNDS.map { it.value to Strings.get("subtitle_bg_" + it.value) },
                         selected = subtitleStyle.background,
                         onSelect = onSetSubtitleBackground,
                     )
                 }
                 item {
                     SubtitleStyleGroup(
-                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_color"),
-                        options = SUBTITLE_COLORS.map { it.first to com.jellio.tv.ui.i18n.Strings.get("subtitle_color_" + it.first) },
+                        label = Strings.get("player_subtitle_color"),
+                        options = SUBTITLE_COLORS.map { it.first to Strings.get("subtitle_color_" + it.first) },
                         selected = subtitleStyle.color,
                         onSelect = { onSetSubtitleLook(subtitleStyle.copy(color = it)) },
                     )
                 }
                 item {
                     SubtitleStyleGroup(
-                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_edge"),
-                        options = SUBTITLE_EDGES.map { it to com.jellio.tv.ui.i18n.Strings.get("subtitle_edge_" + it) },
+                        label = Strings.get("player_subtitle_edge"),
+                        options = SUBTITLE_EDGES.map { it to Strings.get("subtitle_edge_" + it) },
                         selected = subtitleStyle.edge,
                         onSelect = { onSetSubtitleLook(subtitleStyle.copy(edge = it)) },
                     )
                 }
                 item {
                     SubtitleStyleGroup(
-                        label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_position"),
-                        options = SUBTITLE_POSITIONS.map { it.first to com.jellio.tv.ui.i18n.Strings.get("subtitle_pos_" + it.first) },
+                        label = Strings.get("player_subtitle_position"),
+                        options = SUBTITLE_POSITIONS.map { it.first to Strings.get("subtitle_pos_" + it.first) },
                         selected = subtitleStyle.position,
                         onSelect = { onSetSubtitleLook(subtitleStyle.copy(position = it)) },
                     )
@@ -949,7 +889,7 @@ internal fun SubtitleMenu(
                 if (canSyncSubtitles) {
                     item {
                         SyncAdjustRow(
-                            label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_sync"),
+                            label = Strings.get("player_subtitle_sync"),
                             valueMs = subtitleOffsetMs,
                             stepMs = 100,
                             onChange = onSubtitleOffset,
@@ -1053,7 +993,7 @@ internal fun SubtitlePreview(style: SubtitleStyle) {
             .background(Brush.verticalGradient(listOf(Color(0xFF2B3A55), Color(0xFF151B28))), RoundedCornerShape(10.dp)),
     ) {
         Text(
-            text = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_preview"),
+            text = Strings.get("player_subtitle_preview"),
             color = textColor,
             fontSize = (13f * size).sp,
             style = androidx.compose.ui.text.TextStyle(shadow = shadow),
@@ -1076,7 +1016,7 @@ internal fun SyncAdjustRow(label: String, valueMs: Int, stepMs: Int, onChange: (
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             SyncButton("+") { onChange((valueMs + stepMs).coerceAtMost(10_000)) }
-            if (valueMs != 0) SyncButton(com.jellio.tv.ui.i18n.Strings.get("player_sync_reset")) { onChange(0) }
+            if (valueMs != 0) SyncButton(Strings.get("player_sync_reset")) { onChange(0) }
         }
     }
 }

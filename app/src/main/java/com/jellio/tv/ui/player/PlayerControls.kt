@@ -1,46 +1,29 @@
 package com.jellio.tv.ui.player
 
-import android.net.Uri
-import androidx.activity.compose.BackHandler
+import com.jellio.tv.ui.i18n.Strings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
@@ -49,107 +32,39 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
-import com.jellio.tv.data.network.APP_VERSION
-import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
-import android.content.Context
-import androidx.activity.ComponentActivity
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
-import androidx.media3.exoplayer.audio.AudioCapabilities
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.ui.CaptionStyleCompat
-import androidx.media3.ui.PlayerView
-import androidx.media3.ui.SubtitleView
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
-import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.data.model.IntroSkipperSegmentsDto
-import com.jellio.tv.data.model.MediaSourceDto
-import com.jellio.tv.data.model.SUBTITLE_BACKGROUNDS
-import com.jellio.tv.data.model.SUBTITLE_SIZES
-import com.jellio.tv.data.model.SUBTITLE_COLORS
-import com.jellio.tv.data.model.SUBTITLE_EDGES
-import com.jellio.tv.data.model.SUBTITLE_POSITIONS
-import com.jellio.tv.data.model.SubtitleStyle
-import com.jellio.tv.data.model.subtitleBackgroundOption
-import com.jellio.tv.data.model.subtitleSizeOption
-import com.jellio.tv.data.session.Session
-import com.jellio.tv.ui.detail.FilterChipRow
-import com.jellio.tv.ui.detail.QUALITY_ORDER
-import com.jellio.tv.ui.detail.SourceCard
-import com.jellio.tv.ui.detail.sourceAudioLanguages
-import com.jellio.tv.ui.detail.sourceQuality
-import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.isActive
 
 @Composable
 internal fun PlayerControls(
@@ -190,15 +105,15 @@ internal fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.Center),
         ) {
-            TransportButton(icon = Icons.Filled.Replay10, label = com.jellio.tv.ui.i18n.Strings.get("player_back_10s"), size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
+            TransportButton(icon = Icons.Filled.Replay10, label = Strings.get("player_back_10s"), size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
             TransportButton(
                 icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                label = if (isPlaying) com.jellio.tv.ui.i18n.Strings.get("action_pause") else com.jellio.tv.ui.i18n.Strings.get("action_play"),
+                label = if (isPlaying) Strings.get("action_pause") else Strings.get("action_play"),
                 size = 96.dp,
                 onClick = onPlayPause,
                 modifier = Modifier.focusRequester(playPauseFocusRequester),
             )
-            TransportButton(icon = Icons.Filled.Forward10, label = com.jellio.tv.ui.i18n.Strings.get("player_forward_10s"), size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
+            TransportButton(icon = Icons.Filled.Forward10, label = Strings.get("player_forward_10s"), size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
         }
 
         Column(
@@ -249,25 +164,25 @@ internal fun PlayerControls(
                     ) {
                         PlayerPillButton(icon = Icons.Filled.Speed, label = speedLabel, onClick = onOpenSpeedMenu)
                         if (hasSubtitleTracks) {
-                            PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = com.jellio.tv.ui.i18n.Strings.get("player_subtitle_track"), onClick = onOpenSubtitleMenu)
+                            PlayerPillButton(icon = Icons.Filled.ClosedCaption, label = Strings.get("player_subtitle_track"), onClick = onOpenSubtitleMenu)
                         }
                         if (hasAudioTracks) {
-                            PlayerPillButton(icon = Icons.Filled.GraphicEq, label = com.jellio.tv.ui.i18n.Strings.get("player_audio_track"), onClick = onOpenAudioMenu)
+                            PlayerPillButton(icon = Icons.Filled.GraphicEq, label = Strings.get("player_audio_track"), onClick = onOpenAudioMenu)
                         }
                         if (hasSourceOptions) {
-                            PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = com.jellio.tv.ui.i18n.Strings.get("detail_streams"), onClick = onOpenSourceMenu)
+                            PlayerPillButton(icon = Icons.Filled.SwapHoriz, label = Strings.get("detail_streams"), onClick = onOpenSourceMenu)
                         }
                         if (hasEpisodes) {
-                            PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = com.jellio.tv.ui.i18n.Strings.get("detail_episodes"), onClick = onOpenEpisodesMenu)
+                            PlayerPillButton(icon = Icons.Filled.VideoLibrary, label = Strings.get("detail_episodes"), onClick = onOpenEpisodesMenu)
                         }
                         PlayerPillButton(
                             icon = Icons.Filled.Bedtime,
-                            label = com.jellio.tv.ui.i18n.Strings.get("settings_sleep_timer"),
+                            label = Strings.get("settings_sleep_timer"),
                             active = sleepTimerActive,
                             onClick = onOpenSleepMenu,
                         )
                         if (inGroup) {
-                            PlayerPillButton(icon = Icons.Filled.EmojiEmotions, label = com.jellio.tv.ui.i18n.Strings.get("player_react"), onClick = onOpenReactMenu)
+                            PlayerPillButton(icon = Icons.Filled.EmojiEmotions, label = Strings.get("player_react"), onClick = onOpenReactMenu)
                         }
                     }
                 }
@@ -394,7 +309,7 @@ internal fun SeekBar(
             Text(text = " / " + com.jellio.tv.ui.common.formatPlaybackTime(durationMs), color = JellioTextSecondary)
             if (focused && target == null) {
                 Text(
-                    text = "   " + com.jellio.tv.ui.i18n.Strings.get("player_scrub_hint"),
+                    text = "   " + Strings.get("player_scrub_hint"),
                     color = JellioTextSecondary,
                     style = androidx.tv.material3.MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.CenterVertically),

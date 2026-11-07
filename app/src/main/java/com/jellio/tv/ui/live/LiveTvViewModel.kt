@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.live
 
+import com.jellio.tv.ui.i18n.Strings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
@@ -82,7 +83,7 @@ class LiveTvViewModel @Inject constructor(
             }.onFailure { err ->
                 android.util.Log.w("JellioLive", "channels failed: ${err.message}")
                 if (_uiState.value.channels.isEmpty() && _uiState.value.links.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.get("live_load_error"))
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = Strings.get("live_load_error"))
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }

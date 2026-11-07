@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.live
 
+import com.jellio.tv.ui.i18n.Strings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -134,7 +135,7 @@ class LivePlayerViewModel @Inject constructor(
                 Log.w(TAG, "link ${channel.id} failed: ${err.code}")
                 report(channel, ok = false, reason = err.code)
                 if (stopped || _uiState.value.channel?.id != channel.id) return@launch
-                _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(com.jellio.tv.ui.i18n.Strings.get(streamLinkErrorKey(err.code))))
+                _uiState.value = _uiState.value.copy(status = LiveStatus.Failed(Strings.get(streamLinkErrorKey(err.code))))
                 return@launch
             } catch (err: Exception) {
                 Log.w(TAG, "open ${channel.id} failed: ${err.javaClass.simpleName}")
@@ -206,7 +207,7 @@ class LivePlayerViewModel @Inject constructor(
                     repository.reportLiveWatching(
                         com.jellio.tv.data.model.LiveWatchingDto(
                             ChannelId = if (channel.userStream) null else channel.id,
-                            ChannelName = channel.name.ifBlank { com.jellio.tv.ui.i18n.Strings.get("nav_live_tv") },
+                            ChannelName = channel.name.ifBlank { Strings.get("nav_live_tv") },
                             Programme = if (channel.userStream) channel.group else (state.now ?: channel.now)?.name,
                             Source = if (channel.userStream) "link" else "tuner",
                             LogoUrl = if (channel.userStream) channel.logoUrl else null,

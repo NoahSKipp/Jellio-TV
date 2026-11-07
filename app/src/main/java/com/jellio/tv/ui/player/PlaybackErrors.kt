@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.player
 
+import com.jellio.tv.ui.i18n.Strings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -46,20 +47,20 @@ data class PlaybackProblem(val title: String, val detail: String)
 
 private fun httpProblem(code: Int): PlaybackProblem = when (code) {
     401, 403 -> PlaybackProblem(
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_forbidden_title"),
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_forbidden_desc"),
+        Strings.get("playback_err_forbidden_title"),
+        Strings.get("playback_err_forbidden_desc"),
     )
     404, 410 -> PlaybackProblem(
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_not_found_title"),
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_not_found_desc"),
+        Strings.get("playback_err_not_found_title"),
+        Strings.get("playback_err_not_found_desc"),
     )
     in 500..599 -> PlaybackProblem(
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_5xx_title"),
-        com.jellio.tv.ui.i18n.Strings.format("playback_err_5xx_desc", code),
+        Strings.get("playback_err_5xx_title"),
+        Strings.format("playback_err_5xx_desc", code),
     )
     else -> PlaybackProblem(
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_http_title"),
-        com.jellio.tv.ui.i18n.Strings.format("playback_err_http_desc", code),
+        Strings.get("playback_err_http_title"),
+        Strings.format("playback_err_http_desc", code),
     )
 }
 
@@ -72,12 +73,12 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
             is HttpException -> return httpProblem(cause.code())
             is HttpDataSource.InvalidResponseCodeException -> return httpProblem(cause.responseCode)
             is UnknownHostException -> return PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_desc"),
+                Strings.get("playback_err_unreachable_title"),
+                Strings.get("playback_err_unreachable_desc"),
             )
             is SocketTimeoutException -> return PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_timeout_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_timeout_desc"),
+                Strings.get("playback_err_timeout_title"),
+                Strings.get("playback_err_timeout_desc"),
             )
         }
         cause = cause.cause
@@ -86,40 +87,40 @@ fun friendlyPlaybackError(error: Throwable): PlaybackProblem {
         return when (error.errorCode) {
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_connection_dropped_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_connection_dropped_desc"),
+                Strings.get("playback_err_connection_dropped_title"),
+                Strings.get("playback_err_connection_dropped_desc"),
             )
             PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
             PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FAILED,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_decode_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_decode_desc"),
+                Strings.get("playback_err_cant_decode_title"),
+                Strings.get("playback_err_cant_decode_desc"),
             )
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED,
             PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
             PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_read_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_read_desc"),
+                Strings.get("playback_err_cant_read_title"),
+                Strings.get("playback_err_cant_read_desc"),
             )
             PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> httpProblem(500)
             else -> PlaybackProblem(
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_stopped_title"),
-                com.jellio.tv.ui.i18n.Strings.get("playback_err_stopped_desc"),
+                Strings.get("playback_err_stopped_title"),
+                Strings.get("playback_err_stopped_desc"),
             )
         }
     }
     if (error is IOException) {
         return PlaybackProblem(
-            com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_title"),
-            com.jellio.tv.ui.i18n.Strings.get("playback_err_unreachable_desc"),
+            Strings.get("playback_err_unreachable_title"),
+            Strings.get("playback_err_unreachable_desc"),
         )
     }
     return PlaybackProblem(
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_title"),
-        com.jellio.tv.ui.i18n.Strings.get("playback_err_cant_start_desc"),
+        Strings.get("playback_err_cant_start_title"),
+        Strings.get("playback_err_cant_start_desc"),
     )
 }
 
@@ -166,14 +167,14 @@ fun PlaybackErrorPanel(
             )
             if (onRetry != null) {
                 Text(
-                    text = com.jellio.tv.ui.i18n.Strings.get("tv_failover_press_ok"),
+                    text = Strings.get("tv_failover_press_ok"),
                     color = JellioText,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(top = 18.dp),
                 )
             }
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_press_back"),
+                text = Strings.get("tv_press_back"),
                 color = JellioTextSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(top = 18.dp),
