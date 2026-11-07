@@ -936,13 +936,13 @@ internal fun PlayerSurface(
                 if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
                 if (placeholderWatch.firstFrameAt == 0L) placeholderWatch.firstFrameAt = System.currentTimeMillis()
                 PlayStartTrace.end("first frame")
-                if (currentSwitchingTo != null) {
+                if (currentSwitchingTo != null && currentSwitchingLoaded) {
                     currentSwitchSettled()
                 }
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
-                if (playing && currentSwitchingTo != null) {
+                if (playing && currentSwitchingTo != null && currentSwitchingLoaded) {
                     currentSwitchSettled()
                 }
             }
@@ -1521,14 +1521,14 @@ internal fun PlayerSurface(
         if (switchingTo != null) {
             LaunchedEffect(switchingTo, switchingLoaded, player) {
                 if (!switchingLoaded) return@LaunchedEffect
-                withTimeoutOrNull(4000L) {
+                withTimeoutOrNull(2500L) {
                     androidx.compose.runtime.snapshotFlow {
                         val playing = isPlaying || player.isPlaying
                         val ready = !isBuffering || player.playbackState == Player.STATE_READY
                         playing && ready
                     }.first { it }
                 }
-                delay(200)
+                delay(150)
                 currentSwitchSettled()
             }
             SwitchingCard(
