@@ -28,6 +28,7 @@ internal object StringsDe {
         m["action_pause"] = "Pause"
         m["action_play"] = "Abspielen"
         m["action_retry"] = "Wiederholen"
+        m["action_search"] = "Suchen"
         m["action_see_all"] = "Alle anzeigen"
         m["action_stop"] = "Stopp"
         m["action_trailer"] = "Trailer"

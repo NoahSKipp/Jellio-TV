@@ -28,6 +28,7 @@ internal object StringsPl {
         m["action_pause"] = "Pauza"
         m["action_play"] = "Odtwarzaj"
         m["action_retry"] = "Ponów"
+        m["action_search"] = "Szukaj"
         m["action_see_all"] = "Zobacz wszystko"
         m["action_stop"] = "Zatrzymaj"
         m["action_trailer"] = "Zwiastun"

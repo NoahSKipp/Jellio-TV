@@ -106,6 +106,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "0.69.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 0.69.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Localized Search Button", "Fixed custom genre search button in Recommendations settings to display Search across all languages."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.69.5",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.69.5",

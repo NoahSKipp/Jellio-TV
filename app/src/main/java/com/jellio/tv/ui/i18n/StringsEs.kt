@@ -28,6 +28,7 @@ internal object StringsEs {
         m["action_pause"] = "Pausar"
         m["action_play"] = "Reproducir"
         m["action_retry"] = "Reintentar"
+        m["action_search"] = "Buscar"
         m["action_see_all"] = "Ver todo"
         m["action_stop"] = "Detener"
         m["action_trailer"] = "Tráiler"

@@ -28,6 +28,7 @@ internal object StringsFr {
         m["action_pause"] = "Pause"
         m["action_play"] = "Lire"
         m["action_retry"] = "Réessayer"
+        m["action_search"] = "Rechercher"
         m["action_see_all"] = "Tout voir"
         m["action_stop"] = "Arreter"
         m["action_trailer"] = "Bande-annonce"

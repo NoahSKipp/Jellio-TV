@@ -28,6 +28,7 @@ internal object StringsIt {
         m["action_pause"] = "Pausa"
         m["action_play"] = "Riproduci"
         m["action_retry"] = "Riprova"
+        m["action_search"] = "Cerca"
         m["action_see_all"] = "Vedi tutti"
         m["action_stop"] = "Interrompi"
         m["action_trailer"] = "Trailer"

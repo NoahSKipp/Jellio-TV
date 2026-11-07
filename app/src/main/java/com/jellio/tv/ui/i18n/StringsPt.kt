@@ -28,6 +28,7 @@ internal object StringsPt {
         m["action_pause"] = "Pausar"
         m["action_play"] = "Reproduzir"
         m["action_retry"] = "Tentar novamente"
+        m["action_search"] = "Pesquisar"
         m["action_see_all"] = "Ver tudo"
         m["action_stop"] = "Parar"
         m["action_trailer"] = "Trailer"

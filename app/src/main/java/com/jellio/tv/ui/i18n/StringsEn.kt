@@ -28,6 +28,7 @@ internal object StringsEn {
         m["action_pause"] = "Pause"
         m["action_play"] = "Play"
         m["action_retry"] = "Retry"
+        m["action_search"] = "Search"
         m["action_see_all"] = "See all"
         m["action_stop"] = "Stop"
         m["action_trailer"] = "Trailer"
