@@ -1,5 +1,7 @@
 package com.jellio.tv.ui.home
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -138,6 +140,10 @@ fun HomeScreen(
         }
     }
     var editMode by remember(initialEditMode) { mutableStateOf(initialEditMode) }
+
+    BackHandler(enabled = editMode) {
+        editMode = false
+    }
 
     LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
         viewModel.load(session)

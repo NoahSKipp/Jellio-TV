@@ -269,7 +269,9 @@ private fun JellioTvApp(
     var changelogReleaseToDisplay by remember { mutableStateOf(com.jellio.tv.ui.changelog.CURRENT_CHANGELOG) }
     var streamPickerItem by remember { mutableStateOf<BaseItemDto?>(null) }
     val libraries by appViewModel.libraries.collectAsState()
-    var homeEditMode by remember { mutableStateOf(false) }
+    var homeEditMode by remember(route) {
+        mutableStateOf((route as? JellioRoute.Home)?.editMode == true)
+    }
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -407,7 +409,12 @@ private fun JellioTvApp(
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 onComingSoonClick = onNavigateToDetail,
                 onServiceClick = { name -> push(JellioRoute.Service(name)) },
-                onEditModeChange = { homeEditMode = it },
+                onEditModeChange = { editing ->
+                    homeEditMode = editing
+                    if (!editing && current.editMode) {
+                        routeStack = listOf(JellioRoute.Home(editMode = false))
+                    }
+                },
                 onPlay = onPlay,
                 onPlayManually = { item ->
                     scope.launch {
@@ -564,7 +571,7 @@ private fun JellioTvApp(
                 items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
-                focusable = !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding),
+                focusable = !homeEditMode && !(showAccountSwitcher || showGroupWatch || showNotifications || showLibraryPicker || showChangelog || showOnboarding),
                 onSelect = { clicked ->
                     if (clicked is JellioRoute.Library) {
                         showLibraryPicker = true
