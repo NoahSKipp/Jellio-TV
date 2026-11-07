@@ -76,6 +76,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -171,11 +173,14 @@ fun SettingsScreen(
     val contentFocus = remember { FocusRequester() }
     var contentHasFocus by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
+        val currentCategoryFocus = categoryFocus.getValue(category)
         Column(modifier = Modifier.width(310.dp)) {
             Text(text = string("settings_title"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.focusRestorer(firstCategory),
+                modifier = Modifier
+                    .focusRestorer(currentCategoryFocus)
+                    .focusGroup(),
             ) {
                 SettingsCategory.entries.forEach { entry ->
                     SettingsCategoryItem(
@@ -192,7 +197,6 @@ fun SettingsScreen(
             }
         }
         Spacer(modifier = Modifier.width(48.dp))
-        val currentCategoryFocus = categoryFocus.getValue(category)
         CompositionLocalProvider(LocalActiveCategoryFocus provides currentCategoryFocus) {
         Column(
             modifier = Modifier
@@ -211,7 +215,15 @@ fun SettingsScreen(
                 .focusRestorer()
                 .focusProperties {
                     left = currentCategoryFocus
+                    onExit = {
+                        if (requestedFocusDirection == FocusDirection.Left) {
+                            currentCategoryFocus
+                        } else {
+                            FocusRequester.Default
+                        }
+                    }
                 }
+                .focusGroup()
                 .verticalScroll(scrollState),
         ) {
           Column(modifier = Modifier.widthIn(max = 820.dp)) {
