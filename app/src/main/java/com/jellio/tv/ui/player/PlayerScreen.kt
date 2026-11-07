@@ -150,10 +150,10 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal const val SEEK_STEP_MS = 10_000L
 internal const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
@@ -326,7 +326,12 @@ fun PlayerScreen(
                 reencodingVideo = uiState.reencodingVideo,
                 onStreamFailed = { reason -> viewModel.streamFailed(session, reason) },
                 onPlaceholder = { sign -> viewModel.placeholderDetected(session, sign) },
-                onPlaybackStarted = { viewModel.failoverPlaying() },
+                onPlaybackStarted = {
+                    viewModel.failoverPlaying()
+                    if (uiState.switchingTo != null && uiState.switchingLoaded) {
+                        viewModel.clearSwitching()
+                    }
+                },
                 remoteControlManager = viewModel.remoteControlManager,
             )
         }
@@ -645,7 +650,9 @@ internal fun PlayerSurface(
     var holdSeekStartTime by remember { mutableLongStateOf(0L) }
     var wasPlayingBeforeHold by remember { mutableStateOf(false) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
-    var isBuffering by remember { mutableStateOf(true) }
+    var isBuffering by remember(player) {
+        mutableStateOf(player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_IDLE)
+    }
     val bufferWatch = remember { BufferWatch() }
     var bufferPromptVisible by remember { mutableStateOf(false) }
 
@@ -926,6 +933,9 @@ internal fun PlayerSurface(
                 if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
                 if (placeholderWatch.firstFrameAt == 0L) placeholderWatch.firstFrameAt = System.currentTimeMillis()
                 PlayStartTrace.end("first frame")
+                if (switchingTo != null && switchingLoaded) {
+                    onSwitchSettled()
+                }
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
@@ -1503,12 +1513,16 @@ internal fun PlayerSurface(
 
         // Switching streams: shown until the new stream has buffered and plays.
         if (switchingTo != null) {
-            LaunchedEffect(switchingTo, switchingLoaded) {
+            LaunchedEffect(switchingTo, switchingLoaded, player) {
                 if (!switchingLoaded) return@LaunchedEffect
-                androidx.compose.runtime.snapshotFlow { isBuffering to isPlaying }
-                    .dropWhile { !it.first }
-                    .first { !it.first && it.second }
-                delay(300)
+                withTimeoutOrNull(6000L) {
+                    androidx.compose.runtime.snapshotFlow {
+                        val playing = isPlaying || player.isPlaying
+                        val ready = !isBuffering || player.playbackState == Player.STATE_READY
+                        playing && ready
+                    }.first { it }
+                }
+                delay(250)
                 onSwitchSettled()
             }
             SwitchingCard(
