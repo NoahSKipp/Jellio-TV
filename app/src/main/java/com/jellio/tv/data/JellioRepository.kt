@@ -82,7 +82,7 @@ internal fun distinctTitles(items: List<BaseItemDto>): List<BaseItemDto> {
 // Overview so Home's showcase can describe a title without asking again.
 private const val ITEM_FIELDS = "PrimaryImageAspectRatio,ProductionYear,PremiereDate,EndDate,CommunityRating,BackdropImageTags,Overview"
 
-internal const val DETAIL_FIELDS = "Overview,Genres,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
+internal const val DETAIL_FIELDS = "Overview,Genres,Tags,People,ProductionYear,RunTimeTicks,PremiereDate,RemoteTrailers," +
     "BackdropImageTags,OfficialRating,CommunityRating,ParentBackdropItemId,ParentBackdropImageTags,Status,EndDate"
 private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks,PremiereDate,CommunityRating,BackdropImageTags," +
     "ParentBackdropItemId,ParentBackdropImageTags"
@@ -1002,15 +1002,16 @@ class JellioRepository @Inject constructor(
         runCatching { api.getIntroSkipperSegments(itemId) }.getOrNull()
 
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
-        val continueWatchingEp = try {
-            getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId }
-        } catch (err: Exception) {
-            null
-        }
-        val nextUp = continueWatchingEp ?: try {
+        val continueWatchingEp = runCatching {
+            getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId && it.UserData?.Played != true }
+        }.getOrNull()
+        val seriesNextUp = runCatching {
             getSeriesNextUp(seriesId, userId)
-        } catch (err: Exception) {
-            null
+        }.getOrNull()
+        fun epOrder(item: BaseItemDto) = (item.ParentIndexNumber ?: 0) * 10_000 + (item.IndexNumber ?: 0)
+        val nextUp = when {
+            continueWatchingEp != null && (seriesNextUp == null || epOrder(continueWatchingEp) >= epOrder(seriesNextUp)) -> continueWatchingEp
+            else -> seriesNextUp
         }
         val episode = nextUp ?: try {
             val seasons = getSeasons(seriesId, userId)
@@ -1036,8 +1037,6 @@ class JellioRepository @Inject constructor(
         val tags = series.Tags.orEmpty()
         if (genres.any { it.contains("anthology", ignoreCase = true) }) return true
         if (tags.any { it.contains("anthology", ignoreCase = true) }) return true
-        val overview = series.Overview.orEmpty()
-        if (overview.contains("anthology series", ignoreCase = true) || overview.contains("anthology", ignoreCase = true)) return true
         val name = series.Name?.lowercase() ?: ""
         val knownAnthologies = listOf(
             "black mirror",
@@ -1068,18 +1067,23 @@ class JellioRepository @Inject constructor(
         val currentEpNum = episode.IndexNumber ?: return
         if (currentSeasonNum <= 0) return
 
-        val series = runCatching { getItem(userId, seriesId) }.getOrNull()
+        val series = runCatching { getItemDetails(userId, seriesId) }.getOrNull()
         if (isEpisodicAnthology(series)) {
             android.util.Log.d("JellioProgress", "Skipping auto-complete for anthology series: ${series?.Name}")
             return
         }
 
         try {
-            val allEpisodes = api.getEpisodes(seriesId = seriesId, userId = userId, fields = "UserData").Items
+            val allEpisodes = api.getEpisodes(
+                seriesId = seriesId,
+                userId = userId,
+                fields = "UserData,PremiereDate,EndDate,ParentIndexNumber,IndexNumber",
+            ).Items
             val toMark = allEpisodes.filter { ep ->
-                val sNum = ep.ParentIndexNumber ?: 0
-                val eNum = ep.IndexNumber ?: 0
-                if (sNum == 0) return@filter false
+                if (isUnreleasedItem(ep)) return@filter false
+                val sNum = ep.ParentIndexNumber ?: return@filter false
+                val eNum = ep.IndexNumber ?: return@filter false
+                if (sNum <= 0) return@filter false
                 val isBefore = sNum < currentSeasonNum || (sNum == currentSeasonNum && eNum < currentEpNum)
                 isBefore && (ep.UserData?.Played != true || (ep.UserData?.PlaybackPositionTicks ?: 0L) > 0L)
             }
@@ -1302,7 +1306,7 @@ class JellioRepository @Inject constructor(
                         val allEpisodes = runCatching {
                             api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
                         }.getOrElse {
-                            val seasons = runCatching { getSeasons(userId, seriesId) }.getOrDefault(emptyList())
+                            val seasons = runCatching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
                             seasons.flatMap { season ->
                                 runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
                             }
@@ -1326,7 +1330,7 @@ class JellioRepository @Inject constructor(
                     val allEpisodes = runCatching {
                         api.getEpisodes(item.Id, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
                     }.getOrElse {
-                        val seasons = runCatching { getSeasons(userId, item.Id) }.getOrDefault(emptyList())
+                        val seasons = runCatching { getSeasons(item.Id, userId) }.getOrDefault(emptyList())
                         seasons.flatMap { season ->
                             runCatching { getEpisodes(item.Id, userId, season.Id) }.getOrDefault(emptyList())
                         }
@@ -1365,7 +1369,7 @@ class JellioRepository @Inject constructor(
                         val allEpisodes = runCatching {
                             api.getEpisodes(seriesId, userId, seasonId = null, fields = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber").Items
                         }.getOrElse {
-                            val seasons = runCatching { getSeasons(userId, seriesId) }.getOrDefault(emptyList())
+                            val seasons = runCatching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
                             seasons.flatMap { season ->
                                 runCatching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
                             }

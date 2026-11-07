@@ -646,12 +646,12 @@ internal fun PlayerSurface(
     val currentSwitchingTo by androidx.compose.runtime.rememberUpdatedState(switchingTo)
     val currentSwitchingLoaded by androidx.compose.runtime.rememberUpdatedState(switchingLoaded)
     var seekFlash by remember { mutableStateOf<SeekFlash?>(null) }
-    var holdSeekTargetMs by remember { mutableStateOf<Long?>(null) }
-    var holdSeekDeltaMs by remember { mutableLongStateOf(0L) }
-    var holdSeekKey by remember { mutableStateOf<Key?>(null) }
-    var holdSeekStartPos by remember { mutableLongStateOf(0L) }
-    var holdSeekStartTime by remember { mutableLongStateOf(0L) }
-    var wasPlayingBeforeHold by remember { mutableStateOf(false) }
+    var holdSeekTargetMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
+    var holdSeekDeltaMs by remember(streamUrl) { mutableLongStateOf(0L) }
+    var holdSeekKey by remember(streamUrl) { mutableStateOf<Key?>(null) }
+    var holdSeekStartPos by remember(streamUrl) { mutableLongStateOf(0L) }
+    var holdSeekStartTime by remember(streamUrl) { mutableLongStateOf(0L) }
+    var wasPlayingBeforeHold by remember(streamUrl) { mutableStateOf(false) }
     var autoSkippedTo by remember { mutableStateOf<Double?>(null) }
     var isBuffering by remember(player) {
         mutableStateOf(player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_IDLE)
@@ -878,6 +878,17 @@ internal fun PlayerSurface(
     var showEpisodesPanel by remember { mutableStateOf(false) }
     var showReactMenu by remember { mutableStateOf(false) }
     var hasReportedStart by remember(player) { mutableStateOf(false) }
+    var hasEverReportedStart by remember { mutableStateOf(false) }
+    val currentHasReportedStart by androidx.compose.runtime.rememberUpdatedState(hasEverReportedStart)
+    val currentPositionTicks by androidx.compose.runtime.rememberUpdatedState(positionMs * TICKS_PER_MS)
+    val currentOnReportStopped by androidx.compose.runtime.rememberUpdatedState(onReportStopped)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (currentHasReportedStart) {
+                currentOnReportStopped(currentPositionTicks)
+            }
+        }
+    }
     var seekedToResume by remember(player) { mutableStateOf(directPlay && startPositionTicks > 0) }
     var loadedSideloadedSubtitleIndex by remember(player) { mutableStateOf(activeSideloadedTrack?.streamIndex) }
     var upNextShown by remember(streamUrl) { mutableStateOf(false) }
@@ -1006,8 +1017,8 @@ internal fun PlayerSurface(
         player.addAnalyticsListener(loadErrors)
         onDispose {
             player.removeListener(listener)
-            if (hasReportedStart) {
-                onReportStopped((streamOffsetMs + player.currentPosition) * TICKS_PER_MS)
+            if (player.currentPosition > 0) {
+                positionMs = streamOffsetMs + player.currentPosition
             }
             player.release()
         }
@@ -1079,6 +1090,7 @@ internal fun PlayerSurface(
                 }
                 if (!hasReportedStart && isPlaying && (realPositionMs() > 0 || player.currentPosition > 0)) {
                     hasReportedStart = true
+                    hasEverReportedStart = true
                     onReportStart(realPositionMs() * TICKS_PER_MS)
                     onPlaybackStarted()
                 }
@@ -1213,6 +1225,7 @@ internal fun PlayerSurface(
 
     val pausedByViewer = pauseInfo != null && hasReportedStart && !playWhenReadyState && !showResumePrompt && !isEnded
     val menuOpen = showSubtitleMenu || showSpeedMenu || showSleepMenu || showAudioMenu || showSourcePanel || showEpisodesPanel || showReactMenu
+    val anyMenuOpen = menuOpen
     var pauseOverlayVisible by remember { mutableStateOf(false) }
     // The key that took the pause screen away, so its key up only does that.
     var pauseOverlayDismissKey by remember { mutableStateOf<Key?>(null) }
@@ -1257,7 +1270,9 @@ internal fun PlayerSurface(
                 val forward = event.key == Key.DirectionRight || event.key == Key.MediaFastForward
 
                 if (event.type == KeyEventType.KeyDown) {
-                    if (isSeekKey && (!controlsVisible || isMedia)) {
+                    val noOverlayOpen = !showEndScreen && !upNextCardVisible && !anyMenuOpen &&
+                        !bufferPromptVisible && !showResumePrompt && !catchUpOpen && exoError == null
+                    if (isSeekKey && (!controlsVisible || isMedia) && noOverlayOpen) {
                         val repeatCount = event.nativeKeyEvent.repeatCount
                         val now = android.os.SystemClock.uptimeMillis()
                         if (repeatCount == 0 && holdSeekKey != event.key) {
@@ -1268,7 +1283,7 @@ internal fun PlayerSurface(
                             holdSeekDeltaMs = 0L
                         } else if (repeatCount > 0 || (now - holdSeekStartTime > 250L)) {
                             // Hold to fast forward / rewind
-                            if (holdSeekTargetMs == null && player.isPlaying) {
+                            if (holdSeekTargetMs == null && player.isPlaying && syncPlaylistItemId == null && directPlay) {
                                 wasPlayingBeforeHold = true
                                 player.pause()
                             }
@@ -1298,7 +1313,7 @@ internal fun PlayerSurface(
                     holdSeekDeltaMs = 0L
                     holdSeekKey = null
                     if (wasPlayingBeforeHold) {
-                        player.play()
+                        if (syncPlaylistItemId == null && directPlay) player.play()
                         wasPlayingBeforeHold = false
                     }
                 }
@@ -1390,7 +1405,6 @@ internal fun PlayerSurface(
                         true
                     }
                     Key.DirectionLeft, Key.DirectionRight, Key.MediaRewind, Key.MediaFastForward -> {
-                        if (controlsVisible && !isMedia) return@onKeyEvent false
                         if (holdSeekTargetMs != null) {
                             // Finished holding down - seek and resume
                             val target = holdSeekTargetMs!!
@@ -1400,11 +1414,12 @@ internal fun PlayerSurface(
                             holdSeekDeltaMs = 0L
                             holdSeekKey = null
                             if (wasPlayingBeforeHold) {
-                                player.play()
+                                if (syncPlaylistItemId == null && directPlay) player.play()
                                 wasPlayingBeforeHold = false
                             }
                             return@onKeyEvent true
                         }
+                        if (controlsVisible && !isMedia) return@onKeyEvent false
                         // Controls hidden: quick single tap jump, with a small badge saying
                         // where to, rather than bringing the whole overlay up.
                         holdSeekKey = null
@@ -1521,12 +1536,13 @@ internal fun PlayerSurface(
         if (switchingTo != null) {
             LaunchedEffect(switchingTo, switchingLoaded, player) {
                 if (!switchingLoaded) return@LaunchedEffect
-                withTimeoutOrNull(2500L) {
-                    androidx.compose.runtime.snapshotFlow {
-                        val playing = isPlaying || player.isPlaying
-                        val ready = !isBuffering || player.playbackState == Player.STATE_READY
-                        playing && ready
-                    }.first { it }
+                val startMs = System.currentTimeMillis()
+                while (isActive) {
+                    val playing = isPlaying || player.isPlaying
+                    val ready = !isBuffering && player.playbackState == Player.STATE_READY
+                    if (playing && ready) break
+                    if (System.currentTimeMillis() - startMs > 15_000L) break
+                    delay(100)
                 }
                 delay(150)
                 currentSwitchSettled()
@@ -1538,7 +1554,6 @@ internal fun PlayerSurface(
             )
         }
 
-        val anyMenuOpen = menuOpen
         if (controlsVisible) {
             PlayerControls(
                 title = title,

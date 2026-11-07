@@ -77,6 +77,8 @@ fun PosterRow(
     val coroutineScope = rememberCoroutineScope()
     var isLoading by remember(section.key, section.items) { mutableStateOf(false) }
     var isExhausted by remember(section.key, section.items) { mutableStateOf(false) }
+    var rawNextStart by remember(section.key, section.items) { mutableStateOf(section.items.size) }
+    var consecutiveEmptyPages by remember(section.key, section.items) { mutableStateOf(0) }
 
     val currentItems = remember(section.key, section.items) {
         if (fetchPage != null) {
@@ -98,21 +100,29 @@ fun PosterRow(
         isLoading = true
         coroutineScope.launch {
             try {
-                val startIndex = currentItems.size
-                val newItems = fetchPage(startIndex, 20)
-                if (newItems.isEmpty()) {
-                    isExhausted = true
-                } else {
+                while (!isExhausted) {
+                    val startIndex = rawNextStart
+                    val newItems = fetchPage(startIndex, ROW_PAGE_SIZE)
+                    rawNextStart = startIndex + ROW_PAGE_SIZE
+                    if (newItems.isEmpty()) {
+                        isExhausted = true
+                        break
+                    }
                     val existingIds = currentItems.map { it.Id }.toHashSet()
                     val existingKeys = currentItems.map { titleKey(it) }.toHashSet()
                     val toAdd = newItems.filter { item ->
                         existingIds.add(item.Id) && existingKeys.add(titleKey(item))
                     }
                     if (toAdd.isNotEmpty()) {
+                        consecutiveEmptyPages = 0
                         currentItems.addAll(toAdd)
-                    }
-                    if (newItems.size < 20 || toAdd.isEmpty()) {
-                        isExhausted = true
+                        break
+                    } else {
+                        consecutiveEmptyPages += 1
+                        if (consecutiveEmptyPages >= 2) {
+                            isExhausted = true
+                            break
+                        }
                     }
                 }
             } catch (_: Exception) {

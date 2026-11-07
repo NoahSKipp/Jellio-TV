@@ -235,7 +235,7 @@ class PlayerViewModel @Inject constructor(
                 }.getOrNull()
                 if (target != null) {
                     val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, target.startPositionTicks)
-                    _uiState.value = state.copy(
+                    _uiState.value = _uiState.value.copy(
                         streamUrl = target.streamUrl,
                         directPlay = false,
                         subtitleTracks = subtitleTracks,
@@ -271,7 +271,7 @@ class PlayerViewModel @Inject constructor(
                         )
                     }.getOrNull()
                     if (target != null) {
-                        _uiState.value = state.copy(
+                        _uiState.value = _uiState.value.copy(
                             streamUrl = target.streamUrl,
                             directPlay = true,
                             subtitleTracks = buildSubtitleTracks(id, target.mediaSource, 0L),
@@ -284,7 +284,7 @@ class PlayerViewModel @Inject constructor(
             if (!notReady) BadStreams.mark(id, source)
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
-            chooseNextStream(session, PendingFailover(id, sourceId, reason, state, remuxFailed, notReady), loaded)
+            chooseNextStream(session, PendingFailover(id, sourceId, reason, _uiState.value, remuxFailed, notReady), loaded)
         }
     }
 
