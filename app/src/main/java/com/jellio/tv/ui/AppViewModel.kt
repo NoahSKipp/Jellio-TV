@@ -37,6 +37,8 @@ class AppViewModel @Inject constructor(
     private val watchNextSyncer: com.jellio.tv.data.watchnext.WatchNextSyncer,
     val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
     val nowPlayingManager: com.jellio.tv.data.nowplaying.NowPlayingManager,
+    private val sessionGuard: com.jellio.tv.data.session.SessionGuard,
+    private val syncPlayManager: com.jellio.tv.data.syncplay.SyncPlayManager,
 ) : ViewModel() {
     val authState: StateFlow<AuthState> = repository.sessionFlow
         .map { session -> if (session != null) AuthState.LoggedIn(session) else AuthState.LoggedOut }
@@ -46,6 +48,14 @@ class AppViewModel @Inject constructor(
     val libraries: StateFlow<List<BaseItemDto>> = _libraries.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            sessionGuard.expired.collect { expired ->
+                if (expired != null) {
+                    signOut(expired)
+                    sessionGuard.acknowledge(expired)
+                }
+            }
+        }
         viewModelScope.launch {
             authState.collectLatest { state ->
                 if (state is AuthState.LoggedIn) {
@@ -74,10 +84,22 @@ class AppViewModel @Inject constructor(
     }
 
     fun logout() {
-        viewModelScope.launch {
-            watchNextSyncer.clear()
+        viewModelScope.launch { signOut(expired = null) }
+    }
+
+    // A session the server ended signs out the same way, then the sign-in
+    // screen opens on that account with a note saying why.
+    private suspend fun signOut(expired: com.jellio.tv.data.session.ExpiredSession?) {
+        nowPlayingManager.stopPolling()
+        watchNextSyncer.clear()
+        if (expired == null) {
             repository.logout()
+            return
         }
+        syncPlayManager.leaveLocally()
+        com.jellio.tv.ui.auth.LoginHandoff.put(expired.userName)
+        com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
+        repository.logoutExpired(expired.serverAddress, expired.userId)
     }
 
     fun imageUrl(session: Session, item: BaseItemDto, imageType: String, maxWidth: Int): String {

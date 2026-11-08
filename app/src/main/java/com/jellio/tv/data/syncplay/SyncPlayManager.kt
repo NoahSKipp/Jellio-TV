@@ -369,6 +369,12 @@ class SyncPlayManager @Inject constructor(
         resetGroup()
     }
 
+    // The token is gone, so the server can't be told; only this TV forgets the group.
+    fun leaveLocally() {
+        pendingCreateName = null
+        resetGroup()
+    }
+
     suspend fun requestPause() = runCatching { api.syncPlayPause() }
     suspend fun requestUnpause() = runCatching { api.syncPlayUnpause() }
     suspend fun requestSeek(positionTicks: Long) = runCatching { api.syncPlaySeek(SyncPlaySeekBody(positionTicks)) }

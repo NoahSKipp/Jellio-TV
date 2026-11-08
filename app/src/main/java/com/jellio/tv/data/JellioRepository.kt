@@ -333,6 +333,8 @@ class JellioRepository @Inject constructor(
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         val entry = rememberedUsersStore.getRememberedUsers(normalized)[userId]
             ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_no_remembered_signin"))
+        // The server dropped this sign-in earlier: the profile stays, the password is needed.
+        if (entry.accessToken.isBlank()) return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
         sessionManager.saveServerAddress(normalized)
         return try {
             val authorization = com.jellio.tv.data.network.buildEmbyAuthorizationHeader(
@@ -400,6 +402,12 @@ class JellioRepository @Inject constructor(
     suspend fun logout() {
         clearCache()
         sessionManager.clearSession()
+    }
+
+    // Signs out a session the server no longer accepts, keeping its profile listed.
+    suspend fun logoutExpired(serverAddress: String, userId: String) {
+        rememberedUsersStore.clearToken(com.jellio.tv.di.normalizeServerAddress(serverAddress), userId)
+        logout()
     }
 
     private suspend fun getLibraries(userId: String): List<BaseItemDto> =
@@ -1441,13 +1449,6 @@ class JellioRepository @Inject constructor(
 
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
-
-    suspend fun deleteItem(itemId: String) = api.deleteItem(itemId)
-
-    suspend fun canDeleteItems(userId: String): Boolean {
-        val policy = catching { getUser(userId) }.getOrNull()?.Policy ?: return false
-        return policy.IsAdministrator || policy.EnableContentDeletion
-    }
 
     private fun isKnownWarm(itemId: String): Boolean =
         knownWarm.contains(com.jellio.tv.data.streams.normalizeSourceId(itemId))

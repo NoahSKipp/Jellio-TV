@@ -92,8 +92,6 @@ fun SearchScreen(
     val focusController = rememberGridFocusController()
     val context = LocalContext.current
 
-    LaunchedEffect(session.userId) { viewModel.loadPermissions(session) }
-
     val voiceIntent = remember {
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)

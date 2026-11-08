@@ -74,6 +74,7 @@ class LoginViewModel @Inject constructor(
             val publicOnly = publicUsers.filter { it.Id !in rememberedIds }
 
             val handoff = LoginHandoff.take()
+            val notice = LoginHandoff.takeNotice()
             _uiState.value = if (handoff != null) {
                 LoginUiState(
                     mode = LoginMode.MANUAL,
@@ -82,9 +83,10 @@ class LoginViewModel @Inject constructor(
                     publicOnly = publicOnly,
                     manualPrefillUsername = handoff,
                     canReturnToProfiles = liveRemembered.isNotEmpty() || publicOnly.isNotEmpty(),
+                    error = notice,
                 )
             } else if (liveRemembered.isEmpty() && publicOnly.isEmpty()) {
-                LoginUiState(mode = LoginMode.MANUAL, serverAddress = serverAddress)
+                LoginUiState(mode = LoginMode.MANUAL, serverAddress = serverAddress, error = notice)
             } else {
                 LoginUiState(
                     mode = LoginMode.PROFILE_PICKER,
@@ -92,6 +94,7 @@ class LoginViewModel @Inject constructor(
                     remembered = liveRemembered,
                     publicOnly = publicOnly,
                     canReturnToProfiles = true,
+                    error = notice,
                 )
             }
         }
@@ -306,12 +309,22 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
         super.onCleared()
         quickConnectJob?.cancel()
     }
-}object LoginHandoff {
+}
+
+object LoginHandoff {
     @Volatile private var username: String? = null
+    @Volatile private var notice: String? = null
 
     fun put(name: String) {
         username = name
     }
 
     fun take(): String? = username.also { username = null }
+
+    // Shown on the sign-in form after the server ended the session.
+    fun putNotice(message: String) {
+        notice = message
+    }
+
+    fun takeNotice(): String? = notice.also { notice = null }
 }

@@ -95,6 +95,7 @@ internal fun JellioTvRoot(
                 onDownload = { appUpdateViewModel.download() },
                 onDismiss = { appUpdateViewModel.dismiss() },
                 modifier = Modifier.fillMaxSize(),
+                error = updateState.error,
             )
         }
     }

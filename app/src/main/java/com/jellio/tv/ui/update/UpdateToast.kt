@@ -45,6 +45,7 @@ fun UpdateToast(
     onDownload: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    error: String? = null,
 ) {
     val downloadFocusRequester = remember { FocusRequester() }
     var hasFocus by remember { mutableStateOf(false) }
@@ -76,8 +77,16 @@ fun UpdateToast(
                 text = com.jellio.tv.ui.i18n.Strings.format("tv_update_ready", version),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
-                modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),
+                modifier = Modifier.padding(top = 6.dp, bottom = if (error != null) 8.dp else 18.dp),
             )
+            if (error != null) {
+                Text(
+                    text = com.jellio.tv.ui.i18n.Strings.get(error),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = com.jellio.tv.ui.theme.JellioDanger,
+                    modifier = Modifier.padding(bottom = 18.dp),
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     onClick = { if (!downloading) onDismiss() },

@@ -47,6 +47,11 @@ class RememberedUsersStore @Inject constructor(
     suspend fun forgetUser(serverAddress: String, userId: String) =
         update(serverAddress) { it.remove(userId) }
 
+    // Keeps the profile listed for a quick password sign-in once the server
+    // stopped accepting its token.
+    suspend fun clearToken(serverAddress: String, userId: String) =
+        update(serverAddress) { users -> users[userId]?.let { users[userId] = it.copy(accessToken = "") } }
+
     // Read and written in one edit, so two sign-ins at once both stick.
     private suspend fun update(serverAddress: String, change: (MutableMap<String, RememberedUserEntry>) -> Unit) {
         context.rememberedUsersDataStore.edit { prefs ->

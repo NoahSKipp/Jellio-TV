@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Matches DownloadManager.Request's own setDestinationInExternalFilesDir(
-     context, Environment.DIRECTORY_DOWNLOADS, ...) call in
-     AppUpdateViewModel: the one real directory this app's own
-     FileProvider ever needs to expose a Uri into. -->
+<!-- AppUpdateViewModel downloads the update to Download/ and installs a
+     checked copy from the app's private updates/ directory. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-files-path name="downloads" path="Download/" />
+    <files-path name="updates" path="updates/" />
 </paths>

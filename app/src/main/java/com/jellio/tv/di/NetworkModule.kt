@@ -5,6 +5,7 @@ import com.jellio.tv.data.network.APP_VERSION
 import com.jellio.tv.data.network.SharedHttp
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
+import com.jellio.tv.data.session.SessionGuard
 import com.jellio.tv.data.session.SessionManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -93,7 +94,7 @@ object NetworkModule {
     @Provides
     @Singleton
     @AuthInterceptor
-    fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor =
+    fun provideAuthInterceptor(sessionManager: SessionManager, sessionGuard: SessionGuard): Interceptor =
         Interceptor { chain ->
             val original = chain.request()
             val activeLang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage
@@ -101,11 +102,14 @@ object NetworkModule {
                 .header("Accept-Language", "${activeLang.localeTag}, ${activeLang.code};q=0.9, en;q=0.8")
             // A request carrying its own credentials (checking a saved
             // profile's token) keeps them.
-            if (original.header("Authorization") == null) {
-                val token = sessionManager.getCachedAccessToken()
+            val ownCredentials = original.header("Authorization") != null
+            val token = if (ownCredentials) null else sessionManager.getCachedAccessToken()
+            if (!ownCredentials) {
                 request.header("Authorization", buildEmbyAuthorizationHeader(sessionManager.getCachedDeviceId(), APP_VERSION, token))
             }
-            chain.proceed(request.build())
+            val response = chain.proceed(request.build())
+            sessionGuard.onResponse(response.code, original.url.host, original.url.encodedPath, token, ownCredentials)
+            response
         }
 
     @Provides

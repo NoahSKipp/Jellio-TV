@@ -188,7 +188,7 @@ fun AccountSwitcherOverlay(
                             name = profile.name,
                             imageUrl = viewModel.avatarUrl(session, profile.userId, profile.primaryImageTag),
                             busy = uiState.busyUserId == profile.userId,
-                            onClick = { viewModel.quickSignIn(session, profile.userId) },
+                            onClick = { viewModel.quickSignIn(session, profile.userId, onNeedsPassword = onSignOut) },
                         )
                     }
                     items(uiState.publicOnly, key = { "p:" + it.Id }) { user ->

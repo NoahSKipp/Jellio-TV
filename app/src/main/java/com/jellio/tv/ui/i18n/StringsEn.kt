@@ -763,6 +763,10 @@ internal object StringsEn {
         m["update_downloading"] = "Downloading..."
         m["update_download"] = "Download"
         m["update_install"] = "Install"
+        m["update_error_download"] = "The update could not be downloaded. Try again later."
+        m["update_error_checksum"] = "The downloaded update did not match its published checksum and was deleted."
+        m["update_error_not_genuine"] = "The downloaded file is not a genuine Jellio TV update and was deleted."
+        m["update_error_not_newer"] = "The downloaded update is not newer than the installed version."
     }
 
     private fun fillPlaybackAndAuth(m: HashMap<String, String>) {
@@ -803,6 +807,7 @@ internal object StringsEn {
         m["auth_server_unreachable"] = "Could not reach that server"
         m["auth_no_remembered_signin"] = "No remembered sign-in for this profile"
         m["auth_saved_signin_expired"] = "That saved sign-in no longer works. Sign in again."
+        m["auth_session_expired"] = "Your session has expired. Please sign in again."
         m["auth_switch_profile_error"] = "Could not switch to that profile right now."
         m["auth_server_try_again"] = "Could not reach the server. Try again."
         m["auth_reset_code_invalid"] = "That reset code is invalid or has expired."

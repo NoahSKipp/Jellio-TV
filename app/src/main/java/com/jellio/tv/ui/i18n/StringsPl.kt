@@ -763,6 +763,10 @@ internal object StringsPl {
         m["update_downloading"] = "Pobieranie..."
         m["update_download"] = "Pobierz"
         m["update_install"] = "Zainstaluj"
+        m["update_error_download"] = "Nie udało się pobrać aktualizacji. Spróbuj ponownie później."
+        m["update_error_checksum"] = "Pobrana aktualizacja nie zgadzała się z opublikowaną sumą kontrolną i została usunięta."
+        m["update_error_not_genuine"] = "Pobrany plik nie jest prawdziwą aktualizacją Jellio TV i został usunięty."
+        m["update_error_not_newer"] = "Pobrana aktualizacja nie jest nowsza niż zainstalowana wersja."
     }
 
     private fun fillPlaybackAndAuth(m: HashMap<String, String>) {
@@ -803,6 +807,7 @@ internal object StringsPl {
         m["auth_server_unreachable"] = "Nie można połączyć się z tym serwerem"
         m["auth_no_remembered_signin"] = "Brak zapamiętanego logowania dla tego profilu"
         m["auth_saved_signin_expired"] = "To zapamiętane logowanie już nie działa. Zaloguj się ponownie."
+        m["auth_session_expired"] = "Twoja sesja wygasła. Zaloguj się ponownie."
         m["auth_switch_profile_error"] = "Nie można teraz przełączyć na ten profil."
         m["auth_server_try_again"] = "Nie można połączyć się z serwerem. Spróbuj ponownie."
         m["auth_reset_code_invalid"] = "Ten kod resetowania jest nieprawidłowy lub wygasł."

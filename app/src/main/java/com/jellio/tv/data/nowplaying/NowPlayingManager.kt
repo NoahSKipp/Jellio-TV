@@ -57,6 +57,14 @@ class NowPlayingManager @Inject constructor(
         }
     }
 
+    fun stopPolling() {
+        pollJob?.cancel()
+        pollJob = null
+        lastSession = null
+        _sessions.value = emptyList()
+        _activeCount.value = 0
+    }
+
     fun refresh() {
         if (lastSession == null) return
         scope.launch { fetchNowPlaying() }

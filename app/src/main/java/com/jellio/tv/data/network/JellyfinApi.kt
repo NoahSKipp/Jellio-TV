@@ -296,9 +296,6 @@ interface JellyfinApi {
     @DELETE("Users/{userId}/Items/{itemId}/Rating")
     suspend fun clearRating(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
-    @DELETE("Items/{itemId}")
-    suspend fun deleteItem(@Path("itemId") itemId: String)
-
     @GET("Jellio/search/suggestions")
     suspend fun getSearchSuggestions(@Query("query") query: String): com.jellio.tv.data.model.SearchSuggestionsDto
 

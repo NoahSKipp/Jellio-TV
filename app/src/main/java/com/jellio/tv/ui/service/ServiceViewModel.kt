@@ -49,7 +49,6 @@ data class ServiceUiState(
     val heroItem: BaseItemDto? = null,
     val rows: List<ServiceRow> = emptyList(),
     val topGenres: List<String> = emptyList(),
-    val canDeleteItems: Boolean = false,
 )
 
 @HiltViewModel
@@ -271,23 +270,10 @@ class ServiceViewModel @Inject constructor(
         }
     }
 
-    fun deleteItem(item: BaseItemDto) {
-        viewModelScope.launch {
-            runCatching { repository.deleteItem(item.Id) }.onSuccess { removeItemFromRows(item.Id) }
-        }
-    }
-
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
         _uiState.value = state.copy(
             rows = state.rows.map { row -> row.copy(items = row.items.map { if (it.Id == itemId) transform(it) else it }) },
-        )
-    }
-
-    private fun removeItemFromRows(itemId: String) {
-        val state = _uiState.value
-        _uiState.value = state.copy(
-            rows = state.rows.map { row -> row.copy(items = row.items.filterNot { it.Id == itemId }) },
         )
     }
 }

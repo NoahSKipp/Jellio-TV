@@ -64,7 +64,6 @@ data class LibraryUiState(
     val genreOptions: List<String> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     val emptyMessage: String? = null,
-    val canDeleteItems: Boolean = false,
 )
 
 @HiltViewModel
@@ -391,12 +390,6 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    fun deleteItem(item: BaseItemDto) {
-        viewModelScope.launch {
-            runCatching { repository.deleteItem(item.Id) }.onSuccess { removeItemFromSections(item.Id) }
-        }
-    }
-
     private fun updateItem(itemId: String, transform: (BaseItemDto) -> BaseItemDto) {
         val state = _uiState.value
         _uiState.value = state.copy(
@@ -409,18 +402,6 @@ class LibraryViewModel @Inject constructor(
                 } else {
                     section
                 }
-            },
-        )
-    }
-
-    private fun removeItemFromSections(itemId: String) {
-        val state = _uiState.value
-        _uiState.value = state.copy(
-            mainRow = state.mainRow?.let { row ->
-                if (row.items.any { it.Id == itemId }) row.copy(items = row.items.filterNot { it.Id == itemId }) else row
-            },
-            sections = state.sections.map { section ->
-                if (section.items.any { it.Id == itemId }) section.copy(items = section.items.filterNot { it.Id == itemId }) else section
             },
         )
     }

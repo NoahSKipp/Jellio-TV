@@ -48,7 +48,6 @@ data class HomeUiState(
     val greeting: String = "",
     val rows: List<HomeRow> = emptyList(),
     val customization: HomeCustomizationDto = HomeCustomizationDto(),
-    val canDeleteItems: Boolean = false,
     val error: String? = null,
     // More rows are still loading below the ones shown (skeletons there).
     val loadingMore: Boolean = false,
@@ -282,8 +281,6 @@ class HomeViewModel @Inject constructor(
                     // Titles taken off the watchlist here stay off even if a refresh
                     // still gets the older list back.
                     val watchlist = watchlistDeferred.await().filter { removedFromWatchlist[it.Id] == null }
-                    val policy = user?.Policy
-                    val canDeleteItems = policy != null && (policy.IsAdministrator || policy.EnableContentDeletion)
                     val existingComingSoon = _uiState.value.rows.filterIsInstance<ComingSoonHomeRow>().firstOrNull()
                     val topRows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
@@ -315,7 +312,6 @@ class HomeViewModel @Inject constructor(
                             greeting = greeting,
                             rows = topRows,
                             customization = customization,
-                            canDeleteItems = canDeleteItems,
                             loadingMore = true,
                         )
                     }
@@ -380,7 +376,6 @@ class HomeViewModel @Inject constructor(
                             greeting = greeting,
                             rows = assembled(),
                             customization = customization,
-                            canDeleteItems = canDeleteItems,
                             loadingMore = !finished,
                         )
                     }
@@ -722,16 +717,6 @@ class HomeViewModel @Inject constructor(
                     hiddenSeriesIds.remove(seriesId)
                     removedItemIds.remove(item.Id)
                     _uiState.value = _uiState.value.copy(rows = before)
-                }
-        }
-    }
-
-    fun deleteItem(item: BaseItemDto) {
-        viewModelScope.launch {
-            runCatching { repository.deleteItem(item.Id) }
-                .onSuccess {
-                    removedItemIds.add(item.Id)
-                    removeItemFromRows(item.Id)
                 }
         }
     }

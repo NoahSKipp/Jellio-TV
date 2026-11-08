@@ -763,6 +763,10 @@ internal object StringsDe {
         m["update_downloading"] = "Wird heruntergeladen..."
         m["update_download"] = "Herunterladen"
         m["update_install"] = "Installieren"
+        m["update_error_download"] = "Das Update konnte nicht heruntergeladen werden. Versuch es später noch einmal."
+        m["update_error_checksum"] = "Das heruntergeladene Update passte nicht zu seiner veröffentlichten Prüfsumme und wurde gelöscht."
+        m["update_error_not_genuine"] = "Die heruntergeladene Datei ist kein echtes Jellio TV Update und wurde gelöscht."
+        m["update_error_not_newer"] = "Das heruntergeladene Update ist nicht neuer als die installierte Version."
     }
 
     private fun fillPlaybackAndAuth(m: HashMap<String, String>) {
@@ -803,6 +807,7 @@ internal object StringsDe {
         m["auth_server_unreachable"] = "Server konnte nicht erreicht werden"
         m["auth_no_remembered_signin"] = "Keine gespeicherte Anmeldung für dieses Profil"
         m["auth_saved_signin_expired"] = "Diese gespeicherte Anmeldung funktioniert nicht mehr. Melde dich erneut an."
+        m["auth_session_expired"] = "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an."
         m["auth_switch_profile_error"] = "Zu diesem Profil konnte derzeit nicht gewechselt werden."
         m["auth_server_try_again"] = "Der Server konnte nicht erreicht werden. Versuche es erneut."
         m["auth_reset_code_invalid"] = "Dieser Rücksetzcode ist ungültig oder abgelaufen."

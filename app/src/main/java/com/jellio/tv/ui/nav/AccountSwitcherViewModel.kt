@@ -56,9 +56,17 @@ class AccountSwitcherViewModel @Inject constructor(
         }
     }
 
-    fun quickSignIn(session: Session, userId: String) {
+    // onNeedsPassword: the saved sign-in ended on the server, so the password form opens for it.
+    fun quickSignIn(session: Session, userId: String, onNeedsPassword: () -> Unit) {
         if (_uiState.value.busyUserId != null) return
         viewModelScope.launch {
+            val saved = repository.getRememberedUsers(session.serverAddress)[userId]
+            if (saved != null && saved.accessToken.isBlank()) {
+                saved.name.takeIf { it.isNotBlank() }?.let(com.jellio.tv.ui.auth.LoginHandoff::put)
+                com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
+                onNeedsPassword()
+                return@launch
+            }
             _uiState.value = _uiState.value.copy(busyUserId = userId, error = null)
             val result = kotlinx.coroutines.withTimeoutOrNull(QUICK_SIGN_IN_TIMEOUT_MS) {
                 repository.quickSignIn(session.serverAddress, userId)
