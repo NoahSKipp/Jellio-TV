@@ -26,7 +26,6 @@ import com.jellio.tv.ui.AppViewModel
 import com.jellio.tv.ui.AuthState
 import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.auth.LoginScreen
-import com.jellio.tv.ui.calendar.CalendarScreen
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.feed.FeedScreen
@@ -36,7 +35,6 @@ import com.jellio.tv.ui.library.LibraryScreen
 import com.jellio.tv.ui.library.LibraryViewModel
 import com.jellio.tv.ui.nav.AccountSwitcherOverlay
 import com.jellio.tv.ui.nav.JellioRoute
-import com.jellio.tv.ui.nav.LibraryPickerOverlay
 import com.jellio.tv.ui.nav.SidebarNav
 import com.jellio.tv.ui.nav.SidebarReservedWidth
 import com.jellio.tv.ui.nav.isImmersive
@@ -56,7 +54,6 @@ import com.jellio.tv.ui.theme.scaled
 import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
-import com.jellio.tv.ui.watchlist.WatchlistScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -157,8 +154,6 @@ private fun JellioTvApp(
         com.jellio.tv.data.streams.StreamLookupLog.screen(route::class.simpleName ?: "screen")
         onPlayerActiveChanged(route is JellioRoute.Player || route is JellioRoute.LivePlayer)
     }
-    var selectedLibrary by remember { mutableStateOf<BaseItemDto?>(null) }
-    var showLibraryPicker by remember { mutableStateOf(false) }
     var showAccountSwitcher by remember { mutableStateOf(false) }
     // A profile switch swaps the session under the open switcher: close it.
     LaunchedEffect(session.userId) { showAccountSwitcher = false }
@@ -166,7 +161,6 @@ private fun JellioTvApp(
     var showNowPlayingDrawer by remember { mutableStateOf(false) }
     var quickHubInitialTab by remember { mutableStateOf(QuickHubTab.NOW_PLAYING) }
     val nowPlayingSessions by appViewModel.nowPlayingManager.sessions.collectAsState()
-    val nowPlayingActiveCount by appViewModel.nowPlayingManager.activeCount.collectAsState()
     val nowPlayingLocalPaused by appViewModel.nowPlayingManager.localPaused.collectAsState()
     var showChangelog by remember { mutableStateOf(false) }
     var showOnboarding by remember { mutableStateOf(false) }
@@ -209,7 +203,7 @@ private fun JellioTvApp(
     val quickHubShortcutAllowed = !route.isImmersive() && (
         showNowPlayingDrawer || (
             !homeEditMode && streamPickerItem == null &&
-                !(showAccountSwitcher || showNotifications || showLibraryPicker || showChangelog || showOnboarding)
+                !(showAccountSwitcher || showNotifications || showChangelog || showOnboarding)
             )
         )
     androidx.compose.runtime.DisposableEffect(route, showNowPlayingDrawer, quickHubShortcutAllowed) {
@@ -237,15 +231,6 @@ private fun JellioTvApp(
     fun openQuickHub(tab: QuickHubTab) {
         quickHubInitialTab = tab
         showNowPlayingDrawer = true
-    }
-
-    fun openLibrary(library: BaseItemDto) {
-        if (library.CollectionType == "livetv") {
-            switchTab(JellioRoute.LiveTv)
-        } else {
-            selectedLibrary = library
-            switchTab(JellioRoute.Library)
-        }
     }
 
     BackHandler(enabled = routeStack.size > 1) {
@@ -378,17 +363,6 @@ private fun JellioTvApp(
                 onItemClick = { item -> onNavigateToDetail(item.Id) },
                 modifier = Modifier.fillMaxSize(),
             )
-            JellioRoute.Watchlist -> WatchlistScreen(
-                session = session,
-                imageUrl = memoizedImageUrl,
-                onItemClick = { item -> onNavigateToDetail(item.Id) },
-                modifier = Modifier.fillMaxSize(),
-            )
-            JellioRoute.Calendar -> CalendarScreen(
-                imageUrl = memoizedRawImageUrl,
-                onItemClick = onNavigateToDetail,
-                modifier = Modifier.fillMaxSize(),
-            )
             is JellioRoute.LibraryTab -> {
                 val library = libraries.firstOrNull { it.Id == current.libraryId && (it.Name ?: "Library") == current.name }
                 if (library != null) {
@@ -401,18 +375,6 @@ private fun JellioTvApp(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                }
-            }
-            JellioRoute.Library -> {
-                val library = selectedLibrary
-                if (library != null) {
-                    LibraryScreen(
-                        session = session,
-                        library = library,
-                        imageUrl = memoizedImageUrl,
-                        onItemClick = { item -> onNavigateToDetail(item.Id) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 }
             }
             JellioRoute.Settings -> SettingsScreen(
@@ -489,7 +451,6 @@ private fun JellioTvApp(
                     onBack = { routeStack = routeStack.dropLast(1) },
                 )
             }
-            JellioRoute.NowPlaying -> Unit
         }
         }
 
@@ -519,14 +480,9 @@ private fun JellioTvApp(
                 items = jellioNavItems(libraries),
                 selected = route,
                 enabled = !homeEditMode,
-                focusable = !homeEditMode && !(showAccountSwitcher || showNotifications || showLibraryPicker || showChangelog || showOnboarding || showNowPlayingDrawer),
-                nowPlayingCount = nowPlayingActiveCount,
+                focusable = !homeEditMode && !(showAccountSwitcher || showNotifications || showChangelog || showOnboarding || showNowPlayingDrawer),
                 onSelect = { clicked ->
-                    if (clicked is JellioRoute.NowPlaying) {
-                        openQuickHub(QuickHubTab.NOW_PLAYING)
-                    } else if (clicked is JellioRoute.Library) {
-                        showLibraryPicker = true
-                    } else if (clicked is JellioRoute.Profile && clicked.userId == null) {
+                    if (clicked is JellioRoute.Profile && clicked.userId == null) {
                         showAccountSwitcher = true
                     } else {
                         switchTab(clicked)
@@ -569,19 +525,6 @@ private fun JellioTvApp(
                     onOpenGroupWatch = {
                         showNotifications = false
                         openQuickHub(QuickHubTab.GROUP_WATCH)
-                    },
-                )
-            }
-            if (showLibraryPicker) {
-                LibraryPickerOverlay(
-                    libraries = libraries,
-                    onDismiss = {
-                        sidebarFocusRequester.requestFocus()
-                        showLibraryPicker = false
-                    },
-                    onSelect = { library ->
-                        showLibraryPicker = false
-                        openLibrary(library)
                     },
                 )
             }

@@ -5,12 +5,14 @@ import android.view.KeyEvent
 object QuickHubKeys {
     const val HOLD_TIMEOUT_MS = 450L
 
-    // OK and Back are needed for normal navigation, so they never fire on a short press.
-    fun requiresLongPress(keyCode: Int): Boolean =
+    // Back is needed for normal navigation, so it never fires on a short press.
+    fun requiresLongPress(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_BACK
+
+    // OK selects things everywhere, so it can never open the hub.
+    fun isOkKey(keyCode: Int): Boolean =
         keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
             keyCode == KeyEvent.KEYCODE_ENTER ||
-            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
-            keyCode == KeyEvent.KEYCODE_BACK
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
 
     fun isSystemRestrictedKey(keyCode: Int): Boolean = when (keyCode) {
         KeyEvent.KEYCODE_HOME,
@@ -28,18 +30,15 @@ object QuickHubKeys {
     }
 
     fun isValidCustomKey(keyCode: Int): Boolean =
-        keyCode > KeyEvent.KEYCODE_UNKNOWN && !isSystemRestrictedKey(keyCode)
+        keyCode > KeyEvent.KEYCODE_UNKNOWN && !isSystemRestrictedKey(keyCode) && !isOkKey(keyCode)
 
     fun forcesLongPress(button: QuickHubButton, customKeyCode: Int): Boolean = when (button) {
-        QuickHubButton.CENTER, QuickHubButton.BACK -> true
+        QuickHubButton.BACK -> true
         QuickHubButton.CUSTOM -> requiresLongPress(customKeyCode)
         else -> false
     }
 
     fun isTargetKey(keyCode: Int, button: QuickHubButton, customKeyCode: Int): Boolean = when (button) {
-        QuickHubButton.CENTER -> keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-            keyCode == KeyEvent.KEYCODE_ENTER ||
-            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
         QuickHubButton.PLAY_PAUSE -> keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
             keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
             keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||

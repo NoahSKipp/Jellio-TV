@@ -54,30 +54,28 @@ class QuickHubKeyGateTest {
 
     @Test
     fun canceledUpBeforeTimeoutIsDroppedNotReplayed() {
-        down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = config(QuickHubButton.CENTER))
-        assertEquals(Action.CONSUME, up(KeyEvent.KEYCODE_DPAD_CENTER, canceled = true, cfg = config(QuickHubButton.CENTER)))
+        down(KeyEvent.KEYCODE_MENU, cfg = config(QuickHubButton.MENU))
+        assertEquals(Action.CONSUME, up(KeyEvent.KEYCODE_MENU, canceled = true, cfg = config(QuickHubButton.MENU)))
     }
 
     @Test
     fun lostUpDoesNotEatTheNextPress() {
-        val center = config(QuickHubButton.CENTER)
-        down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center)
-        assertTrue(gate.onHoldTimeout(KeyEvent.KEYCODE_DPAD_CENTER, available = true))
-        // UP never arrives. The next press starts a fresh hold and a short release clicks.
-        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center))
-        assertEquals(Action.REPLAY_PRESS, up(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center))
+        down(KeyEvent.KEYCODE_BACK)
+        assertTrue(gate.onHoldTimeout(KeyEvent.KEYCODE_BACK, available = true))
+        // UP never arrives. The next press starts a fresh hold and a short release goes back.
+        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_BACK))
+        assertEquals(Action.REPLAY_PRESS, up(KeyEvent.KEYCODE_BACK))
     }
 
     @Test
     fun focusLossDropsHoldAndEatsTheRestOfThePress() {
-        val center = config(QuickHubButton.CENTER)
-        down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center)
+        down(KeyEvent.KEYCODE_BACK)
         gate.onFocusLost()
         assertFalse(gate.isHolding)
-        assertFalse(gate.onHoldTimeout(KeyEvent.KEYCODE_DPAD_CENTER, available = true))
-        assertEquals(Action.CONSUME, down(KeyEvent.KEYCODE_DPAD_CENTER, repeat = 3, cfg = center))
-        assertEquals(Action.CONSUME, up(KeyEvent.KEYCODE_DPAD_CENTER, canceled = true, cfg = center))
-        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center))
+        assertFalse(gate.onHoldTimeout(KeyEvent.KEYCODE_BACK, available = true))
+        assertEquals(Action.CONSUME, down(KeyEvent.KEYCODE_BACK, repeat = 3))
+        assertEquals(Action.CONSUME, up(KeyEvent.KEYCODE_BACK, canceled = true))
+        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_BACK))
     }
 
     @Test
@@ -117,25 +115,38 @@ class QuickHubKeyGateTest {
     }
 
     @Test
-    fun shortPressIsIgnoredForNavigationKeys() {
-        val center = config(QuickHubButton.CENTER, QuickHubTrigger.SHORT_PRESS)
-        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_ENTER, cfg = center))
-        val custom = config(QuickHubButton.CUSTOM, QuickHubTrigger.SHORT_PRESS, KeyEvent.KEYCODE_NUMPAD_ENTER)
-        gate.onFocusLost()
-        up(KeyEvent.KEYCODE_ENTER, cfg = center)
-        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_NUMPAD_ENTER, cfg = custom))
+    fun shortPressIsIgnoredForBack() {
+        val back = config(QuickHubButton.BACK, QuickHubTrigger.SHORT_PRESS)
+        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_BACK, cfg = back))
+        assertEquals(Action.REPLAY_PRESS, up(KeyEvent.KEYCODE_BACK, cfg = back))
+        val custom = config(QuickHubButton.CUSTOM, QuickHubTrigger.SHORT_PRESS, KeyEvent.KEYCODE_BACK)
+        assertEquals(Action.START_HOLD, down(KeyEvent.KEYCODE_BACK, cfg = custom))
+    }
+
+    @Test
+    fun okKeysNeverOpenTheHub() {
+        for (code in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+            for (trigger in QuickHubTrigger.entries) {
+                val custom = config(QuickHubButton.CUSTOM, trigger, code)
+                assertEquals(Action.PASS, down(code, cfg = custom))
+                assertEquals(Action.PASS, up(code, cfg = custom))
+            }
+            for (button in QuickHubButton.entries) {
+                assertFalse(QuickHubKeys.isTargetKey(code, button, code))
+            }
+        }
     }
 
     @Test
     fun otherKeysPassWhileHolding() {
-        val center = config(QuickHubButton.CENTER)
-        down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center)
-        assertEquals(Action.PASS, down(KeyEvent.KEYCODE_DPAD_DOWN, cfg = center))
-        assertEquals(Action.PASS, up(KeyEvent.KEYCODE_DPAD_DOWN, cfg = center))
-        assertEquals(Action.PASS, down(KeyEvent.KEYCODE_ENTER, cfg = center))
-        assertEquals(Action.PASS, up(KeyEvent.KEYCODE_ENTER, cfg = center))
+        val menu = config(QuickHubButton.MENU)
+        down(KeyEvent.KEYCODE_MENU, cfg = menu)
+        assertEquals(Action.PASS, down(KeyEvent.KEYCODE_DPAD_DOWN, cfg = menu))
+        assertEquals(Action.PASS, up(KeyEvent.KEYCODE_DPAD_DOWN, cfg = menu))
+        assertEquals(Action.PASS, down(KeyEvent.KEYCODE_DPAD_CENTER, cfg = menu))
+        assertEquals(Action.PASS, up(KeyEvent.KEYCODE_DPAD_CENTER, cfg = menu))
         assertTrue(gate.isHolding)
-        assertEquals(Action.REPLAY_PRESS, up(KeyEvent.KEYCODE_DPAD_CENTER, cfg = center))
+        assertEquals(Action.REPLAY_PRESS, up(KeyEvent.KEYCODE_MENU, cfg = menu))
     }
 
     @Test
@@ -171,14 +182,23 @@ class QuickHubKeyGateTest {
 
     @Test
     fun longPressRules() {
-        assertTrue(QuickHubKeys.forcesLongPress(QuickHubButton.CENTER, 0))
         assertTrue(QuickHubKeys.forcesLongPress(QuickHubButton.BACK, 0))
-        assertTrue(QuickHubKeys.forcesLongPress(QuickHubButton.CUSTOM, KeyEvent.KEYCODE_ENTER))
+        assertTrue(QuickHubKeys.forcesLongPress(QuickHubButton.CUSTOM, KeyEvent.KEYCODE_BACK))
         assertFalse(QuickHubKeys.forcesLongPress(QuickHubButton.CUSTOM, KeyEvent.KEYCODE_PROG_RED))
         // A stale custom code must not lock other buttons to long press.
-        assertFalse(QuickHubKeys.forcesLongPress(QuickHubButton.MENU, KeyEvent.KEYCODE_DPAD_CENTER))
+        assertFalse(QuickHubKeys.forcesLongPress(QuickHubButton.MENU, KeyEvent.KEYCODE_BACK))
         assertFalse(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_UNKNOWN))
         assertFalse(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_HOME))
+        assertFalse(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertFalse(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_ENTER))
+        assertFalse(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_NUMPAD_ENTER))
         assertTrue(QuickHubKeys.isValidCustomKey(KeyEvent.KEYCODE_INFO))
+    }
+
+    @Test
+    fun retiredOkButtonFallsBackToTheDefault() {
+        assertEquals(QuickHubButton.BACK, QuickHubButton.fromId("center"))
+        assertEquals(QuickHubButton.PLAY_PAUSE, QuickHubButton.fromId("center", isAmazon = true))
+        assertEquals(QuickHubButton.MENU, QuickHubButton.fromId("menu"))
     }
 }

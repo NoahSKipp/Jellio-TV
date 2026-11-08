@@ -1,7 +1,7 @@
 # Release mechanics mirrored from Jellio-Plugin's own Makefile
 # (itself taken as-is from Gelato, https://github.com/lostb1t/Gelato,
 # GPL-3.0), adapted here to bump app/build.gradle.kts's own
-# versionName/versionCode instead of a plugin manifest.
+# versionName (versionCode follows from it) instead of a plugin manifest.
 
 release:
 	@# Resumable: run it again (or with VERSION=x.y.z) after a failure part

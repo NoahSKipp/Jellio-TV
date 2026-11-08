@@ -107,16 +107,3 @@ val AnimeIconVector: ImageVector by lazy {
         )
     }.build()
 }
-
-fun getLibraryIcon(name: String?, collectionType: String?): ImageVector {
-    val lowerName = name?.lowercase() ?: ""
-    if (lowerName.contains("anime")) {
-        return AnimeIconVector
-    }
-    return when (collectionType?.lowercase()) {
-        "movies" -> MovieIconVector
-        "tvshows", "shows", "series" -> TvShowsIconVector
-        "anime" -> AnimeIconVector
-        else -> LibraryIconVector
-    }
-}

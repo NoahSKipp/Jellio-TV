@@ -2,10 +2,7 @@ package com.jellio.tv.ui.nav
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.BookmarkAdd
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DynamicFeed
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Settings
@@ -16,9 +13,6 @@ sealed interface JellioRoute {
     data class Profile(val userId: String? = null) : JellioRoute
     data class Home(val editMode: Boolean = false) : JellioRoute
     data object Search : JellioRoute
-    data object Watchlist : JellioRoute
-    data object Calendar : JellioRoute
-    data object Library : JellioRoute
     data object Feed : JellioRoute
     // One library as its own rail button (the Anime entry shares the
     // Shows library's id, so the name tells them apart).
@@ -30,7 +24,6 @@ sealed interface JellioRoute {
     data class Player(val itemId: String, val mediaSourceId: String? = null, val startPositionTicks: Long? = null) : JellioRoute
     data object LiveTv : JellioRoute
     data class LivePlayer(val channelId: String) : JellioRoute
-    data object NowPlaying : JellioRoute
 }
 
 fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<JellioRoute> = buildList {
@@ -48,9 +41,6 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     is JellioRoute.Profile -> Icons.Filled.AccountCircle
     is JellioRoute.Home -> Icons.Filled.Home
     JellioRoute.Search -> SearchIconVector
-    JellioRoute.Watchlist -> Icons.Filled.BookmarkAdd
-    JellioRoute.Calendar -> Icons.Filled.CalendarMonth
-    JellioRoute.Library -> LibraryIconVector
     JellioRoute.Feed -> Icons.Filled.DynamicFeed
     // The same icons Jellio web draws (components/navShared.js SVG_ICONS),
     // ported in JellioIcons.kt.
@@ -62,7 +52,6 @@ fun JellioRoute.icon(): ImageVector = when (this) {
     }
     JellioRoute.Settings -> Icons.Filled.Settings
     JellioRoute.LiveTv -> Icons.Filled.LiveTv
-    JellioRoute.NowPlaying -> Icons.Filled.GraphicEq
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> Icons.Filled.Home
 }
 
@@ -75,14 +64,10 @@ fun JellioRoute.label(): String = when (this) {
     is JellioRoute.Profile -> com.jellio.tv.ui.i18n.Strings.get("nav_profile")
     is JellioRoute.Home -> com.jellio.tv.ui.i18n.Strings.get("nav_home")
     JellioRoute.Search -> com.jellio.tv.ui.i18n.Strings.get("nav_search")
-    JellioRoute.Watchlist -> com.jellio.tv.ui.i18n.Strings.get("nav_watchlist")
-    JellioRoute.Calendar -> com.jellio.tv.ui.i18n.Strings.get("nav_calendar")
-    JellioRoute.Library -> com.jellio.tv.ui.i18n.Strings.get("nav_library")
     JellioRoute.Feed -> com.jellio.tv.ui.i18n.Strings.get("nav_feed")
     is JellioRoute.LibraryTab -> com.jellio.tv.ui.i18n.libraryDisplayName(name, collectionType)
     JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
     JellioRoute.LiveTv -> com.jellio.tv.ui.i18n.Strings.get("nav_live_tv")
-    JellioRoute.NowPlaying -> com.jellio.tv.ui.i18n.Strings.get("nav_now_playing")
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""
 }
 

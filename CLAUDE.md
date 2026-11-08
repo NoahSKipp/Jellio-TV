@@ -105,9 +105,12 @@ Jellio-Plugin's own NuvioWeb/Gelato-derived license.
 Mirrors Jellio-Plugin's own `Makefile`/`release.yml`: `workflow_dispatch`
 runs `make release`, which bumps `versionName` in `app/build.gradle.kts`
 with git-cliff off conventional commit history, tags, and creates a GitHub
-release. `versionCode` is derived at build time from `GITHUB_RUN_NUMBER`,
-not hand-bumped. `publish.yml` then builds a debug-signed APK (no release
-keystore configured yet) and attaches it, plus checksums, to that release.
+release. `versionCode` is derived at build time from `versionName`
+(`major * 100000 + minor * 1000 + patch`, so 0.85.0 is 85000), not
+hand-bumped; the build fails on a name that is not `major.minor.patch` or
+has minor > 99 or patch > 999, so go to the next major before 0.99.x runs
+out. `publish.yml` then builds a debug-signed APK (no release keystore
+configured yet) and attaches it, plus checksums, to that release.
 Needs the same `RELEASE_TOKEN` repo secret Jellio-Plugin already uses (a
 PAT with `contents:write`; the default `GITHUB_TOKEN` cannot trigger
 `publish.yml`'s own `release: released` event).

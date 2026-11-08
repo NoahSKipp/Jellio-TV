@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 enum class QuickHubButton(val id: String, val labelKey: String, val subKey: String) {
-    CENTER("center", "settings_quick_hub_btn_ok", "settings_quick_hub_btn_ok_sub"),
     PLAY_PAUSE("play_pause", "settings_quick_hub_btn_play_pause", "settings_quick_hub_btn_play_pause_sub"),
     MENU("menu", "settings_quick_hub_btn_menu", "settings_quick_hub_btn_menu_sub"),
     BACK("back", "settings_quick_hub_btn_back", "settings_quick_hub_btn_back_sub"),
@@ -14,11 +13,13 @@ enum class QuickHubButton(val id: String, val labelKey: String, val subKey: Stri
     NONE("none", "settings_quick_hub_btn_none", "settings_quick_hub_btn_none_sub");
 
     companion object {
+        fun default(isAmazon: Boolean): QuickHubButton = if (isAmazon) PLAY_PAUSE else BACK
+
+        // Unknown ids, including the retired "center" (OK) option, fall back to the default.
         fun fromId(id: String?, isAmazon: Boolean = false): QuickHubButton {
-            val defaultBtn = if (isAmazon) PLAY_PAUSE else BACK
-            if (id == null) return defaultBtn
+            if (id == null) return default(isAmazon)
             return entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
-                ?: defaultBtn
+                ?: default(isAmazon)
         }
     }
 }
@@ -104,22 +105,30 @@ object QuickHubPreferences {
         customKeyCode = sp.getInt(KEY_CUSTOM_KEY_CODE, 0)
         customKeyLabel = sp.getString(KEY_CUSTOM_KEY_LABEL, "") ?: ""
 
+        val defaultButton = QuickHubButton.default(isAmazon)
         button = when {
             savedButton != null -> QuickHubButton.fromId(savedButton, isAmazon)
             legacy != null -> when {
                 legacy.contains("play_pause", ignoreCase = true) -> QuickHubButton.PLAY_PAUSE
                 legacy.contains("menu", ignoreCase = true) -> QuickHubButton.MENU
                 legacy.contains("back", ignoreCase = true) -> QuickHubButton.BACK
-                legacy.contains("center", ignoreCase = true) -> QuickHubButton.CENTER
                 legacy.contains("none", ignoreCase = true) -> QuickHubButton.NONE
-                else -> if (isAmazon) QuickHubButton.PLAY_PAUSE else QuickHubButton.BACK
+                else -> defaultButton
             }
-            else -> if (isAmazon) QuickHubButton.PLAY_PAUSE else QuickHubButton.BACK
+            else -> defaultButton
         }
 
-        // A custom mapping without a usable key code would leave the shortcut silently dead.
+        // Custom keys that are no longer allowed (OK, or no usable code) are forgotten.
+        if (customKeyCode != 0 && !QuickHubKeys.isValidCustomKey(customKeyCode)) {
+            customKeyCode = 0
+            customKeyLabel = ""
+            sp.edit().remove(KEY_CUSTOM_KEY_CODE).remove(KEY_CUSTOM_KEY_LABEL).apply()
+        }
         if (button == QuickHubButton.CUSTOM && !QuickHubKeys.isValidCustomKey(customKeyCode)) {
-            button = if (isAmazon) QuickHubButton.PLAY_PAUSE else QuickHubButton.BACK
+            button = defaultButton
+        }
+        if (savedButton != null && savedButton != button.id) {
+            sp.edit().putString(KEY_BUTTON, button.id).apply()
         }
 
         trigger = QuickHubTrigger.fromId(savedTrigger)

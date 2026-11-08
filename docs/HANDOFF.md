@@ -44,11 +44,13 @@ JellioTvTheme { Surface { JellioTvRoot() } } }`.
   `BackHandler(enabled = routeStack.size > 1)` pops. Chrome layering:
   `SeasonalEffectsOverlay` bottommost on non-immersive routes, then screen
   content padded `start = SidebarReservedWidth.scaled()`, then (non-immersive
-  only) `SidebarNav`, `NowPlayingButton`/panel, `GroupWatchButton`/overlay,
-  `LibraryPickerOverlay`. `StreamPickerOverlay`/`UpdateToast` render globally.
+  only) `SidebarNav`, `NowPlayingButton`/panel, `GroupWatchButton`/overlay.
+  `StreamPickerOverlay`/`UpdateToast` render globally.
 
-`ui/nav/JellioRoute.kt` — sealed interface. `Profile/Home/Search/Watchlist/
-Calendar/Library/Settings` are the fixed tab set (`JellioNavItems`).
+`ui/nav/JellioRoute.kt`: sealed interface. `jellioNavItems()` builds the
+rail: `Profile/Home/Search`, one `LibraryTab` per server library (`LiveTv`
+for a live TV library), then `Feed`. Watchlists and Coming Soon are Home
+rows; Now Playing lives in the Quick Hub.
 `Detail(itemId)/Person(personId)/Service(name)/Player(itemId,
 mediaSourceId)` are pushed-only, never in nav. `isImmersive()` is true for
 Detail/Person/Service/Player — no sidebar, no seasonal overlay, full-bleed.
@@ -93,7 +95,6 @@ navigation under the previous approach (see the focus history below;
 - **auth/** — `LoginScreen`/`LoginViewModel`. Server address asked before
   username/password, remembered-user grid, manual form, forgot-password/PIN
   reset flow.
-- **calendar/** — upcoming release/air-date calendar.
 - **common/** — `JellioTextField`, `ProgressSweep`.
 - **detail/** — `DetailScreen` (hero + collapse/expand action row,
   `LazyColumn` with `focusRestorer()`), `StreamPickerOverlay`.
@@ -106,7 +107,7 @@ navigation under the previous approach (see the focus history below;
   `CardShatterOverlay`.
 - **library/** — `LibraryScreen`, `LibraryCoverflow` (three-wide overlapping
   stage), sort/genre filter chips.
-- **nav/** — `JellioRoute`, `SidebarNav`, `LibraryPickerOverlay`, hand-ported
+- **nav/**: `JellioRoute`, `SidebarNav`, hand-ported
   `LibraryIcon`/`SearchIcon` SVG path data (Material-icon approximations were
   visibly wrong in live feedback).
 - **nowplaying/** — polled active-session panel, corner trigger button.
@@ -119,7 +120,7 @@ navigation under the previous approach (see the focus history below;
   **service/** (per-streaming-service hub, immersive route),
   **settings/** (`SettingsScreen`, `AvatarPickerOverlay`, About section reads
   `BuildConfig.VERSION_NAME`), **theme/** (see below), **update/**
-  (`AppUpdateViewModel`, `BootSplashMark`, `UpdateToast`), **watchlist/**.
+  (`AppUpdateViewModel`, `BootSplashMark`, `UpdateToast`).
 
 ## `data/` layer
 
@@ -186,7 +187,7 @@ see its header comment.
 
 Working idioms, applied consistently rather than reinvented per screen:
 - **`focusRestorer()`** on every top-level scrollable screen (Home, Library,
-  Watchlist, Search, Detail, Person, RowListModal). Plain Compose Foundation
+  Search, Detail, Person, RowListModal). Plain Compose Foundation
   `LazyColumn`/`LazyRow` (unlike `tv-foundation`'s Tv-prefixed variants)
   advertise no default D-pad entry point until something has been focused
   inside them once; `focusRestorer()` picks a sensible default child on first
@@ -194,7 +195,7 @@ Working idioms, applied consistently rather than reinvented per screen:
 - **Explicit `FocusRequester` + `LaunchedEffect(Unit) { requester.requestFocus()
   }`** wherever a modal/overlay/rail needs guaranteed initial focus on open
   (doesn't sit inside a plain scroll container): `SidebarNav`,
-  `GroupWatchOverlay`, `LibraryPickerOverlay`, `SettingsScreen`'s first row,
+  `GroupWatchOverlay`, `SettingsScreen`'s first row,
   `UpdateToast`, `RowListModal`.
 - **`focusProperties { exit = { FocusRequester.Cancel } }`** traps focus
   inside a modal overlay so it can't escape to the screen underneath while
@@ -243,8 +244,9 @@ splash mark.
 ## Build/release pipeline
 
 `app/build.gradle.kts`: `compileSdk`/`targetSdk = 36`, `minSdk = 24`.
-`versionCode = GITHUB_RUN_NUMBER ?: 1` (always monotonic in CI, falls back to
-1 locally). `versionName` is hand-bumped by `make release`/git-cliff off
+`versionCode` comes from `versionName` (`major * 100000 + minor * 1000 +
+patch`), so it grows with every release whichever workflow builds it.
+`versionName` is hand-bumped by `make release`/git-cliff off
 conventional commits. `buildConfig = true` explicitly enabled (AGP 8 defaults
 it off) because Settings' About section needs `BuildConfig.VERSION_NAME`.
 

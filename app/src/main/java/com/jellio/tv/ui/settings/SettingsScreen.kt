@@ -1251,6 +1251,7 @@ private fun RecordRemoteButtonDialog(
     var recordedCode by remember { mutableStateOf<Int?>(null) }
     var recordedLabel by remember { mutableStateOf("") }
     var isRestricted by remember { mutableStateOf(false) }
+    var isOkKey by remember { mutableStateOf(false) }
     var selectedTrigger by remember { mutableStateOf(com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS) }
 
     val listeningFocusRequester = remember { FocusRequester() }
@@ -1273,13 +1274,10 @@ private fun RecordRemoteButtonDialog(
                         true
                     } else {
                         val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
-                        val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                         recordedCode = code
                         recordedLabel = name
-                        isRestricted = restricted
-                        if (com.jellio.tv.data.prefs.QuickHubKeys.requiresLongPress(code)) {
-                            selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
-                        }
+                        isOkKey = com.jellio.tv.data.prefs.QuickHubKeys.isOkKey(code)
+                        isRestricted = isOkKey || com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                         true
                     }
                 } else {
@@ -1327,13 +1325,10 @@ private fun RecordRemoteButtonDialog(
                                 }
                                 if (code == android.view.KeyEvent.KEYCODE_UNKNOWN) return@onPreviewKeyEvent true
                                 val name = com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(code)
-                                val restricted = com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                                 recordedCode = code
                                 recordedLabel = name
-                                isRestricted = restricted
-                                if (com.jellio.tv.data.prefs.QuickHubKeys.requiresLongPress(code)) {
-                                    selectedTrigger = com.jellio.tv.data.prefs.QuickHubTrigger.LONG_PRESS
-                                }
+                                isOkKey = com.jellio.tv.data.prefs.QuickHubKeys.isOkKey(code)
+                                isRestricted = isOkKey || com.jellio.tv.data.prefs.QuickHubPreferences.isSystemRestrictedKey(code)
                                 return@onPreviewKeyEvent true
                             }
                             false
@@ -1434,7 +1429,10 @@ private fun RecordRemoteButtonDialog(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = formatString("settings_quick_hub_dialog_reserved_warning", recordedLabel),
+                    text = formatString(
+                        if (isOkKey) "settings_quick_hub_dialog_ok_warning" else "settings_quick_hub_dialog_reserved_warning",
+                        recordedLabel,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = JellioTextSecondary,
                     textAlign = TextAlign.Center,

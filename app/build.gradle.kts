@@ -8,6 +8,20 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Each release needs a higher versionCode than every build before it, and CI run
+// numbers differ per workflow, so the code comes from versionName instead:
+// major * 100000 + minor * 1000 + patch (0.85.0 is 85000, 1.0.0 is 100000).
+fun versionCodeOf(name: String): Int {
+    val parts = Regex("""(\d{1,5})\.(\d{1,5})\.(\d{1,5})""").matchEntire(name)
+        ?.groupValues?.drop(1)?.map { it.toInt() }
+        ?: throw GradleException("versionName \"$name\" must be major.minor.patch, like 1.2.3")
+    val (major, minor, patch) = parts
+    if (major > 20000 || minor > 99 || patch > 999) {
+        throw GradleException("versionName \"$name\" is out of range: major <= 20000, minor <= 99, patch <= 999")
+    }
+    return major * 100000 + minor * 1000 + patch
+}
+
 android {
     namespace = "com.jellio.tv"
     // activity-compose 1.11 needs compileSdk 36.
@@ -17,9 +31,8 @@ android {
         applicationId = "com.jellio.tv"
         minSdk = 24
         targetSdk = 36
-        // The package manager compares versionCode for upgrades; the CI run number only grows.
-        versionCode = (System.getenv("VERSION_CODE") ?: System.getenv("GITHUB_RUN_NUMBER"))?.toIntOrNull() ?: 1
         versionName = "0.84.2" // Quick Hub upward focus navigation polish
+        versionCode = versionCodeOf(versionName!!)
     }
 
     val signingKeystore = (System.getenv("SIGNING_KEYSTORE_FILE") ?: System.getenv("SIGNING_KEYSTORE_PATH"))
