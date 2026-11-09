@@ -926,5 +926,18 @@ internal object StringsPt {
         m["search_load_error"] = "Não foi possível carregar os resultados da busca."
         m["live_guide_load_error"] = "Não foi possível carregar o guia"
         m["person_filmography_load_error"] = "Não foi possível carregar a filmografia"
+        m["person_known_for"] = "Conhecido por"
+        m["person_tab_all"] = "Tudo"
+        m["person_tab_acting"] = "Atuação"
+        m["person_tab_directing"] = "Direção"
+        m["person_tab_writing"] = "Roteiro"
+        m["person_tab_production"] = "Produção"
+        m["person_tab_other"] = "Outros"
+        m["person_born"] = "Nascimento"
+        m["person_age"] = "{0} anos"
+        m["person_in_library"] = "Na biblioteca"
+        m["person_credits_count"] = "{0} créditos"
+        m["person_read_more"] = "Ler mais"
+        m["person_read_less"] = "Ler menos"
     }
 }

@@ -926,5 +926,18 @@ internal object StringsDe {
         m["search_load_error"] = "Suchergebnisse konnten nicht geladen werden."
         m["live_guide_load_error"] = "Programm konnte nicht geladen werden"
         m["person_filmography_load_error"] = "Filmografie konnte nicht geladen werden"
+        m["person_known_for"] = "Bekannt für"
+        m["person_tab_all"] = "Alle"
+        m["person_tab_acting"] = "Schauspiel"
+        m["person_tab_directing"] = "Regie"
+        m["person_tab_writing"] = "Drehbuch"
+        m["person_tab_production"] = "Produktion"
+        m["person_tab_other"] = "Sonstiges"
+        m["person_born"] = "Geboren"
+        m["person_age"] = "{0} Jahre alt"
+        m["person_in_library"] = "In Mediathek"
+        m["person_credits_count"] = "{0} Credits"
+        m["person_read_more"] = "Mehr anzeigen"
+        m["person_read_less"] = "Weniger anzeigen"
     }
 }

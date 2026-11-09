@@ -926,5 +926,18 @@ internal object StringsPl {
         m["search_load_error"] = "Nie udało się wczytać wyników wyszukiwania."
         m["live_guide_load_error"] = "Nie udało się wczytać programu"
         m["person_filmography_load_error"] = "Nie udało się wczytać filmografii"
+        m["person_known_for"] = "Znany z"
+        m["person_tab_all"] = "Wszystko"
+        m["person_tab_acting"] = "Aktorstwo"
+        m["person_tab_directing"] = "Reżyseria"
+        m["person_tab_writing"] = "Scenariusz"
+        m["person_tab_production"] = "Produkcja"
+        m["person_tab_other"] = "Inne"
+        m["person_born"] = "Urodzony"
+        m["person_age"] = "{0} lat"
+        m["person_in_library"] = "W bibliotece"
+        m["person_credits_count"] = "{0} ról"
+        m["person_read_more"] = "Czytaj więcej"
+        m["person_read_less"] = "Czytaj mniej"
     }
 }

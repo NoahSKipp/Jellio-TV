@@ -926,5 +926,18 @@ internal object StringsEs {
         m["search_load_error"] = "No se pudieron cargar los resultados de búsqueda."
         m["live_guide_load_error"] = "No se pudo cargar la guía"
         m["person_filmography_load_error"] = "No se pudo cargar la filmografía"
+        m["person_known_for"] = "Conocido por"
+        m["person_tab_all"] = "Todos"
+        m["person_tab_acting"] = "Actuación"
+        m["person_tab_directing"] = "Dirección"
+        m["person_tab_writing"] = "Guion"
+        m["person_tab_production"] = "Producción"
+        m["person_tab_other"] = "Otros"
+        m["person_born"] = "Nacimiento"
+        m["person_age"] = "{0} años"
+        m["person_in_library"] = "En biblioteca"
+        m["person_credits_count"] = "{0} créditos"
+        m["person_read_more"] = "Leer más"
+        m["person_read_less"] = "Leer menos"
     }
 }

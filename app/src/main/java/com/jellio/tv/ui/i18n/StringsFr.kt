@@ -926,5 +926,18 @@ internal object StringsFr {
         m["search_load_error"] = "Impossible de charger les résultats de recherche."
         m["live_guide_load_error"] = "Impossible de charger le guide"
         m["person_filmography_load_error"] = "Impossible de charger la filmographie"
+        m["person_known_for"] = "Connu pour"
+        m["person_tab_all"] = "Tout"
+        m["person_tab_acting"] = "Interprétation"
+        m["person_tab_directing"] = "Réalisation"
+        m["person_tab_writing"] = "Scénario"
+        m["person_tab_production"] = "Production"
+        m["person_tab_other"] = "Autre"
+        m["person_born"] = "Né(e)"
+        m["person_age"] = "{0} ans"
+        m["person_in_library"] = "Dans la bibliothèque"
+        m["person_credits_count"] = "{0} crédits"
+        m["person_read_more"] = "Lire la suite"
+        m["person_read_less"] = "Lire moins"
     }
 }

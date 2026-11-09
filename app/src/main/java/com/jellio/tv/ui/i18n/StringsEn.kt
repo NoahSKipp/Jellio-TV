@@ -926,5 +926,18 @@ internal object StringsEn {
         m["search_load_error"] = "Could not load search results."
         m["live_guide_load_error"] = "Could not load the guide"
         m["person_filmography_load_error"] = "Could not load the filmography"
+        m["person_known_for"] = "Known For"
+        m["person_tab_all"] = "All"
+        m["person_tab_acting"] = "Acting"
+        m["person_tab_directing"] = "Directing"
+        m["person_tab_writing"] = "Writing"
+        m["person_tab_production"] = "Production"
+        m["person_tab_other"] = "Other"
+        m["person_born"] = "Born"
+        m["person_age"] = "{0} years old"
+        m["person_in_library"] = "In Library"
+        m["person_credits_count"] = "{0} credits"
+        m["person_read_more"] = "Read more"
+        m["person_read_less"] = "Read less"
     }
 }

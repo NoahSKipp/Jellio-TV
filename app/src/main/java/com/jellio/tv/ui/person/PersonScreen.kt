@@ -1,15 +1,18 @@
 package com.jellio.tv.ui.person
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,35 +22,52 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.DepartmentTab
+import com.jellio.tv.data.model.PersonCreditItem
+import com.jellio.tv.data.model.RichPersonDetails
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ErrorState
-import com.jellio.tv.ui.common.InlineErrorState
+import com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec
+import com.jellio.tv.ui.home.RatingChip
+import com.jellio.tv.ui.home.TmdbBadge
+import com.jellio.tv.ui.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
+import com.jellio.tv.ui.theme.scaled
 
 @Composable
 fun PersonScreen(
@@ -61,109 +81,500 @@ fun PersonScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(personId) { viewModel.load(session, personId) }
-    LaunchedEffect(uiState.person, uiState.filmography.isNotEmpty(), uiState.filmographyError != null) {
-        if (uiState.person != null) runCatching { contentFocusRequester.requestFocus() }
+
+    LaunchedEffect(personId) {
+        viewModel.load(session, personId)
+    }
+
+    LaunchedEffect(uiState.details) {
+        if (uiState.details != null) {
+            runCatching { contentFocusRequester.requestFocus() }
+        }
     }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
-            uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
+            uiState.isLoading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = Strings.get("status_loading"), color = JellioTextSecondary)
+                }
             }
-            uiState.error != null -> ErrorState(
-                message = com.jellio.tv.ui.i18n.Strings.get("person_load_error"),
-                failure = uiState.error,
-                onRetry = { viewModel.retry(session, personId) },
-                modifier = Modifier.fillMaxSize(),
-            )
-            uiState.person != null -> {
-                val person = uiState.person!!
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRequester(contentFocusRequester).focusRestorer()) {
+            uiState.error != null -> {
+                ErrorState(
+                    message = Strings.get("person_load_error"),
+                    failure = uiState.error,
+                    onRetry = { viewModel.retry(session, personId) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            uiState.details != null -> {
+                val details = uiState.details!!
+                val chunkedCredits = remember(uiState.filmography) { uiState.filmography.chunked(6) }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusRequester(contentFocusRequester)
+                        .focusRestorer(),
+                    contentPadding = PaddingValues(bottom = 64.dp),
+                ) {
+                    // 1. Hero Header Section
                     item {
-                        Row(modifier = Modifier.padding(horizontal = 48.dp)) {
-                            val tag = person.ImageTags?.get("Primary")
-                            Box(
-                                modifier = Modifier.width(220.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(JellioBgElevated),
-                            ) {
-                                if (tag != null) {
-                                    AsyncImage(
-                                        model = imageUrl(person.Id, tag, "Primary", 400),
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
+                        PersonHeroHeader(
+                            details = details,
+                            fallbackImageUrl = imageUrl(details.id, null, "Primary", 400),
+                        )
+                    }
+
+                    // 2. Known For Section (Top 10 works)
+                    if (details.knownFor.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(top = 28.dp)) {
+                                Text(
+                                    text = Strings.get("person_known_for"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JellioText,
+                                    modifier = Modifier.padding(start = 48.dp, bottom = 14.dp),
+                                )
+                                CompositionLocalProvider(
+                                    androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec(),
+                                ) {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 48.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    ) {
+                                        items(details.knownFor, key = { "known_" + it.id + "_" + it.department }) { credit ->
+                                            PersonCreditCard(
+                                                credit = credit,
+                                                imageUrl = imageUrl,
+                                                onClick = { onItemClick(credit.id) },
+                                                modifier = Modifier.width(160.dp),
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                            Column(modifier = Modifier.padding(start = 32.dp).widthIn(max = 700.dp)) {
-                                Text(text = person.Name.orEmpty(), style = MaterialTheme.typography.titleLarge, color = JellioText)
-                                person.Overview?.let {
-                                    Text(
-                                        text = it,
-                                        color = JellioTextSecondary,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.padding(top = 16.dp),
+                        }
+                    }
+
+                    // 3. Filmography Heading & Department Filter Tabs
+                    if (details.allCredits.isNotEmpty()) {
+                        item {
+                            Column(modifier = Modifier.padding(top = 32.dp, bottom = 12.dp)) {
+                                Text(
+                                    text = Strings.get("tv_filmography"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JellioText,
+                                    modifier = Modifier.padding(start = 48.dp, bottom = 14.dp),
+                                )
+                                CompositionLocalProvider(
+                                    androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides rememberTvHorizontalBringIntoViewSpec(),
+                                ) {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 48.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        items(details.departmentTabs, key = { it.key }) { tab ->
+                                            DepartmentTabPill(
+                                                tab = tab,
+                                                selected = uiState.selectedDepartment.equals(tab.key, ignoreCase = true),
+                                                onSelect = { viewModel.selectDepartment(tab.key) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 4. Filtered Filmography Cards in Rows
+                        items(chunkedCredits.size, key = { "row_" + uiState.selectedDepartment + "_$it" }) { rowIndex ->
+                            val rowCredits = chunkedCredits[rowIndex]
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 48.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                for (credit in rowCredits) {
+                                    PersonCreditCard(
+                                        credit = credit,
+                                        imageUrl = imageUrl,
+                                        onClick = { onItemClick(credit.id) },
+                                        modifier = Modifier.width(160.dp),
                                     )
                                 }
                             }
                         }
                     }
-                    if (uiState.filmography.isNotEmpty()) {
-                        item {
-                            Column(modifier = Modifier.padding(top = 32.dp)) {
-                                Text(
-                                    text = com.jellio.tv.ui.i18n.Strings.get("tv_filmography"),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = JellioText,
-                                    modifier = Modifier.padding(start = 48.dp, bottom = 12.dp),
-                                )
-                                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
-                                    LazyRow(contentPadding = PaddingValues(horizontal = 48.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        items(uiState.filmography, key = { it.Id }) { work -> FilmographyCard(work, imageUrl, onClick = { onItemClick(work.Id) }) }
-                                    }
-                                }
-                            }
-                        }
-                    } else if (uiState.filmographyError != null) {
-                        item {
-                            // Nothing else here takes focus, so the button does.
-                            InlineErrorState(
-                                message = com.jellio.tv.ui.i18n.Strings.get("person_filmography_load_error"),
-                                onRetry = { viewModel.retryFilmography(session, personId) },
-                                modifier = Modifier.padding(start = 48.dp, top = 32.dp),
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonHeroHeader(
+    details: RichPersonDetails,
+    fallbackImageUrl: String,
+    modifier: Modifier = Modifier,
+) {
+    var isBioExpanded by remember { mutableStateOf(false) }
+    val heroHeight = 440.dp.scaled()
+
+    Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
+        // Cinematic backdrop art with gradient overlays
+        if (!details.backdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = details.backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, JellioBg.copy(alpha = 0.7f), JellioBg),
+                        startY = 0f,
+                        endY = Float.POSITIVE_INFINITY,
+                    ),
+                ),
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            JellioBg.copy(alpha = 0.95f),
+                            JellioBg.copy(alpha = 0.75f),
+                            Color.Transparent,
+                        ),
+                        endX = 1300f,
+                    ),
+                ),
+        )
+
+        // Hero Content Row
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 48.dp, end = 48.dp, top = 60.dp, bottom = 24.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            // High-resolution Portrait Photo
+            val photoModel = details.profileUrl ?: fallbackImageUrl
+            Box(
+                modifier = Modifier
+                    .width(190.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(JellioBgElevated)
+                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (photoModel.isNotBlank()) {
+                    AsyncImage(
+                        model = photoModel,
+                        contentDescription = details.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = JellioTextSecondary.copy(alpha = 0.4f),
+                        modifier = Modifier.size(64.dp),
+                    )
+                }
+            }
+
+            // Person Details & Metadata
+            Column(
+                modifier = Modifier
+                    .padding(start = 32.dp)
+                    .widthIn(max = 840.dp),
+            ) {
+                // Name
+                Text(
+                    text = details.name,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = JellioText,
+                )
+
+                // Stats / Chips Row
+                Row(
+                    modifier = Modifier.padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Department Badge
+                    MetadataBadge(text = details.knownForDepartment ?: "Acting", accent = true)
+
+                    // Born and Age Badge
+                    if (!details.birthday.isNullOrBlank()) {
+                        val ageText = if (details.age != null) " (${Strings.format("person_age", details.age)})" else ""
+                        MetadataBadge(text = "${Strings.get("person_born")} ${details.birthday}$ageText")
+                    }
+
+                    // Place of Birth Badge
+                    if (!details.placeOfBirth.isNullOrBlank()) {
+                        MetadataBadge(text = details.placeOfBirth)
+                    }
+
+                    // Total Credits Badge
+                    MetadataBadge(text = Strings.format("person_credits_count", details.totalCreditsCount))
+
+                    // IMDb Badge
+                    if (!details.imdbId.isNullOrBlank()) {
+                        ImdbBadge()
+                    }
+
+                    // TMDB Badge
+                    TmdbBadge(width = 28.dp, height = 12.dp)
+                }
+
+                // Biography Text & Read More Toggle
+                if (!details.biography.isNullOrBlank()) {
+                    val bioText = details.biography
+                    val isLong = bioText.length > 200
+
+                    Text(
+                        text = bioText,
+                        color = JellioTextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = if (isBioExpanded) 20 else 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+
+                    if (isLong) {
+                        Surface(
+                            onClick = { isBioExpanded = !isBioExpanded },
+                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                            colors = ClickableSurfaceDefaults.colors(
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                contentColor = JellioTextSecondary,
+                                focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                focusedContentColor = Color.White,
+                            ),
+                            border = ClickableSurfaceDefaults.border(
+                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                            ),
+                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            Text(
+                                text = Strings.get(if (isBioExpanded) "person_read_less" else "person_read_more"),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             )
                         }
                     }
                 }
             }
         }
-
     }
 }
 
 @Composable
-private fun FilmographyCard(item: BaseItemDto, imageUrl: (String, String?, String, Int) -> String, onClick: () -> Unit) {
+private fun MetadataBadge(text: String, accent: Boolean = false, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(
+                if (accent) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+                RoundedCornerShape(999.dp),
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = text,
+            color = if (accent) Color.White else JellioTextSecondary,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (accent) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ImdbBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFFF5C518), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = "IMDb",
+            color = Color.Black,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+        )
+    }
+}
+
+@Composable
+private fun DepartmentTabPill(
+    tab: DepartmentTab,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onSelect,
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f, pressedScale = 0.97f),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.06f),
+            contentColor = if (selected) Color.White else JellioTextSecondary,
+            focusedContainerColor = Color.White.copy(alpha = 0.30f),
+            focusedContentColor = Color.White,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            border = if (selected) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))) else Border.None,
+            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+        ),
+        modifier = modifier.onFocusChanged {
+            if (it.isFocused) {
+                onSelect()
+            }
+        },
+    ) {
+        Text(
+            text = "${tab.label} (${tab.count})",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            ),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun PersonCreditCard(
+    credit: PersonCreditItem,
+    imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val imageModel = credit.posterUrl
+        ?: if (credit.inLibrary) imageUrl(credit.id, credit.baseItem.PrimaryImageTag, "Primary", 400) else null
+
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-        modifier = Modifier.width(170.dp),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = JellioBgElevated,
+            contentColor = JellioText,
+            focusedContainerColor = JellioBgElevated,
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color.White),
+                shape = RoundedCornerShape(12.dp),
+            ),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        modifier = modifier,
     ) {
         Column {
-            val tag = item.ImageTags?.get("Primary")
-            AsyncImage(
-                model = imageUrl(item.Id, tag, "Primary", 400),
-                contentDescription = item.Name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f),
-            )
-            Text(
-                text = item.Name.orEmpty(),
-                color = JellioText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(8.dp),
-            )
+            // Poster Artwork with Badges
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .background(Color.White.copy(alpha = 0.04f)),
+            ) {
+                if (!imageModel.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageModel,
+                        contentDescription = credit.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                // "In Library" Badge
+                if (credit.inLibrary) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .background(JellioBg.copy(alpha = 0.88f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = Color(0xFF22C55E),
+                                modifier = Modifier.size(11.dp),
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = Strings.get("person_in_library"),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                    }
+                }
+
+                // TMDB Rating Badge
+                if (credit.rating != null && credit.rating > 0.0) {
+                    RatingChip(
+                        rating = credit.rating,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp),
+                    )
+                }
+            }
+
+            // Title and Role Details
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                Text(
+                    text = credit.title,
+                    color = JellioText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                val yearStr = credit.year?.toString()
+                val roleStr = credit.role?.takeIf { it.isNotBlank() }
+                val subtitle = when {
+                    credit.department == "Acting" && roleStr != null && yearStr != null -> "$yearStr (as $roleStr)"
+                    roleStr != null && yearStr != null -> "$yearStr ($roleStr)"
+                    yearStr != null -> yearStr
+                    roleStr != null -> roleStr
+                    else -> credit.mediaType
+                }
+
+                Text(
+                    text = subtitle,
+                    color = JellioTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }

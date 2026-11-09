@@ -926,5 +926,18 @@ internal object StringsIt {
         m["search_load_error"] = "Impossibile caricare i risultati di ricerca."
         m["live_guide_load_error"] = "Impossibile caricare la guida"
         m["person_filmography_load_error"] = "Impossibile caricare la filmografia"
+        m["person_known_for"] = "Conosciuto per"
+        m["person_tab_all"] = "Tutti"
+        m["person_tab_acting"] = "Recitazione"
+        m["person_tab_directing"] = "Regia"
+        m["person_tab_writing"] = "Sceneggiatura"
+        m["person_tab_production"] = "Produzione"
+        m["person_tab_other"] = "Altro"
+        m["person_born"] = "Nascita"
+        m["person_age"] = "{0} anni"
+        m["person_in_library"] = "In libreria"
+        m["person_credits_count"] = "{0} crediti"
+        m["person_read_more"] = "Leggi di più"
+        m["person_read_less"] = "Mostra meno"
     }
 }
