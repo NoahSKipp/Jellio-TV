@@ -62,6 +62,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -240,6 +241,7 @@ fun ChangelogPopup(
     allReleases: List<ChangelogRelease> = CHANGELOG_RELEASES,
 ) {
     val buttonFocusRequester = remember { FocusRequester() }
+    val firstFeatureFocusRequester = remember { FocusRequester() }
     var showPreviousVersions by remember { mutableStateOf(false) }
     var expandedPreviousVersion by remember { mutableStateOf<String?>(null) }
 
@@ -317,46 +319,71 @@ fun ChangelogPopup(
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
+                    .focusRestorer { firstFeatureFocusRequester }
                     .padding(end = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                release.features.forEach { feature ->
-                    Row(
+                release.features.forEachIndexed { index, feature ->
+                    val isFirst = index == 0
+                    Surface(
+                        onClick = {},
+                        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),
+                        colors = ClickableSurfaceDefaults.colors(
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            contentColor = JellioText,
+                            focusedContainerColor = Color.White.copy(alpha = 0.14f),
+                            focusedContentColor = JellioText,
+                        ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
+                        border = ClickableSurfaceDefaults.border(
+                            border = Border(
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                            focusedBorder = Border(
+                                border = BorderStroke(2.dp, Color.White),
+                                shape = RoundedCornerShape(12.dp),
+                            ),
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.Top,
+                            .then(if (isFirst) Modifier.focusRequester(firstFeatureFocusRequester) else Modifier)
+                            .then(if (isFirst) Modifier.focusProperties { up = FocusRequester.Cancel } else Modifier),
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.08f)),
-                            contentAlignment = Alignment.Center,
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Icon(
-                                imageVector = feature.icon,
-                                contentDescription = null,
-                                tint = JellioText,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = feature.title,
-                                color = JellioText,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = feature.description,
-                                color = JellioTextSecondary,
-                                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White.copy(alpha = 0.08f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = feature.icon,
+                                    contentDescription = null,
+                                    tint = JellioText,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = feature.title,
+                                    color = JellioText,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = feature.description,
+                                    color = JellioTextSecondary,
+                                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                                )
+                            }
                         }
                     }
                 }
@@ -450,28 +477,48 @@ fun ChangelogPopup(
                                         verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         prev.features.forEach { prevFeature ->
-                                            Row(
+                                            Surface(
+                                                onClick = {},
+                                                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = JellioText,
+                                                    focusedContainerColor = Color.White.copy(alpha = 0.10f),
+                                                    focusedContentColor = JellioText,
+                                                ),
+                                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.01f),
+                                                border = ClickableSurfaceDefaults.border(
+                                                    border = Border.None,
+                                                    focusedBorder = Border(
+                                                        border = BorderStroke(1.5.dp, Color.White),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                    ),
+                                                ),
                                                 modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.Top,
                                             ) {
-                                                Icon(
-                                                    imageVector = prevFeature.icon,
-                                                    contentDescription = null,
-                                                    tint = JellioTextSecondary,
-                                                    modifier = Modifier.size(16.dp).padding(top = 2.dp),
-                                                )
-                                                Spacer(modifier = Modifier.width(10.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = prevFeature.title,
-                                                        color = JellioText,
-                                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.Top,
+                                                ) {
+                                                    Icon(
+                                                        imageVector = prevFeature.icon,
+                                                        contentDescription = null,
+                                                        tint = JellioTextSecondary,
+                                                        modifier = Modifier.size(16.dp).padding(top = 2.dp),
                                                     )
-                                                    Text(
-                                                        text = prevFeature.description,
-                                                        color = JellioTextSecondary,
-                                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
-                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = prevFeature.title,
+                                                            color = JellioText,
+                                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                                        )
+                                                        Text(
+                                                            text = prevFeature.description,
+                                                            color = JellioTextSecondary,
+                                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -499,7 +546,10 @@ fun ChangelogPopup(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .focusRequester(buttonFocusRequester),
+                    .focusRequester(buttonFocusRequester)
+                    .focusProperties {
+                        up = firstFeatureFocusRequester
+                    },
             ) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
