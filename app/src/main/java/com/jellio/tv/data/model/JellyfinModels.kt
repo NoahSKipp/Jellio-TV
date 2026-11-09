@@ -627,6 +627,16 @@ data class ProfileDto(
     val RemoveFromWatchlistAfterWatching: Boolean = true,
     @Json(name = "selectedGenres") val selectedGenres: List<String>? = null,
     @Json(name = "customGenres") val customGenres: List<CustomGenreItem>? = null,
+    @Json(name = "subtitleStyle") val subtitleStyle: SubtitleStyleDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class SubtitleStyleDto(
+    @Json(name = "size") val size: String? = null,
+    @Json(name = "background") val background: String? = null,
+    @Json(name = "color") val color: String? = null,
+    @Json(name = "edge") val edge: String? = null,
+    @Json(name = "position") val position: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

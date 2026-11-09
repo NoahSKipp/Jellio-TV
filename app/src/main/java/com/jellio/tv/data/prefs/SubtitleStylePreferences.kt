@@ -65,4 +65,14 @@ class SubtitleStylePreferences @Inject constructor(
     suspend fun setBackground(background: String) {
         context.subtitleStyleDataStore.edit { it[Keys.BACKGROUND] = background }
     }
+
+    suspend fun applyServerStyle(serverStyle: com.jellio.tv.data.model.SubtitleStyleDto) {
+        context.subtitleStyleDataStore.edit { prefs ->
+            serverStyle.size?.takeIf { v -> SUBTITLE_SIZES.any { it.value == v } }?.let { prefs[Keys.SIZE] = it }
+            serverStyle.background?.takeIf { v -> SUBTITLE_BACKGROUNDS.any { it.value == v } }?.let { prefs[Keys.BACKGROUND] = it }
+            serverStyle.color?.takeIf { v -> SUBTITLE_COLORS.any { it.first == v } }?.let { prefs[Keys.COLOR] = it }
+            serverStyle.edge?.takeIf { it in SUBTITLE_EDGES }?.let { prefs[Keys.EDGE] = it }
+            serverStyle.position?.takeIf { v -> SUBTITLE_POSITIONS.any { it.first == v } }?.let { prefs[Keys.POSITION] = it }
+        }
+    }
 }

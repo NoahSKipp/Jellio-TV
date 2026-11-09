@@ -228,6 +228,7 @@ class JellioRepository @Inject constructor(
     internal val sessionManager: SessionManager,
     private val rememberedUsersStore: RememberedUsersStore,
     private val watchlistPreferences: WatchlistPreferences,
+    private val subtitleStylePreferences: com.jellio.tv.data.prefs.SubtitleStylePreferences,
 ) {
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
 
@@ -1926,7 +1927,11 @@ class JellioRepository @Inject constructor(
 
     suspend fun getProfileSettings(): ProfileDto = api.getProfileSettings().also { profile ->
         syncRemoveFromWatchlistAfterWatching(profile.RemoveFromWatchlistAfterWatching)
+        profile.subtitleStyle?.let { subtitleStylePreferences.applyServerStyle(it) }
     }
+
+    suspend fun saveSubtitleStyle(style: com.jellio.tv.data.model.SubtitleStyleDto): ProfileDto =
+        api.saveSubtitleStyle(style)
 
     suspend fun saveProfileRecommendations(
         selectedGenres: List<String>?,

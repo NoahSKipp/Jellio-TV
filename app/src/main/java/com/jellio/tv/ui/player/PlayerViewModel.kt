@@ -305,16 +305,41 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    private fun syncSubtitleStyleToServer(style: SubtitleStyle) {
+        viewModelScope.launch {
+            runCatching {
+                repository.saveSubtitleStyle(
+                    com.jellio.tv.data.model.SubtitleStyleDto(
+                        size = style.size,
+                        background = style.background,
+                        color = style.color,
+                        edge = style.edge,
+                        position = style.position,
+                    ),
+                )
+            }
+        }
+    }
+
     fun setSubtitleSize(size: String) {
-        viewModelScope.launch { subtitleStylePreferences.setSize(size) }
+        viewModelScope.launch {
+            subtitleStylePreferences.setSize(size)
+            syncSubtitleStyleToServer(_subtitleStyle.value.copy(size = size))
+        }
     }
 
     fun setSubtitleLook(style: SubtitleStyle) {
-        viewModelScope.launch { subtitleStylePreferences.setLook(style.color, style.edge, style.position) }
+        viewModelScope.launch {
+            subtitleStylePreferences.setLook(style.color, style.edge, style.position)
+            syncSubtitleStyleToServer(style)
+        }
     }
 
     fun setSubtitleBackground(background: String) {
-        viewModelScope.launch { subtitleStylePreferences.setBackground(background) }
+        viewModelScope.launch {
+            subtitleStylePreferences.setBackground(background)
+            syncSubtitleStyleToServer(_subtitleStyle.value.copy(background = background))
+        }
     }
 
     private var loadedItemId: String? = null

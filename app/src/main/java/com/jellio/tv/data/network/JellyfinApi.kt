@@ -521,6 +521,9 @@ interface JellyfinApi {
     @POST("Jellio/profile/privacy")
     suspend fun setProfilePrivacy(@Body body: SetPrivacyRequest)
 
+    @POST("Jellio/profile/subtitles")
+    suspend fun saveSubtitleStyle(@Body body: com.jellio.tv.data.model.SubtitleStyleDto): ProfileDto
+
     @GET("Jellio/achievements/{userId}")
     suspend fun getAchievements(@Path("userId") userId: String): AchievementsDto
 
