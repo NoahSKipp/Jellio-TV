@@ -1,10 +1,13 @@
 package com.jellio.tv.ui.person
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,9 +24,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -32,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,9 +45,16 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +72,7 @@ import com.jellio.tv.data.model.PersonCreditItem
 import com.jellio.tv.data.model.RichPersonDetails
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ErrorState
+import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec
 import com.jellio.tv.ui.home.RatingChip
 import com.jellio.tv.ui.home.TmdbBadge
@@ -68,6 +82,38 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
+
+private fun renderMarkdownBiography(raw: String): AnnotatedString {
+    val cleanLinks = raw.replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
+    val builder = AnnotatedString.Builder()
+    val tokenRegex = Regex("(\\*\\*|__)(.*?)\\1|(\\*|_)(.*?)\\3")
+    var lastIndex = 0
+
+    for (match in tokenRegex.findAll(cleanLinks)) {
+        val range = match.range
+        if (range.first > lastIndex) {
+            builder.append(cleanLinks.substring(lastIndex, range.first))
+        }
+        val boldContent = match.groups[2]?.value
+        val italicContent = match.groups[4]?.value
+        if (boldContent != null) {
+            builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+            builder.append(boldContent)
+            builder.pop()
+        } else if (italicContent != null) {
+            builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+            builder.append(italicContent)
+            builder.pop()
+        }
+        lastIndex = range.last + 1
+    }
+
+    if (lastIndex < cleanLinks.length) {
+        builder.append(cleanLinks.substring(lastIndex))
+    }
+
+    return builder.toAnnotatedString()
+}
 
 @Composable
 fun PersonScreen(
@@ -80,7 +126,18 @@ fun PersonScreen(
     viewModel: PersonViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val contentFocusRequester = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    val heroFocusRequester = remember { FocusRequester() }
+    var heroHasFocus by remember { mutableStateOf(false) }
+
+    val blockScrollWhileHeroFocused = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                if (heroHasFocus) available else Offset.Zero
+        }
+    }
+
+    BackHandler(onBack = onBack)
 
     LaunchedEffect(personId) {
         viewModel.load(session, personId)
@@ -88,11 +145,21 @@ fun PersonScreen(
 
     LaunchedEffect(uiState.details) {
         if (uiState.details != null) {
-            runCatching { contentFocusRequester.requestFocus() }
+            listState.scrollToItem(0)
+            runCatching { heroFocusRequester.requestFocus() }
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
+    LaunchedEffect(heroHasFocus) {
+        if (heroHasFocus) {
+            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                .collect { (index, offset) ->
+                    if (index != 0 || offset != 0) listState.scrollToItem(0)
+                }
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
             uiState.isLoading -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -109,21 +176,32 @@ fun PersonScreen(
             }
             uiState.details != null -> {
                 val details = uiState.details!!
-                val chunkedCredits = remember(uiState.filmography) { uiState.filmography.chunked(6) }
+                val horizontalPadding = 48.dp
+                val spacing = 16.dp
+                val availableWidth = maxWidth - (horizontalPadding * 2)
+                val columns = maxOf(1, ((availableWidth + spacing) / (160.dp + spacing)).toInt())
+                val chunkedCredits = remember(uiState.filmography, columns) { uiState.filmography.chunked(columns) }
 
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .focusRequester(contentFocusRequester)
+                        .nestedScroll(blockScrollWhileHeroFocused)
                         .focusRestorer(),
                     contentPadding = PaddingValues(bottom = 64.dp),
                 ) {
                     // 1. Hero Header Section
                     item {
-                        PersonHeroHeader(
-                            details = details,
-                            fallbackImageUrl = imageUrl(details.id, null, "Primary", 400),
-                        )
+                        Box(modifier = Modifier.onFocusChanged { heroHasFocus = it.hasFocus }) {
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
+                                PersonHeroHeader(
+                                    details = details,
+                                    fallbackImageUrl = imageUrl(details.id, null, "Primary", 400),
+                                    onBack = onBack,
+                                    backFocusRequester = heroFocusRequester,
+                                )
+                            }
+                        }
                     }
 
                     // 2. Known For Section (Top 10 works)
@@ -218,12 +296,13 @@ fun PersonScreen(
 private fun PersonHeroHeader(
     details: RichPersonDetails,
     fallbackImageUrl: String,
+    onBack: () -> Unit,
+    backFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     var isBioExpanded by remember { mutableStateOf(false) }
-    val heroHeight = 440.dp.scaled()
 
-    Box(modifier = modifier.fillMaxWidth().height(heroHeight)) {
+    Box(modifier = modifier.fillMaxWidth().heightIn(min = 380.dp.scaled())) {
         // Cinematic backdrop art with gradient overlays
         if (!details.backdropUrl.isNullOrBlank()) {
             AsyncImage(
@@ -261,18 +340,54 @@ private fun PersonHeroHeader(
                 ),
         )
 
+        // Top Back Button
+        Surface(
+            onClick = onBack,
+            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = Color.White.copy(alpha = 0.08f),
+                contentColor = JellioText,
+                focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                focusedContentColor = Color.White,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+            ),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+            modifier = Modifier
+                .padding(start = 48.dp, top = 20.dp)
+                .focusRequester(backFocusRequester),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = Strings.get("nav_back"),
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(
+                    text = Strings.get("nav_back"),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
         // Hero Content Row
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 48.dp, end = 48.dp, top = 60.dp, bottom = 24.dp),
+                .fillMaxWidth()
+                .padding(start = 48.dp, end = 48.dp, top = 64.dp, bottom = 20.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             // High-resolution Portrait Photo
             val photoModel = details.profileUrl ?: fallbackImageUrl
             Box(
                 modifier = Modifier
-                    .width(190.dp)
+                    .width(170.dp)
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(16.dp))
                     .background(JellioBgElevated)
@@ -299,7 +414,7 @@ private fun PersonHeroHeader(
             // Person Details & Metadata
             Column(
                 modifier = Modifier
-                    .padding(start = 32.dp)
+                    .padding(start = 28.dp)
                     .widthIn(max = 840.dp),
             ) {
                 // Name
@@ -345,15 +460,16 @@ private fun PersonHeroHeader(
                 // Biography Text & Read More Toggle
                 if (!details.biography.isNullOrBlank()) {
                     val bioText = details.biography
+                    val annotatedBio = remember(bioText) { renderMarkdownBiography(bioText) }
                     val isLong = bioText.length > 200
 
                     Text(
-                        text = bioText,
+                        text = annotatedBio,
                         color = JellioTextSecondary,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = if (isBioExpanded) 20 else 3,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 12.dp),
+                        modifier = Modifier.padding(top = 10.dp),
                     )
 
                     if (isLong) {
@@ -504,33 +620,6 @@ private fun PersonCreditCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
-                }
-
-                // "In Library" Badge
-                if (credit.inLibrary) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .background(JellioBg.copy(alpha = 0.88f), RoundedCornerShape(999.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = Color(0xFF22C55E),
-                                modifier = Modifier.size(11.dp),
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = Strings.get("person_in_library"),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                            )
-                        }
-                    }
                 }
 
                 // TMDB Rating Badge
