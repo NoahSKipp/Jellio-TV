@@ -162,9 +162,12 @@ fun HomeScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         when {
             uiState.isLoading -> HomeSkeleton()
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("status_error"), color = JellioTextSecondary)
-            }
+            uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
+                message = com.jellio.tv.ui.i18n.string("home_load_error"),
+                failure = uiState.error,
+                onRetry = { viewModel.retry(session) },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.rows.isEmpty() && !uiState.loadingMore -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
@@ -317,6 +320,15 @@ fun HomeScreen(
                                     )
                                     is StudioHubsHomeRow -> StudioHubRow(services = row.services, logoUrl = serviceLogoUrl, onServiceClick = onServiceClick)
                                 }
+                            }
+                        }
+                        if (uiState.rowsError != null && !editMode) {
+                            item(key = "rows_error") {
+                                com.jellio.tv.ui.common.InlineErrorState(
+                                    message = com.jellio.tv.ui.i18n.string("rows_load_error"),
+                                    onRetry = { viewModel.retry(session) },
+                                    modifier = Modifier.padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
+                                )
                             }
                         }
                         // Rows still loading below the ones already shown.

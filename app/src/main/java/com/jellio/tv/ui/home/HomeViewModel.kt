@@ -3,6 +3,7 @@ package com.jellio.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.greetingText
@@ -18,6 +19,8 @@ import com.jellio.tv.data.cache.toHomeRow
 import com.jellio.tv.data.prefs.RecommendationPreferences
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.watchnext.WatchNextSyncer
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import com.jellio.tv.ui.seasonal.activeSeasonalTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
@@ -48,7 +51,10 @@ data class HomeUiState(
     val greeting: String = "",
     val rows: List<HomeRow> = emptyList(),
     val customization: HomeCustomizationDto = HomeCustomizationDto(),
-    val error: String? = null,
+    // Nothing loaded and nothing saved to show instead.
+    val error: LoadFailure? = null,
+    // Some rows failed; they show their last loaded items if there were any.
+    val rowsError: LoadFailure? = null,
     // More rows are still loading below the ones shown (skeletons there).
     val loadingMore: Boolean = false,
 )
@@ -110,6 +116,8 @@ private fun leadIndex(name: String?): Int {
 private fun titleFor(name: String?, kind: String): String =
     com.jellio.tv.ui.i18n.catalogDisplayName(name, kind)
 
+private const val COMMUNITY_ROW_KEY = "rec:What Others Are Watching"
+
 private const val HOME_BACKGROUND_RETRIES = 3
 private const val HOME_RETRY_DELAY_MS = 20_000L
 
@@ -155,18 +163,31 @@ class HomeViewModel @Inject constructor(
     private var loadedForUserId: String? = null
 
     private val failedFetches = java.util.concurrent.atomic.AtomicInteger()
+    @Volatile private var lastFailure: Throwable? = null
     private var homeRetryJob: kotlinx.coroutines.Job? = null
     private var homeRetryRound = 0
+    private var loadJob: kotlinx.coroutines.Job? = null
 
-    private suspend fun <T> orEmptyOnFailure(block: suspend () -> List<T>): List<T> =
+    // Null when the request failed, so a failure is not mistaken for an empty row.
+    private suspend fun <T> orNullOnFailure(block: suspend () -> List<T>): List<T>? =
         try {
             block()
         } catch (err: kotlinx.coroutines.CancellationException) {
             throw err
         } catch (err: Exception) {
             failedFetches.incrementAndGet()
-            emptyList()
+            lastFailure = err
+            null
         }
+
+    // Try again on Home: a full page error shows the skeleton meanwhile, a
+    // partial one keeps its rows and retry line until the new answer is in.
+    fun retry(session: Session) {
+        if (loadJob?.isActive == true) return
+        homeRetryRound = 0
+        if (_uiState.value.rows.isEmpty()) _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        load(session)
+    }
 
     private fun scheduleHomeRetry(session: Session) {
         if (homeRetryRound >= HOME_BACKGROUND_RETRIES) return
@@ -184,9 +205,10 @@ class HomeViewModel @Inject constructor(
         loadedForUserId = loadKey
         homeRetryJob?.cancel()
         failedFetches.set(0)
-        viewModelScope.launch {
+        lastFailure = null
+        loadJob = viewModelScope.launch {
             if (!isReturningVisit) {
-                val cachedSnapshot = runCatching { rowSnapshotStore.loadHomeSnapshot(session.userId) }.getOrNull()
+                val cachedSnapshot = catching { rowSnapshotStore.loadHomeSnapshot(session.userId) }.getOrNull()
                 if (cachedSnapshot != null && (cachedSnapshot.rows.isNotEmpty() || cachedSnapshot.heroItems.isNotEmpty())) {
                     val restoredRows = cachedSnapshot.rows.map { it.toHomeRow() }
                     restoredRows.forEach { row ->
@@ -208,21 +230,33 @@ class HomeViewModel @Inject constructor(
                     _uiState.value = HomeUiState(isLoading = true)
                 }
             }
+            // A row whose request fails keeps what it showed before (from the
+            // last load or the saved snapshot) instead of disappearing.
+            val previousRows = _uiState.value.rows
+            fun previousSection(key: String): HomeSection? =
+                (previousRows.firstOrNull { it.key == key } as? PosterHomeRow)?.section
+            fun previousSections(prefix: String): List<HomeSection> =
+                previousRows.filterIsInstance<PosterHomeRow>().map { it.section }.filter { it.key.startsWith(prefix) }
             try {
                 coroutineScope {
-                    val continueWatchingDeferred = async { orEmptyOnFailure { repository.getContinueWatching(session.userId) } }
-                    val upNextDeferred = async { orEmptyOnFailure { repository.getNextUp(session.userId) } }
-                    val comingSoonDeferred = async { orEmptyOnFailure { repository.getCalendarEntries().take(COMING_SOON_LIMIT) } }
-                    val collectionsDeferred = async { orEmptyOnFailure { repository.getCollections(session.userId) } }
-                    val userDeferred = async { runCatching { repository.getUser(session.userId) }.getOrNull() }
-                    val configDeferred = async { runCatching { repository.getJellioConfig() }.getOrNull() }
-                    val customizationDeferred = async { runCatching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
+                    val continueWatchingDeferred = async { orNullOnFailure { repository.getContinueWatching(session.userId) } }
+                    val upNextDeferred = async { orNullOnFailure { repository.getNextUp(session.userId) } }
+                    val comingSoonDeferred = async { orNullOnFailure { repository.getCalendarEntries().take(COMING_SOON_LIMIT) } }
+                    val collectionsDeferred = async { orNullOnFailure { repository.getCollections(session.userId) } }
+                    val userDeferred = async { catching { repository.getUser(session.userId) }.getOrNull() }
+                    val configDeferred = async { catching { repository.getJellioConfig() }.getOrNull() }
+                    val customizationDeferred = async { catching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
                     val animeIdsDeferred = async { repository.getAnimeIds() }
-                    val watchlistDeferred = async { orEmptyOnFailure { repository.getWatchlistItems(session.userId) } }
+                    val watchlistDeferred = async { orNullOnFailure { repository.getWatchlistItems(session.userId) } }
 
-                    val upNext = upNextDeferred.await()
-                    val continueWatching = continueWatchingDeferred.await().withoutStaleEpisodes(upNext)
-                    launch { runCatching { watchNextSyncer.sync(session, continueWatching, upNext) } }
+                    val upNextFresh = upNextDeferred.await()
+                    val continueWatchingFresh = continueWatchingDeferred.await()
+                    val upNext = upNextFresh ?: previousSection("up-next")?.items.orEmpty()
+                    val continueWatching = continueWatchingFresh?.withoutStaleEpisodes(upNext)
+                        ?: previousSection("continue-watching")?.items.orEmpty()
+                    if (upNextFresh != null && continueWatchingFresh != null) {
+                        launch { catching { watchNextSyncer.sync(session, continueWatching, upNext) } }
+                    }
                     repository.prefetchStreamsInTurn(
                         continueWatching.filter { it.Type == "Movie" || it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT).map { it.Id },
                     )
@@ -255,11 +289,12 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                     // The reader's own Watchlist: anime they follow stays in.
-                    val comingSoon = comingSoonDeferred.await()
-                    val comingSoonItems = runCatching { repository.getItemsInfo(session.userId, comingSoon.map { it.ItemId }) }
+                    val comingSoon = comingSoonDeferred.await().orEmpty()
+                    val comingSoonItems = catching { repository.getItemsInfo(session.userId, comingSoon.map { it.ItemId }) }
                         .getOrDefault(emptyMap())
                         .mapKeys { normalizeId(it.key) }
-                    val collections = collectionsDeferred.await()
+                    val collectionsFresh = collectionsDeferred.await()
+                    val collections = collectionsFresh.orEmpty()
                     val config = configDeferred.await()
 
                     val activeTheme = activeSeasonalTheme(Calendar.getInstance(), config)
@@ -267,21 +302,26 @@ class HomeViewModel @Inject constructor(
                     val seasonalDeferred = if (activeTheme != null && seasons.containsKey(activeTheme)) {
                         val spec = seasons.getValue(activeTheme)
                         async {
-                            runCatching {
-                                val raw = repository.getSeasonalItems(session.userId, spec.genres, spec.searchTerms, 60)
-                                spec.title to raw
-                            }.getOrNull()
+                            orNullOnFailure { repository.getSeasonalItems(session.userId, spec.genres, spec.searchTerms, 60) }
+                                ?.let { spec.title to it }
                         }
                     } else {
                         null
                     }
 
-                    val studioHubs = groupByService(collections).keys.sorted()
+                    val studioHubs = if (collectionsFresh != null) {
+                        groupByService(collections).keys.sorted()
+                    } else {
+                        previousRows.filterIsInstance<StudioHubsHomeRow>().firstOrNull()?.services.orEmpty()
+                    }
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
                     // Titles taken off the watchlist here stay off even if a refresh
                     // still gets the older list back.
-                    val watchlist = watchlistDeferred.await().filter { removedFromWatchlist[it.Id] == null }
-                    val existingComingSoon = _uiState.value.rows.filterIsInstance<ComingSoonHomeRow>().firstOrNull()
+                    val watchlist = (
+                        watchlistDeferred.await()
+                            ?: (previousSection("watchlist-movies")?.items.orEmpty() + previousSection("watchlist-shows")?.items.orEmpty())
+                        ).filter { removedFromWatchlist[it.Id] == null }
+                    val existingComingSoon = (_uiState.value.rows + previousRows).filterIsInstance<ComingSoonHomeRow>().firstOrNull()
                     val topRows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
                             add(PosterHomeRow(HomeSection(com.jellio.tv.ui.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
@@ -370,43 +410,61 @@ class HomeViewModel @Inject constructor(
 
                     fun publish() {
                         if (isReturningVisit && !finished) return
+                        val rows = assembled()
+                        val failed = finished && failedFetches.get() > 0
                         _uiState.value = HomeUiState(
                             isLoading = false,
                             heroItems = heroCandidates,
                             greeting = greeting,
-                            rows = assembled(),
+                            rows = rows,
                             customization = customization,
                             loadingMore = !finished,
+                            error = if (failed && rows.isEmpty()) loadFailureOf(lastFailure) else null,
+                            rowsError = if (failed && rows.isNotEmpty()) loadFailureOf(lastFailure) else null,
                         )
                     }
 
                     // Never awaited: a slow community lookup holds nothing up.
                     if (isCommunityEnabled) {
                         launch {
-                            val raw = orEmptyOnFailure { repository.getCommunityWatching(communityExcluded) }
+                            val raw = orNullOnFailure { repository.getCommunityWatching(communityExcluded) }
+                            if (raw == null) {
+                                communitySection = previousSection(COMMUNITY_ROW_KEY) ?: return@launch
+                                publish()
+                                return@launch
+                            }
                             // Lands after the other rows, so filtering against them would usually empty it.
                             val eligible = raw.distinctBy { it.Id }
                             if (eligible.isEmpty()) return@launch
                             communitySection = HomeSection(
                                 title = com.jellio.tv.ui.i18n.Strings.get("home_community_watching"),
                                 items = eligible.take(24),
-                                key = "rec:What Others Are Watching",
+                                key = COMMUNITY_ROW_KEY,
                             )
                             publish()
                         }
                     }
 
                     val recommendationJob = async {
-                        val recs = orEmptyOnFailure { buildRecommendationRows(recommendationSource, recExclude) }
+                        val recs = orNullOnFailure { buildRecommendationRows(recommendationSource, recExclude) }
+                        if (recs == null) {
+                            recommendationRows = previousSections("rec:").filter { it.key != COMMUNITY_ROW_KEY }
+                            publish()
+                            return@async
+                        }
                         recommendationRows = recs.map { it.copy(key = "rec:${it.title}") }
                         val picks = (recs.firstOrNull { it.title == com.jellio.tv.ui.i18n.Strings.get("home_top_picks") } ?: recs.firstOrNull())?.items
-                        if (!picks.isNullOrEmpty()) launch { runCatching { watchNextSyncer.updateTopPicks(session, picks) } }
+                        if (!picks.isNullOrEmpty()) launch { catching { watchNextSyncer.updateTopPicks(session, picks) } }
                         publish()
                     }
 
                     val seasonalJob = seasonalDeferred?.let { pending ->
                         async {
-                            val (title, rawItems) = pending.await() ?: return@async
+                            val (title, rawItems) = pending.await() ?: run {
+                                seasonalSection = previousSections("seasonal:").firstOrNull() ?: return@async
+                                publish()
+                                return@async
+                            }
                             val eligible = rawItems.filter { it.UserData?.Played != true && !recExclude.contains(it.Id) }
                             eligible.forEach { recExclude.add(it.Id) }
                             if (eligible.isNotEmpty()) {
@@ -416,10 +474,21 @@ class HomeViewModel @Inject constructor(
                         }
                     }
 
+                    if (collectionsFresh == null) {
+                        previousSections("catalog:").forEachIndexed { index, section -> catalogSections[index] = section }
+                    }
                     val catalogJobs = chooseCatalogs(collections).mapIndexed { index, collection ->
                         async {
                             val kind = repository.collectionKind(collection)
-                            val items = orEmptyOnFailure { repository.getCollectionItems(session.userId, collection.Id, kind, CATALOG_ROW_LIMIT) }.filterNot { isAnime(it) }
+                            val fetched = orNullOnFailure { repository.getCollectionItems(session.userId, collection.Id, kind, CATALOG_ROW_LIMIT) }
+                            if (fetched == null) {
+                                previousSection("catalog:${collection.Id}")?.let {
+                                    catalogSections[index] = it
+                                    publish()
+                                }
+                                return@async
+                            }
+                            val items = fetched.filterNot { isAnime(it) }
                             val entry = CatalogRowEntry(title = titleFor(collection.Name, kind), items = items, collectionId = collection.Id, kind = kind)
                             catalogSection(session.userId, entry, catalogAndGenreDeduplicator)?.let {
                                 catalogSections[index] = it
@@ -429,10 +498,23 @@ class HomeViewModel @Inject constructor(
                     }
 
                     val genreJob = async {
-                        val genres = orEmptyOnFailure { chooseGenres(session.userId) }
+                        val genres = orNullOnFailure { chooseGenres(session.userId) }
+                        if (genres == null) {
+                            previousSections("genre:").forEachIndexed { index, section -> genreSections[index] = section }
+                            publish()
+                            return@async
+                        }
                         genres.mapIndexed { index, genre ->
                             async {
-                                val items = orEmptyOnFailure { repository.getGenreItems(session.userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }.filterNot { isAnime(it) }
+                                val fetched = orNullOnFailure { repository.getGenreItems(session.userId, null, "Movie,Series", genre, GENRE_ROW_LIMIT) }
+                                if (fetched == null) {
+                                    previousSection("genre:$genre")?.let {
+                                        genreSections[index] = it
+                                        publish()
+                                    }
+                                    return@async
+                                }
+                                val items = fetched.filterNot { isAnime(it) }
                                 genreSection(session.userId, GenreRowEntry(genre = genre, items = items), catalogAndGenreDeduplicator)?.let {
                                     genreSections[index] = it
                                     publish()
@@ -467,10 +549,16 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                 }
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
             } catch (err: Exception) {
-                if (_uiState.value.loadingMore) _uiState.value = _uiState.value.copy(loadingMore = false)
-                if (!isReturningVisit && _uiState.value.rows.isEmpty()) {
-                    _uiState.value = HomeUiState(isLoading = false, error = err.message ?: "Could not load Home")
+                android.util.Log.w("JellioHome", "home failed: ${err.message}")
+                val failure = loadFailureOf(err)
+                val state = _uiState.value
+                _uiState.value = if (state.rows.isEmpty()) {
+                    HomeUiState(isLoading = false, greeting = state.greeting, customization = state.customization, error = failure)
+                } else {
+                    state.copy(isLoading = false, loadingMore = false, rowsError = failure)
                 }
                 scheduleHomeRetry(session)
             }

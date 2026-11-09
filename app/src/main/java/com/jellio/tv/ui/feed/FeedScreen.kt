@@ -96,19 +96,12 @@ fun FeedScreen(
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 com.jellio.tv.ui.common.ScreenSpinner()
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("feed_load_error"), color = JellioTextSecondary)
-                    Surface(
-                        onClick = { viewModel.retry() },
-                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                        modifier = Modifier.padding(top = 20.dp),
-                    ) {
-                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
-                    }
-                }
-            }
+            uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
+                message = com.jellio.tv.ui.i18n.string("feed_load_error"),
+                failure = uiState.error,
+                onRetry = { viewModel.retry() },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = com.jellio.tv.ui.i18n.string("status_empty"), color = JellioTextSecondary)
             }

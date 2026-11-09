@@ -374,7 +374,6 @@ internal object StringsEn {
         m["state_off"] = "Off"
         m["state_on"] = "On"
         m["status_empty"] = "Nothing here yet"
-        m["status_error"] = "Something went wrong"
         m["status_loading"] = "Loading…"
         m["stream_all"] = "All"
         m["stream_bad_flag"] = "⚠ Didn't play recently"
@@ -919,5 +918,13 @@ internal object StringsEn {
         m["player_subtitle_image"] = "image"
         m["player_subtitle_image_slow"] = "slow: burns into video"
         m["player_scrub_hint"] = "◀ ▶ to scrub"
+        m["action_try_again"] = "Try again"
+        m["error_server_unreachable"] = "Could not reach the server. Check your connection."
+        m["home_load_error"] = "Could not load Home"
+        m["rows_load_error"] = "Some rows could not load."
+        m["library_load_error"] = "Could not load this library"
+        m["search_load_error"] = "Could not load search results."
+        m["live_guide_load_error"] = "Could not load the guide"
+        m["person_filmography_load_error"] = "Could not load the filmography"
     }
 }

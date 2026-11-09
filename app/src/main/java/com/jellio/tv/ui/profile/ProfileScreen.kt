@@ -52,6 +52,7 @@ import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BadgeDto
 import com.jellio.tv.data.model.GroupedActivityEntryDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ErrorState
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.common.formatRelativeTime
 import com.jellio.tv.ui.common.rarityColor
@@ -89,19 +90,12 @@ fun ProfileScreen(
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("profile_load_error"), color = JellioTextSecondary)
-                    Surface(
-                        onClick = { viewModel.retry(session, userId) },
-                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                        modifier = Modifier.padding(top = 20.dp),
-                    ) {
-                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
-                    }
-                }
-            }
+            uiState.error != null -> ErrorState(
+                message = com.jellio.tv.ui.i18n.string("profile_load_error"),
+                failure = uiState.error,
+                onRetry = { viewModel.retry(session, userId) },
+                modifier = Modifier.fillMaxSize(),
+            )
             else -> {
                 val user = uiState.user
                 val profile = uiState.profile

@@ -6,6 +6,8 @@ import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -28,7 +30,7 @@ data class SearchUiState(
     val isSearching: Boolean = false,
     val results: List<BaseItemDto> = emptyList(),
     val hasSearched: Boolean = false,
-    val error: String? = null,
+    val error: LoadFailure? = null,
     // Nothing found: related titles in the library, the way Netflix answers a
     // title it doesn't carry.
     val suggestions: com.jellio.tv.data.model.SearchSuggestionsDto? = null,
@@ -100,6 +102,9 @@ class SearchViewModel @Inject constructor(
             var pending = 3
             var failures = 0
             var fellBack = false
+            // The library is the main source: with it down, nothing found is not "no results".
+            var libraryFailed = false
+            var lastError: Throwable? = null
 
             suspend fun add(items: List<BaseItemDto>) {
                 stateLock.withLock {
@@ -121,13 +126,14 @@ class SearchViewModel @Inject constructor(
                     if (failed) failures += count
                     if (_uiState.value.query != query || pending > 0) return
                     val nothing = _uiState.value.results.isEmpty()
+                    val failed = nothing && (failures >= 3 || libraryFailed)
                     _uiState.value = _uiState.value.copy(
                         isSearching = false,
-                        error = if (nothing && failures >= 3) com.jellio.tv.ui.i18n.Strings.get("search_network_error") else null,
+                        error = if (failed) loadFailureOf(lastError) else null,
                     )
-                    if (nothing && failures < 3) {
+                    if (nothing && !failed) {
                         viewModelScope.launch {
-                            val answer = runCatching { repository.getSearchSuggestions(query) }.getOrNull()
+                            val answer = com.jellio.tv.data.catching { repository.getSearchSuggestions(query) }.getOrNull()
                             if (answer != null && answer.Rows.isNotEmpty() && _uiState.value.query == query) {
                                 _uiState.value = _uiState.value.copy(suggestions = answer)
                             }
@@ -146,6 +152,7 @@ class SearchViewModel @Inject constructor(
                 } catch (err: CancellationException) {
                     throw err
                 } catch (err: Exception) {
+                    lastError = err
                     false
                 }
                 settle(2, !ok)
@@ -159,8 +166,14 @@ class SearchViewModel @Inject constructor(
                 } catch (err: CancellationException) {
                     throw err
                 } catch (err: HttpException) {
-                    if (err.code() == 404) fallBackToCombined() else settle(1, true)
+                    if (err.code() == 404) {
+                        fallBackToCombined()
+                    } else {
+                        lastError = err
+                        settle(1, true)
+                    }
                 } catch (err: Exception) {
+                    lastError = err
                     settle(1, true)
                 }
             }
@@ -173,6 +186,8 @@ class SearchViewModel @Inject constructor(
                     } catch (err: CancellationException) {
                         throw err
                     } catch (err: Exception) {
+                        lastError = err
+                        libraryFailed = true
                         false
                     }
                     settle(1, !ok)
@@ -181,6 +196,11 @@ class SearchViewModel @Inject constructor(
                 launch { runAddon { repository.searchSeries(query) } }
             }
         }
+    }
+
+    fun retry(session: Session) {
+        val query = _uiState.value.query
+        if (query.isNotBlank()) onQueryChange(session, query)
     }
 
     private fun identityKeys(item: BaseItemDto): List<String> = buildList {

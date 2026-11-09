@@ -117,18 +117,12 @@ fun ServiceScreen(
                     Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
                 }
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.formatString("service_load_error", serviceName), color = JellioTextSecondary)
-                    androidx.tv.material3.Surface(
-                        onClick = { viewModel.retry(session, serviceName) },
-                        shape = androidx.tv.material3.ClickableSurfaceDefaults.shape(shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)),
-                        modifier = Modifier.padding(top = 20.dp),
-                    ) {
-                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
-                    }
-                }
-            }
+            uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
+                message = com.jellio.tv.ui.i18n.formatString("service_load_error", serviceName),
+                failure = uiState.error,
+                onRetry = { viewModel.retry(session, serviceName) },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.rows.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = com.jellio.tv.ui.i18n.formatString("service_nothing_imported", serviceName), color = JellioTextSecondary)
             }

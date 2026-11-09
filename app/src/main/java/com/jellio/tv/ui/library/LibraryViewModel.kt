@@ -3,6 +3,7 @@ package com.jellio.tv.ui.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.i18n.genreDisplayName
 import com.jellio.tv.data.model.ShowsEditorial
@@ -17,8 +18,12 @@ import com.jellio.tv.data.cache.RowSnapshotStore
 import com.jellio.tv.data.cache.toCachedRowDto
 import com.jellio.tv.data.cache.toHomeSection
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import com.jellio.tv.ui.home.HomeSection
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +69,10 @@ data class LibraryUiState(
     val genreOptions: List<String> = emptyList(),
     val sections: List<HomeSection> = emptyList(),
     val emptyMessage: String? = null,
+    // Nothing could be loaded and there is nothing to fall back on.
+    val error: LoadFailure? = null,
+    // Some rows failed; the ones shown are what did load, or the last visit's.
+    val rowsError: LoadFailure? = null,
 )
 
 @HiltViewModel
@@ -77,6 +86,44 @@ class LibraryViewModel @Inject constructor(
     private var loadedFor: String? = null
     private var currentLibrary: BaseItemDto? = null
     private var currentItemType: String? = null
+    private var loadJob: Job? = null
+
+    // Requests that failed or timed out in the load running now.
+    private val failures = java.util.concurrent.atomic.AtomicInteger()
+    @Volatile private var lastError: Throwable? = null
+    private var mainRowFailed = false
+
+    private suspend fun <T> Deferred<Result<T>>.within(timeoutMs: Long): T? {
+        val result = withTimeoutOrNull(timeoutMs) { await() }
+        if (result != null && result.isSuccess) return result.getOrNull()
+        failures.incrementAndGet()
+        lastError = result?.exceptionOrNull()
+        return null
+    }
+
+    // Nothing new came back: keep what is on screen if there is anything,
+    // otherwise show the error.
+    private fun failWholePage(title: String, progressive: Boolean) {
+        val failure = loadFailureOf(lastError)
+        _uiState.value = if (progressive) {
+            LibraryUiState(isLoading = false, title = title, error = failure)
+        } else {
+            _uiState.value.copy(isLoading = false, rowsError = failure)
+        }
+    }
+
+    fun retry(session: Session) {
+        val library = currentLibrary ?: return
+        val state = _uiState.value
+        // The retry line stays (and keeps focus) until the new answer replaces it.
+        if (state.error == null && state.rowsError != null && mainRowFailed && failures.get() == 0) {
+            reloadMainRow(session, library, state.selectedSort, state.selectedGenre)
+            return
+        }
+        if (loadJob?.isActive == true) return
+        if (state.error != null) _uiState.value = LibraryUiState(isLoading = true, title = state.title)
+        load(session, library)
+    }
 
     fun load(session: Session, library: BaseItemDto) {
         val key = "${session.userId}:${library.Id}:${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}"
@@ -84,14 +131,18 @@ class LibraryViewModel @Inject constructor(
         loadedFor = key
         currentLibrary = library
         currentItemType = if (library.CollectionType == "movies") "Movie" else "Series"
-        viewModelScope.launch {
+        loadJob?.cancel()
+        failures.set(0)
+        lastError = null
+        mainRowFailed = false
+        loadJob = viewModelScope.launch {
             val libTitle = if (repository.isAnimeLibrary(library)) {
                 com.jellio.tv.ui.i18n.Strings.get("library_anime_title")
             } else {
                 com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType)
             }
             if (!isReturningVisit) {
-                val cached = rowSnapshotStore.loadLibrarySnapshot(session.userId, library.Id)
+                val cached = catching { rowSnapshotStore.loadLibrarySnapshot(session.userId, library.Id) }.getOrNull()
                 if (cached != null && (cached.coverflowItems.isNotEmpty() || cached.sections.isNotEmpty())) {
                     _uiState.value = LibraryUiState(
                         isLoading = false,
@@ -108,10 +159,18 @@ class LibraryViewModel @Inject constructor(
                     _uiState.value = LibraryUiState(isLoading = true, title = libTitle)
                 }
             }
-            if (repository.isAnimeLibrary(library)) {
-                loadAnime(session, library.Id)
-            } else {
-                loadLibrary(session, library)
+            try {
+                if (repository.isAnimeLibrary(library)) {
+                    loadAnime(session, library.Id)
+                } else {
+                    loadLibrary(session, library)
+                }
+            } catch (err: kotlinx.coroutines.CancellationException) {
+                throw err
+            } catch (err: Exception) {
+                android.util.Log.w("JellioLibrary", "library ${library.Id} failed: ${err.message}")
+                lastError = err
+                failWholePage(_uiState.value.title.ifEmpty { libTitle }, _uiState.value.isLoading)
             }
         }
     }
@@ -121,14 +180,14 @@ class LibraryViewModel @Inject constructor(
 
         val excludeIdsDeferred = async { repository.getAnimeIds() }
         val allGenresDeferred = async {
-            runCatching { repository.getAllGenres(session.userId, library.Id, itemType) }.getOrDefault(emptyList())
+            catching { repository.getAllGenres(session.userId, library.Id, itemType) }.getOrDefault(emptyList())
         }
         val coverflowItemsDeferred = async {
-            runCatching { repository.getHeroCandidates(session.userId, limit = 8, parentId = library.Id) }.getOrDefault(emptyList())
+            catching { repository.getHeroCandidates(session.userId, limit = 8, parentId = library.Id) }
         }
         val theme = if (library.CollectionType == "movies") moviesTimeOfDay(currentHour()) else showsTimeOfDay(currentHour())
         val themedDeferred = async {
-            runCatching {
+            catching {
                 repository.getLibraryItems(
                     session.userId,
                     library.Id,
@@ -142,18 +201,19 @@ class LibraryViewModel @Inject constructor(
         }
         val defaultSort = LIBRARY_SORT_OPTIONS.first().value.split(":")
         val mainItemsDeferred = async {
-            runCatching {
+            catching {
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = defaultSort[0], sortOrder = defaultSort[1])
-            }.getOrDefault(emptyList())
+            }
         }
         val genresDeferred = async {
-            runCatching { repository.discoverGenres(session.userId, library.Id, itemType, GENRE_ROWS) }.getOrDefault(emptyList())
+            catching { repository.discoverGenres(session.userId, library.Id, itemType, GENRE_ROWS) }
         }
         val progressive = _uiState.value.isLoading
 
         val excludeIds = withTimeoutOrNull(ROW_TIMEOUT_MS) { excludeIdsDeferred.await() }.orEmpty()
         animeIds = excludeIds
-        val mainItems = withTimeoutOrNull(ROW_TIMEOUT_MS) { mainItemsDeferred.await() }.orEmpty().filterNot { isAnime(it) }
+        val mainLoaded = mainItemsDeferred.within(ROW_TIMEOUT_MS)
+        val mainItems = mainLoaded.orEmpty().filterNot { isAnime(it) }
         val mainRow = HomeSection(
             sortLabel(LIBRARY_SORT_OPTIONS.first().value),
             mainItems,
@@ -184,21 +244,22 @@ class LibraryViewModel @Inject constructor(
         }
         publish(emptyList(), null, emptyList())
 
+        // The themed pick is optional: missing it just falls back below.
         val themed = withTimeoutOrNull(THEMED_TIMEOUT_MS) { themedDeferred.await() }.orEmpty().filterNot { isAnime(it) }.take(ROW_LIMIT)
         val useThemed = themed.size >= MIN_THEMED_ITEMS
-        val coverflowItems = if (useThemed) themed else withTimeoutOrNull(THEMED_TIMEOUT_MS) { coverflowItemsDeferred.await() }.orEmpty().filterNot { isAnime(it) }
+        val coverflowItems = if (useThemed) themed else coverflowItemsDeferred.within(THEMED_TIMEOUT_MS).orEmpty().filterNot { isAnime(it) }
         val featuredTitle = if (useThemed) theme.title else null
         publish(coverflowItems, featuredTitle, emptyList())
 
-        val genres = withTimeoutOrNull(ROW_TIMEOUT_MS) { genresDeferred.await() }.orEmpty()
+        val genres = genresDeferred.within(ROW_TIMEOUT_MS).orEmpty()
         val genreItemsDeferred = genres.map { genre ->
             genre to async {
-                runCatching { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIMIT) }.getOrDefault(emptyList())
+                catching { repository.getGenreItems(session.userId, library.Id, itemType, genre, ROW_LIMIT) }
             }
         }
         val sections = mutableListOf<HomeSection>()
         genreItemsDeferred.forEach { (genre, deferred) ->
-            val items = withTimeoutOrNull(ROW_TIMEOUT_MS) { deferred.await() }.orEmpty().filterNot { isAnime(it) }
+            val items = deferred.within(ROW_TIMEOUT_MS).orEmpty().filterNot { isAnime(it) }
             if (items.isNotEmpty()) {
                 sections.add(
                     HomeSection(
@@ -213,6 +274,11 @@ class LibraryViewModel @Inject constructor(
         }
 
         val allGenres = withTimeoutOrNull(ROW_TIMEOUT_MS) { allGenresDeferred.await() }.orEmpty().ifEmpty { genres }
+        if (mainLoaded == null && coverflowItems.isEmpty() && sections.isEmpty()) {
+            failWholePage(libTitle, progressive)
+            return@coroutineScope
+        }
+        val failed = failures.get() > 0
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = libTitle,
@@ -222,7 +288,10 @@ class LibraryViewModel @Inject constructor(
             // Every genre the library has, not just the few with rows.
             genreOptions = allGenres,
             sections = sections,
+            rowsError = if (failed) loadFailureOf(lastError) else null,
         )
+        // A page missing rows is not kept as the library's last good one.
+        if (failed) return@coroutineScope
         val snapshot = LibrarySnapshot(
             title = libTitle,
             coverflowItems = coverflowItems,
@@ -260,10 +329,18 @@ class LibraryViewModel @Inject constructor(
         val sortBy = parts.getOrElse(0) { "CommunityRating" }
         val sortOrder = parts.getOrElse(1) { "Descending" }
         viewModelScope.launch {
-            val items = runCatching {
+            val result = catching {
                 repository.getLibraryItems(session.userId, library.Id, limit = ROW_LIMIT, includeItemTypes = itemType, sortBy = sortBy, sortOrder = sortOrder, genre = genre)
-            }.getOrDefault(emptyList()).filterNot { isAnime(it) }
+            }
+            mainRowFailed = result.isFailure
+            val items = result.getOrDefault(emptyList()).filterNot { isAnime(it) }
+            val rowsError = when {
+                result.isFailure -> loadFailureOf(result.exceptionOrNull())
+                failures.get() > 0 -> _uiState.value.rowsError
+                else -> null
+            }
             _uiState.value = _uiState.value.copy(
+                rowsError = rowsError,
                 mainRow = HomeSection(
                     genre?.let { genreDisplayName(it) } ?: sortLabel(sort),
                     items,
@@ -277,9 +354,16 @@ class LibraryViewModel @Inject constructor(
     }
 
     private suspend fun loadAnime(session: Session, libraryId: String) = coroutineScope {
-        val collections = runCatching { repository.getCollections(session.userId) }
-            .getOrDefault(emptyList())
-            .filter { repository.isAnimeCollection(it) }
+        val animeTitle = com.jellio.tv.ui.i18n.Strings.get("library_anime_title")
+        val progressive = _uiState.value.isLoading
+        val allCollections = catching { repository.getCollections(session.userId) }
+            .onFailure { lastError = it }
+            .getOrNull()
+        if (allCollections == null) {
+            failWholePage(animeTitle, progressive)
+            return@coroutineScope
+        }
+        val collections = allCollections.filter { repository.isAnimeCollection(it) }
 
         if (collections.isEmpty()) {
             _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"), emptyMessage = com.jellio.tv.ui.i18n.Strings.get("library_anime_empty"))
@@ -290,7 +374,7 @@ class LibraryViewModel @Inject constructor(
         val theme = animeTimeOfDay(currentHour())
         val animeIdsDeferred = async { repository.getAnimeIds() }
         val themedPoolDeferred = async {
-            runCatching {
+            catching {
                 repository.getLibraryItems(
                     session.userId,
                     libraryId,
@@ -302,9 +386,8 @@ class LibraryViewModel @Inject constructor(
                 )
             }.getOrDefault(emptyList())
         }
-        val progressive = _uiState.value.isLoading
         val fetches = picked.map { collection ->
-            collection to async { runCatching { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIMIT) }.getOrDefault(emptyList()) }
+            collection to async { catching { repository.getCollectionItems(session.userId, collection.Id, "tvshows", ROW_LIMIT) } }
         }
 
         // Rows go up one by one in catalog order as each answers, AniList
@@ -313,7 +396,7 @@ class LibraryViewModel @Inject constructor(
         val itemLists = mutableListOf<Pair<BaseItemDto, List<BaseItemDto>>>()
         val sections = mutableListOf<HomeSection>()
         fetches.forEach { (collection, deferred) ->
-            val items = withTimeoutOrNull(ROW_TIMEOUT_MS) { deferred.await() }.orEmpty()
+            val items = deferred.within(ROW_TIMEOUT_MS).orEmpty()
             itemLists += collection to items
             if (items.isEmpty()) return@forEach
             if (coverflowSource.isEmpty() && TRENDING_ANIME_NAME.containsMatchIn(collection.Name ?: "") && items.size >= COVERFLOW_MIN_ITEMS) {
@@ -350,19 +433,26 @@ class LibraryViewModel @Inject constructor(
             .take(ROW_LIMIT)
         val sectionsWithTheme = if (themed.size >= MIN_THEMED_ITEMS) listOf(HomeSection(theme.title, themed)) + sections else sections.toList()
 
+        val failed = failures.get() > 0
         if (sectionsWithTheme.isEmpty() && coverflowSource.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"), emptyMessage = com.jellio.tv.ui.i18n.Strings.get("library_anime_empty"))
+            if (failed) {
+                failWholePage(animeTitle, progressive)
+            } else {
+                _uiState.value = LibraryUiState(isLoading = false, title = animeTitle, emptyMessage = com.jellio.tv.ui.i18n.Strings.get("library_anime_empty"))
+            }
             return@coroutineScope
         }
 
         val badge = if (coverflowSource.isNotEmpty()) com.jellio.tv.ui.i18n.Strings.get("library_trending_anilist") else null
         _uiState.value = LibraryUiState(
             isLoading = false,
-            title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
+            title = animeTitle,
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
             sections = sectionsWithTheme,
+            rowsError = if (failed) loadFailureOf(lastError) else null,
         )
+        if (failed) return@coroutineScope
         val snapshot = LibrarySnapshot(
             title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
             coverflowItems = coverflowSource,

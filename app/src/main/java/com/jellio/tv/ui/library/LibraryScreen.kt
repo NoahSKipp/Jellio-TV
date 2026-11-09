@@ -50,6 +50,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ErrorState
+import com.jellio.tv.ui.common.InlineErrorState
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.TvBringIntoViewSpec
 import com.jellio.tv.ui.common.ScreenSpinner
@@ -112,6 +114,12 @@ fun LibraryScreen(
                     Text(text = com.jellio.tv.ui.i18n.string("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(top = 16.dp))
                 }
             }
+            uiState.error != null -> ErrorState(
+                message = com.jellio.tv.ui.i18n.string("library_load_error"),
+                failure = uiState.error,
+                onRetry = { viewModel.retry(session) },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.emptyMessage != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = uiState.emptyMessage ?: "", color = JellioTextSecondary)
             }
@@ -201,6 +209,15 @@ fun LibraryScreen(
                                 onTitleClick = onSectionTitleClick,
                                 onItemFocus = onCardFocus,
                             )
+                        }
+                        if (uiState.rowsError != null) {
+                            item(key = "rows_error") {
+                                InlineErrorState(
+                                    message = com.jellio.tv.ui.i18n.string("rows_load_error"),
+                                    onRetry = { viewModel.retry(session) },
+                                    modifier = Modifier.padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
+                                )
+                            }
                         }
                         item(key = "bottom_space") { Spacer(modifier = Modifier.height(32.dp)) }
                     }

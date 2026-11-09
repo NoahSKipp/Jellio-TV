@@ -374,7 +374,6 @@ internal object StringsIt {
         m["state_off"] = "Disattivo"
         m["state_on"] = "Attivo"
         m["status_empty"] = "Ancora nulla qui"
-        m["status_error"] = "Si è verificato un errore"
         m["status_loading"] = "Caricamento…"
         m["stream_all"] = "Tutti"
         m["stream_bad_flag"] = "⚠ Riproduzione fallita di recente"
@@ -919,5 +918,13 @@ internal object StringsIt {
         m["player_subtitle_image"] = "immagine"
         m["player_subtitle_image_slow"] = "lento: impresso nel video"
         m["player_scrub_hint"] = "◀ ▶ per scorrere"
+        m["action_try_again"] = "Riprova"
+        m["error_server_unreachable"] = "Impossibile raggiungere il server. Controlla la connessione."
+        m["home_load_error"] = "Impossibile caricare la pagina iniziale"
+        m["rows_load_error"] = "Alcune righe non sono state caricate."
+        m["library_load_error"] = "Impossibile caricare questa libreria"
+        m["search_load_error"] = "Impossibile caricare i risultati di ricerca."
+        m["live_guide_load_error"] = "Impossibile caricare la guida"
+        m["person_filmography_load_error"] = "Impossibile caricare la filmografia"
     }
 }

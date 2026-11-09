@@ -374,7 +374,6 @@ internal object StringsPl {
         m["state_off"] = "Wyłączone"
         m["state_on"] = "Włączone"
         m["status_empty"] = "Jeszcze nic tu nie ma"
-        m["status_error"] = "Coś poszło nie tak"
         m["status_loading"] = "Ładowanie…"
         m["stream_all"] = "Wszystkie"
         m["stream_bad_flag"] = "⚠ Ostatnio nie odtworzono"
@@ -919,5 +918,13 @@ internal object StringsPl {
         m["player_subtitle_image"] = "obraz"
         m["player_subtitle_image_slow"] = "wolne: wypalane w obrazie"
         m["player_scrub_hint"] = "◀ ▶ aby przewijać"
+        m["action_try_again"] = "Spróbuj ponownie"
+        m["error_server_unreachable"] = "Nie można połączyć się z serwerem. Sprawdź połączenie."
+        m["home_load_error"] = "Nie udało się wczytać strony głównej"
+        m["rows_load_error"] = "Nie udało się wczytać niektórych rzędów."
+        m["library_load_error"] = "Nie udało się wczytać tej biblioteki"
+        m["search_load_error"] = "Nie udało się wczytać wyników wyszukiwania."
+        m["live_guide_load_error"] = "Nie udało się wczytać programu"
+        m["person_filmography_load_error"] = "Nie udało się wczytać filmografii"
     }
 }

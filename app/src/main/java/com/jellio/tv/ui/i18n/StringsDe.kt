@@ -374,7 +374,6 @@ internal object StringsDe {
         m["state_off"] = "Aus"
         m["state_on"] = "Ein"
         m["status_empty"] = "Hier gibt es noch nichts"
-        m["status_error"] = "Etwas ist schiefgelaufen"
         m["status_loading"] = "Wird geladen…"
         m["stream_all"] = "Alle"
         m["stream_bad_flag"] = "⚠ Kürzlich fehlgeschlagen"
@@ -919,5 +918,13 @@ internal object StringsDe {
         m["player_subtitle_image"] = "Bild"
         m["player_subtitle_image_slow"] = "langsam: wird ins Bild eingebrannt"
         m["player_scrub_hint"] = "◀ ▶ zum Spulen"
+        m["action_try_again"] = "Erneut versuchen"
+        m["error_server_unreachable"] = "Server nicht erreichbar. Prüfe deine Verbindung."
+        m["home_load_error"] = "Startseite konnte nicht geladen werden"
+        m["rows_load_error"] = "Einige Reihen konnten nicht geladen werden."
+        m["library_load_error"] = "Diese Mediathek konnte nicht geladen werden"
+        m["search_load_error"] = "Suchergebnisse konnten nicht geladen werden."
+        m["live_guide_load_error"] = "Programm konnte nicht geladen werden"
+        m["person_filmography_load_error"] = "Filmografie konnte nicht geladen werden"
     }
 }

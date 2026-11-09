@@ -374,7 +374,6 @@ internal object StringsFr {
         m["state_off"] = "Désactivé"
         m["state_on"] = "Activé"
         m["status_empty"] = "Rien ici pour le moment"
-        m["status_error"] = "Une erreur est survenue"
         m["status_loading"] = "Chargement…"
         m["stream_all"] = "Tous"
         m["stream_bad_flag"] = "⚠ Échec de lecture récent"
@@ -919,5 +918,13 @@ internal object StringsFr {
         m["player_subtitle_image"] = "image"
         m["player_subtitle_image_slow"] = "lent : incrusté dans la vidéo"
         m["player_scrub_hint"] = "◀ ▶ pour naviguer"
+        m["action_try_again"] = "Réessayer"
+        m["error_server_unreachable"] = "Impossible de joindre le serveur. Vérifiez votre connexion."
+        m["home_load_error"] = "Impossible de charger l'accueil"
+        m["rows_load_error"] = "Certaines rangées n'ont pas pu être chargées."
+        m["library_load_error"] = "Impossible de charger cette bibliothèque"
+        m["search_load_error"] = "Impossible de charger les résultats de recherche."
+        m["live_guide_load_error"] = "Impossible de charger le guide"
+        m["person_filmography_load_error"] = "Impossible de charger la filmographie"
     }
 }

@@ -279,9 +279,15 @@ fun SearchScreen(
                     }
                 }
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: "", color = JellioTextSecondary)
-            }
+            uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
+                message = com.jellio.tv.ui.i18n.string(
+                    if (uiState.error == com.jellio.tv.ui.common.LoadFailure.Unreachable) "search_network_error" else "search_load_error",
+                ),
+                onRetry = { viewModel.retry(session) },
+                // The search field keeps focus while typing.
+                takeFocus = false,
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.hasSearched && uiState.suggestions != null -> {
                 val answer = uiState.suggestions!!
                 androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize()) {

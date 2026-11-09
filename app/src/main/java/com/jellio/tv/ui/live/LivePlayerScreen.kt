@@ -196,6 +196,8 @@ fun LivePlayerScreen(
 
     var guideOpen by remember { mutableStateOf(false) }
     var guide by remember { mutableStateOf<List<LiveProgramme>?>(null) }
+    var guideFailure by remember { mutableStateOf<com.jellio.tv.ui.common.LoadFailure?>(null) }
+    var guideAttempt by remember { mutableStateOf(0) }
     var infoVisible by remember { mutableStateOf(true) }
     LaunchedEffect(uiState.infoVersion) {
         infoVisible = true
@@ -227,6 +229,7 @@ fun LivePlayerScreen(
                         val channel = uiState.channel
                         if (channel != null && !channel.userStream) {
                             guide = null
+                            guideFailure = null
                             guideOpen = true
                         }
                         true
@@ -283,9 +286,11 @@ fun LivePlayerScreen(
         }
 
         if (guideOpen && channel != null) {
-            LaunchedEffect(channel.id) {
+            LaunchedEffect(channel.id, guideAttempt) {
                 val now = System.currentTimeMillis()
-                guide = runCatching { viewModel.loadGuide(channel.id, now) }.getOrDefault(emptyList())
+                com.jellio.tv.data.catching { viewModel.loadGuide(channel.id, now) }
+                    .onSuccess { guide = it }
+                    .onFailure { guideFailure = com.jellio.tv.ui.common.loadFailureOf(it) }
             }
             GuideSheet(
                 channel = channel,
@@ -293,6 +298,12 @@ fun LivePlayerScreen(
                 imageUrl = imageUrl,
                 onPlay = null,
                 onClose = { guideOpen = false },
+                failure = guideFailure,
+                onRetry = {
+                    guide = null
+                    guideFailure = null
+                    guideAttempt++
+                },
             )
         }
     }

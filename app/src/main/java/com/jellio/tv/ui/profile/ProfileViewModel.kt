@@ -3,10 +3,13 @@ package com.jellio.tv.ui.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.AchievementsDto
 import com.jellio.tv.data.model.ProfileDto
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -19,7 +22,7 @@ import javax.inject.Inject
 
 data class ProfileUiState(
     val isLoading: Boolean = true,
-    val error: String? = null,
+    val error: LoadFailure? = null,
     val user: UserDto? = null,
     val profile: ProfileDto? = null,
     val achievements: AchievementsDto? = null,
@@ -58,7 +61,7 @@ class ProfileViewModel @Inject constructor(
 
     private suspend fun fetchNow(session: Session, userId: String) {
         _uiState.value = ProfileUiState(isLoading = true)
-        runCatching {
+        catching {
             coroutineScope {
                 val userDeferred = async { repository.getUser(userId) }
                 val profileDeferred = async { repository.getProfile(userId) }
@@ -74,8 +77,7 @@ class ProfileViewModel @Inject constructor(
                 isOwner = userId == session.userId,
             )
         }.onFailure { err ->
-            if (err is kotlinx.coroutines.CancellationException) throw err
-            _uiState.value = ProfileUiState(isLoading = false, error = err.message ?: com.jellio.tv.ui.i18n.Strings.get("profile_load_error"))
+            _uiState.value = ProfileUiState(isLoading = false, error = loadFailureOf(err))
         }
     }
 

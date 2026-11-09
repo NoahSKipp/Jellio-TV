@@ -1,10 +1,12 @@
 package com.jellio.tv.ui.live
 
-import com.jellio.tv.ui.i18n.Strings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -28,12 +30,13 @@ import com.jellio.tv.data.setChannelFavorite
 
 data class LiveTvUiState(
     val isLoading: Boolean = true,
-    val error: String? = null,
+    val error: LoadFailure? = null,
     val channels: List<LiveChannel> = emptyList(),
     val query: String = "",
     val filters: LiveFilters = LiveFilters(),
     val guideChannel: LiveChannel? = null,
     val guide: List<LiveProgramme>? = null,
+    val guideError: LoadFailure? = null,
     val links: List<com.jellio.tv.data.model.StreamLinkDto> = emptyList(),
     val pairing: LivePairing? = null,
     val pendingPlay: String? = null,
@@ -74,21 +77,26 @@ class LiveTvViewModel @Inject constructor(
             if (fresh) repository.invalidateLiveChannels(session.userId)
             // My streams failing never hides the server's channels, and the
             // other way round.
-            val links = async { runCatching { repository.getStreamLinks() } }
+            val links = async { catching { repository.getStreamLinks() } }
             val broken = async { repository.getBrokenLiveChannels() }
-            val result = runCatching { repository.getLiveChannels(session.userId) }
+            val result = catching { repository.getLiveChannels(session.userId) }
             links.await().onSuccess { _uiState.value = _uiState.value.copy(links = it) }
             result.onSuccess { items ->
                 _uiState.value = _uiState.value.copy(isLoading = false, error = null, channels = applyHealth(mapChannels(items, System.currentTimeMillis()), broken.await()))
             }.onFailure { err ->
                 android.util.Log.w("JellioLive", "channels failed: ${err.message}")
                 if (_uiState.value.channels.isEmpty() && _uiState.value.links.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = Strings.get("live_load_error"))
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = loadFailureOf(err))
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }
             }
         }
+    }
+
+    fun retry(session: Session) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        load(session, fresh = true)
     }
 
     private suspend fun reloadLinks() {
@@ -183,20 +191,23 @@ class LiveTvViewModel @Inject constructor(
     }
 
     fun openGuide(session: Session, channel: LiveChannel) {
-        _uiState.value = _uiState.value.copy(guideChannel = channel, guide = null)
+        _uiState.value = _uiState.value.copy(guideChannel = channel, guide = null, guideError = null)
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val programs = runCatching {
+            val programs = catching {
                 repository.getLivePrograms(session.userId, channel.id, now, now + GUIDE_HOURS * 3_600_000L)
-            }.getOrDefault(emptyList())
-            if (_uiState.value.guideChannel?.id == channel.id) {
-                _uiState.value = _uiState.value.copy(guide = guideWindow(programs, System.currentTimeMillis()))
+            }
+            if (_uiState.value.guideChannel?.id != channel.id) return@launch
+            programs.onSuccess {
+                _uiState.value = _uiState.value.copy(guide = guideWindow(it, System.currentTimeMillis()))
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(guideError = loadFailureOf(it))
             }
         }
     }
 
     fun closeGuide() {
-        _uiState.value = _uiState.value.copy(guideChannel = null, guide = null)
+        _uiState.value = _uiState.value.copy(guideChannel = null, guide = null, guideError = null)
     }
 
     private fun update(id: String, change: (LiveChannel) -> LiveChannel) {

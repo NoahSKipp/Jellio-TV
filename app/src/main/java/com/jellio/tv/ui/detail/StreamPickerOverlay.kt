@@ -201,7 +201,7 @@ internal fun sourceAudioLanguages(source: MediaSourceDto): List<String> {
 private sealed interface SourcesState {
     data object Loading : SourcesState
     data class Loaded(val sources: List<MediaSourceDto>) : SourcesState
-    data class Error(val message: String) : SourcesState
+    data class Error(val message: String, val failure: com.jellio.tv.ui.common.LoadFailure? = null) : SourcesState
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -274,8 +274,10 @@ fun StreamPickerOverlay(
                     },
                 )
             }
+        } catch (err: kotlinx.coroutines.CancellationException) {
+            throw err
         } catch (err: Exception) {
-            SourcesState.Error(err.message ?: com.jellio.tv.ui.i18n.Strings.get("stream_load_error"))
+            SourcesState.Error(com.jellio.tv.ui.i18n.Strings.get("stream_load_error"), com.jellio.tv.ui.common.loadFailureOf(err))
         }
     }
     LaunchedEffect(item.Id) { remembered = rememberedSourceId() }
@@ -320,7 +322,18 @@ fun StreamPickerOverlay(
                 }
                 is SourcesState.Error -> Column(modifier = Modifier.padding(top = 48.dp)) {
                     Text(text = currentState.message, color = JellioTextSecondary)
-                    RetryButton(onClick = { reloadKey++ }, focusRequester = initialFocusRequester)
+                    if (currentState.failure == com.jellio.tv.ui.common.LoadFailure.Unreachable) {
+                        Text(
+                            text = com.jellio.tv.ui.i18n.string("error_server_unreachable"),
+                            color = com.jellio.tv.ui.theme.JellioTextTertiary,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    com.jellio.tv.ui.common.RetryButton(
+                        onClick = { reloadKey++ },
+                        modifier = Modifier.padding(top = 20.dp).focusRequester(initialFocusRequester),
+                    )
                 }
                 is SourcesState.Loaded -> if (currentState.sources.isEmpty()) {
                     val refreshRequester = remember { FocusRequester() }
@@ -626,18 +639,6 @@ internal fun FilterChipRow(
                 Text(text = label, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
         }
-    }
-}
-
-@Composable
-private fun RetryButton(onClick: () -> Unit, focusRequester: FocusRequester? = null) {
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-        modifier = Modifier.padding(top = 20.dp).let { if (focusRequester != null) it.focusRequester(focusRequester) else it },
-    ) {
-        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
     }
 }
 

@@ -374,7 +374,6 @@ internal object StringsPt {
         m["state_off"] = "Desligado"
         m["state_on"] = "Ligado"
         m["status_empty"] = "Nada por aqui ainda"
-        m["status_error"] = "Ocorreu um erro"
         m["status_loading"] = "Carregando…"
         m["stream_all"] = "Todos"
         m["stream_bad_flag"] = "⚠ Não reproduziu recentemente"
@@ -919,5 +918,13 @@ internal object StringsPt {
         m["player_subtitle_image"] = "imagem"
         m["player_subtitle_image_slow"] = "lento: gravado no vídeo"
         m["player_scrub_hint"] = "◀ ▶ para avançar ou voltar"
+        m["action_try_again"] = "Tentar novamente"
+        m["error_server_unreachable"] = "Não foi possível acessar o servidor. Verifique sua conexão."
+        m["home_load_error"] = "Não foi possível carregar o Início"
+        m["rows_load_error"] = "Algumas fileiras não puderam ser carregadas."
+        m["library_load_error"] = "Não foi possível carregar esta biblioteca"
+        m["search_load_error"] = "Não foi possível carregar os resultados da busca."
+        m["live_guide_load_error"] = "Não foi possível carregar o guia"
+        m["person_filmography_load_error"] = "Não foi possível carregar a filmografia"
     }
 }

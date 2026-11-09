@@ -203,19 +203,11 @@ fun DetailScreen(
                     DetailLoading(uiState.loadingArt)
                 }
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = uiState.error ?: com.jellio.tv.ui.i18n.string("detail_load_error"), color = JellioTextSecondary)
-                    Surface(
-                        onClick = { viewModel.retry(session, itemId) },
-                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                        colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                        modifier = Modifier.padding(top = 20.dp),
-                    ) {
-                        Text(text = com.jellio.tv.ui.i18n.string("action_retry"), modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
-                    }
-                }
-            }
+            uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
+                message = uiState.error ?: com.jellio.tv.ui.i18n.string("detail_load_error"),
+                onRetry = { viewModel.retry(session, itemId) },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.item != null -> {
                 val item = uiState.item!!
                 LazyColumn(

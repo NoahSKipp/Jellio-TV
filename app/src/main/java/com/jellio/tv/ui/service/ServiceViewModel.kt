@@ -3,6 +3,7 @@ package com.jellio.tv.ui.service
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.cache.CachedServiceRowDto
 import com.jellio.tv.data.cache.RowSnapshotStore
 import com.jellio.tv.data.cache.ServiceSnapshot
@@ -11,6 +12,8 @@ import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.groupByService
 import com.jellio.tv.data.model.rowTitle
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +47,7 @@ const val MIXED_KIND = "mixed"
 
 data class ServiceUiState(
     val isLoading: Boolean = true,
-    val error: String? = null,
+    val error: LoadFailure? = null,
     val serviceName: String = "",
     val heroItem: BaseItemDto? = null,
     val rows: List<ServiceRow> = emptyList(),
@@ -79,7 +82,7 @@ class ServiceViewModel @Inject constructor(
             // The last visit's rows show at once; the refresh replaces them
             // in one go when it's done so nothing moves while browsing.
             val showing = _uiState.value.takeIf { it.serviceName == serviceName && it.rows.isNotEmpty() }
-            val cached = if (showing != null) null else runCatching { rowSnapshotStore.loadServiceSnapshot(session.userId, serviceName) }.getOrNull()
+            val cached = if (showing != null) null else catching { rowSnapshotStore.loadServiceSnapshot(session.userId, serviceName) }.getOrNull()
                 ?.takeIf { it.rows.isNotEmpty() }
             val baseline = showing ?: cached?.let {
                 ServiceUiState(
@@ -91,9 +94,10 @@ class ServiceViewModel @Inject constructor(
                 )
             }
             _uiState.value = baseline ?: ServiceUiState(isLoading = true, serviceName = serviceName)
+            lastError = null
             try {
                 val collections = withBackoff { repository.getCollections(session.userId) }
-                    ?: throw IllegalStateException("collections timed out")
+                    ?: throw (lastError ?: java.io.InterruptedIOException("collections timed out"))
                 val matching = groupByService(collections)[serviceName].orEmpty()
 
                 // Slots keep the collections' order while each row goes up as
@@ -142,7 +146,7 @@ class ServiceViewModel @Inject constructor(
                 val complete = failedRows == 0
                 if (complete || baseline == null || finalRows.size >= baseline.rows.size) {
                     _uiState.value = if (rows.isEmpty() && !complete) {
-                        ServiceUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.format("service_load_error", serviceName), serviceName = serviceName)
+                        ServiceUiState(isLoading = false, error = loadFailureOf(lastError), serviceName = serviceName)
                     } else {
                         ServiceUiState(
                             isLoading = false,
@@ -172,7 +176,7 @@ class ServiceViewModel @Inject constructor(
                 if (err is kotlinx.coroutines.CancellationException) throw err
                 android.util.Log.w("JellioService", "$serviceName failed to load: ${err.message}")
                 if (baseline == null) {
-                    _uiState.value = ServiceUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.format("service_load_error", serviceName), serviceName = serviceName)
+                    _uiState.value = ServiceUiState(isLoading = false, error = loadFailureOf(err), serviceName = serviceName)
                 }
                 scheduleRetry(session, serviceName, retryRound)
             }
@@ -191,10 +195,14 @@ class ServiceViewModel @Inject constructor(
         }
     }
 
+    // The last failure behind a row or page that gave up; null after a timeout.
+    @Volatile private var lastError: Throwable? = null
+
     private suspend fun <T> withBackoff(block: suspend () -> T): T? {
         repeat(SERVICE_ROW_ATTEMPTS) { attempt ->
-            val result = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { runCatching { block() } }
+            val result = withTimeoutOrNull(SERVICE_ROW_TIMEOUT_MS) { catching { block() } }
             if (result != null && result.isSuccess) return result.getOrNull()
+            lastError = result?.exceptionOrNull()
             if (attempt < SERVICE_ROW_ATTEMPTS - 1) kotlinx.coroutines.delay(2_000L shl attempt)
         }
         return null

@@ -53,7 +53,9 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ErrorState
 import com.jellio.tv.ui.common.JellioTextField
+import com.jellio.tv.ui.common.LoadFailure
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBg
@@ -373,7 +375,12 @@ fun LiveTvScreen(
             }
             when {
                 uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ScreenSpinner() }
-                uiState.error != null -> Text(text = uiState.error.orEmpty(), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
+                uiState.error != null -> ErrorState(
+                    message = Strings.get("live_load_error"),
+                    failure = uiState.error,
+                    onRetry = { viewModel.retry(session) },
+                    modifier = Modifier.fillMaxSize(),
+                )
                 uiState.channels.isEmpty() && uiState.links.isEmpty() -> Text(text = Strings.get("live_no_channels"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 uiState.arranged.all.isEmpty() && uiState.arranged.broken.isEmpty() && uiState.myStreams.isEmpty() -> Text(text = Strings.get("live_no_results"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 else -> {
@@ -457,6 +464,8 @@ fun LiveTvScreen(
                 imageUrl = imageUrl,
                 onPlay = { viewModel.closeGuide(); onPlay(guideChannel.id) },
                 onClose = viewModel::closeGuide,
+                failure = uiState.guideError,
+                onRetry = { viewModel.openGuide(session, guideChannel) },
             )
         }
     }
@@ -475,6 +484,8 @@ internal fun GuideSheet(
     imageUrl: (String, String?) -> String,
     onPlay: (() -> Unit)?,
     onClose: () -> Unit,
+    failure: LoadFailure? = null,
+    onRetry: () -> Unit = {},
 ) {
     BackHandler(onBack = onClose)
     val focus = remember { FocusRequester() }
@@ -499,6 +510,14 @@ internal fun GuideSheet(
             }
             val nowMs = System.currentTimeMillis()
             when {
+                // Without a Play button the retry is the only thing to focus.
+                failure != null -> ErrorState(
+                    message = Strings.get("live_guide_load_error"),
+                    failure = failure,
+                    onRetry = onRetry,
+                    takeFocus = onPlay == null,
+                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                )
                 programmes == null -> Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) { ScreenSpinner() }
                 programmes.isEmpty() -> Text(text = Strings.get("live_guide_empty"), color = JellioTextSecondary, modifier = Modifier.padding(top = 24.dp))
                 else -> LazyColumn(contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

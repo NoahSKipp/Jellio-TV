@@ -3,7 +3,10 @@ package com.jellio.tv.ui.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.FeedEntryDto
+import com.jellio.tv.ui.common.LoadFailure
+import com.jellio.tv.ui.common.loadFailureOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +21,7 @@ private const val FEED_BACKGROUND_RETRIES = 3
 data class FeedUiState(
     val isLoading: Boolean = true,
     val entries: List<FeedEntryDto> = emptyList(),
-    val error: String? = null,
+    val error: LoadFailure? = null,
 )
 
 @HiltViewModel
@@ -47,7 +50,7 @@ class FeedViewModel @Inject constructor(
             if (showing.isEmpty()) _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             var lastError: Throwable? = null
             repeat(FEED_ATTEMPTS) { attempt ->
-                val result = kotlinx.coroutines.withTimeoutOrNull(FEED_TIMEOUT_MS) { runCatching { repository.getFeed() } }
+                val result = kotlinx.coroutines.withTimeoutOrNull(FEED_TIMEOUT_MS) { catching { repository.getFeed() } }
                 if (result != null && result.isSuccess) {
                     _uiState.value = FeedUiState(isLoading = false, entries = result.getOrThrow())
                     return@launch
@@ -59,7 +62,7 @@ class FeedViewModel @Inject constructor(
             _uiState.value = if (showing.isNotEmpty()) {
                 FeedUiState(isLoading = false, entries = showing)
             } else {
-                FeedUiState(isLoading = false, error = com.jellio.tv.ui.i18n.Strings.get("feed_load_error"))
+                FeedUiState(isLoading = false, error = loadFailureOf(lastError))
             }
             if (round < FEED_BACKGROUND_RETRIES) {
                 kotlinx.coroutines.delay(30_000L shl round)

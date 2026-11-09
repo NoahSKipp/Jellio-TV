@@ -42,6 +42,8 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.common.ErrorState
+import com.jellio.tv.ui.common.InlineErrorState
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
@@ -60,8 +62,8 @@ fun PersonScreen(
     val uiState by viewModel.uiState.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
     LaunchedEffect(personId) { viewModel.load(session, personId) }
-    LaunchedEffect(uiState.person) {
-        if (uiState.person != null) contentFocusRequester.requestFocus()
+    LaunchedEffect(uiState.person, uiState.filmography.isNotEmpty(), uiState.filmographyError != null) {
+        if (uiState.person != null) runCatching { contentFocusRequester.requestFocus() }
     }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
@@ -69,9 +71,12 @@ fun PersonScreen(
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
-            uiState.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = uiState.error ?: com.jellio.tv.ui.i18n.Strings.get("person_load_error"), color = JellioTextSecondary)
-            }
+            uiState.error != null -> ErrorState(
+                message = com.jellio.tv.ui.i18n.Strings.get("person_load_error"),
+                failure = uiState.error,
+                onRetry = { viewModel.retry(session, personId) },
+                modifier = Modifier.fillMaxSize(),
+            )
             uiState.person != null -> {
                 val person = uiState.person!!
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 140.dp).focusRequester(contentFocusRequester).focusRestorer()) {
@@ -118,6 +123,15 @@ fun PersonScreen(
                                     }
                                 }
                             }
+                        }
+                    } else if (uiState.filmographyError != null) {
+                        item {
+                            // Nothing else here takes focus, so the button does.
+                            InlineErrorState(
+                                message = com.jellio.tv.ui.i18n.Strings.get("person_filmography_load_error"),
+                                onRetry = { viewModel.retryFilmography(session, personId) },
+                                modifier = Modifier.padding(start = 48.dp, top = 32.dp),
+                            )
                         }
                     }
                 }
