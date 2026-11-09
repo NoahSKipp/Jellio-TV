@@ -53,6 +53,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
@@ -104,8 +105,12 @@ fun LivePlayerScreen(
     }
 
     val player = remember {
-        // Start on a small buffer, keep a deeper one to ride out stalls.
+        // Start on a small buffer, keep a deeper one to ride out stalls, capped by system heap.
+        val heap = Runtime.getRuntime().maxMemory()
+        val targetLiveBytes = minOf(64L * 1024 * 1024, (heap * 0.20).toLong()).toInt()
         val loadControl = DefaultLoadControl.Builder()
+            .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+            .setTargetBufferBytes(targetLiveBytes)
             .setBufferDurationsMs(15_000, 60_000, 1_500, 3_000)
             .build()
         ExoPlayer.Builder(context)

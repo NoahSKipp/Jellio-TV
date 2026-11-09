@@ -117,7 +117,15 @@ fun HomeScreen(
             viewModel.clearToast()
         }
     }
+    // The last focused card (row key and item id), kept across visits to a
+    // title's page so coming back puts focus right where it was.
+    var lastFocus by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var restorePending by remember { mutableStateOf(true) }
+
     LaunchedEffect(uiState.rows) {
+        if (lastFocus != null) {
+            restorePending = true
+        }
         val current = highlightedItem.value ?: return@LaunchedEffect
         val stillExists = uiState.rows.any { row ->
             when (row) {
@@ -130,10 +138,6 @@ fun HomeScreen(
             highlightedItem.value = uiState.rows.firstNotNullOfOrNull { (it as? PosterHomeRow)?.section?.items?.firstOrNull() }
         }
     }
-    // The last focused card (row key and item id), kept across visits to a
-    // title's page so coming back puts focus right where it was.
-    var lastFocus by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
-    var restorePending by remember { mutableStateOf(true) }
     val rowFocus = remember { mutableMapOf<String, androidx.compose.ui.focus.FocusRequester>() }
     var cardMenuTarget by remember { mutableStateOf<CardMenuTarget?>(null) }
     var comingSoonMenuTarget by remember { mutableStateOf<com.jellio.tv.data.model.CalendarEntryDto?>(null) }
@@ -165,7 +169,10 @@ fun HomeScreen(
             uiState.error != null -> com.jellio.tv.ui.common.ErrorState(
                 message = com.jellio.tv.ui.i18n.string("home_load_error"),
                 failure = uiState.error,
-                onRetry = { viewModel.retry(session) },
+                onRetry = {
+                    restorePending = true
+                    viewModel.retry(session)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             uiState.rows.isEmpty() && !uiState.loadingMore -> {
@@ -326,7 +333,10 @@ fun HomeScreen(
                             item(key = "rows_error") {
                                 com.jellio.tv.ui.common.InlineErrorState(
                                     message = com.jellio.tv.ui.i18n.string("rows_load_error"),
-                                    onRetry = { viewModel.retry(session) },
+                                    onRetry = {
+                                        restorePending = true
+                                        viewModel.retry(session)
+                                    },
                                     modifier = Modifier.padding(start = 48.dp, top = 8.dp, bottom = 8.dp),
                                 )
                             }

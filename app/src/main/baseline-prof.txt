@@ -54,3 +54,16 @@ Lcoil3/ImageLoader;
 Lcoil3/SingletonImageLoader;
 Lcoil3/request/ImageRequest;
 Lcoil3/compose/AsyncImageKt;
+
+# Quick Hub & Overlays
+Lcom/jellio/tv/ui/hub/QuickHubKt;
+Lcom/jellio/tv/ui/hub/QuickHubViewModel;
+Lcom/jellio/tv/ui/nowplaying/NowPlayingPillKt;
+
+# Live TV Playback
+Lcom/jellio/tv/ui/live/LivePlayerScreenKt;
+Lcom/jellio/tv/ui/live/LivePlayerViewModel;
+
+# Subtitles & Preferences
+Lcom/jellio/tv/ui/player/SubtitlesKt;
+Lcom/jellio/tv/data/prefs/SubtitleStylePreferences;

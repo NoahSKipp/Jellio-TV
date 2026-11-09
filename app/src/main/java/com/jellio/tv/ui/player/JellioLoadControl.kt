@@ -61,13 +61,18 @@ fun buildLoadControl(level: String): LoadControl {
             pausedMaxUs = 10L * 60 * 1_000_000,
             pausedBytes = capped(640, 0.5),
         )
-        else -> DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                /* minBufferMs = */ 15_000,
-                /* maxBufferMs = */ 50_000,
-                /* bufferForPlaybackMs = */ 1_000,
-                /* bufferForPlaybackAfterRebufferMs = */ 2_500,
-            )
-            .build()
+        else -> {
+            val defaultTargetBytes = capped(96, 0.25).toInt()
+            DefaultLoadControl.Builder()
+                .setAllocator(DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE))
+                .setTargetBufferBytes(defaultTargetBytes)
+                .setBufferDurationsMs(
+                    /* minBufferMs = */ 15_000,
+                    /* maxBufferMs = */ 50_000,
+                    /* bufferForPlaybackMs = */ 1_000,
+                    /* bufferForPlaybackAfterRebufferMs = */ 2_500,
+                )
+                .build()
+        }
     }
 }
