@@ -96,7 +96,22 @@ fun PlayerScreen(
             viewModel.onScreenDisposed()
         }
     }
-    val frameRateActivity = LocalContext.current as? android.app.Activity
+    val context = LocalContext.current
+    val httpDataSourceFactory = remember(session.accessToken) {
+        streamDataSourceFactory(viewModel.streamClient, viewModel.deviceId, session.accessToken)
+    }
+    // The player is built while PlaybackInfo loads, after the loading art's
+    // first frame, and handed to the surface once the stream URL is known.
+    val prebuiltPlayer = remember { PrebuiltPlayer() }
+    LaunchedEffect(Unit) {
+        androidx.compose.runtime.withFrameNanos { }
+        if (!prebuiltPlayer.wanted) return@LaunchedEffect
+        prebuiltPlayer.offer(buildStreamPlayer(context, httpDataSourceFactory))
+    }
+    DisposableEffect(Unit) {
+        onDispose { prebuiltPlayer.release() }
+    }
+    val frameRateActivity = context as? android.app.Activity
     LaunchedEffect(uiState.videoFrameRate) {
         val fps = uiState.videoFrameRate
         if (frameRateActivity != null && fps != null && PlayerPrefs.matchFrameRate) {
@@ -125,8 +140,8 @@ fun PlayerScreen(
             }
             uiState.streamUrl != null -> PlayerSurface(
                 session = session,
-                deviceId = viewModel.deviceId,
-                streamClient = viewModel.streamClient,
+                httpDataSourceFactory = httpDataSourceFactory,
+                prebuiltPlayer = prebuiltPlayer,
                 streamUrl = uiState.streamUrl!!,
                 startPositionTicks = uiState.startPositionTicks,
                 resumePercent = uiState.resumePercent,
@@ -219,8 +234,7 @@ fun PlayerScreen(
 @Composable
 internal fun PlayerSurface(
     session: Session,
-    deviceId: String,
-    streamClient: okhttp3.Call.Factory,
+    httpDataSourceFactory: androidx.media3.datasource.DataSource.Factory,
     streamUrl: String,
     startPositionTicks: Long,
     resumePercent: Int?,
@@ -279,6 +293,7 @@ internal fun PlayerSurface(
     onPlaybackStarted: () -> Unit = {},
     onPlayStartTraced: (PlayStartRun) -> Unit = {},
     remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager? = null,
+    prebuiltPlayer: PrebuiltPlayer? = null,
 ) {
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
@@ -305,10 +320,6 @@ internal fun PlayerSurface(
 
     val activeSideloadedTrack = subtitleTracks.firstOrNull {
         it.streamIndex == selectedSubtitleIndex && it.isTextBased && it.url != null && (!directPlay || it.isExternal)
-    }
-
-    val httpDataSourceFactory = remember(session.accessToken, streamClient) {
-        streamDataSourceFactory(streamClient, deviceId, session.accessToken)
     }
 
     // Audio and subtitle sync, read by SyncDelayMediaSource as samples are read.
@@ -369,34 +380,7 @@ internal fun PlayerSurface(
     }
 
     val player = remember(streamUrl) {
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-            .build()
-        val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(httpDataSourceFactory)
-
-        val audioSink = DefaultAudioSink.Builder(context)
-            .setAudioCapabilities(
-                if (PlayerPrefs.audioPassthrough) {
-                    AudioCapabilities.getCapabilities(context)
-                } else {
-                    AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES
-                }
-            )
-            .build()
-        val renderersFactory = object : DefaultRenderersFactory(context) {
-            @OptIn(UnstableApi::class)
-            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
-                return audioSink
-            }
-        }
-
-        ExoPlayer.Builder(context, renderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
-            .setAudioAttributes(audioAttributes, true)
-            .build().apply {
+        (prebuiltPlayer?.take() ?: buildStreamPlayer(context, httpDataSourceFactory)).apply {
             // Direct play opens at the resume point instead of buffering
             // from 0:00 and seeking once the duration is known.
             val resumeMs = if (directPlay && startPositionTicks > 0) startPositionTicks / TICKS_PER_MS else 0L
@@ -1665,4 +1649,58 @@ private object FirstByteListener : androidx.media3.datasource.TransferListener {
     override fun onBytesTransferred(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean, bytesTransferred: Int) {}
 
     override fun onTransferEnd(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean) {}
+}
+
+// Renderers, audio sink and load control; the media goes in once the URL is known.
+@OptIn(UnstableApi::class)
+internal fun buildStreamPlayer(context: Context, dataSourceFactory: androidx.media3.datasource.DataSource.Factory): ExoPlayer {
+    val audioAttributes = AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+        .build()
+    val mediaSourceFactory = DefaultMediaSourceFactory(context)
+        .setDataSourceFactory(dataSourceFactory)
+    val audioSink = DefaultAudioSink.Builder(context)
+        .setAudioCapabilities(
+            if (PlayerPrefs.audioPassthrough) {
+                AudioCapabilities.getCapabilities(context)
+            } else {
+                AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES
+            }
+        )
+        .build()
+    val renderersFactory = object : DefaultRenderersFactory(context) {
+        override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink {
+            return audioSink
+        }
+    }
+    return ExoPlayer.Builder(context, renderersFactory)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .setLoadControl(buildLoadControl(PlayerPrefs.prebuffer))
+        .setAudioAttributes(audioAttributes, true)
+        .build()
+}
+
+// Holds the player built ahead for the first stream. Whoever takes it
+// releases it; one never taken is released with the screen. Main thread only.
+internal class PrebuiltPlayer {
+    private var player: ExoPlayer? = null
+    private var done = false
+
+    val wanted: Boolean get() = !done
+
+    fun offer(built: ExoPlayer) {
+        if (done) built.release() else player = built
+    }
+
+    fun take(): ExoPlayer? {
+        done = true
+        return player.also { player = null }
+    }
+
+    fun release() {
+        done = true
+        player?.release()
+        player = null
+    }
 }
