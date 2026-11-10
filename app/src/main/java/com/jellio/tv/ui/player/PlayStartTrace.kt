@@ -85,6 +85,8 @@ fun playStartRecord(
     val after = run.marks.dropWhile { it !== open }
     fun stage(step: String): Int? = after.firstOrNull { it.step == step }?.let { (it.at - open.at).coerceAtLeast(0L).toInt() }
     val firstFrame = after.lastOrNull { it.step == "first frame" } ?: return null
+    // Same meaning as the web client: TotalMs counts from player open, like every stage.
+    val firstFrameMs = (firstFrame.at - open.at).coerceAtLeast(0L).toInt()
     val trigger = when {
         open.detail == "failover" -> "failover"
         run.begunFrom == "title page" -> "detail"
@@ -107,8 +109,8 @@ fun playStartRecord(
             PlaybackInfoMs = stage("playback info"),
             PlayerReadyMs = stage("player ready"),
             FirstByteMs = stage("first byte"),
-            FirstFrameMs = (firstFrame.at - open.at).coerceAtLeast(0L).toInt(),
+            FirstFrameMs = firstFrameMs,
         ),
-        TotalMs = (firstFrame.at - run.startedAt).coerceAtLeast(0L).toInt(),
+        TotalMs = firstFrameMs,
     )
 }

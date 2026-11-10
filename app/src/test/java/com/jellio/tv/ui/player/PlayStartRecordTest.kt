@@ -38,7 +38,7 @@ class PlayStartRecordTest {
         assertEquals(1_400, record.Stages.PlayerReadyMs)
         assertEquals(900, record.Stages.FirstByteMs)
         assertEquals(1_500, record.Stages.FirstFrameMs)
-        assertEquals(2_000, record.TotalMs)
+        assertEquals(1_500, record.TotalMs)
     }
 
     @Test
@@ -93,7 +93,7 @@ class PlayStartRecordTest {
         assertEquals(400, record.Stages.PlaybackInfoMs)
         assertNull(record.Stages.FirstByteMs)
         assertEquals(1_000, record.Stages.FirstFrameMs)
-        assertEquals(5_000, record.TotalMs)
+        assertEquals(1_000, record.TotalMs)
     }
 
     @Test
