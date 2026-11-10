@@ -31,7 +31,7 @@ android {
         applicationId = "com.jellio.tv"
         minSdk = 24
         targetSdk = 36
-        versionName = "0.85.0" // Quick Hub upward focus navigation polish
+        versionName = "1.0.0"
         versionCode = versionCodeOf(versionName!!)
     }
 
