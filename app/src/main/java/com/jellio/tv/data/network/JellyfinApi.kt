@@ -178,6 +178,9 @@ interface JellyfinApi {
     @POST("Sessions/Playing")
     suspend fun reportPlaybackStart(@Body body: PlaybackReportRequest)
 
+    @POST("Jellio/playback/start")
+    suspend fun reportPlayStart(@Body body: com.jellio.tv.data.model.PlayStartRecord): retrofit2.Response<Unit>
+
     @POST("Sessions/Playing/Progress")
     suspend fun reportPlaybackProgress(@Body body: PlaybackReportRequest)
 

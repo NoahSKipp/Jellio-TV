@@ -440,6 +440,7 @@ class PlayerViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             _uiState.value = PlayerUiState(isLoading = true)
             PlayStartTrace.mark(itemId, "player open", if (fromFailover) "failover" else "source=${mediaSourceId ?: "default"}")
+            warmAtOpen = repository.recentWarmSources(itemId)
             try {
                 val prewarmed = if (mediaSourceId == null && !fromFailover && prewarmedPlayback?.itemId == itemId) {
                     prewarmedPlayback.also { prewarmedPlayback = null }
@@ -1098,6 +1099,16 @@ class PlayerViewModel @Inject constructor(
             rating = episode.CommunityRating?.let { "%.1f".format(it) },
             overview = episode.Overview,
         )
+    }
+
+    private var warmAtOpen: Set<String>? = null
+
+    fun reportPlayStart(run: PlayStartRun) {
+        val state = _uiState.value
+        val sourceId = state.mediaSourceId
+        val warm = warmAtOpen?.let { seen -> sourceId?.let { com.jellio.tv.data.streams.normalizeSourceId(it) in seen } }
+        val record = playStartRecord(run, sourceId, state.directPlay, warm, state.startPositionTicks) ?: return
+        repository.reportPlayStart(record)
     }
 
     fun reportStart(positionTicks: Long) {

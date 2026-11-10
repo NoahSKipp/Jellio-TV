@@ -178,7 +178,11 @@ fun PlayerScreen(
                     if (seriesId != null) viewModel.loadSeasonEpisodes(session, seriesId, seasonId)
                 },
                 onRestart = { viewModel.restart(session) },
-                onPlayNext = onPlayNext,
+                onPlayNext = { nextId ->
+                    PlayStartTrace.begin(if (nextId == uiState.upNextInfo?.itemId) "next episode" else "player")
+                    onPlayNext(nextId)
+                },
+                onPlayStartTraced = { viewModel.reportPlayStart(it) },
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },
                 onCancelSleepTimer = { viewModel.cancelSleepTimer() },
                 onShowToast = { message -> viewModel.showToast(message) },
@@ -273,6 +277,7 @@ internal fun PlayerSurface(
     onStreamFailed: (String) -> Unit = {},
     onPlaceholder: (PlaceholderSign) -> Unit = {},
     onPlaybackStarted: () -> Unit = {},
+    onPlayStartTraced: (PlayStartRun) -> Unit = {},
     remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager? = null,
 ) {
     val context = LocalContext.current
@@ -780,7 +785,7 @@ internal fun PlayerSurface(
             override fun onRenderedFirstFrame() {
                 if (bufferWatch.firstFrameAt == 0L) bufferWatch.firstFrameAt = System.currentTimeMillis()
                 if (placeholderWatch.firstFrameAt == 0L) placeholderWatch.firstFrameAt = System.currentTimeMillis()
-                PlayStartTrace.end("first frame")
+                PlayStartTrace.end("first frame")?.let(onPlayStartTraced)
                 if (currentSwitchingTo != null && currentSwitchingLoaded) {
                     currentSwitchSettled()
                 }
@@ -807,6 +812,7 @@ internal fun PlayerSurface(
                 exoError = friendlyPlaybackError(error)
             }
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) PlayStartTrace.markOnce("player ready")
                 isEnded = state == Player.STATE_ENDED
                 isBuffering = state == Player.STATE_BUFFERING || (state == Player.STATE_IDLE && exoError == null)
                 if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs) && !stoppedTooEarly(realPositionMs(), expectedRuntimeMs)) {
@@ -1639,9 +1645,24 @@ internal fun PlayerSurface(
 internal fun streamDataSourceFactory(client: okhttp3.Call.Factory, deviceId: String, accessToken: String): OkHttpDataSource.Factory =
     OkHttpDataSource.Factory(client)
         .setUserAgent("Jellio-TV/$APP_VERSION")
+        .setTransferListener(FirstByteListener)
         .setDefaultRequestProperties(
             mapOf(
                 "X-Emby-Token" to accessToken,
                 "Authorization" to buildEmbyAuthorizationHeader(deviceId, APP_VERSION, accessToken),
             )
         )
+
+// Marks the first response of the video stream itself, not a side-loaded subtitle.
+@OptIn(UnstableApi::class)
+private object FirstByteListener : androidx.media3.datasource.TransferListener {
+    override fun onTransferInitializing(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean) {}
+
+    override fun onTransferStart(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean) {
+        if (isNetwork && dataSpec.uri.path?.contains("/stream.", ignoreCase = true) == true) PlayStartTrace.markOnce("first byte")
+    }
+
+    override fun onBytesTransferred(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean, bytesTransferred: Int) {}
+
+    override fun onTransferEnd(source: androidx.media3.datasource.DataSource, dataSpec: androidx.media3.datasource.DataSpec, isNetwork: Boolean) {}
+}

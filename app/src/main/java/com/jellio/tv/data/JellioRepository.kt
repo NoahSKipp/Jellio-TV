@@ -78,6 +78,7 @@ import javax.inject.Singleton
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 private const val PREFETCH_SLOT_WAIT_MS = 3_000L
 private const val PREWARM_RANGE_BYTES = 64L * 1024
+private const val WARM_SEEN_TTL_MS = 10 * 60_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
@@ -1766,7 +1767,16 @@ class JellioRepository @Inject constructor(
     suspend fun getWarmSources(itemId: String): Map<String, String>? = catching {
         val response = api.getWarmSources(itemId)
         if (response.isSuccessful) response.body().orEmpty() else null
-    }.getOrNull()
+    }.getOrNull()?.also { warm ->
+        if (warmSeen.size > 64) warmSeen.clear()
+        warmSeen[itemId] = System.currentTimeMillis() to warm.keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet()
+    }
+
+    private val warmSeen = ConcurrentHashMap<String, Pair<Long, Set<String>>>()
+
+    // The title's warm sources as last asked, if that was recent; no request.
+    fun recentWarmSources(itemId: String): Set<String>? =
+        warmSeen[itemId]?.takeIf { System.currentTimeMillis() - it.first < WARM_SEEN_TTL_MS }?.second
 
     suspend fun getQualityTiers(itemId: String): Map<String, String> = catching {
         val response = api.getQualityTiers(itemId)
@@ -2206,6 +2216,11 @@ class JellioRepository @Inject constructor(
         catching {
             api.reportPlaybackStart(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
         }
+    }
+
+    // Fire and forget: an older plugin answers 404, and nothing waits on it.
+    fun reportPlayStart(record: com.jellio.tv.data.model.PlayStartRecord) {
+        prefetchScope.launch { catching { api.reportPlayStart(record) } }
     }
 
     suspend fun reportPlaybackProgress(itemId: String, mediaSourceId: String?, positionTicks: Long, isPaused: Boolean) {
