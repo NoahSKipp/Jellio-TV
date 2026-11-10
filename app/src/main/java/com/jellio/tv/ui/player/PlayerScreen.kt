@@ -399,31 +399,7 @@ internal fun PlayerSurface(
         }
     }
 
-    DisposableEffect(player, PlayerPrefs.dialogueBoost) {
-        val sessionId = player.audioSessionId
-        val loudnessEnhancer = if (sessionId != C.AUDIO_SESSION_ID_UNSET && PlayerPrefs.dialogueBoost) {
-            runCatching {
-                android.media.audiofx.LoudnessEnhancer(sessionId).apply {
-                    setTargetGain(600)
-                    enabled = true
-                }
-            }.getOrNull()
-        } else {
-            null
-        }
-        onDispose { runCatching { loudnessEnhancer?.release() } }
-    }
-
-    DisposableEffect(player) {
-        val mediaSession = MediaSession.Builder(context, player).build()
-        onDispose { mediaSession.release() }
-    }
-
-    // Turned down while a sound sent from the dashboard plays.
-    LaunchedEffect(player) {
-        androidx.compose.runtime.snapshotFlow { com.jellio.tv.ui.announce.PlaybackDuck.level }
-            .collect { player.volume = it }
-    }
+    PlayerAudioEffects(player)
 
     var isPlaying by remember(player) { mutableStateOf(false) }
     var playWhenReadyState by remember(streamUrl) { mutableStateOf(!showResumePrompt) }
@@ -596,40 +572,9 @@ internal fun PlayerSurface(
         }
     }
 
-    LaunchedEffect(player, remoteControlManager) {
-        val manager = remoteControlManager ?: return@LaunchedEffect
-        manager.generalCommands.collectLatest { command ->
-            when (command.name.lowercase()) {
-                "volumeup" -> {
-                    player.volume = (player.volume + 0.1f).coerceAtMost(1f)
-                }
-                "volumedown" -> {
-                    player.volume = (player.volume - 0.1f).coerceAtLeast(0f)
-                }
-                "mute" -> {
-                    player.volume = 0f
-                }
-                "unmute" -> {
-                    player.volume = 1f
-                }
-                "togglemute" -> {
-                    player.volume = if (player.volume > 0f) 0f else 1f
-                }
-                "setvolume" -> {
-                    command.arguments["Volume"]?.toFloatOrNull()?.let { v ->
-                        player.volume = (v / 100f).coerceIn(0f, 1f)
-                    }
-                }
-            }
-        }
-    }
+    RemoteVolumeCommands(player, remoteControlManager)
 
-    // Cleared when the player closes, so a party's countdown and ready
-    // check don't carry over to other screens.
-    DisposableEffect(syncPlaylistItemId) {
-        groupWatch.party.setPlaylistItem(syncPlaylistItemId)
-        onDispose { groupWatch.party.setPlaylistItem(null) }
-    }
+    PartyPlaylistItemEffect(groupWatch.party, syncPlaylistItemId)
 
     // Joining a group well into its title: follow it, or start from the
     // beginning alone. Picks the group after a few seconds by itself.
