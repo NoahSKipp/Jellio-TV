@@ -123,7 +123,6 @@ private val KNOWN_ANTHOLOGIES = listOf(
     "american horror stories",
 )
 
-private const val WATCHLIST_EPISODE_FIELDS = "Overview,PremiereDate,EndDate,UserData,ParentIndexNumber,IndexNumber"
 
 sealed interface LoginResult {
     data object Success : LoginResult
@@ -1688,88 +1687,7 @@ class JellioRepository @Inject constructor(
     suspend fun setPlayed(userId: String, itemId: String, played: Boolean): UserItemDataDto {
         val result = if (played) api.markPlayed(userId, itemId) else api.markUnplayed(userId, itemId)
         cache.clear()
-        if (played) {
-            catching { maybeRemoveFromWatchlistAfterWatching(userId, itemId) }
-        }
         return result
-    }
-
-    private suspend fun isItemWatchlisted(userId: String, item: BaseItemDto): Boolean {
-        if (item.UserData?.IsFavorite == true) return true
-        val watchlistItems = catching { getWatchlistItems(userId) }.getOrNull()
-        return watchlistItems?.any { it.Id == item.Id } == true
-    }
-
-    private suspend fun maybeRemoveFromWatchlistAfterWatching(userId: String, itemId: String): Set<String> {
-        if (!isRemoveFromWatchlistAfterWatchingEnabled()) return emptySet()
-        val item = catching { getItemDetails(userId, itemId) }.getOrNull() ?: return emptySet()
-        val removedIds = mutableSetOf<String>()
-
-        when (item.Type) {
-            "Movie" -> {
-                if (isMovieWatchlistRemovalEligible(item, isItemWatchlisted(userId, item))) {
-                    removeFromWatchlist(userId, item.Id, removedIds)
-                }
-            }
-            "Episode" -> {
-                if (isItemWatchlisted(userId, item)) {
-                    removeFromWatchlist(userId, item.Id, removedIds)
-                }
-                removeSeriesIfFinished(userId, item.SeriesId, null, itemId, removedIds)
-            }
-            "Series" -> removeSeriesIfFinished(userId, item.Id, item, itemId, removedIds)
-            "Season" -> {
-                if (isItemWatchlisted(userId, item)) {
-                    val seasonEpisodes = catching {
-                        api.getEpisodes(item.SeriesId ?: "", userId, seasonId = item.Id, fields = WATCHLIST_EPISODE_FIELDS).Items
-                    }.getOrDefault(emptyList())
-                    if (seasonEpisodes.isNotEmpty() &&
-                        seasonEpisodes.none { isUnreleasedItem(it) } &&
-                        seasonEpisodes.all { it.Id == itemId || it.UserData?.Played == true }
-                    ) {
-                        removeFromWatchlist(userId, item.Id, removedIds)
-                    }
-                }
-                removeSeriesIfFinished(userId, item.SeriesId, null, itemId, removedIds)
-            }
-        }
-
-        if (removedIds.isNotEmpty()) {
-            _lastAutoRemovedWatchlistIds.value = removedIds
-        }
-        return removedIds
-    }
-
-    private suspend fun removeFromWatchlist(userId: String, itemId: String, removedIds: MutableSet<String>) {
-        catching { api.removeFavorite(userId, itemId) }
-        cache.invalidatePrefix("watchlist:$userId:")
-        removedIds.add(itemId)
-    }
-
-    // An ended series on the watchlist leaves it once every episode is watched.
-    // series is looked up by id when the caller does not have it.
-    private suspend fun removeSeriesIfFinished(
-        userId: String,
-        seriesId: String?,
-        series: BaseItemDto?,
-        watchedItemId: String,
-        removedIds: MutableSet<String>,
-    ) {
-        if (seriesId.isNullOrBlank()) return
-        val show = series ?: catching { getItemDetails(userId, seriesId) }.getOrNull() ?: return
-        val isFavorite = isItemWatchlisted(userId, show)
-        if (!isFavorite || !show.Status.equals("Ended", ignoreCase = true)) return
-        val allEpisodes = catching {
-            api.getEpisodes(seriesId, userId, seasonId = null, fields = WATCHLIST_EPISODE_FIELDS).Items
-        }.getOrElse {
-            val seasons = catching { getSeasons(seriesId, userId) }.getOrDefault(emptyList())
-            seasons.flatMap { season ->
-                catching { getEpisodes(seriesId, userId, season.Id) }.getOrDefault(emptyList())
-            }
-        }
-        if (isSeriesWatchlistRemovalEligible(series = show, episodes = allEpisodes, watchedItemId = watchedItemId, isFavorite = isFavorite)) {
-            removeFromWatchlist(userId, seriesId, removedIds)
-        }
     }
 
     suspend fun clearResumePosition(userId: String, itemId: String): UserItemDataDto {
