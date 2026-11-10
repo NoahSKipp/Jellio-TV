@@ -22,57 +22,37 @@ import com.jellio.tv.data.model.SetPrivacyRequest
 import com.jellio.tv.data.model.SleepTimerStartRequest
 import com.jellio.tv.data.model.SleepTimerStatusDto
 import com.jellio.tv.data.model.MediaStreamDto
-import com.jellio.tv.data.model.PlaybackInfoRequest
-import com.jellio.tv.data.model.PlaybackReportRequest
 import com.jellio.tv.data.model.UpdatePasswordRequest
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.model.WatchlistAutoRemoveRequest
-import com.jellio.tv.data.model.DepartmentTab
-import com.jellio.tv.data.model.PersonCreditItem
 import com.jellio.tv.data.model.RichPersonDetails
-import com.jellio.tv.data.model.TmdbPersonDetails
-import com.jellio.tv.data.model.TmdbPersonSearchResponse
 import com.jellio.tv.data.cache.lruMap
 import com.jellio.tv.data.network.JellyfinApi
-import com.jellio.tv.data.network.SharedHttp
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.jellio.tv.data.prefs.WatchlistPreferences
 import com.jellio.tv.data.recommend.CandidateEntry
 import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val PREFETCH_WINDOW_MS = 8 * 60_000L
-private const val PREFETCH_SLOT_WAIT_MS = 3_000L
-private const val PREWARM_RANGE_BYTES = 64L * 1024
-private const val WARM_SEEN_TTL_MS = 10 * 60_000L
-private const val FIRST_BYTES_RANGE_BYTES = 256L * 1024
-private const val FIRST_BYTES_GRACE_MS = 3_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
@@ -98,7 +78,6 @@ private const val SHOWCASE_FIELDS = "Overview,Genres,ProductionYear,RunTimeTicks
 private val ANIME_VIEW_NAME = Regex("anime", RegexOption.IGNORE_CASE)
 private val ANIME_COLLECTION_NAME = Regex("anime|anilist|kitsu", RegexOption.IGNORE_CASE)
 private val SPECIALS_SEASON_NAME = Regex("special", RegexOption.IGNORE_CASE)
-private val TRANSCODE_REASONS_PARAM = Regex("[?&]TranscodeReasons=([^&]*)", RegexOption.IGNORE_CASE)
 // Named because their genres rarely say so; episodes stand alone.
 private val KNOWN_ANTHOLOGIES = listOf(
     "black mirror",
@@ -120,7 +99,6 @@ private val KNOWN_ANTHOLOGIES = listOf(
     "tales from the loop",
     "american horror stories",
 )
-
 
 sealed interface LoginResult {
     data object Success : LoginResult
@@ -150,26 +128,15 @@ data class PlaybackTarget(
     val directPlay: Boolean,
 )
 
-private val DIRECT_PLAY_CONTAINERS = setOf("mp4", "webm", "m4v", "mkv", "m2ts", "ts", "avi")
-private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8", "vp9", "av1", "mpeg4")
-private val DIRECT_PLAY_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "ac3", "eac3", "dts", "truehd")
-
-private val SOFTWARE_AUDIO_CODECS = setOf("aac", "mp3", "opus", "vorbis", "flac", "pcm", "pcm_s16le", "pcm_s24le", "alac")
-
-private const val FALLBACK_VIDEO_BITRATE = 20000000L
-private const val COPY_RANGE_TYPES = "SDR,HDR10,HDR10Plus,HLG,DOVIWithHDR10,DOVIWithHLG,DOVIWithSDR,DOVIWithHDR10Plus"
-
-private const val FAILOVER_FIRST_TIMEOUT_SECONDS = 20
 private const val CACHE_TTL_MS = 60_000L
 private const val SHORT_CACHE_TTL_MS = 8_000L
-private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 // Same as the web row cache's genres/people class: a title's genre and
 // cast neighbours barely change, so Home refreshes reuse them.
 private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
 
 // Per-title hint maps (prefetch times, last stream lists, empty checks)
 // keep at most this many titles, least recently used dropped first.
-private const val MAX_HINTS = 500
+internal const val MAX_HINTS = 500
 
 internal class TtlCache {
     private data class Entry(val value: Any?, val expiresAt: Long)
@@ -220,28 +187,16 @@ class JellioRepository @Inject constructor(
     private val rememberedUsersStore: RememberedUsersStore,
     private val watchlistPreferences: WatchlistPreferences,
     private val subtitleStylePreferences: com.jellio.tv.data.prefs.SubtitleStylePreferences,
-    apiClient: okhttp3.OkHttpClient,
+    private val streams: StreamsRepository,
+    private val playback: PlaybackRepository,
+    private val config: JellioConfigRepository,
+    private val imageUrls: ImageUrls,
+    private val tmdbPeople: TmdbPeople,
+    private val prefetch: PrefetchScope,
 ) {
-    // Video streams on the API client's pool and trust settings, so a
-    // connection warmed by either is reused. Without its interceptors:
-    // stream URLs are absolute and carry their token, and a 401 from a
-    // stream must not end the session.
-    val streamClient: okhttp3.OkHttpClient by lazy {
-        apiClient.newBuilder()
-            .apply {
-                interceptors().clear()
-                networkInterceptors().clear()
-            }
-            // Its own dispatcher, so the player never queues behind API calls to the same host.
-            .dispatcher(okhttp3.Dispatcher())
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
-            .callTimeout(0, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-    }
+    val streamClient: okhttp3.OkHttpClient get() = playback.streamClient
 
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
-
 
     fun isRemoveFromWatchlistAfterWatchingEnabled(): Boolean =
         watchlistPreferences.isRemoveFromWatchlistAfterWatchingEnabled()
@@ -259,36 +214,21 @@ class JellioRepository @Inject constructor(
     val deviceId: String get() = sessionManager.getCachedDeviceId()
     internal val cache = TtlCache()
 
-    private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
-    private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
-    private val lastSources = lruMap<String, com.jellio.tv.data.streams.LastList<MediaSourceDto>>(MAX_HINTS)
-    private val prefetchedAt = lruMap<String, Long>(MAX_HINTS)
-    // One warm-up request to the server at a time, whoever asks.
-    private val prefetchSlots = java.util.concurrent.Semaphore(1)
-    // Titles the server said are already warm.
-    private val knownWarm = ConcurrentHashMap.newKeySet<String>()
     private val emptyTodayStreamCheckAt = lruMap<String, Long>(MAX_HINTS)
 
     fun clearCache() {
         // An earlier account's warm-ups must not refill the caches below.
-        prefetchScope.coroutineContext.cancelChildren()
-        queuedPrefetch = null
-        sourcesInFlight.clear()
+        prefetch.cancelAll()
+        streams.clear()
         cache.clear()
         preloaded.clear()
         recentLists.clear()
-        sourceCache.clear()
-        lastSources.clear()
-        prefetchedAt.clear()
         // Seen items carry the last account's watched state, and prefetched
         // playback its token in the stream URL.
         previews.clear()
         showcaseCache.clear()
-        playbackPrefetch.clear()
+        playback.clear()
         emptyTodayStreamCheckAt.clear()
-        knownWarm.clear()
     }
 
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
@@ -383,17 +323,11 @@ class JellioRepository @Inject constructor(
         }
     }
 
-    fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300, accessToken: String? = null): String {
-        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        val base = "$cleanServer/Users/$userId/Images/Primary?maxWidth=$maxWidth"
-        val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
-        return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
-    }
+    fun userImageUrl(serverAddress: String, userId: String, tag: String?, maxWidth: Int = 300, accessToken: String? = null): String =
+        imageUrls.userImageUrl(serverAddress, userId, tag, maxWidth, accessToken)
 
-    fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String {
-        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        return "$cleanServer/Jellio/profile/banner/$userId?ApiKey=$accessToken&api_key=$accessToken&t=${System.currentTimeMillis()}"
-    }
+    fun bannerUrl(serverAddress: String, accessToken: String, userId: String): String =
+        imageUrls.bannerUrl(serverAddress, accessToken, userId)
 
     suspend fun requestPasswordReset(serverAddress: String, username: String): Boolean {
         sessionManager.saveServerAddress(serverAddress)
@@ -876,7 +810,7 @@ class JellioRepository @Inject constructor(
             if (seriesId == null || recentSeasons(seriesId) != null) return
         }
         if (!preloadSlots.tryAcquire()) return
-        prefetchScope.launch {
+        prefetch.scope.launch {
             try {
                 val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
                 val item = existing ?: fetchItemInfo(userId, itemId, DETAIL_FIELDS).also {
@@ -906,7 +840,7 @@ class JellioRepository @Inject constructor(
 
     fun preloadEpisodeSeasonsInTurn(userId: String, episodes: List<BaseItemDto>) {
         if (episodes.isEmpty()) return
-        prefetchScope.launch {
+        prefetch.scope.launch {
             val seenSeasons = HashSet<String>()
             for (ep in episodes) {
                 val seriesId = ep.SeriesId ?: continue
@@ -950,24 +884,6 @@ class JellioRepository @Inject constructor(
             .associateBy { it.Id }
     }
 
-    private suspend fun <T> withRetry(maxAttempts: Int = 3, initialDelayMs: Long = 1000L, block: suspend () -> T): T {
-        var currentDelay = initialDelayMs
-        repeat(maxAttempts - 1) {
-            try {
-                return block()
-            } catch (e: Exception) {
-                val isTransient = (e is HttpException && e.code() in 500..504) || e is IOException
-                if (isTransient) {
-                    delay(currentDelay)
-                    currentDelay = (currentDelay * 1.5).toLong()
-                } else {
-                    throw e
-                }
-            }
-        }
-        return block()
-    }
-
     private suspend fun fetchItemInfo(userId: String, itemId: String, fields: String?): BaseItemDto =
         withRetry {
             catching {
@@ -998,312 +914,22 @@ class JellioRepository @Inject constructor(
 
             var tmdbId = person.ProviderIds?.get("Tmdb")?.toIntOrNull()
             if (tmdbId == null && !person.Name.isNullOrBlank()) {
-                tmdbId = searchTmdbPersonId(person.Name)
+                tmdbId = tmdbPeople.searchTmdbPersonId(person.Name)
             }
 
             if (tmdbId != null) {
-                val tmdbDetails = fetchTmdbPersonDetails(tmdbId)
+                val tmdbDetails = tmdbPeople.fetchTmdbPersonDetails(tmdbId)
                 if (tmdbDetails != null) {
-                    val result = buildRichPersonDetails(personId, person, tmdbDetails, localFilmography)
+                    val result = tmdbPeople.buildRichPersonDetails(personId, person, tmdbDetails, localFilmography)
                     seedPreviews(result.allCredits.map { it.baseItem })
                     return@get result
                 }
             }
 
-            val fallback = buildFallbackPersonDetails(personId, person, localFilmography)
+            val fallback = tmdbPeople.buildFallbackPersonDetails(personId, person, localFilmography)
             seedPreviews(fallback.allCredits.map { it.baseItem })
             fallback
         }
-
-    private val tmdbMoshi: Moshi by lazy {
-        Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
-    }
-
-    private suspend fun searchTmdbPersonId(name: String): Int? = withContext(Dispatchers.IO) {
-        catching {
-            val encodedName = java.net.URLEncoder.encode(name, "UTF-8")
-            val url = "https://api.themoviedb.org/3/search/person?api_key=4219e299c89411838049ab0dab19ebd5&query=$encodedName"
-            val request = okhttp3.Request.Builder().url(url).build()
-            SharedHttp.plainClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@catching null
-                val body = response.body?.string() ?: return@catching null
-                val adapter = tmdbMoshi.adapter(TmdbPersonSearchResponse::class.java)
-                adapter.fromJson(body)?.results?.firstOrNull()?.id
-            }
-        }.getOrNull()
-    }
-
-    private suspend fun fetchTmdbPersonDetails(tmdbId: Int): TmdbPersonDetails? = withContext(Dispatchers.IO) {
-        catching {
-            val url = "https://api.themoviedb.org/3/person/$tmdbId?api_key=4219e299c89411838049ab0dab19ebd5&append_to_response=combined_credits,external_ids"
-            val request = okhttp3.Request.Builder().url(url).build()
-            SharedHttp.plainClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@catching null
-                val body = response.body?.string() ?: return@catching null
-                val adapter = tmdbMoshi.adapter(TmdbPersonDetails::class.java)
-                adapter.fromJson(body)
-            }
-        }.getOrNull()
-    }
-
-    private fun buildRichPersonDetails(
-        personId: String,
-        person: BaseItemDto,
-        tmdb: TmdbPersonDetails,
-        localFilmography: List<BaseItemDto>,
-    ): RichPersonDetails {
-        val localByTmdb = localFilmography
-            .filter { !it.ProviderIds?.get("Tmdb").isNullOrBlank() }
-            .associateBy { it.ProviderIds!!["Tmdb"]!! }
-
-        val localByNameAndYear = localFilmography.associateBy {
-            normalizeTitleForMatching(it.Name.orEmpty()) + ":" + (it.ProductionYear ?: 0)
-        }
-
-        val allCredits = mutableListOf<PersonCreditItem>()
-
-        val castList = tmdb.combined_credits?.cast.orEmpty()
-        for (cast in castList) {
-            val title = cast.title ?: cast.name ?: continue
-            val mediaType = if (cast.media_type == "tv") "Series" else "Movie"
-            val releaseDate = cast.release_date ?: cast.first_air_date
-            val year = releaseDate?.split("-")?.firstOrNull()?.toIntOrNull()
-
-            val localItem = localByTmdb[cast.id.toString()]
-                ?: (if (year != null) localByNameAndYear[normalizeTitleForMatching(title) + ":" + year] else null)
-
-            val inLibrary = localItem != null
-            val creditId = localItem?.Id ?: generateDeterministicVirtualId(if (cast.media_type == "tv") "tv" else "movie", cast.id.toString())
-
-            val baseItem = localItem ?: BaseItemDto(
-                Id = creditId,
-                Name = title,
-                Type = mediaType,
-                ProductionYear = year,
-                PremiereDate = releaseDate,
-                Overview = cast.overview,
-                CommunityRating = cast.vote_average,
-                PrimaryImageTag = cast.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" },
-                BackdropImageTags = cast.backdrop_path?.let { listOf("https://image.tmdb.org/t/p/original$it") },
-                ProviderIds = mapOf("Tmdb" to cast.id.toString()),
-            )
-
-            allCredits.add(
-                PersonCreditItem(
-                    id = creditId,
-                    tmdbId = cast.id,
-                    title = title,
-                    mediaType = mediaType,
-                    year = year,
-                    releaseDate = releaseDate,
-                    role = cast.character?.takeIf { it.isNotBlank() },
-                    department = "Acting",
-                    overview = cast.overview,
-                    posterUrl = cast.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" },
-                    backdropUrl = cast.backdrop_path?.let { "https://image.tmdb.org/t/p/original$it" },
-                    rating = cast.vote_average,
-                    popularity = cast.popularity ?: 0.0,
-                    voteCount = cast.vote_count ?: 0,
-                    inLibrary = inLibrary,
-                    baseItem = baseItem,
-                )
-            )
-        }
-
-        val crewList = tmdb.combined_credits?.crew.orEmpty()
-        for (crew in crewList) {
-            val title = crew.title ?: crew.name ?: continue
-            val mediaType = if (crew.media_type == "tv") "Series" else "Movie"
-            val releaseDate = crew.release_date ?: crew.first_air_date
-            val year = releaseDate?.split("-")?.firstOrNull()?.toIntOrNull()
-
-            val dept = when (crew.department?.lowercase(java.util.Locale.US)) {
-                "directing" -> "Directing"
-                "writing" -> "Writing"
-                "production" -> "Production"
-                else -> "Other"
-            }
-
-            val localItem = localByTmdb[crew.id.toString()]
-                ?: (if (year != null) localByNameAndYear[normalizeTitleForMatching(title) + ":" + year] else null)
-
-            val inLibrary = localItem != null
-            val creditId = localItem?.Id ?: generateDeterministicVirtualId(if (crew.media_type == "tv") "tv" else "movie", crew.id.toString())
-
-            val baseItem = localItem ?: BaseItemDto(
-                Id = creditId,
-                Name = title,
-                Type = mediaType,
-                ProductionYear = year,
-                PremiereDate = releaseDate,
-                Overview = crew.overview,
-                CommunityRating = crew.vote_average,
-                PrimaryImageTag = crew.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" },
-                BackdropImageTags = crew.backdrop_path?.let { listOf("https://image.tmdb.org/t/p/original$it") },
-                ProviderIds = mapOf("Tmdb" to crew.id.toString()),
-            )
-
-            allCredits.add(
-                PersonCreditItem(
-                    id = creditId,
-                    tmdbId = crew.id,
-                    title = title,
-                    mediaType = mediaType,
-                    year = year,
-                    releaseDate = releaseDate,
-                    role = crew.job ?: crew.department,
-                    department = dept,
-                    overview = crew.overview,
-                    posterUrl = crew.poster_path?.let { "https://image.tmdb.org/t/p/w500$it" },
-                    backdropUrl = crew.backdrop_path?.let { "https://image.tmdb.org/t/p/original$it" },
-                    rating = crew.vote_average,
-                    popularity = crew.popularity ?: 0.0,
-                    voteCount = crew.vote_count ?: 0,
-                    inLibrary = inLibrary,
-                    baseItem = baseItem,
-                )
-            )
-        }
-
-        val dedupedCredits = allCredits
-            .groupBy { it.tmdbId.toString() + ":" + it.department }
-            .values
-            .map { list -> list.maxByOrNull { it.popularity } ?: list.first() }
-            .sortedByDescending { it.releaseDate ?: "${it.year ?: 0}" }
-
-        val knownFor = dedupedCredits
-            .distinctBy { it.tmdbId }
-            .sortedByDescending { (it.voteCount * (it.rating ?: 0.0)) + (it.popularity * 2.0) }
-            .take(10)
-
-        val bestBackdropUrl = knownFor.firstOrNull { !it.backdropUrl.isNullOrBlank() }?.backdropUrl
-            ?: dedupedCredits.firstOrNull { !it.backdropUrl.isNullOrBlank() }?.backdropUrl
-
-        val age = calculateAge(tmdb.birthday, tmdb.deathday)
-        val profileUrl = tmdb.profile_path?.let { "https://image.tmdb.org/t/p/h632$it" }
-
-        val uniqueTmdbCount = dedupedCredits.distinctBy { it.tmdbId }.size
-        val tabs = mutableListOf<DepartmentTab>()
-        tabs.add(DepartmentTab("All", com.jellio.tv.data.i18n.Strings.get("person_tab_all"), uniqueTmdbCount))
-
-        val actingCount = dedupedCredits.count { it.department == "Acting" }
-        if (actingCount > 0) {
-            tabs.add(DepartmentTab("Acting", com.jellio.tv.data.i18n.Strings.get("person_tab_acting"), actingCount))
-        }
-        val directingCount = dedupedCredits.count { it.department == "Directing" }
-        if (directingCount > 0) {
-            tabs.add(DepartmentTab("Directing", com.jellio.tv.data.i18n.Strings.get("person_tab_directing"), directingCount))
-        }
-        val writingCount = dedupedCredits.count { it.department == "Writing" }
-        if (writingCount > 0) {
-            tabs.add(DepartmentTab("Writing", com.jellio.tv.data.i18n.Strings.get("person_tab_writing"), writingCount))
-        }
-        val productionCount = dedupedCredits.count { it.department == "Production" }
-        if (productionCount > 0) {
-            tabs.add(DepartmentTab("Production", com.jellio.tv.data.i18n.Strings.get("person_tab_production"), productionCount))
-        }
-        val otherCount = dedupedCredits.count { it.department == "Other" }
-        if (otherCount > 0) {
-            tabs.add(DepartmentTab("Other", com.jellio.tv.data.i18n.Strings.get("person_tab_other"), otherCount))
-        }
-
-        return RichPersonDetails(
-            id = personId,
-            name = tmdb.name?.takeIf { it.isNotBlank() } ?: person.Name.orEmpty(),
-            biography = tmdb.biography?.takeIf { it.isNotBlank() } ?: person.Overview,
-            birthday = tmdb.birthday,
-            deathday = tmdb.deathday,
-            placeOfBirth = tmdb.place_of_birth,
-            age = age,
-            knownForDepartment = tmdb.known_for_department ?: "Acting",
-            profileUrl = profileUrl,
-            backdropUrl = bestBackdropUrl,
-            imdbId = tmdb.external_ids?.imdb_id ?: person.ProviderIds?.get("Imdb"),
-            tmdbId = tmdb.id,
-            totalCreditsCount = uniqueTmdbCount,
-            knownFor = knownFor,
-            allCredits = dedupedCredits,
-            departmentTabs = tabs,
-        )
-    }
-
-    private fun buildFallbackPersonDetails(
-        personId: String,
-        person: BaseItemDto,
-        localFilmography: List<BaseItemDto>,
-    ): RichPersonDetails {
-        val credits = localFilmography.map { item ->
-            val tmdbId = item.ProviderIds?.get("Tmdb")?.toIntOrNull() ?: 0
-            PersonCreditItem(
-                id = item.Id,
-                tmdbId = tmdbId,
-                title = item.Name.orEmpty(),
-                mediaType = item.Type ?: "Movie",
-                year = item.ProductionYear,
-                releaseDate = item.PremiereDate,
-                role = item.Type,
-                department = "Acting",
-                overview = item.Overview,
-                posterUrl = null,
-                backdropUrl = null,
-                rating = item.CommunityRating,
-                popularity = 0.0,
-                voteCount = 0,
-                inLibrary = true,
-                baseItem = item,
-            )
-        }
-        val knownFor = credits.take(10)
-        val tabs = listOf(
-            DepartmentTab("All", com.jellio.tv.data.i18n.Strings.get("person_tab_all"), credits.size),
-            DepartmentTab("Acting", com.jellio.tv.data.i18n.Strings.get("person_tab_acting"), credits.size),
-        )
-        return RichPersonDetails(
-            id = personId,
-            name = person.Name.orEmpty(),
-            biography = person.Overview,
-            birthday = null,
-            deathday = null,
-            placeOfBirth = null,
-            age = null,
-            knownForDepartment = "Acting",
-            profileUrl = null,
-            backdropUrl = null,
-            imdbId = person.ProviderIds?.get("Imdb"),
-            tmdbId = person.ProviderIds?.get("Tmdb")?.toIntOrNull(),
-            totalCreditsCount = credits.size,
-            knownFor = knownFor,
-            allCredits = credits,
-            departmentTabs = tabs,
-        )
-    }
-
-    private fun normalizeTitleForMatching(title: String): String =
-        title.lowercase(java.util.Locale.US).replace(Regex("[^a-z0-9]"), "")
-
-    private fun calculateAge(birthday: String?, deathday: String?): Int? {
-        if (birthday.isNullOrBlank()) return null
-        return runCatching {
-            val birthParts = birthday.split("-").mapNotNull { it.toIntOrNull() }
-            if (birthParts.size < 3) return@runCatching null
-            val birthCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
-                set(birthParts[0], birthParts[1] - 1, birthParts[2], 0, 0, 0)
-            }
-            val endCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
-                if (!deathday.isNullOrBlank()) {
-                    val deathParts = deathday.split("-").mapNotNull { it.toIntOrNull() }
-                    if (deathParts.size >= 3) {
-                        set(deathParts[0], deathParts[1] - 1, deathParts[2], 0, 0, 0)
-                    }
-                }
-            }
-            var age = endCal.get(java.util.Calendar.YEAR) - birthCal.get(java.util.Calendar.YEAR)
-            if (endCal.get(java.util.Calendar.DAY_OF_YEAR) < birthCal.get(java.util.Calendar.DAY_OF_YEAR)) {
-                age--
-            }
-            age.takeIf { it in 0..130 }
-        }.getOrNull()
-    }
 
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { withRetry { api.getSeasons(seriesId, userId).Items } }
@@ -1526,139 +1152,12 @@ class JellioRepository @Inject constructor(
         itemId: String,
         reason: String = "play",
         forceFresh: Boolean = false,
-    ): List<MediaSourceDto> {
-        // Stream lists are ranked and badged by it.
-        loadVideoTranscodePolicy()
-        if (!forceFresh) {
-            sourceCache.get(itemId, System.currentTimeMillis())?.let {
-                com.jellio.tv.data.streams.StreamLookupLog.cacheHit()
-                return it
-            }
-        }
-        val request = sourcesInFlight.computeIfAbsent(itemId) {
-            prefetchScope.async(start = kotlinx.coroutines.CoroutineStart.LAZY) {
-                val started = System.currentTimeMillis()
-                val sources = fetchMediaSources(userId, itemId)
-                if (sources.isNotEmpty()) {
-                    sourceCache.put(itemId, sources, System.currentTimeMillis())
-                    lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, System.currentTimeMillis())
-                }
-                com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
-                sources
-            }
-        }
-        request.start()
-        try {
-            return request.await()
-        } finally {
-            sourcesInFlight.remove(itemId, request)
-        }
-    }
+    ): List<MediaSourceDto> = streams.getMediaSources(userId, itemId, reason, forceFresh)
 
-    private val streamInfoNamePattern = Regex(
-        "(^|[^a-z0-9])(web-?dl|web-?rip|bluray|blu-ray|bdrip|brrip|remux|hdtv|hevc|[xh]\\.?265|[xh]\\.?264|avc|av1|vp9|hdr10?\\+?|dovi|dolby\\s?vision|hlg|10\\s?bit|aac|e?-?ac-?3|ddp|dd\\+|dts(-?hd|-?x)?|truehd|atmos|flac|l?pcm|[257]\\.[01]|dual[-.\\s]?audio|multi[-.\\s]?audio|\\d+(\\.\\d+)?\\s*(gb|mb|gib|mib|mbps|kbps))([^a-z0-9]|$)",
-        RegexOption.IGNORE_CASE,
-    )
+    suspend fun getFailoverSources(userId: String, itemId: String, fresh: Boolean = false): com.jellio.tv.data.streams.FailoverLoad<MediaSourceDto> =
+        streams.getFailoverSources(userId, itemId, fresh)
 
-    private fun hasFlagEmoji(text: String): Boolean {
-        if (text.isEmpty()) return false
-        val points = text.codePoints().toArray()
-        for (i in 0 until points.size - 1) {
-            val a = points[i]
-            val b = points[i + 1]
-            if (a in 0x1F1E6..0x1F1FF && b in 0x1F1E6..0x1F1FF) return true
-        }
-        return false
-    }
-
-    private fun isRealStreamValue(value: String?): Boolean {
-        val clean = value?.trim()?.lowercase() ?: return false
-        return clean.isNotEmpty() && clean != "unknown" && clean != "und"
-    }
-
-    private fun hasStreamInfo(source: MediaSourceDto): Boolean {
-        if (com.jellio.tv.data.streams.sourceQuality(source) != null) return true
-        if ((source.Size ?: 0L) >= 1024L * 1024L) return true
-
-        val hasProbedStream = source.MediaStreams?.any { s ->
-            when (s.Type) {
-                "Video" -> (s.Width ?: 0) > 0 || (s.Height ?: 0) > 0 || (s.BitRate ?: 0L) > 0L
-                "Audio" -> isRealStreamValue(s.Codec) || (s.Channels ?: 0) > 0 || isRealStreamValue(s.Language)
-                else -> false
-            }
-        } == true
-        if (hasProbedStream) return true
-
-        val name = source.Name.orEmpty()
-        if (streamInfoNamePattern.containsMatchIn(name)) return true
-        if (hasFlagEmoji(name)) return true
-
-        return false
-    }
-
-    // The other streams after one failed: a fresh list, then one retry with a
-    // longer timeout, then the last list loaded for the title. Errors are kept.
-    suspend fun getFailoverSources(userId: String, itemId: String, fresh: Boolean = false): com.jellio.tv.data.streams.FailoverLoad<MediaSourceDto> {
-        loadVideoTranscodePolicy()
-        return com.jellio.tv.data.streams.loadFailoverSources(lastSources[itemId], System::currentTimeMillis, skipRecent = fresh) { timeout ->
-            val started = System.currentTimeMillis()
-            val sources = fetchMediaSources(userId, itemId, timeout ?: FAILOVER_FIRST_TIMEOUT_SECONDS)
-            com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, "failover", sources.size, System.currentTimeMillis() - started)
-            if (sources.isNotEmpty()) {
-                val now = System.currentTimeMillis()
-                sourceCache.put(itemId, sources, now)
-                lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, now)
-            }
-            sources
-        }
-    }
-
-    suspend fun logFailover(body: com.jellio.tv.data.model.FailoverLogBody) {
-        catching { api.logFailover(body) }
-    }
-
-    private suspend fun fetchMediaSources(userId: String, itemId: String, readTimeoutSeconds: Int? = null): List<MediaSourceDto> {
-        val fields = "MediaSources,OriginalTitle,PremiereDate,ProductionYear"
-        val item = if (readTimeoutSeconds == null) {
-            withRetry { api.getItem(userId, itemId, fields = fields) }
-        } else {
-            api.getItem(userId, itemId, fields = fields, readTimeoutSeconds = readTimeoutSeconds)
-        }
-        val sources = item.MediaSources ?: emptyList()
-        if (sources.size == 1 && !hasStreamInfo(sources[0])) {
-            return emptyList()
-        }
-        val seenMultiLine = mutableMapOf<String, Int>()
-        val result = mutableListOf<MediaSourceDto>()
-        for (s in sources) {
-            val name = s.Name?.trim().orEmpty()
-            if (!name.contains("\n")) {
-                result.add(s)
-                continue
-            }
-            val existingIdx = seenMultiLine[name]
-            if (existingIdx != null) {
-                val existing = result[existingIdx]
-                val sHasProbed = s.MediaStreams?.any { it.Type == "Video" } == true
-                val exHasProbed = existing.MediaStreams?.any { it.Type == "Video" } == true
-                val merged = if (!sHasProbed && exHasProbed) {
-                    s.copy(
-                        MediaStreams = existing.MediaStreams,
-                        RunTimeTicks = s.RunTimeTicks ?: existing.RunTimeTicks,
-                        Size = s.Size ?: existing.Size,
-                        Container = s.Container ?: existing.Container,
-                    )
-                } else {
-                    s
-                }
-                result[existingIdx] = merged
-            } else {
-                seenMultiLine[name] = result.size
-                result.add(s)
-            }
-        }
-        return result
-    }
+    suspend fun logFailover(body: com.jellio.tv.data.model.FailoverLogBody) = streams.logFailover(body)
 
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
@@ -1695,164 +1194,21 @@ class JellioRepository @Inject constructor(
     suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
         if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
 
-    private fun isKnownWarm(itemId: String): Boolean =
-        knownWarm.contains(com.jellio.tv.data.streams.normalizeSourceId(itemId))
+    fun prefetchStreams(itemId: String) = streams.prefetchStreams(itemId)
 
-    fun prefetchStreams(itemId: String) {
-        val now = System.currentTimeMillis()
-        if (isKnownWarm(itemId) || hasRecentStreams(itemId, now)) return
-        prefetchedAt[itemId] = now
-        prefetchScope.launch {
-            // Waits its turn briefly; given up, a later dwell tries again.
-            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) {
-                prefetchedAt.remove(itemId)
-                return@launch
-            }
-            com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
-            try {
-                catching { api.prefetchGelatoStreams(itemId) }
-            } finally {
-                prefetchSlots.release()
-            }
-        }
-    }
+    fun prefetchStreamsBatch(itemIds: List<String>): kotlinx.coroutines.Job? = streams.prefetchStreamsBatch(itemIds)
 
-    // Warmed a short while ago, or its stream list is cached or loading.
-    private fun hasRecentStreams(itemId: String, now: Long): Boolean {
-        val last = prefetchedAt[itemId]
-        if (last != null && now - last < PREFETCH_WINDOW_MS) return true
-        return sourceCache.get(itemId, now) != null || sourcesInFlight.containsKey(itemId)
-    }
+    suspend fun getWarmSources(itemId: String): Map<String, String>? = streams.getWarmSources(itemId)
 
-    private suspend fun acquirePrefetchSlot(waitMs: Long): Boolean {
-        val until = System.currentTimeMillis() + waitMs
-        while (!prefetchSlots.tryAcquire()) {
-            if (System.currentTimeMillis() >= until) return false
-            delay(100)
-        }
-        return true
-    }
+    fun recentWarmSources(itemId: String): Set<String>? = streams.recentWarmSources(itemId)
 
-    // Stream lists only, a few titles in one call; the job is cancelled
-    // when the search that asked for it changes.
-    fun prefetchStreamsBatch(itemIds: List<String>): kotlinx.coroutines.Job? {
-        val ids = itemIds.filter { it.isNotBlank() && !isKnownWarm(it) }.distinct()
-        if (ids.isEmpty()) return null
-        return prefetchScope.launch {
-            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
-            try {
-                val response = catching {
-                    api.prefetchGelatoBatch(com.jellio.tv.data.model.PrefetchBatchRequest(ids, Probe = false))
-                }.getOrNull()
-                if (knownWarm.size > MAX_HINTS) knownWarm.clear()
-                response?.body()?.AlreadyWarm.orEmpty().forEach {
-                    knownWarm.add(com.jellio.tv.data.streams.normalizeSourceId(it))
-                }
-            } finally {
-                prefetchSlots.release()
-            }
-        }
-    }
+    suspend fun getQualityTiers(itemId: String): Map<String, String> = streams.getQualityTiers(itemId)
 
-    // { sourceId: warmedAt } for sources that start fast now; null when the
-    // server can't say.
-    suspend fun getWarmSources(itemId: String): Map<String, String>? = catching {
-        val response = api.getWarmSources(itemId)
-        if (response.isSuccessful) response.body().orEmpty() else null
-    }.getOrNull()?.also { warm ->
-        if (warmSeen.size > 64) warmSeen.clear()
-        warmSeen[itemId] = System.currentTimeMillis() to warm.keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet()
-    }
+    fun probeSource(userId: String, itemId: String, mediaSourceId: String) = streams.probeSource(userId, itemId, mediaSourceId)
 
-    private val warmSeen = ConcurrentHashMap<String, Pair<Long, Set<String>>>()
+    fun prefetchStreamsInTurn(itemIds: List<String>) = streams.prefetchStreamsInTurn(itemIds)
 
-    // The title's warm sources as last asked, if that was recent; no request.
-    fun recentWarmSources(itemId: String): Set<String>? =
-        warmSeen[itemId]?.takeIf { System.currentTimeMillis() - it.first < WARM_SEEN_TTL_MS }?.second
-
-    suspend fun getQualityTiers(itemId: String): Map<String, String> = catching {
-        val response = api.getQualityTiers(itemId)
-        if (response.isSuccessful) response.body().orEmpty() else emptyMap()
-    }.getOrDefault(emptyMap())
-
-    // The probe Play would run for one particular source, so picking it
-    // later starts fast.
-    fun probeSource(userId: String, itemId: String, mediaSourceId: String) {
-        prefetchScope.launch {
-            if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
-            try {
-                catching {
-                    api.getPlaybackInfo(itemId, PlaybackInfoRequest(UserId = userId, MediaSourceId = mediaSourceId))
-                }
-            } finally {
-                prefetchSlots.release()
-            }
-        }
-    }
-
-    private var queuedPrefetch: kotlinx.coroutines.Job? = null
-
-    // One title at a time, so a slot stays free for whatever gets focus.
-    fun prefetchStreamsInTurn(itemIds: List<String>) {
-        queuedPrefetch?.cancel()
-        queuedPrefetch = prefetchScope.launch {
-            for (itemId in itemIds) {
-                if (hasRecentStreams(itemId, System.currentTimeMillis())) continue
-                while (!prefetchSlots.tryAcquire()) delay(500)
-                prefetchedAt[itemId] = System.currentTimeMillis()
-                com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
-                try {
-                    catching { api.prefetchGelatoStreams(itemId) }
-                } finally {
-                    prefetchSlots.release()
-                }
-            }
-        }
-    }
-
-    // Pre-warms the stream connection and Usenet/nzbdav reader for the upcoming episode.
-    fun prewarmStreamUrl(streamUrl: String) {
-        prefetchScope.launch { warmStreamStart(streamUrl, PREWARM_RANGE_BYTES) }
-    }
-
-    // Reads the head of a stream through the player's client, so the
-    // connection sits warm in the shared pool and the origin has the start
-    // ready. Reading the whole range lets the connection go back to the pool.
-    private suspend fun warmStreamStart(streamUrl: String, bytes: Long) {
-        val request = okhttp3.Request.Builder()
-            .url(streamUrl)
-            .header("Range", "bytes=0-${bytes - 1}")
-            .header("Accept-Encoding", "identity")
-            .header("User-Agent", "Jellio-TV/${com.jellio.tv.data.network.APP_VERSION}")
-            .build()
-        val call = streamClient.newCall(request)
-        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
-            cont.invokeOnCancellation { call.cancel() }
-            call.enqueue(object : okhttp3.Callback {
-                override fun onFailure(call: okhttp3.Call, e: IOException) {
-                    cont.resumeWith(Result.success(Unit))
-                }
-
-                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                    runCatching {
-                        response.use {
-                            if (it.code != 200 && it.code != 206) return@use
-                            val source = it.body?.source() ?: return@use
-                            val sink = okio.Buffer()
-                            var left = bytes
-                            while (left > 0) {
-                                val read = source.read(sink, minOf(left, 64L * 1024))
-                                if (read < 0) break
-                                left -= read
-                                sink.clear()
-                            }
-                        }
-                    }
-                    cont.resumeWith(Result.success(Unit))
-                }
-            })
-        }
-    }
+    fun prewarmStreamUrl(streamUrl: String) = playback.prewarmStreamUrl(streamUrl)
 
     suspend fun getCalendarEntries(): List<CalendarEntryDto> = withRetry { api.getCalendarEntries() }
 
@@ -1895,36 +1251,12 @@ class JellioRepository @Inject constructor(
 
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 
-    suspend fun getJellioConfig(): ClientConfigDto? = catching { api.getJellioConfig() }.getOrNull()
-        ?.also { com.jellio.tv.data.playback.VideoTranscodePolicy.set(it.VideoTranscodePolicy) }
+    suspend fun getJellioConfig(): ClientConfigDto? = config.getJellioConfig()
 
-    // The admin's Video transcode policy, re-read every few minutes.
-    suspend fun loadVideoTranscodePolicy(): String {
-        if (!com.jellio.tv.data.playback.VideoTranscodePolicy.isFresh()) getJellioConfig()
-        return com.jellio.tv.data.playback.VideoTranscodePolicy.policy
-    }
+    suspend fun loadVideoTranscodePolicy(): String = config.loadVideoTranscodePolicy()
 
-    // One line in the Jellyfin log per playback: play method and why.
-    suspend fun logPlaybackDecision(itemId: String, mediaSource: MediaSourceDto, directPlay: Boolean) {
-        val policy = com.jellio.tv.data.playback.VideoTranscodePolicy
-        val classification = policy.classify(mediaSource)
-        val serverReasons = mediaSource.TranscodingUrl
-            ?.let { TRANSCODE_REASONS_PARAM.find(it)?.groupValues?.get(1) }
-            ?.let { catching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
-        catching {
-            api.logPlaybackDecision(
-                com.jellio.tv.data.model.PlaybackDecisionBody(
-                    ItemId = itemId,
-                    MediaSourceId = mediaSource.Id,
-                    PlayMethod = com.jellio.tv.data.playback.playMethodFor(classification, directPlay).name,
-                    Reasons = classification.reasons,
-                    ServerTranscodeReasons = serverReasons,
-                    Policy = policy.policy,
-                    Guessed = classification.guessed,
-                ),
-            )
-        }
-    }
+    suspend fun logPlaybackDecision(itemId: String, mediaSource: MediaSourceDto, directPlay: Boolean) =
+        playback.logPlaybackDecision(itemId, mediaSource, directPlay)
 
     suspend fun startSleepTimer(minutes: Int): SleepTimerStatusDto = api.startSleepTimer(SleepTimerStartRequest(minutes))
 
@@ -1994,11 +1326,8 @@ class JellioRepository @Inject constructor(
 
     suspend fun getAvatarPresets(): List<AvatarPresetDto> = api.getAvatarPresets()
 
-    private fun encodeAvatarId(id: String): String =
-        id.split("/").joinToString("/") { java.net.URLEncoder.encode(it, "UTF-8") }
-
     fun avatarPresetUrl(serverAddress: String, accessToken: String, id: String): String =
-        "$serverAddress/Jellio/avatars/${encodeAvatarId(id)}?ApiKey=$accessToken&api_key=$accessToken"
+        imageUrls.avatarPresetUrl(serverAddress, accessToken, id)
 
     suspend fun setUserAvatarFromPreset(userId: String, presetId: String) {
         val response = api.getAvatarPresetImage(encodeAvatarId(presetId))
@@ -2021,71 +1350,18 @@ class JellioRepository @Inject constructor(
         cache.invalidate("user:$userId")
     }
 
-    private class PrefetchedPlayback(val at: Long, val target: kotlinx.coroutines.Deferred<PlaybackTarget?>)
-    private val playbackPrefetch = ConcurrentHashMap<String, PrefetchedPlayback>()
+    fun prefetchPlayback(userId: String, itemId: String, mediaSourceId: String?, startTicks: Long) =
+        playback.prefetchPlayback(userId, itemId, mediaSourceId, startTicks)
 
-    private fun playbackKey(itemId: String, mediaSourceId: String?, startTicks: Long) = "$itemId|${mediaSourceId.orEmpty()}|$startTicks"
+    suspend fun awaitPrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? =
+        playback.awaitPrefetchedPlayback(itemId, mediaSourceId, startTicks)
 
-    fun prefetchPlayback(userId: String, itemId: String, mediaSourceId: String?, startTicks: Long) {
-        val now = System.currentTimeMillis()
-        playbackPrefetch.entries.removeIf { now - it.value.at > PLAYBACK_PREFETCH_TTL_MS }
-        val key = playbackKey(itemId, mediaSourceId, startTicks)
-        if (playbackPrefetch.containsKey(key)) return
-        playbackPrefetch[key] = PrefetchedPlayback(
-            now,
-            prefetchScope.async { catching { resolvePlayback(userId, itemId, mediaSourceId, startTicks) }.getOrNull() },
-        )
-    }
+    suspend fun warmFirstBytes(itemId: String, streamUrl: String) = playback.warmFirstBytes(itemId, streamUrl)
 
-    // The prefetched target without taking it, for warming its stream.
-    suspend fun awaitPrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? {
-        val entry = playbackPrefetch[playbackKey(itemId, mediaSourceId, startTicks)] ?: return null
-        return entry.target.await()
-    }
+    fun claimFirstBytesWarm(itemId: String) = playback.claimFirstBytesWarm(itemId)
 
-    private class FirstBytesWarm(val itemId: String, val job: kotlinx.coroutines.Job) {
-        @Volatile var claimed = false
-    }
-    private val firstBytesLock = Any()
-    private var firstBytes: FirstBytesWarm? = null
-
-    // One at a time, a newer title's replaces it. When the caller goes away
-    // (focus left, page closed) it ends after a short grace, unless the
-    // player opened that title meanwhile: then it finishes, so its
-    // connection goes back to the pool for the player.
-    suspend fun warmFirstBytes(itemId: String, streamUrl: String) {
-        val warm = synchronized(firstBytesLock) {
-            firstBytes?.job?.cancel()
-            FirstBytesWarm(itemId, prefetchScope.launch { warmStreamStart(streamUrl, FIRST_BYTES_RANGE_BYTES) })
-                .also { firstBytes = it }
-        }
-        try {
-            warm.job.join()
-        } finally {
-            if (warm.job.isActive) {
-                prefetchScope.launch {
-                    delay(FIRST_BYTES_GRACE_MS)
-                    if (!warm.claimed) warm.job.cancel()
-                }
-            }
-        }
-    }
-
-    fun claimFirstBytesWarm(itemId: String) {
-        synchronized(firstBytesLock) { firstBytes?.takeIf { it.itemId == itemId }?.claimed = true }
-    }
-
-    suspend fun takePrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? {
-        val now = System.currentTimeMillis()
-        val keys = listOf(playbackKey(itemId, mediaSourceId, startTicks), playbackKey(itemId, null, startTicks)).distinct()
-        for (key in keys) {
-            val entry = playbackPrefetch.remove(key) ?: continue
-            if (now - entry.at > PLAYBACK_PREFETCH_TTL_MS) continue
-            val target = entry.target.await() ?: continue
-            if (mediaSourceId == null || target.mediaSource.Id == mediaSourceId) return target
-        }
-        return null
-    }
+    suspend fun takePrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? =
+        playback.takePrefetchedPlayback(itemId, mediaSourceId, startTicks)
 
     suspend fun resolvePlayback(
         userId: String,
@@ -2096,178 +1372,39 @@ class JellioRepository @Inject constructor(
         audioStreamIndex: Int? = null,
         forceTranscode: Boolean = false,
         forceDirectPlay: Boolean = false,
-    ): PlaybackTarget {
-        val response = api.getPlaybackInfo(
-            itemId,
-            PlaybackInfoRequest(
-                UserId = userId,
-                StartTimeTicks = startTimeTicks,
-                MediaSourceId = mediaSourceId,
-                AudioStreamIndex = audioStreamIndex,
-                SubtitleStreamIndex = burnInSubtitleStreamIndex,
-            ),
-        )
-        val mediaSource = response.MediaSources.firstOrNull { it.Id == mediaSourceId }
-            ?: response.MediaSources.firstOrNull()
-            ?: if (mediaSourceId != null) {
-                throw com.jellio.tv.data.streams.SourceGoneException()
-            } else {
-                throw IllegalStateException("No playable source for this title")
-            }
+    ): PlaybackTarget = playback.resolvePlayback(
+        userId,
+        itemId,
+        mediaSourceId,
+        startTimeTicks,
+        burnInSubtitleStreamIndex,
+        audioStreamIndex,
+        forceTranscode,
+        forceDirectPlay,
+    )
 
-        val targetAudioStream = if (audioStreamIndex != null) {
-            mediaSource.MediaStreams?.firstOrNull { it.Type == "Audio" && it.Index == audioStreamIndex }
-        } else {
-            null
-        }
-        val audioNeedsTranscode = if (audioStreamIndex != null && audioStreamIndex != mediaSource.DefaultAudioStreamIndex) {
-            targetAudioStream == null || !canDirectPlayAudio(targetAudioStream.Codec)
-        } else {
-            false
-        }
-        val shouldTranscode = forceTranscode ||
-            burnInSubtitleStreamIndex != null ||
-            audioNeedsTranscode
-        val directPlay = forceDirectPlay || (!shouldTranscode && canDirectPlay(mediaSource, audioStreamIndex))
-        val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
-        val token = sessionManager.accessToken() ?: throw IllegalStateException("Not signed in")
-        val deviceId = sessionManager.deviceId()
-        val resolvedMediaSourceId = mediaSource.Id ?: itemId
-        val parsedContainer = normalizeStreamContainer(mediaSource.Container)
-        val container = if (directPlay) parsedContainer else "mp4"
+    fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> = playback.getAudioStreams(mediaSource)
 
-        val streamUrl = buildString {
-            append(serverAddress)
-            append("/Videos/").append(itemId).append("/stream.").append(container)
-            append("?MediaSourceId=").append(resolvedMediaSourceId)
-            append("&DeviceId=").append(deviceId)
-            append("&ApiKey=").append(token)
-            append("&api_key=").append(token)
-            append("&StartTimeTicks=").append(startTimeTicks)
-            response.PlaySessionId?.let { append("&PlaySessionId=").append(it) }
-            if (directPlay) {
-                append("&Static=true")
-            } else {
-                if (com.jellio.tv.data.playback.VideoTranscodePolicy.avoiding) {
-                    val codecs = com.jellio.tv.data.playback.copyableVideoCodecs(com.jellio.tv.data.playback.DeviceDecoderCaps)
-                    append("&VideoCodec=").append(codecs.joinToString(","))
-                    append("&AudioCodec=aac&AudioBitRate=192000")
-                    append("&AllowVideoStreamCopy=true&AllowAudioStreamCopy=true")
-                    val ranges = if (com.jellio.tv.data.playback.DeviceDecoderCaps.dolbyVision) "$COPY_RANGE_TYPES,DOVI" else COPY_RANGE_TYPES
-                    codecs.filter { it != "h264" }.forEach { codec ->
-                        append("&").append(codec).append("-videorangetype=").append(ranges)
-                    }
-                } else {
-                    append("&VideoCodec=h264&AudioCodec=aac")
-                    append("&VideoBitRate=").append(estimateVideoBitrate(mediaSource))
-                    append("&AudioBitRate=192000")
-                }
-            }
-            if (audioStreamIndex != null) {
-                append("&AudioStreamIndex=").append(audioStreamIndex)
-            }
-            if (burnInSubtitleStreamIndex != null) {
-                append("&SubtitleStreamIndex=").append(burnInSubtitleStreamIndex)
-                append("&SubtitleMethod=Encode")
-            }
-        }
+    suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto, offsetTicks: Long = 0): String =
+        playback.buildSubtitleUrl(itemId, mediaSourceId, stream, offsetTicks)
 
-        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks, directPlay)
-    }
+    internal fun canDirectPlayAudio(codec: String?): Boolean = playback.canDirectPlayAudio(codec)
 
-    fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =
-        mediaSource.MediaStreams?.filter { it.Type == "Audio" } ?: emptyList()
+    internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null, ignoreAudio: Boolean = false): Boolean =
+        playback.canDirectPlay(mediaSource, audioStreamIndex, ignoreAudio)
 
-    private fun estimateVideoBitrate(mediaSource: MediaSourceDto): Long {
-        val video = mediaSource.MediaStreams?.firstOrNull { it.Type == "Video" }
-        return video?.BitRate ?: mediaSource.Bitrate ?: FALLBACK_VIDEO_BITRATE
-    }
+    suspend fun reportPlaybackStart(itemId: String, mediaSourceId: String?, positionTicks: Long) =
+        playback.reportPlaybackStart(itemId, mediaSourceId, positionTicks)
 
-    suspend fun buildSubtitleUrl(itemId: String, mediaSourceId: String, stream: MediaStreamDto, offsetTicks: Long = 0): String {
-        val serverAddress = sessionManager.serverAddress() ?: throw IllegalStateException("Not signed in")
-        if (stream.DeliveryMethod == "External" && !stream.DeliveryUrl.isNullOrEmpty()) {
-            return if (stream.IsExternalUrl == true) stream.DeliveryUrl else serverAddress + stream.DeliveryUrl
-        }
-        val token = sessionManager.accessToken()
-        val base = if (offsetTicks > 0) {
-            "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/$offsetTicks/Stream.vtt"
-        } else {
-            "$serverAddress/Videos/$itemId/$mediaSourceId/Subtitles/${stream.Index}/Stream.vtt"
-        }
-        return if (!token.isNullOrEmpty()) "$base?ApiKey=$token&api_key=$token" else base
-    }
+    fun reportPlayStart(record: com.jellio.tv.data.model.PlayStartRecord) = playback.reportPlayStart(record)
 
-    internal fun canDirectPlayAudio(codec: String?): Boolean {
-        val c = codec?.lowercase() ?: return false
-        if (c in SOFTWARE_AUDIO_CODECS) return true
-        if (com.jellio.tv.data.prefs.PlayerPrefs.audioPassthrough && c in DIRECT_PLAY_AUDIO_CODECS) return true
-        val mimeType = when (c) {
-            "ac3" -> "audio/ac3"
-            "eac3" -> "audio/eac3"
-            else -> return false // DTS, TrueHD, etc. have no native software decoder in Android/Media3 without passthrough
-        }
-        return hasAudioDecoder.getOrPut(mimeType) {
-            try {
-                val list = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
-                list.codecInfos.any { info ->
-                    !info.isEncoder && info.supportedTypes.any { it.equals(mimeType, ignoreCase = true) }
-                }
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
+    suspend fun reportPlaybackProgress(itemId: String, mediaSourceId: String?, positionTicks: Long, isPaused: Boolean) =
+        playback.reportPlaybackProgress(itemId, mediaSourceId, positionTicks, isPaused)
 
-    // The decoder list is fixed for the device, and building it is slow
-    // enough to show when every stream of a title is checked.
-    private val hasAudioDecoder = ConcurrentHashMap<String, Boolean>()
+    suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) =
+        playback.reportPlaybackStopped(itemId, mediaSourceId, positionTicks)
 
-    // ignoreAudio: whether the picture and container alone can be played as is.
-    internal fun canDirectPlay(mediaSource: MediaSourceDto, audioStreamIndex: Int? = null, ignoreAudio: Boolean = false): Boolean {
-        if (mediaSource.SupportsDirectPlay != true) return false
-        val container = mediaSource.Container?.lowercase() ?: return false
-        if (container !in DIRECT_PLAY_CONTAINERS) return false
-
-        val streams = mediaSource.MediaStreams ?: emptyList()
-        val video = streams.firstOrNull { it.Type == "Video" }
-        val audioStreams = streams.filter { it.Type == "Audio" }
-        val targetAudioIndex = audioStreamIndex ?: mediaSource.DefaultAudioStreamIndex
-        val audio = if (targetAudioIndex != null) {
-            audioStreams.firstOrNull { it.Index == targetAudioIndex } ?: audioStreams.firstOrNull()
-        } else {
-            audioStreams.firstOrNull()
-        }
-        if (video != null && video.Codec?.lowercase() !in DIRECT_PLAY_VIDEO_CODECS) return false
-        if (!ignoreAudio && audio != null && !canDirectPlayAudio(audio.Codec)) return false
-        return true
-    }
-
-    suspend fun reportPlaybackStart(itemId: String, mediaSourceId: String?, positionTicks: Long) {
-        catching {
-            api.reportPlaybackStart(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
-        }
-    }
-
-    // Fire and forget: an older plugin answers 404, and nothing waits on it.
-    fun reportPlayStart(record: com.jellio.tv.data.model.PlayStartRecord) {
-        prefetchScope.launch { catching { api.reportPlayStart(record) } }
-    }
-
-    suspend fun reportPlaybackProgress(itemId: String, mediaSourceId: String?, positionTicks: Long, isPaused: Boolean) {
-        catching {
-            api.reportPlaybackProgress(PlaybackReportRequest(itemId, mediaSourceId, positionTicks, isPaused))
-        }
-    }
-
-    suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) {
-        catching {
-            api.reportPlaybackStopped(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
-        }
-    }
-
-    suspend fun reportCapabilities(): Result<Unit> = catching {
-        api.postCapabilities(com.jellio.tv.data.model.ClientCapabilitiesDto())
-    }
+    suspend fun reportCapabilities(): Result<Unit> = playback.reportCapabilities()
 
     fun imageUrl(
         serverAddress: String,
@@ -2276,18 +1413,8 @@ class JellioRepository @Inject constructor(
         imageType: String = "Primary",
         maxWidth: Int = 400,
         accessToken: String? = null,
-    ): String {
-        if (!tag.isNullOrEmpty() && (tag.startsWith("http://") || tag.startsWith("https://"))) {
-            return tag
-        }
-        if (itemId.startsWith("http://") || itemId.startsWith("https://")) {
-            return itemId
-        }
-        val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=85"
-        val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
-        return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
-    }
+    ): String = imageUrls.imageUrl(serverAddress, itemId, tag, imageType, maxWidth, accessToken)
+
 }
 
 internal fun normalizeStreamContainer(rawContainer: String?): String {

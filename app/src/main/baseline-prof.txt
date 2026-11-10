@@ -133,6 +133,9 @@ HSPLcom/jellio/tv/data/JellioRepository;->prefetchStreamsInTurn(**)**
 HSPLcom/jellio/tv/data/JellioRepository;->preloadEpisodeSeasonsInTurn(**)**
 HSPLcom/jellio/tv/data/JellioRepository$get*;->**(**)**
 HSPLcom/jellio/tv/data/TtlCache*;->**(**)**
+HSPLcom/jellio/tv/data/StreamsRepository*;->**(**)**
+HSPLcom/jellio/tv/data/ImageUrls;->**(**)**
+HSPLcom/jellio/tv/data/JellioConfigRepository*;->**(**)**
 
 # Moshi adapters for the Home DTOs
 HSPLcom/jellio/tv/data/model/BaseItemDtoJsonAdapter;->**(**)**
