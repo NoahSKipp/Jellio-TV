@@ -27,9 +27,21 @@ fun clearVerifiedTodayStreamIds() {
 
 private data class ParsedUtcDay(val year: Int, val epochMs: Long, val exactEpochMs: Long? = null)
 
+// The UTC day of the moment the date names, like the web client's
+// Date.getUTC*. A date without a time or zone is taken as that UTC day.
 private fun parseUtcDay(raw: String?): ParsedUtcDay? {
     if (raw.isNullOrBlank()) return null
-    val match = ISO_DATE_PREFIX.find(raw.trim()) ?: return null
+    val trimmed = raw.trim()
+    val exact = runCatching {
+        java.time.OffsetDateTime.parse(trimmed).toInstant().toEpochMilli()
+    }.recoverCatching {
+        java.time.Instant.parse(trimmed).toEpochMilli()
+    }.getOrNull()
+    if (exact != null) {
+        val day = java.time.Instant.ofEpochMilli(exact).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+        return ParsedUtcDay(day.year, day.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(), exact)
+    }
+    val match = ISO_DATE_PREFIX.find(trimmed) ?: return null
     val (yearStr, monthStr, dayStr) = match.destructured
     val year = yearStr.toIntOrNull() ?: return null
     val month = monthStr.toIntOrNull() ?: return null
@@ -39,11 +51,11 @@ private fun parseUtcDay(raw: String?): ParsedUtcDay? {
         set(year, month - 1, day, 0, 0, 0)
         set(Calendar.MILLISECOND, 0)
     }
-    val trimmed = raw.trim()
-    val exact = JellyfinDates.parseEpochMs(trimmed)
-    val exactEpochMs = if (exact != null && exact != cal.timeInMillis) exact else null
-    return ParsedUtcDay(year, cal.timeInMillis, exactEpochMs)
+    return ParsedUtcDay(year, cal.timeInMillis)
 }
+
+// PremiereDate, or EndDate when there is no readable PremiereDate.
+private fun itemDay(item: BaseItemDto): ParsedUtcDay? = parseUtcDay(item.PremiereDate) ?: parseUtcDay(item.EndDate)
 
 private fun utcMidnightMs(nowMs: Long): Long {
     val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
@@ -60,9 +72,7 @@ private fun utcMidnightMs(nowMs: Long): Long {
 // placeholder year, or a virtual item with no dates and no runtime.
 fun isUnreleasedByDate(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (item.UserData?.Played == true || (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L) return false
-    val raw = item.PremiereDate?.takeIf { it.isNotBlank() } ?: item.EndDate?.takeIf { it.isNotBlank() }
-    if (raw == null) return item.LocationType == "Virtual" && (item.RunTimeTicks ?: 0L) <= 0L
-    val parsed = parseUtcDay(raw) ?: return false
+    val parsed = itemDay(item) ?: return item.LocationType == "Virtual" && (item.RunTimeTicks ?: 0L) <= 0L
     if (parsed.year >= 9000) return true
     val todayUtcMs = utcMidnightMs(nowMs)
     if (parsed.epochMs > todayUtcMs) return true
@@ -80,9 +90,7 @@ fun isUnreleasedItem(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()
 fun isReleasedToday(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (item.UserData?.Played == true || (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L) return false
     val todayUtcMs = utcMidnightMs(nowMs)
-    val dateStr = if (!item.PremiereDate.isNullOrBlank()) item.PremiereDate else item.EndDate
-    if (dateStr.isNullOrBlank()) return false
-    val parsed = parseUtcDay(dateStr) ?: return false
+    val parsed = itemDay(item) ?: return false
     if (parsed.year >= 9000) return false
     return parsed.epochMs == todayUtcMs
 }
