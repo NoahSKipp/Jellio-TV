@@ -394,7 +394,14 @@ class DetailViewModel @Inject constructor(
             if (isUnreleasedItem(target)) return@launch
             if (!playPrefetched.add(target.Id)) return@launch
             val remembered = if (streamPreferences.isRememberEnabled()) streamPreferences.rememberedMediaSourceId(target.Id) else null
-            repository.prefetchPlayback(session.userId, target.Id, remembered, target.UserData?.PlaybackPositionTicks ?: 0)
+            val startTicks = target.UserData?.PlaybackPositionTicks ?: 0
+            repository.prefetchPlayback(session.userId, target.Id, remembered, startTicks)
+            // Then the stream's first bytes, so the connection and origin are
+            // warm too. Not for a transcode, which this would start, nor on a
+            // low-RAM device.
+            if (com.jellio.tv.ui.perf.MotionPolicy.profile?.lowRam != false) return@launch
+            val playback = repository.awaitPrefetchedPlayback(target.Id, remembered, startTicks) ?: return@launch
+            if (playback.directPlay) repository.warmFirstBytes(target.Id, playback.streamUrl)
         }
     }
 

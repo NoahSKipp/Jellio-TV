@@ -441,6 +441,7 @@ class PlayerViewModel @Inject constructor(
             _uiState.value = PlayerUiState(isLoading = true)
             PlayStartTrace.mark(itemId, "player open", if (fromFailover) "failover" else "source=${mediaSourceId ?: "default"}")
             warmAtOpen = repository.recentWarmSources(itemId)
+            repository.claimFirstBytesWarm(itemId)
             try {
                 val prewarmed = if (mediaSourceId == null && !fromFailover && prewarmedPlayback?.itemId == itemId) {
                     prewarmedPlayback.also { prewarmedPlayback = null }

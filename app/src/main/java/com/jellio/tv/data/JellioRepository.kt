@@ -79,6 +79,8 @@ private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 private const val PREFETCH_SLOT_WAIT_MS = 3_000L
 private const val PREWARM_RANGE_BYTES = 64L * 1024
 private const val WARM_SEEN_TTL_MS = 10 * 60_000L
+private const val FIRST_BYTES_RANGE_BYTES = 256L * 1024
+private const val FIRST_BYTES_GRACE_MS = 3_000L
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
@@ -2043,6 +2045,44 @@ class JellioRepository @Inject constructor(
             now,
             prefetchScope.async { catching { resolvePlayback(userId, itemId, mediaSourceId, startTicks) }.getOrNull() },
         )
+    }
+
+    // The prefetched target without taking it, for warming its stream.
+    suspend fun awaitPrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? {
+        val entry = playbackPrefetch[playbackKey(itemId, mediaSourceId, startTicks)] ?: return null
+        return entry.target.await()
+    }
+
+    private class FirstBytesWarm(val itemId: String, val job: kotlinx.coroutines.Job) {
+        @Volatile var claimed = false
+    }
+    private val firstBytesLock = Any()
+    private var firstBytes: FirstBytesWarm? = null
+
+    // One at a time, a newer title's replaces it. When the caller goes away
+    // (focus left, page closed) it ends after a short grace, unless the
+    // player opened that title meanwhile: then it finishes, so its
+    // connection goes back to the pool for the player.
+    suspend fun warmFirstBytes(itemId: String, streamUrl: String) {
+        val warm = synchronized(firstBytesLock) {
+            firstBytes?.job?.cancel()
+            FirstBytesWarm(itemId, prefetchScope.launch { warmStreamStart(streamUrl, FIRST_BYTES_RANGE_BYTES) })
+                .also { firstBytes = it }
+        }
+        try {
+            warm.job.join()
+        } finally {
+            if (warm.job.isActive) {
+                prefetchScope.launch {
+                    delay(FIRST_BYTES_GRACE_MS)
+                    if (!warm.claimed) warm.job.cancel()
+                }
+            }
+        }
+    }
+
+    fun claimFirstBytesWarm(itemId: String) {
+        synchronized(firstBytesLock) { firstBytes?.takeIf { it.itemId == itemId }?.claimed = true }
     }
 
     suspend fun takePrefetchedPlayback(itemId: String, mediaSourceId: String?, startTicks: Long): PlaybackTarget? {
