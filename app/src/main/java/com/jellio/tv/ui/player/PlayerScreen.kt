@@ -698,12 +698,14 @@ internal fun PlayerSurface(
     var hasReportedStart by remember(player) { mutableStateOf(false) }
     var hasEverReportedStart by remember { mutableStateOf(false) }
     val currentHasReportedStart by androidx.compose.runtime.rememberUpdatedState(hasEverReportedStart)
-    val currentPositionTicks by androidx.compose.runtime.rememberUpdatedState(positionMs * TICKS_PER_MS)
     val currentOnReportStopped by androidx.compose.runtime.rememberUpdatedState(onReportStopped)
+    // positionMs is read here, not in composition, so its 500 ms ticks don't
+    // recompose the player. The player's own dispose runs first and stores
+    // the final position.
     DisposableEffect(Unit) {
         onDispose {
             if (currentHasReportedStart) {
-                currentOnReportStopped(currentPositionTicks)
+                currentOnReportStopped(positionMs * TICKS_PER_MS)
             }
         }
     }
