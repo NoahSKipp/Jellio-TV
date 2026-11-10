@@ -32,6 +32,8 @@ Lcom/jellio/tv/ui/library/LibraryViewModel;
 
 # Playback & Audio
 Lcom/jellio/tv/ui/player/PlayerScreenKt;
+Lcom/jellio/tv/ui/player/PlayerSurfaceKt;
+Lcom/jellio/tv/ui/player/StreamPlayerFactoryKt;
 Lcom/jellio/tv/ui/player/PlayerViewModel;
 Lcom/jellio/tv/data/prefs/PlayerPrefs;
 Lcom/jellio/tv/ui/player/JellioLoadControlKt;
