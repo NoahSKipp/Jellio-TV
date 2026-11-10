@@ -25,13 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.jellio.tv.ui.PlayAction
+import com.jellio.tv.ui.decidePlayAction
 
 private const val SECOND_SOURCE_DELAY_MS = 1_500L
-
-sealed interface PlayAction {
-    data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
-    data class ShowPicker(val item: BaseItemDto) : PlayAction
-}
 
 data class DetailUiState(
     val isLoading: Boolean = true,
@@ -563,23 +560,8 @@ class DetailViewModel @Inject constructor(
         }
     }
 
-    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
-        val edition = _selectedEdition.value
-        if (!forceChoice && streamPreferences.isRememberEnabled()) {
-            val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
-            if (remembered != null) {
-                val sources = getMediaSources(session, item.Id)
-                val rememberedSource = sources.firstOrNull { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }
-                if (rememberedSource != null) {
-                    val editionMatches = edition == null || EditionParser.detectSourceEdition(rememberedSource, sources) == edition
-                    if (editionMatches) {
-                        return PlayAction.Direct(item.Id, remembered)
-                    }
-                }
-            }
-        }
-        return PlayAction.ShowPicker(item)
-    }
+    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction =
+        decidePlayAction(item, streamPreferences, forceChoice, edition = _selectedEdition.value) { getMediaSources(session, item.Id) }
 
     fun toggleEpisodeWatched(session: Session, episode: BaseItemDto) {
         val prevPlayed = episode.UserData?.Played ?: false

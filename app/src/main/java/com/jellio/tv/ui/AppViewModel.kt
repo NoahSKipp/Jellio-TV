@@ -26,11 +26,6 @@ sealed interface AuthState {
     data class LoggedIn(val session: Session) : AuthState
 }
 
-sealed interface PlayAction {
-    data class Direct(val itemId: String, val mediaSourceId: String?) : PlayAction
-    data class ShowPicker(val item: BaseItemDto) : PlayAction
-}
-
 @HiltViewModel
 class AppViewModel @Inject constructor(
     private val repository: JellioRepository,
@@ -164,18 +159,8 @@ class AppViewModel @Inject constructor(
     suspend fun getItemOrNull(session: Session, itemId: String): BaseItemDto? =
         catching { repository.getItem(session.userId, itemId) }.getOrNull()
 
-    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
-        if (!forceChoice && streamPreferences.isRememberEnabled()) {
-            val remembered = streamPreferences.rememberedMediaSourceId(item.Id)
-            if (remembered != null) {
-                val sources = getMediaSources(session, item.Id)
-                if (sources.any { it.Id == remembered && !com.jellio.tv.ui.player.BadStreams.isBad(item.Id, it) }) {
-                    return PlayAction.Direct(item.Id, remembered)
-                }
-            }
-        }
-        return PlayAction.ShowPicker(item)
-    }
+    suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction =
+        decidePlayAction(item, streamPreferences, forceChoice) { getMediaSources(session, item.Id) }
 
     suspend fun getUserConfiguration(userId: String) =
         catching { repository.getUser(userId)?.Configuration }.getOrNull()
