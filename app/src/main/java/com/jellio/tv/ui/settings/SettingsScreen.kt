@@ -192,7 +192,6 @@ fun SettingsScreen(
     var category by remember { mutableStateOf(SettingsCategory.ACCOUNT) }
     LaunchedEffect(category) { scrollState.scrollTo(0) }
     val categoryFocus = remember { SettingsCategory.entries.associateWith { FocusRequester() } }
-    val firstCategory = categoryFocus.getValue(SettingsCategory.ACCOUNT)
     val contentFocus = remember { FocusRequester() }
     var contentHasFocus by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {

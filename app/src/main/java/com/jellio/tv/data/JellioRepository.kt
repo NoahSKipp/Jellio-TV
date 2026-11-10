@@ -972,20 +972,6 @@ class JellioRepository @Inject constructor(
 
     suspend fun getPerson(userId: String, personId: String): BaseItemDto = fetchItemInfo(userId, personId, null)
 
-    suspend fun getPersonFilmography(userId: String, personId: String, limit: Int = 50): List<BaseItemDto> =
-        cache.get("filmography:$personId:$limit", CACHE_TTL_MS) {
-            api.getItems(
-                userId = userId,
-                includeItemTypes = "Movie,Series",
-                recursive = true,
-                limit = limit,
-                sortBy = "PremiereDate",
-                sortOrder = "Descending",
-                fields = "$ITEM_FIELDS,ProviderIds,ProductionYear",
-                personIds = personId,
-            ).Items
-        }
-
     suspend fun getRichPersonDetails(session: Session, personId: String): RichPersonDetails =
         cache.get("rich_person:$personId", RECOMMENDATION_CACHE_TTL_MS) {
             val person = getPerson(session.userId, personId)

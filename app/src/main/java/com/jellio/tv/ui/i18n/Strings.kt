@@ -17,8 +17,6 @@ object Strings {
         AppLanguage.PORTUGUESE -> StringsPt.MAP
     }
 
-    private fun mapFor(lang: AppLanguage): Map<String, String> = tableFor(lang)
-
     fun get(key: String): String {
         val lang = DisplayPreferences.displayLanguage
         val current = tableFor(lang)[key]

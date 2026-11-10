@@ -96,10 +96,6 @@ class AppUpdateViewModel @Inject constructor(
     // next app open still asks again.
     private var dismissedVersion: String? = null
 
-    fun checkForUpdate() {
-        viewModelScope.launch { runCheck() }
-    }
-
     private suspend fun runCheck() {
         lastCheckAt = System.currentTimeMillis()
         if (_uiState.value.availableVersion != null) return
