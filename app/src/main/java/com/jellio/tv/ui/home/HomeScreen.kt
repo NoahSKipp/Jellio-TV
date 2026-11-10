@@ -218,6 +218,17 @@ fun HomeScreen(
                         .height(topFixtureHeight + HeaderOverlap),
                 )
 
+                val clockStyle = com.jellio.tv.data.prefs.DisplayPreferences.clockStyle
+                val showClock = clockStyle != com.jellio.tv.data.prefs.ClockStyle.OFF
+                if (showClock) {
+                    com.jellio.tv.ui.common.HomeClock(
+                        style = clockStyle,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 22.dp, end = 44.dp),
+                    )
+                }
+
                 if (com.jellio.tv.data.prefs.DisplayPreferences.showNowPlayingPill) {
                     com.jellio.tv.ui.nowplaying.NowPlayingPill(
                         activeCount = nowPlayingActiveCount,
@@ -228,7 +239,7 @@ fun HomeScreen(
                         session = session,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 28.dp, end = 40.dp),
+                            .padding(top = if (showClock) 74.dp else 28.dp, end = 40.dp),
                     )
                 }
 

@@ -830,6 +830,23 @@ fun SettingsScreen(
                         checked = showPill,
                         onToggle = { com.jellio.tv.data.prefs.DisplayPreferences.setShowNowPlayingPill(displayContext, !showPill) },
                     )
+                    SettingsDivider()
+                    val clockStyle = com.jellio.tv.data.prefs.DisplayPreferences.clockStyle
+                    SettingsPickerRow(
+                        label = string("settings_clock"),
+                        value = string(
+                            when (clockStyle) {
+                                com.jellio.tv.data.prefs.ClockStyle.HOURS_24 -> "settings_clock_24h"
+                                com.jellio.tv.data.prefs.ClockStyle.HOURS_12 -> "settings_clock_12h"
+                                com.jellio.tv.data.prefs.ClockStyle.OFF -> "settings_clock_off"
+                            },
+                        ),
+                        onClick = {
+                            val styles = com.jellio.tv.data.prefs.ClockStyle.entries
+                            val next = styles[(styles.indexOf(clockStyle) + 1) % styles.size]
+                            com.jellio.tv.data.prefs.DisplayPreferences.setClockStyle(displayContext, next)
+                        },
+                    )
                 }
                 }
                 SettingsCategory.SHORTCUTS -> {

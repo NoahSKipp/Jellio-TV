@@ -24,11 +24,23 @@ enum class AppLanguage(val code: String, val label: String, val nativeName: Stri
     }
 }
 
+// HH:MM clock on Home. Default 24-hour.
+enum class ClockStyle(val code: String) {
+    HOURS_24("24h"),
+    HOURS_12("12h"),
+    OFF("off");
+
+    companion object {
+        fun fromCode(code: String?): ClockStyle = entries.firstOrNull { it.code == code } ?: HOURS_24
+    }
+}
+
 object DisplayPreferences {
     private const val PREFS = "jellio_display"
     private const val KEY_OVERSCAN = "overscan_percent"
     private const val KEY_DISPLAY_LANGUAGE = "display_language"
     private const val KEY_SHOW_NOW_PLAYING_PILL = "show_now_playing_pill"
+    private const val KEY_CLOCK_STYLE = "clock_style"
 
     const val MIN_PERCENT = 0
     const val MAX_PERCENT = 8
@@ -42,6 +54,9 @@ object DisplayPreferences {
     var showNowPlayingPill by mutableStateOf(true)
         private set
 
+    var clockStyle by mutableStateOf(ClockStyle.HOURS_24)
+        private set
+
     var isCalibrating by mutableStateOf(false)
 
     fun init(context: Context) {
@@ -51,6 +66,16 @@ object DisplayPreferences {
         val langCode = sp.getString(KEY_DISPLAY_LANGUAGE, "en")
         displayLanguage = AppLanguage.fromCode(langCode)
         showNowPlayingPill = sp.getBoolean(KEY_SHOW_NOW_PLAYING_PILL, true)
+        clockStyle = ClockStyle.fromCode(sp.getString(KEY_CLOCK_STYLE, null))
+    }
+
+    fun setClockStyle(context: Context, style: ClockStyle) {
+        clockStyle = style
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CLOCK_STYLE, style.code)
+            .apply()
     }
 
     fun setShowNowPlayingPill(context: Context, show: Boolean) {
