@@ -102,5 +102,5 @@ object BadStreams {
 private const val MAX_PLACEHOLDER_MS = 3L * 60 * 1000
 
 fun looksLikePlaceholder(actualMs: Long, expectedMs: Long): Boolean =
-    actualMs in 1..MAX_PLACEHOLDER_MS && expectedMs >= 10 * 60 * 1000 && actualMs < expectedMs / 4
+    actualMs in 1..MAX_PLACEHOLDER_MS && expectedMs >= 10 * 60 * 1000 && actualMs * 4 < expectedMs
 
