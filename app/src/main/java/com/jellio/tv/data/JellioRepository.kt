@@ -43,9 +43,9 @@ import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
-import com.jellio.tv.ui.common.filterReleasedItems
 import com.jellio.tv.ui.common.isReleasedToday
 import com.jellio.tv.ui.common.isTodayItemStreamVerified
+import com.jellio.tv.ui.common.isUnreleasedByDate
 import com.jellio.tv.ui.common.isUnreleasedItem
 import com.jellio.tv.ui.common.markTodayItemHasStream
 import kotlinx.coroutines.CoroutineScope
@@ -544,7 +544,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun hasValidStreamForTodayItem(userId: String, item: BaseItemDto): Boolean {
         if (!isReleasedToday(item)) return true
-        if (isUnreleasedItem(item)) return false
+        if (isUnreleasedByDate(item)) return false
         if (isTodayItemStreamVerified(item.Id)) return true
         val lastEmptyAt = emptyTodayStreamCheckAt[item.Id]
         if (lastEmptyAt != null && System.currentTimeMillis() - lastEmptyAt < 120_000L) {
@@ -565,7 +565,8 @@ class JellioRepository @Inject constructor(
     }
 
     private suspend fun filterReadyToWatchItems(userId: String, items: List<BaseItemDto>): List<BaseItemDto> = coroutineScope {
-        val released = filterReleasedItems(items)
+        // Today's episodes stay in until their stream check says otherwise.
+        val released = items.filterNot { isUnreleasedByDate(it) }
         if (released.none { isReleasedToday(it) }) {
             return@coroutineScope released
         }
@@ -1410,7 +1411,7 @@ class JellioRepository @Inject constructor(
             val index = episodes.indexOfFirst { it.Id == item.Id }
             if (index != -1 && index + 1 < episodes.size) {
                 val next = episodes[index + 1]
-                return if (isUnreleasedItem(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
+                return if (isUnreleasedByDate(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
             }
         }
         val seasons = getSeasons(seriesId, userId)
@@ -1418,7 +1419,7 @@ class JellioRepository @Inject constructor(
         val nextSeason = if (seasonIndex != -1) seasons.getOrNull(seasonIndex + 1) else null
         nextSeason ?: return null
         val next = getEpisodes(seriesId, userId, nextSeason.Id).firstOrNull() ?: return null
-        return if (isUnreleasedItem(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
+        return if (isUnreleasedByDate(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
     }
 
     suspend fun getCommunitySkipSegments(itemId: String): SkipSegments? =
@@ -1459,7 +1460,7 @@ class JellioRepository @Inject constructor(
             val firstSeason = ordered.firstOrNull()
             firstSeason?.let {
                 val eps = getEpisodes(seriesId, userId, it.Id)
-                eps.firstOrNull { ep -> !isUnreleasedItem(ep) && (!isReleasedToday(ep) || hasValidStreamForTodayItem(userId, ep)) } ?: eps.firstOrNull()
+                eps.firstOrNull { ep -> !isUnreleasedByDate(ep) && (!isReleasedToday(ep) || hasValidStreamForTodayItem(userId, ep)) } ?: eps.firstOrNull()
             }
         } catch (err: Exception) {
             null

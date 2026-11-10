@@ -11,6 +11,7 @@ import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.isPendingTodayRelease
 import com.jellio.tv.ui.common.isReleasedToday
+import com.jellio.tv.ui.common.isUnreleasedByDate
 import com.jellio.tv.ui.common.isUnreleasedItem
 import com.jellio.tv.ui.common.markTodayItemHasStream
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -268,7 +269,7 @@ class DetailViewModel @Inject constructor(
         // The episode Play will start: its details and streams load now, so
         // pressing Play starts right away.
         repository.preloadDetails(target.episode.Id)
-        if (!isUnreleasedItem(target.episode)) {
+        if (!isUnreleasedByDate(target.episode)) {
             repository.prefetchStreams(target.episode.Id)
         }
         return target.episode
@@ -357,7 +358,7 @@ class DetailViewModel @Inject constructor(
     }
 
     private fun checkTodayEpisodeStreams(session: Session, episodes: List<BaseItemDto>) {
-        val todayEpisodes = episodes.filter { isPendingTodayRelease(it) && !isUnreleasedItem(it) }
+        val todayEpisodes = episodes.filter { isPendingTodayRelease(it) && !isUnreleasedByDate(it) }
         if (todayEpisodes.isEmpty()) return
         viewModelScope.launch {
             val results = todayEpisodes.map { ep ->

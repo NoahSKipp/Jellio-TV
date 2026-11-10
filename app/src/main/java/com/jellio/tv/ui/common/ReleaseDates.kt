@@ -60,24 +60,25 @@ private fun utcMidnightMs(nowMs: Long): Long {
     return cal.timeInMillis
 }
 
-fun isUnreleasedItem(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
+// Unreleased by its dates alone: a later day, a later air time today, a
+// placeholder year, or a virtual item with no dates and no runtime.
+fun isUnreleasedByDate(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (item.UserData?.Played == true || (item.UserData?.PlaybackPositionTicks ?: 0L) > 0L) return false
+    val raw = item.PremiereDate?.takeIf { it.isNotBlank() } ?: item.EndDate?.takeIf { it.isNotBlank() }
+    if (raw == null) return item.LocationType == "Virtual" && (item.RunTimeTicks ?: 0L) <= 0L
+    val parsed = parseUtcDay(raw) ?: return false
+    if (parsed.year >= 9000) return true
     val todayUtcMs = utcMidnightMs(nowMs)
-    if (!item.PremiereDate.isNullOrBlank()) {
-        val parsed = parseUtcDay(item.PremiereDate) ?: return false
-        if (parsed.year >= 9000) return true
-        if (parsed.epochMs > todayUtcMs) return true
-        if (parsed.epochMs == todayUtcMs && parsed.exactEpochMs != null && parsed.exactEpochMs > nowMs) return true
-        return false
-    }
-    if (!item.EndDate.isNullOrBlank()) {
-        val parsed = parseUtcDay(item.EndDate) ?: return false
-        if (parsed.year >= 9000) return true
-        if (parsed.epochMs > todayUtcMs) return true
-        if (parsed.epochMs == todayUtcMs && parsed.exactEpochMs != null && parsed.exactEpochMs > nowMs) return true
-        return false
-    }
-    return false
+    if (parsed.epochMs > todayUtcMs) return true
+    return parsed.epochMs == todayUtcMs && parsed.exactEpochMs != null && parsed.exactEpochMs > nowMs
+}
+
+// Like web: an episode dated today stays unreleased until a stream for it
+// has been found.
+fun isUnreleasedItem(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {
+    if (isUnreleasedByDate(item, nowMs)) return true
+    if (item.Type != null && item.Type != "Episode") return false
+    return isReleasedToday(item, nowMs) && !isTodayItemStreamVerified(item.Id)
 }
 
 fun isReleasedToday(item: BaseItemDto, nowMs: Long = System.currentTimeMillis()): Boolean {

@@ -169,6 +169,7 @@ data class BaseItemDto(
     val ChildCount: Int? = null,
     val Watchers: List<CommunityWatcherDto>? = null,
     val Chapters: List<ChapterInfoDto>? = null,
+    val LocationType: String? = null,
 )
 
 @Immutable

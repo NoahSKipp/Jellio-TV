@@ -8,6 +8,7 @@ import com.jellio.tv.ui.common.filterReleasedItems
 import com.jellio.tv.ui.common.isPendingTodayRelease
 import com.jellio.tv.ui.common.isReleasedToday
 import com.jellio.tv.ui.common.isTodayItemStreamVerified
+import com.jellio.tv.ui.common.isUnreleasedByDate
 import com.jellio.tv.ui.common.isUnreleasedItem
 import com.jellio.tv.ui.common.markTodayItemHasStream
 import com.jellio.tv.ui.common.seasonEpisodeReleaseLabels
@@ -56,7 +57,7 @@ class ReleaseDatesTest {
     @Test
     fun todayDateWithoutStreamIsPendingRelease() {
         val item = BaseItemDto(Id = "e2-pending", PremiereDate = "2026-05-15T00:00:00Z")
-        assertFalse(isUnreleasedItem(item, nowMs))
+        assertTrue(isUnreleasedItem(item, nowMs))
         assertTrue(isReleasedToday(item, nowMs))
         assertTrue(isPendingTodayRelease(item, nowMs))
         assertEquals("Today", episodeReleaseLabel(item, nowMs, Locale.US))
@@ -83,12 +84,14 @@ class ReleaseDatesTest {
     fun pastAirTimeEarlierTodayIsReleasedItem() {
         val now = utcMs(2026, 4, 10, 12, 0)
         val item = BaseItemDto(Id = "ep-earlier", PremiereDate = "2026-04-10T08:00:00.000Z")
-        assertFalse(isUnreleasedItem(item, now))
+        assertTrue(isUnreleasedItem(item, now))
+        assertFalse(isUnreleasedByDate(item, now))
         assertTrue(isReleasedToday(item, now))
         assertTrue(isPendingTodayRelease(item, now))
         assertEquals("Today", episodeReleaseLabel(item, now, Locale.US))
 
         markTodayItemHasStream("ep-earlier", true)
+        assertFalse(isUnreleasedItem(item, now))
         assertFalse(isPendingTodayRelease(item, now))
         assertNull(episodeReleaseLabel(item, now, Locale.US))
     }
@@ -133,7 +136,7 @@ class ReleaseDatesTest {
     fun missingPremiereDateWithTodayEndDateIsDetectedAsToday() {
         val now = utcMs(2026, 4, 10, 12, 0)
         val item = BaseItemDto(Id = "ep-end-today", PremiereDate = null, EndDate = "2026-04-10T00:00:00Z")
-        assertFalse(isUnreleasedItem(item, now))
+        assertTrue(isUnreleasedItem(item, now))
         assertTrue(isReleasedToday(item, now))
         assertTrue(isPendingTodayRelease(item, now))
     }
@@ -142,7 +145,7 @@ class ReleaseDatesTest {
     fun todayReleaseWithoutStreamIsPendingAndLabeledToday() {
         val now = utcMs(2026, 4, 10, 12, 0)
         val item = BaseItemDto(Id = "ep-today", PremiereDate = "2026-04-10T00:00:00.000Z")
-        assertFalse(isUnreleasedItem(item, now))
+        assertTrue(isUnreleasedItem(item, now))
         assertTrue(isReleasedToday(item, now))
         assertTrue(isPendingTodayRelease(item, now))
         assertEquals("Today", episodeReleaseLabel(item, now, Locale.US))
@@ -250,8 +253,10 @@ class ReleaseDatesTest {
             UserData = UserItemDataDto(Played = true),
         )
 
-        val result = filterReleasedItems(listOf(past, today, tomorrow, sentinel, playedFuture), nowMs)
-        assertEquals(listOf("p", "t", "pf"), result.map { it.Id })
+        val all = listOf(past, today, tomorrow, sentinel, playedFuture)
+        assertEquals(listOf("p", "pf"), filterReleasedItems(all, nowMs).map { it.Id })
+        markTodayItemHasStream("t", true)
+        assertEquals(listOf("p", "t", "pf"), filterReleasedItems(all, nowMs).map { it.Id })
     }
 
     @Test
@@ -308,6 +313,95 @@ class ReleaseDatesTest {
                 "ep5" to "Coming soon",
             ),
             verifiedLabels,
+        )
+    }
+
+    // Ported from tests/frontend/releaseDate.test.mjs.
+    private val webNow = utcMs(2026, 11, 5, 12, 0)
+
+    @Test
+    fun webTodayEpisodeFollowsItsStreamCheck() {
+        val item = BaseItemDto(Id = "ep-today-past-airtime", PremiereDate = "2026-11-05T00:00:00Z")
+        assertTrue(isUnreleasedItem(item, webNow))
+        assertEquals("Today", episodeReleaseLabel(item, webNow, Locale.US))
+
+        markTodayItemHasStream(item.Id, true)
+        assertFalse(isUnreleasedItem(item, webNow))
+        assertNull(episodeReleaseLabel(item, webNow, Locale.US))
+
+        markTodayItemHasStream(item.Id, false)
+        assertTrue(isUnreleasedItem(item, webNow))
+        assertEquals("Today", episodeReleaseLabel(item, webNow, Locale.US))
+    }
+
+    @Test
+    fun webIsReleasedTodayCases() {
+        assertFalse(isReleasedToday(BaseItemDto(Id = "a", PremiereDate = "2026-11-05T00:00:00Z", UserData = UserItemDataDto(Played = true)), webNow))
+        assertFalse(isReleasedToday(BaseItemDto(Id = "b", PremiereDate = "2026-11-05T00:00:00Z", UserData = UserItemDataDto(PlaybackPositionTicks = 5000)), webNow))
+        assertTrue(isReleasedToday(BaseItemDto(Id = "c", PremiereDate = "2026-11-05T20:00:00Z"), webNow))
+        assertTrue(isReleasedToday(BaseItemDto(Id = "d", EndDate = "2026-11-05T10:00:00Z"), webNow))
+        assertFalse(isReleasedToday(BaseItemDto(Id = "e", PremiereDate = "2026-11-06T00:00:00Z"), webNow))
+        assertFalse(isReleasedToday(BaseItemDto(Id = "f", PremiereDate = "2026-11-04T23:59:59Z"), webNow))
+        assertFalse(isReleasedToday(BaseItemDto(Id = "g", PremiereDate = "9999-11-05T00:00:00Z"), webNow))
+    }
+
+    @Test
+    fun webReleasedEpisodeWithoutPremiereDate() {
+        val item = BaseItemDto(Id = "ep-normal", RunTimeTicks = 25_000_000_000L, LocationType = "FileSystem")
+        assertFalse(isUnreleasedItem(item, webNow))
+        assertNull(episodeReleaseLabel(item, webNow, Locale.US))
+    }
+
+    @Test
+    fun webVirtualItemWithoutRuntimeIsUnreleased() {
+        val item = BaseItemDto(Id = "ep-virtual", LocationType = "Virtual")
+        assertTrue(isUnreleasedItem(item, webNow))
+        assertEquals("Coming soon", episodeReleaseLabel(item, webNow, Locale.US))
+        assertFalse(isUnreleasedItem(item.copy(RunTimeTicks = 1200L), webNow))
+    }
+
+    @Test
+    fun aMovieDatedTodayIsNotHeldBackByTheStreamCheck() {
+        val movie = BaseItemDto(Id = "m-today", Type = "Movie", PremiereDate = "2026-11-05T00:00:00Z")
+        assertFalse(isUnreleasedItem(movie, webNow))
+    }
+
+    @Test
+    fun webFilterReleasedItemsDropsUnverifiedTodayEpisodes() {
+        val items = listOf(
+            BaseItemDto(Id = "ep-1", PremiereDate = "2026-10-01T00:00:00Z"),
+            BaseItemDto(Id = "ep-2", PremiereDate = "2026-11-05T00:00:00Z"),
+            BaseItemDto(Id = "ep-3", PremiereDate = "2026-11-06T00:00:00Z"),
+            BaseItemDto(Id = "ep-4", PremiereDate = "2026-11-12T00:00:00Z"),
+            BaseItemDto(Id = "ep-5", EndDate = "9999-01-01T00:00:00Z"),
+            BaseItemDto(Id = "ep-6", LocationType = "Virtual"),
+        )
+        assertEquals(listOf("ep-1"), filterReleasedItems(items, webNow).map { it.Id })
+        markTodayItemHasStream("ep-2", true)
+        assertEquals(listOf("ep-1", "ep-2"), filterReleasedItems(items, webNow).map { it.Id })
+    }
+
+    @Test
+    fun webSeasonLabelsForUnverifiedTodayAndTrailingEpisodes() {
+        val episodes = listOf(
+            BaseItemDto(Id = "ep-1", IndexNumber = 1, PremiereDate = "2026-10-25T00:00:00Z", RunTimeTicks = 1000),
+            BaseItemDto(Id = "ep-2", IndexNumber = 2, PremiereDate = "2026-11-05T00:00:00Z", RunTimeTicks = 1000),
+            BaseItemDto(Id = "ep-3", IndexNumber = 3, PremiereDate = "2026-11-06T00:00:00Z"),
+            BaseItemDto(Id = "ep-4", IndexNumber = 4),
+            BaseItemDto(Id = "ep-5", IndexNumber = 5),
+            BaseItemDto(Id = "ep-6", IndexNumber = 6, RunTimeTicks = 1200),
+            BaseItemDto(Id = "ep-7", IndexNumber = 7, UserData = UserItemDataDto(Played = true)),
+        )
+        val unverified = seasonEpisodeReleaseLabels(episodes, webNow, Locale.US)
+        assertNull(unverified["ep-1"])
+        assertEquals("Today", unverified["ep-2"])
+        assertEquals("Tomorrow", unverified["ep-3"])
+        assertEquals("Coming soon", unverified["ep-4"])
+
+        markTodayItemHasStream("ep-2", true)
+        assertEquals(
+            mapOf("ep-3" to "Tomorrow", "ep-4" to "Coming soon", "ep-5" to "Coming soon"),
+            seasonEpisodeReleaseLabels(episodes, webNow, Locale.US),
         )
     }
 }
