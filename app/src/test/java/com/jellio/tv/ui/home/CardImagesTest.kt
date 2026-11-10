@@ -58,4 +58,12 @@ class CardImagesTest {
         assertEquals("", episodeLabel(episode.copy(IndexNumber = null)))
         assertEquals("", episodeLabel(BaseItemDto(Id = "m", Type = "Movie")))
     }
+
+    @Test
+    fun posterWidthRoundsUpToABucket() {
+        assertEquals(200, imageWidthBucket(190))
+        assertEquals(300, imageWidthBucket(252))
+        assertEquals(400, imageWidthBucket(400))
+        assertEquals(1280, imageWidthBucket(4000))
+    }
 }

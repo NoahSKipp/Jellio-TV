@@ -61,7 +61,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import coil3.request.crossfade
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -82,6 +81,13 @@ private const val EXPAND_ANIMATION_MS = 220
 private const val TICKS_PER_MINUTE = 10_000_000L * 60L
 
 internal val PosterWidth = 126.dp
+
+// Image widths asked of the server, so cards of nearly the same size share
+// one cached file instead of each asking for its own.
+private val IMAGE_WIDTH_BUCKETS = intArrayOf(200, 300, 400, 600, 800, 1280)
+
+internal fun imageWidthBucket(px: Int): Int =
+    IMAGE_WIDTH_BUCKETS.firstOrNull { it >= px } ?: IMAGE_WIDTH_BUCKETS.last()
 
 private fun imageFor(
     imageUrl: (BaseItemDto, String, Int) -> String,
@@ -247,7 +253,10 @@ fun PosterCard(
     val expandedWidthPx = with(density) { expandedWidth.roundToPx() }.coerceAtLeast(1)
     val logoHeightPx = with(density) { 40.dp.scaled().roundToPx() }.coerceAtLeast(1)
 
-    val candidates = remember(item, imageUrl, progress) { posterImageCandidates(item, imageUrl, 400, seriesFirst = progress) }
+    val posterRequestWidth = imageWidthBucket(baseWidthPx)
+    val candidates = remember(item, imageUrl, progress, posterRequestWidth) {
+        posterImageCandidates(item, imageUrl, posterRequestWidth, seriesFirst = progress)
+    }
     var candidateIndex by remember(item.Id, candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeUrl = candidates.getOrNull(candidateIndex)
 
@@ -384,7 +393,7 @@ fun PosterCard(
             } else {
                 if (activeUrl != null) {
                     AsyncImage(
-                        model = remember(activeUrl) { sizedImageRequest(context, activeUrl, baseWidthPx, baseHeightPx, crossfade = true) },
+                        model = remember(activeUrl) { sizedImageRequest(context, activeUrl, baseWidthPx, baseHeightPx) },
                         contentDescription = item.Name,
                         contentScale = ContentScale.Crop,
                         onError = { if (candidateIndex < candidates.size) candidateIndex += 1 },
@@ -488,13 +497,11 @@ internal fun sizedImageRequest(
     url: String,
     widthPx: Int,
     heightPx: Int,
-    crossfade: Boolean = false,
 ): coil3.request.ImageRequest =
     coil3.request.ImageRequest.Builder(context)
         .data(url)
         .memoryCacheKey("${url}_${widthPx}x$heightPx")
         .size(widthPx, heightPx)
-        .apply { if (crossfade) crossfade(150) }
         .build()
 
 // A title's TMDB rating on a card: the TMDB badge and the score in one chip.
