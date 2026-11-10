@@ -817,7 +817,7 @@ internal fun PlayerSurface(
             override fun onPlaybackStateChanged(state: Int) {
                 isEnded = state == Player.STATE_ENDED
                 isBuffering = state == Player.STATE_BUFFERING || (state == Player.STATE_IDLE && exoError == null)
-                if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs)) {
+                if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs) && !stoppedTooEarly(realPositionMs(), expectedRuntimeMs)) {
                     onReportRealDuration(realPositionMs() / 1000.0)
                     onMarkRealWatchComplete()
                 }
@@ -907,7 +907,8 @@ internal fun PlayerSurface(
                 durationMs = if (directPlay && player.duration > 0) streamOffsetMs + player.duration else 0L,
                 firstFrameRendered = placeholderWatch.firstFrameAt > 0,
                 formatFrameRate = player.videoFormat?.frameRate?.takeIf { it > 0f },
-                measuredFrameRate = placeholderWatch.measuredFps,
+                measuredFrames = placeholderWatch.measuredFrames,
+                measuredSeconds = placeholderWatch.measuredSeconds,
                 hasAudioTrack = placeholderWatch.hasAudio,
                 ended = player.playbackState == Player.STATE_ENDED,
                 stalledMs = if (placeholderWatch.stallStartedAt > 0 && !placeholderWatch.stallAfterSeek) now - placeholderWatch.stallStartedAt else 0L,
