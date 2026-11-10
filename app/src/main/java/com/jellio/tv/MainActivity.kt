@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
             return super.dispatchKeyEvent(event)
         }
 
+        StartupPrefs.awaitBlocking()
         val action = quickHubGate.onKey(
             keyCode = keyCode,
             isDown = isDown,
@@ -140,13 +141,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The first frame reads motion, overscan and language; the rest load meanwhile.
         com.jellio.tv.ui.perf.MotionPolicy.init(this)
         com.jellio.tv.data.prefs.DisplayPreferences.init(this)
-        com.jellio.tv.data.prefs.QuickHubPreferences.init(this)
-        com.jellio.tv.ui.player.PlayerPrefs.init(this)
-        com.jellio.tv.ui.player.BadStreams.init(this)
-        com.jellio.tv.ui.onboarding.OnboardingPrefs.init(this)
         com.jellio.tv.data.playback.DeviceDecoderCaps.attach(this)
+        StartupPrefs.start(this)
         enableEdgeToEdge()
         handleIntent(intent)
         setContent {

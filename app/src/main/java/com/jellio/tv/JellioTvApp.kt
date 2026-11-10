@@ -123,6 +123,7 @@ private fun AppBootGate(
         withTimeoutOrNull(SPLASH_MAX_MS) { homeViewModel.uiState.first { !it.isLoading } }
         val left = SPLASH_MIN_MS - (android.os.SystemClock.uptimeMillis() - shownAt)
         if (left > 0) delay(left)
+        StartupPrefs.await()
         splashDone = true
     }
     // Loads Home for each user and language; HomeScreen only refreshes on return.
