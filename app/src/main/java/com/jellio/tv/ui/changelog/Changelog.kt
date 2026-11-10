@@ -102,6 +102,19 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.0.0",
+        title = "Jellio TV 1.0",
+        subtitle = "Version 1.0.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Speed, "Faster Start and Home", "Home loads once instead of twice, cached rows show while fresh ones arrive without reshuffling, the splash ends as soon as there is something to show, and posters load at the size they are shown."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Quicker Playback Start", "Resting on Play now warms the stream's first bytes, the player is built while playback is negotiated, streams reuse the app's open connections, and the next episode's streams are fetched as soon as it is known."),
+            ChangelogFeature(Icons.Filled.Sync, "Smarter Stream Recovery", "Slow starts and buffering switches only skip a stream for two hours instead of two days, silent slideshows and early stalls are detected like on the web, and today's episodes stay marked upcoming until a stream is found."),
+            ChangelogFeature(Icons.Filled.Groups, "Watch Party Polish", "Starting, joining or leaving a group keeps focus inside Watch Party instead of jumping to Now Playing, and skip segments come from one server source shared with the web player."),
+            ChangelogFeature(Icons.Filled.Info, "Clearer Messages Everywhere", "Sign-in problems, playback outlooks and subtitle options are shown as translated messages instead of raw errors, and the feed refreshes after switching profiles."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Readable Actor Pages", "Person pages blur and dim the backdrop behind the biography and fade it smoothly into the page, so the text stays readable on any artwork."),
+        ),
+    ),
+    ChangelogRelease(
         version = "0.85.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 0.85.0",
