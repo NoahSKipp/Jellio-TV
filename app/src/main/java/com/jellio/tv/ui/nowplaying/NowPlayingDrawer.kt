@@ -807,6 +807,20 @@ private fun GroupWatchTabContent(
     var creating by remember { mutableStateOf(false) }
     var createError by remember { mutableStateOf<String?>(null) }
 
+    // Creating, joining or leaving swaps the card, and the focused button
+    // goes with it. Without a new target the next key press lands on the
+    // first tab (which selects Now Playing) or behind the hub.
+    val stateFocus = remember { FocusRequester() }
+    var lastGroupId by remember { mutableStateOf(activeGroup?.groupId) }
+    LaunchedEffect(activeGroup?.groupId) {
+        if (activeGroup?.groupId == lastGroupId) return@LaunchedEffect
+        lastGroupId = activeGroup?.groupId
+        repeat(20) {
+            if (runCatching { stateFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(40)
+        }
+    }
+
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
@@ -943,7 +957,7 @@ private fun GroupWatchTabContent(
                             icon = Icons.Filled.Close,
                             primary = true,
                             onClick = { groupWatchViewModel.leave() },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().focusRequester(stateFocus),
                         )
                     }
                 }
@@ -997,7 +1011,7 @@ private fun GroupWatchTabContent(
                                         }
                                     }
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).focusRequester(stateFocus),
                             )
                             DrawerActionButton(
                                 label = Strings.get("gw_refresh"),
