@@ -1,6 +1,5 @@
 package com.jellio.tv.ui.seasonal
 
-import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing

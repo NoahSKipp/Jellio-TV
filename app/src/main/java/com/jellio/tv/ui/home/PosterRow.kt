@@ -4,9 +4,7 @@ import com.jellio.tv.ui.common.rowEntry
 import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -44,7 +41,6 @@ import androidx.tv.material3.Text
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.recommend.titleKey
 import com.jellio.tv.ui.theme.JellioBgElevated
-import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.scaled
 import androidx.compose.runtime.CompositionLocalProvider

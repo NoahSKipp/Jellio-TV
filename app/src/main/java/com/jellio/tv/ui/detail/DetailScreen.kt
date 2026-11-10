@@ -97,7 +97,6 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
 import com.jellio.tv.ui.common.episodeReleaseLabel
-import com.jellio.tv.ui.common.isUnreleasedItem
 import com.jellio.tv.ui.common.seasonEpisodeReleaseLabels
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated

@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.AddAPhoto
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.filled.MovieFilter
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Tune
@@ -100,12 +98,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import androidx.compose.ui.platform.LocalContext
-import coil3.SingletonImageLoader
-import coil3.network.HttpException
-import coil3.request.CachePolicy
-import coil3.request.ErrorResult
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
 import com.jellio.tv.BuildConfig
 import com.jellio.tv.di.normalizeServerAddress
 import com.jellio.tv.ui.perf.MotionLevel
