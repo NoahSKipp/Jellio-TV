@@ -322,6 +322,7 @@ private fun JellioTvApp(
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Feed -> FeedScreen(
+                userId = session.userId,
                 imageUrl = memoizedRawImageUrl,
                 userImageUrl = { userId, tag, maxWidth -> appViewModel.userImageUrl(session, userId, tag, maxWidth) },
                 onUserClick = { userId -> push(JellioRoute.Profile(userId)) },

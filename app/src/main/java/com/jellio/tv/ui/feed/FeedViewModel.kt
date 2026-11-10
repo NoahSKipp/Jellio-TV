@@ -31,11 +31,13 @@ class FeedViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(FeedUiState())
     val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
 
-    private var loaded = false
+    private var loadedFor: String? = null
 
-    fun load() {
-        if (loaded) return
-        loaded = true
+    // Once per profile: another profile's feed is never shown for this one.
+    fun load(userId: String) {
+        if (loadedFor == userId) return
+        if (loadedFor != null) _uiState.value = FeedUiState()
+        loadedFor = userId
         fetch()
     }
 

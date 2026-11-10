@@ -77,6 +77,7 @@ import java.time.temporal.ChronoUnit
 
 @Composable
 fun FeedScreen(
+    userId: String,
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
     userImageUrl: (userId: String, tag: String?, maxWidth: Int) -> String,
     onUserClick: (String) -> Unit,
@@ -89,7 +90,7 @@ fun FeedScreen(
     // Read only by the spotlight, so moving through the list redraws it alone.
     val focusedEntry = remember { mutableStateOf<FeedEntryDto?>(null) }
 
-    LaunchedEffect(Unit) { viewModel.load() }
+    LaunchedEffect(userId) { viewModel.load(userId) }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
