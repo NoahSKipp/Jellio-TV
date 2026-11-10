@@ -55,6 +55,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -258,6 +259,10 @@ class JellioRepository @Inject constructor(
     private val emptyTodayStreamCheckAt = lruMap<String, Long>(MAX_HINTS)
 
     fun clearCache() {
+        // An earlier account's warm-ups must not refill the caches below.
+        prefetchScope.coroutineContext.cancelChildren()
+        queuedPrefetch = null
+        sourcesInFlight.clear()
         cache.clear()
         preloaded.clear()
         recentLists.clear()
