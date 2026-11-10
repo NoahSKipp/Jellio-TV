@@ -13,7 +13,6 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import coil3.bitmapFactoryMaxParallelism
-import coil3.request.allowHardware
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import com.jellio.tv.data.network.APP_VERSION
@@ -108,7 +107,6 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
             }
             .crossfade(false)
             .precision(coil3.size.Precision.INEXACT)
-            .allowHardware(false)
             .bitmapFactoryMaxParallelism(4)
             .apply { if (BuildConfig.DEBUG) logger(DebugLogger()) }
             .build()
