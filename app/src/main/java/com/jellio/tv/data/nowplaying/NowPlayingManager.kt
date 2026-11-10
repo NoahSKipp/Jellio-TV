@@ -1,5 +1,6 @@
 package com.jellio.tv.data.nowplaying
 
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.session.Session
@@ -71,7 +72,7 @@ class NowPlayingManager @Inject constructor(
     }
 
     private suspend fun fetchNowPlaying() {
-        runCatching {
+        catching {
             val list = api.getNowPlaying()
             val active = list.filter { it.Item != null && !it.Item.Name.isNullOrBlank() }
             _sessions.value = active

@@ -3,6 +3,7 @@ package com.jellio.tv.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.AvatarPresetDto
 import com.jellio.tv.data.model.UserConfigurationDto
 import com.jellio.tv.data.model.matchLanguageOption
@@ -106,7 +107,7 @@ class SettingsViewModel @Inject constructor(
         if (loadedUserId == session.userId) return
         loadedUserId = session.userId
         viewModelScope.launch {
-            val user = runCatching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
+            val user = catching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
             user.Configuration?.let { configuration ->
                 _audioLanguage.value = matchLanguageOption(configuration.AudioLanguagePreference)?.code
                 _subtitleLanguage.value = subtitleCode(configuration)
@@ -114,7 +115,7 @@ class SettingsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _removeFromWatchlistAfterWatching.value = repository.isRemoveFromWatchlistAfterWatchingEnabled()
-            val settings = runCatching { repository.getProfileSettings() }.getOrNull() ?: return@launch
+            val settings = catching { repository.getProfileSettings() }.getOrNull() ?: return@launch
             _isPrivate.value = settings.IsPrivate
             _removeFromWatchlistAfterWatching.value = settings.RemoveFromWatchlistAfterWatching
         }
@@ -124,7 +125,7 @@ class SettingsViewModel @Inject constructor(
         val previous = _removeFromWatchlistAfterWatching.value
         _removeFromWatchlistAfterWatching.value = enabled
         viewModelScope.launch {
-            runCatching { repository.setRemoveFromWatchlistAfterWatching(enabled) }
+            catching { repository.setRemoveFromWatchlistAfterWatching(enabled) }
                 .onFailure { _removeFromWatchlistAfterWatching.value = previous }
         }
     }
@@ -133,7 +134,7 @@ class SettingsViewModel @Inject constructor(
         val previous = _isPrivate.value
         _isPrivate.value = enabled
         viewModelScope.launch {
-            runCatching { repository.setProfilePrivacy(enabled) }.onFailure { _isPrivate.value = previous }
+            catching { repository.setProfilePrivacy(enabled) }.onFailure { _isPrivate.value = previous }
         }
     }
 
@@ -153,11 +154,11 @@ class SettingsViewModel @Inject constructor(
 
     private fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
         viewModelScope.launch {
-            val saved = runCatching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
+            val saved = catching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
                 .onFailure { android.util.Log.w("JellioSettings", "language save reported an error", it) }
                 .isSuccess
             if (saved) return@launch
-            val stored = runCatching { repository.getUserFresh(session.userId).Configuration }.getOrNull()
+            val stored = catching { repository.getUserFresh(session.userId).Configuration }.getOrNull()
             if (stored != null) {
                 _audioLanguage.value = matchLanguageOption(stored.AudioLanguagePreference)?.code
                 _subtitleLanguage.value = subtitleCode(stored)
@@ -260,7 +261,7 @@ class SettingsViewModel @Inject constructor(
             _selectedGenres.value = recommendationPreferences.getSelectedGenres(userId)
             _customGenres.value = recommendationPreferences.getCustomGenres(userId)
 
-            runCatching {
+            catching {
                 val profile = repository.getProfileSettings()
                 var pushNeeded = false
                 var toPushSelected = profile.selectedGenres
@@ -283,7 +284,7 @@ class SettingsViewModel @Inject constructor(
                 }
 
                 if (pushNeeded) {
-                    runCatching {
+                    catching {
                         repository.saveProfileRecommendations(
                             selectedGenres = toPushSelected,
                             customGenres = toPushCustom,
@@ -292,10 +293,10 @@ class SettingsViewModel @Inject constructor(
                 }
             }
 
-            runCatching {
+            catching {
                 _communityUsers.value = repository.getCommunityUsers()
             }
-            runCatching {
+            catching {
                 _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sortedBy { com.jellio.tv.ui.i18n.genreDisplayName(it) }
             }
         }
@@ -303,7 +304,7 @@ class SettingsViewModel @Inject constructor(
 
     private fun syncRecommendationsToServer() {
         viewModelScope.launch {
-            runCatching {
+            catching {
                 repository.saveProfileRecommendations(
                     selectedGenres = _selectedGenres.value,
                     customGenres = _customGenres.value,

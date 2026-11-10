@@ -98,7 +98,7 @@ class ProfileViewModel @Inject constructor(
         val trimmed = state.bioDraft.trim().ifEmpty { null }
         viewModelScope.launch {
             _uiState.value = state.copy(isSavingBio = true)
-            runCatching { repository.setProfileBio(trimmed) }
+            catching { repository.setProfileBio(trimmed) }
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
                         isSavingBio = false,

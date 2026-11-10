@@ -1,5 +1,6 @@
 package com.jellio.tv.data.syncplay
 
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.GroupWatchMessageDto
 import com.jellio.tv.data.model.PartyControlBody
 import com.jellio.tv.data.model.PartyCountdownBody
@@ -105,7 +106,7 @@ class PartyManager @Inject constructor(
             stateGroupId = group.groupId
         }
         val sentAt = System.currentTimeMillis()
-        val fresh = runCatching { api.getPartyState(group.groupId, lastRequestId) }.getOrNull() ?: return
+        val fresh = catching { api.getPartyState(group.groupId, lastRequestId) }.getOrNull() ?: return
         val receivedAt = System.currentTimeMillis()
         parseTime(fresh.ServerNow)?.let { skewMs = it - (sentAt + receivedAt) / 2 }
         _state.value = fresh
@@ -167,7 +168,7 @@ class PartyManager @Inject constructor(
         if (count.first < count.second && System.currentTimeMillis() - startPendingSince < PARTY_READY_WAIT_MS) return
         startPending = false
         scope.launch {
-            val result = runCatching { api.startPartyCountdown(groupId, PartyCountdownBody(id, PARTY_COUNTDOWN_SECONDS)) }.getOrNull()
+            val result = catching { api.startPartyCountdown(groupId, PartyCountdownBody(id, PARTY_COUNTDOWN_SECONDS)) }.getOrNull()
             val endsAt = parseTime(result?.EndsAt)
             parseTime(result?.ServerNow)?.let { skewMs = it - System.currentTimeMillis() }
             countdownFiredFor = id
@@ -185,7 +186,7 @@ class PartyManager @Inject constructor(
     // check and unpauses everyone when the countdown ends.
     fun published(itemId: String): Boolean {
         val groupId = syncPlay.group.value?.groupId ?: return false
-        scope.launch { runCatching { api.setPartyItem(groupId, PartyItemBody(itemId)) } }
+        scope.launch { catching { api.setPartyItem(groupId, PartyItemBody(itemId)) } }
         startPending = true
         startPendingSince = System.currentTimeMillis()
         return true
@@ -196,7 +197,7 @@ class PartyManager @Inject constructor(
         this.playlistItemId = playlistItemId
         if (!readyReported.add(playlistItemId)) return
         scope.launch {
-            runCatching { api.setPartyReady(groupId, PartyReadyBody(playlistItemId, true)) }
+            catching { api.setPartyReady(groupId, PartyReadyBody(playlistItemId, true)) }
             maybeStartGroup()
         }
     }
@@ -209,7 +210,7 @@ class PartyManager @Inject constructor(
     fun ask(kind: String, positionTicks: Long? = null) {
         val groupId = syncPlay.group.value?.groupId ?: return
         scope.launch {
-            if (runCatching { api.requestPartyControl(groupId, PartyControlBody(kind, positionTicks)) }.isSuccess) {
+            if (catching { api.requestPartyControl(groupId, PartyControlBody(kind, positionTicks)) }.isSuccess) {
                 _events.tryEmit(PartyEvent.AskedHost(_state.value?.HostName))
             }
         }

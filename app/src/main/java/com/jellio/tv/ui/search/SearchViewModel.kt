@@ -3,6 +3,7 @@ package com.jellio.tv.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.session.Session
@@ -76,7 +77,7 @@ class SearchViewModel @Inject constructor(
             // library yet is sent as is, which adds it.
             val ids = top.map { item ->
                 if (item.Type != "Series") item.Id
-                else runCatching { repository.getSeriesNextUp(item.Id, session.userId)?.Id }.getOrNull() ?: item.Id
+                else catching { repository.getSeriesNextUp(item.Id, session.userId)?.Id }.getOrNull() ?: item.Id
             }
             batchJob?.cancel()
             batchJob = repository.prefetchStreamsBatch(ids)
@@ -214,7 +215,7 @@ class SearchViewModel @Inject constructor(
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
-            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            val newValue = catching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
         }
     }
@@ -222,7 +223,7 @@ class SearchViewModel @Inject constructor(
     fun toggleWatched(session: Session, item: BaseItemDto) {
         val next = !(item.UserData?.Played ?: false)
         viewModelScope.launch {
-            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            val updated = catching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = updated) }
         }
     }

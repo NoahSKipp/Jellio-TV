@@ -45,6 +45,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.GroupWatchSendBody
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.session.Session
@@ -160,7 +161,7 @@ class GroupWatchViewModel @Inject constructor(
     }
 
     private suspend fun pollInvites() {
-        val invites = runCatching { api.getGroupWatchInvites(lastInviteId) }.getOrNull() ?: return
+        val invites = catching { api.getGroupWatchInvites(lastInviteId) }.getOrNull() ?: return
         invites.forEach { invite ->
             lastInviteId = maxOf(lastInviteId, invite.Id)
             _invites.update { list -> (listOf(invite) + list.filterNot { it.GroupId == invite.GroupId }).take(10) }
@@ -186,7 +187,7 @@ class GroupWatchViewModel @Inject constructor(
                     groupId = group.groupId
                     after = -1L
                 }
-                val messages = runCatching { api.getGroupWatchMessages(group.groupId, maxOf(after, 0L)) }.getOrNull()
+                val messages = catching { api.getGroupWatchMessages(group.groupId, maxOf(after, 0L)) }.getOrNull()
                 if (messages != null) {
                     if (after >= 0) {
                         messages.filter { it.ItemId == null && !SyncPlayManager.sameId(it.UserId, session.userId) }
@@ -202,7 +203,7 @@ class GroupWatchViewModel @Inject constructor(
         }
     }
 
-    private suspend fun itemName(session: Session, itemId: String): String? = runCatching {
+    private suspend fun itemName(session: Session, itemId: String): String? = catching {
         val item = api.getItem(session.userId, itemId)
         if (item.Type == "Episode" && item.SeriesName != null) item.SeriesName else item.Name
     }.getOrNull()
@@ -222,7 +223,7 @@ class GroupWatchViewModel @Inject constructor(
         val group = syncPlay.group.value ?: return
         val replyTo = party.replyTarget()
         viewModelScope.launch {
-            runCatching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody(emoji, ReplyToId = replyTo?.Id)) }
+            catching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody(emoji, ReplyToId = replyTo?.Id)) }
             notify(com.jellio.tv.ui.i18n.Strings.get("party_you"), emoji + replySuffix(replyTo?.UserName))
         }
     }
@@ -250,22 +251,22 @@ class GroupWatchViewModel @Inject constructor(
         )
     }
 
-    suspend fun loadParties(): com.jellio.tv.data.model.PartiesDto? = runCatching { api.getParties() }.getOrNull()
+    suspend fun loadParties(): com.jellio.tv.data.model.PartiesDto? = catching { api.getParties() }.getOrNull()
 
     fun setupParty(private: Boolean? = null, hostOnly: Boolean? = null) {
         val group = syncPlay.group.value ?: return
         viewModelScope.launch {
-            runCatching { api.setupParty(group.groupId, com.jellio.tv.data.model.PartySetupBody(Private = private, HostOnly = hostOnly)) }
+            catching { api.setupParty(group.groupId, com.jellio.tv.data.model.PartySetupBody(Private = private, HostOnly = hostOnly)) }
         }
     }
 
     fun makeHost(userId: String) {
         val group = syncPlay.group.value ?: return
-        viewModelScope.launch { runCatching { api.transferPartyHost(group.groupId, com.jellio.tv.data.model.PartyHostBody(userId)) } }
+        viewModelScope.launch { catching { api.transferPartyHost(group.groupId, com.jellio.tv.data.model.PartyHostBody(userId)) } }
     }
 
     suspend fun rsvp(id: String, going: Boolean) {
-        runCatching { api.rsvpParty(id, com.jellio.tv.data.model.PartyRsvpBody(going)) }
+        catching { api.rsvpParty(id, com.jellio.tv.data.model.PartyRsvpBody(going)) }
     }
 
     // A scheduled party's Start: a new group under the party's name with
@@ -278,11 +279,11 @@ class GroupWatchViewModel @Inject constructor(
                 notify(com.jellio.tv.ui.i18n.Strings.get("party_title"), com.jellio.tv.ui.i18n.Strings.get("party_create_failed"))
                 return@launch
             }
-            runCatching { api.getPartyState(joined.groupId, 0) }
-            runCatching {
+            catching { api.getPartyState(joined.groupId, 0) }
+            catching {
                 api.setupParty(joined.groupId, com.jellio.tv.data.model.PartySetupBody(scheduled.Private, scheduled.HostOnly, scheduled.Id))
             }
-            runCatching { api.markScheduledPartyStarted(scheduled.Id, com.jellio.tv.data.model.PartyStartedBody(joined.groupId)) }
+            catching { api.markScheduledPartyStarted(scheduled.Id, com.jellio.tv.data.model.PartyStartedBody(joined.groupId)) }
             // A whole series leaves the episode to pick; anything else plays.
             scheduled.Item?.takeIf { it.Type != "Series" }?.let { party.openItem?.invoke(it.Id) }
         }
@@ -291,7 +292,7 @@ class GroupWatchViewModel @Inject constructor(
     fun announceStarted(itemId: String, name: String) {
         val group = syncPlay.group.value ?: return
         viewModelScope.launch {
-            runCatching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody(com.jellio.tv.ui.i18n.Strings.format("gw_group_started_watching", name), itemId)) }
+            catching { api.sendGroupWatchMessage(group.groupId, GroupWatchSendBody(com.jellio.tv.ui.i18n.Strings.format("gw_group_started_watching", name), itemId)) }
         }
     }
 
@@ -320,7 +321,7 @@ class GroupWatchViewModel @Inject constructor(
 
     // A private party refuses anyone without its code or an invite.
     private suspend fun joinOrExplain(groupId: String): Boolean {
-        val result = runCatching { syncPlay.join(groupId) }
+        val result = catching { syncPlay.join(groupId) }
         val error = result.exceptionOrNull()
         if (error is retrofit2.HttpException && error.code() == 403) {
             notify(com.jellio.tv.ui.i18n.Strings.get("party_title"), com.jellio.tv.ui.i18n.Strings.get("party_join_private"))
@@ -332,7 +333,7 @@ class GroupWatchViewModel @Inject constructor(
     suspend fun joinByCode(code: String): String? {
         val clean = code.filter { it.isLetterOrDigit() }.uppercase()
         if (clean.isEmpty()) return com.jellio.tv.ui.i18n.Strings.get("party_code_unknown")
-        val resolved = runCatching { api.resolvePartyCode(com.jellio.tv.data.model.PartyCodeBody(clean)) }
+        val resolved = catching { api.resolvePartyCode(com.jellio.tv.data.model.PartyCodeBody(clean)) }
         val error = resolved.exceptionOrNull()
         if (error is retrofit2.HttpException && error.code() == 429) return com.jellio.tv.ui.i18n.Strings.get("party_code_throttled")
         val groupId = resolved.getOrNull()?.GroupId?.takeIf { it.isNotEmpty() } ?: return com.jellio.tv.ui.i18n.Strings.get("party_code_unknown")

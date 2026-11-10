@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.live
 
+import com.jellio.tv.data.catching
 import com.jellio.tv.ui.i18n.Strings
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -105,7 +106,7 @@ class LivePlayerViewModel @Inject constructor(
         stopped = false
         viewModelScope.launch {
             val fromLink = parseLinkChannelId(channelId) != null
-            channels = runCatching {
+            channels = catching {
                 if (fromLink) {
                     // My streams keep their own order.
                     filterChannels(flattenStreamLinks(repository.getStreamLinks()), LiveTvMemory.query, LiveTvMemory.filters)
@@ -157,7 +158,7 @@ class LivePlayerViewModel @Inject constructor(
         val session = session ?: return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val programs = runCatching { repository.getLivePrograms(session.userId, channel.id, now, now + 6 * 3_600_000L) }.getOrNull() ?: return@launch
+            val programs = catching { repository.getLivePrograms(session.userId, channel.id, now, now + 6 * 3_600_000L) }.getOrNull() ?: return@launch
             if (_uiState.value.channel?.id != channel.id) return@launch
             val (current, next) = nowAndNext(programs, System.currentTimeMillis())
             _uiState.value = _uiState.value.copy(now = current ?: _uiState.value.now, next = next)

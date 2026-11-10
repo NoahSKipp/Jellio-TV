@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.LoginResult
+import com.jellio.tv.data.catching
 import com.jellio.tv.ui.auth.message
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.session.Session
@@ -47,7 +48,7 @@ class AccountSwitcherViewModel @Inject constructor(
                 publicOnly = publicOnly(known.orEmpty()),
             )
             val fresh = kotlinx.coroutines.withTimeoutOrNull(PUBLIC_USERS_TIMEOUT_MS) {
-                runCatching { repository.getPublicUsers(session.serverAddress) }.getOrNull()
+                catching { repository.getPublicUsers(session.serverAddress) }.getOrNull()
             }
             if (fresh != null) publicUsersCache[session.serverAddress] = fresh
             _uiState.value = _uiState.value.copy(

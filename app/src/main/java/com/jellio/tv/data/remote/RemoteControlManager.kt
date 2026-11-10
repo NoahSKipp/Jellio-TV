@@ -1,6 +1,7 @@
 package com.jellio.tv.data.remote
 
 import android.util.Log
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.ClientCapabilitiesDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.squareup.moshi.Moshi
@@ -51,7 +52,7 @@ class RemoteControlManager @Inject constructor(
         Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
     )
 
-    suspend fun reportCapabilities(): Result<Unit> = runCatching {
+    suspend fun reportCapabilities(): Result<Unit> = catching {
         api.postCapabilities(ClientCapabilitiesDto())
     }
 

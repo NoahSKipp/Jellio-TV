@@ -3,6 +3,7 @@ package com.jellio.tv.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.logoUrl
 import com.jellio.tv.data.prefs.StreamPreferences
@@ -161,7 +162,7 @@ class AppViewModel @Inject constructor(
     suspend fun rememberedMediaSourceId(itemId: String): String? = streamPreferences.rememberedMediaSourceId(itemId)
 
     suspend fun getItemOrNull(session: Session, itemId: String): BaseItemDto? =
-        runCatching { repository.getItem(session.userId, itemId) }.getOrNull()
+        catching { repository.getItem(session.userId, itemId) }.getOrNull()
 
     suspend fun resolvePlayAction(session: Session, item: BaseItemDto, forceChoice: Boolean = false): PlayAction {
         if (!forceChoice && streamPreferences.isRememberEnabled()) {
@@ -177,11 +178,11 @@ class AppViewModel @Inject constructor(
     }
 
     suspend fun getUserConfiguration(userId: String) =
-        runCatching { repository.getUser(userId)?.Configuration }.getOrNull()
+        catching { repository.getUser(userId)?.Configuration }.getOrNull()
 
     fun saveLanguagePreferences(session: Session, audio: String?, subtitle: String?) {
         viewModelScope.launch {
-            runCatching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
+            catching { repository.updateLanguagePreferences(session.userId, audio, subtitle) }
         }
     }
 }

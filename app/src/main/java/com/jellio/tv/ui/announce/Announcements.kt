@@ -27,6 +27,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -63,7 +64,7 @@ class AnnouncementViewModel @Inject constructor(
         polling = true
         viewModelScope.launch {
             while (isActive) {
-                runCatching { repository.getJellioNotifications() }.onSuccess { list ->
+                catching { repository.getJellioNotifications() }.onSuccess { list ->
                     val seen = prefs.getStringSet("seen", emptySet()).orEmpty().toMutableSet()
                     val now = System.currentTimeMillis()
                     list.filter { it.Kind == "announcement" && it.Id !in seen && !it.Id.startsWith("changelog:") }

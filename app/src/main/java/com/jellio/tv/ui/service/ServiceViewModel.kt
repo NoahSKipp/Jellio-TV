@@ -265,7 +265,7 @@ class ServiceViewModel @Inject constructor(
 
     fun toggleWatchlist(session: Session, item: BaseItemDto) {
         viewModelScope.launch {
-            val newValue = runCatching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
+            val newValue = catching { repository.toggleFavorite(session.userId, item) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(IsFavorite = newValue)) }
         }
     }
@@ -273,7 +273,7 @@ class ServiceViewModel @Inject constructor(
     fun toggleWatched(session: Session, item: BaseItemDto) {
         val next = !(item.UserData?.Played ?: false)
         viewModelScope.launch {
-            val updated = runCatching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
+            val updated = catching { repository.setPlayed(session.userId, item.Id, next) }.getOrNull() ?: return@launch
             updateItem(item.Id) { it.copy(UserData = updated) }
         }
     }

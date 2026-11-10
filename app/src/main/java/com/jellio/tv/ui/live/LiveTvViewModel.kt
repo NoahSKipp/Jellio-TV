@@ -100,26 +100,26 @@ class LiveTvViewModel @Inject constructor(
     }
 
     private suspend fun reloadLinks() {
-        runCatching { repository.getStreamLinks() }.onSuccess { _uiState.value = _uiState.value.copy(links = it) }
+        catching { repository.getStreamLinks() }.onSuccess { _uiState.value = _uiState.value.copy(links = it) }
     }
 
     fun removeLink(linkId: String) {
         viewModelScope.launch {
-            runCatching { repository.removeStreamLink(linkId) }
+            catching { repository.removeStreamLink(linkId) }
             reloadLinks()
         }
     }
 
     fun removeEntry(linkId: String, index: Int) {
         viewModelScope.launch {
-            runCatching { repository.removeStreamLinkEntry(linkId, index) }
+            catching { repository.removeStreamLinkEntry(linkId, index) }
             reloadLinks()
         }
     }
 
     fun refreshLink(linkId: String) {
         viewModelScope.launch {
-            runCatching { repository.refreshStreamLink(linkId) }
+            catching { repository.refreshStreamLink(linkId) }
             reloadLinks()
         }
     }
@@ -130,7 +130,7 @@ class LiveTvViewModel @Inject constructor(
         pairingJob?.cancel()
         _uiState.value = _uiState.value.copy(pairing = LivePairing("", ""))
         pairingJob = viewModelScope.launch {
-            val created = runCatching { repository.createStreamPairing() }.getOrElse {
+            val created = catching { repository.createStreamPairing() }.getOrElse {
                 android.util.Log.w("JellioLive", "pairing failed: ${it.message}")
                 _uiState.value = _uiState.value.copy(pairing = LivePairing("", "", expired = true))
                 return@launch
@@ -141,7 +141,7 @@ class LiveTvViewModel @Inject constructor(
             var lastLinkId: String? = null
             while (true) {
                 delay(2_000)
-                val result = runCatching { repository.streamPairingStatus(created.Code) }
+                val result = catching { repository.streamPairingStatus(created.Code) }
                 if (result.isFailure) continue
                 val status = result.getOrNull()
                 if (status == null) {
@@ -185,7 +185,7 @@ class LiveTvViewModel @Inject constructor(
         val next = !channel.favorite
         update(channel.id) { it.copy(favorite = next) }
         viewModelScope.launch {
-            val ok = runCatching { repository.setChannelFavorite(session.userId, channel.id, next) }.isSuccess
+            val ok = catching { repository.setChannelFavorite(session.userId, channel.id, next) }.isSuccess
             if (!ok) update(channel.id) { it.copy(favorite = !next) }
         }
     }

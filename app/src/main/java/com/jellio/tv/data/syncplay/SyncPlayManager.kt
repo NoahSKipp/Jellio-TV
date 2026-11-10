@@ -1,6 +1,7 @@
 package com.jellio.tv.data.syncplay
 
 import android.util.Log
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.SyncPlayJoinBody
 import com.jellio.tv.data.model.SyncPlayQueueBody
 import com.jellio.tv.data.model.SyncPlaySeekBody
@@ -106,7 +107,7 @@ class SyncPlayManager @Inject constructor(
         if (previousUserId != null && !sameId(previousUserId, session.userId)) {
             // Another account on this TV. The server keeps one session per
             // device, so the group the last account was in is left now.
-            if (_group.value != null || myGroupId != null) runCatching { api.syncPlayLeave() }
+            if (_group.value != null || myGroupId != null) catching { api.syncPlayLeave() }
             resetGroup()
             pendingCreateName = null
             explicitLeaveUntil = 0L
@@ -129,12 +130,12 @@ class SyncPlayManager @Inject constructor(
         while (isActive) {
             val closed = CompletableDeferred<Unit>()
             var keepAlive: Job? = null
-            val socket = runCatching {
+            val socket = catching {
                 client.newWebSocket(socketRequest(session), object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
                         launch {
                             reconcile()
-                            runCatching { remoteControlManager.reportCapabilities() }
+                            catching { remoteControlManager.reportCapabilities() }
                         }
                     }
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -281,7 +282,7 @@ class SyncPlayManager @Inject constructor(
 
     private suspend fun reconcile() {
         val before = _group.value?.groupId
-        val groups = runCatching { api.getSyncPlayGroups() }.getOrNull() ?: return
+        val groups = catching { api.getSyncPlayGroups() }.getOrNull() ?: return
         // A join or leave landed while the list was on its way: it is stale.
         if (_group.value?.groupId != before) return
         val stored = myGroupId
@@ -301,7 +302,7 @@ class SyncPlayManager @Inject constructor(
             is ReconcileAction.Join -> {
                 val mine = action.group
                 val startedAt = System.currentTimeMillis()
-                val failure = runCatching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }.exceptionOrNull()
+                val failure = catching { api.syncPlayJoin(SyncPlayJoinBody(mine.GroupId)) }.exceptionOrNull()
                 if (failure != null) {
                     // Refused (a private party): stop believing this TV is in it.
                     if (failure is retrofit2.HttpException && sameId(_group.value?.groupId, mine.GroupId)) resetGroup()
@@ -317,7 +318,7 @@ class SyncPlayManager @Inject constructor(
         }
     }
 
-    suspend fun listGroups() = runCatching { api.getSyncPlayGroups() }.getOrDefault(emptyList())
+    suspend fun listGroups() = catching { api.getSyncPlayGroups() }.getOrDefault(emptyList())
 
     suspend fun join(groupId: String) {
         explicitLeaveUntil = 0L
@@ -332,7 +333,7 @@ class SyncPlayManager @Inject constructor(
     suspend fun create(name: String): SyncGroup? {
         explicitLeaveUntil = 0L
         noteCreating(name)
-        if (runCatching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) }.isFailure) {
+        if (catching { api.syncPlayNew(com.jellio.tv.data.model.SyncPlayNewBody(name)) }.isFailure) {
             pendingCreateName = null
             return null
         }
@@ -341,7 +342,7 @@ class SyncPlayManager @Inject constructor(
             // Cleared by GroupJoined (handled above) or by CreateGroupDenied.
             if (pendingCreateName == null) return _group.value
             if (attempt % 4 == 3) {
-                val found = runCatching { api.getSyncPlayGroups() }.getOrNull()
+                val found = catching { api.getSyncPlayGroups() }.getOrNull()
                     ?.firstOrNull { it.GroupName == name && (myUserName.isEmpty() || myUserName in it.Participants) }
                 if (found != null) {
                     myGroupId = found.GroupId
@@ -365,7 +366,7 @@ class SyncPlayManager @Inject constructor(
     suspend fun leave() {
         explicitLeaveUntil = System.currentTimeMillis() + EXPLICIT_LEAVE_GRACE_MS
         myGroupId = null
-        runCatching { api.syncPlayLeave() }
+        catching { api.syncPlayLeave() }
         resetGroup()
     }
 
@@ -375,25 +376,25 @@ class SyncPlayManager @Inject constructor(
         resetGroup()
     }
 
-    suspend fun requestPause() = runCatching { api.syncPlayPause() }
-    suspend fun requestUnpause() = runCatching { api.syncPlayUnpause() }
-    suspend fun requestSeek(positionTicks: Long) = runCatching { api.syncPlaySeek(SyncPlaySeekBody(positionTicks)) }
+    suspend fun requestPause() = catching { api.syncPlayPause() }
+    suspend fun requestUnpause() = catching { api.syncPlayUnpause() }
+    suspend fun requestSeek(positionTicks: Long) = catching { api.syncPlaySeek(SyncPlaySeekBody(positionTicks)) }
 
-    suspend fun notifyBuffering(positionTicks: Long, isPlaying: Boolean, playlistItemId: String) = runCatching {
+    suspend fun notifyBuffering(positionTicks: Long, isPlaying: Boolean, playlistItemId: String) = catching {
         api.syncPlayBuffering(SyncPlayStateBody(remoteNowIso(), positionTicks, isPlaying, playlistItemId))
     }
 
-    suspend fun notifyReady(positionTicks: Long, isPlaying: Boolean, playlistItemId: String) = runCatching {
+    suspend fun notifyReady(positionTicks: Long, isPlaying: Boolean, playlistItemId: String) = catching {
         api.syncPlayReady(SyncPlayStateBody(remoteNowIso(), positionTicks, isPlaying, playlistItemId))
     }
 
-    suspend fun publishQueue(itemId: String, startPositionTicks: Long) = runCatching {
+    suspend fun publishQueue(itemId: String, startPositionTicks: Long) = catching {
         api.syncPlaySetNewQueue(SyncPlayQueueBody(listOf(itemId), 0, startPositionTicks))
     }
 
     private suspend fun pingServerTime() {
         val sent = System.currentTimeMillis()
-        val time = runCatching { api.getUtcTime() }.getOrNull() ?: return
+        val time = catching { api.getUtcTime() }.getOrNull() ?: return
         val received = System.currentTimeMillis()
         val serverIn = parseTime(time.RequestReceptionTime) ?: return
         val serverOut = parseTime(time.ResponseTransmissionTime) ?: return

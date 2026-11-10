@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
@@ -185,7 +186,7 @@ class WatchNextSyncer @Inject constructor(
                 // Rows carry neither overviews nor always their show's art:
                 // one lookup covers every listed title and its show.
                 val listed = (continueWatching.take(CHANNEL_SIZE) + upNext.take(CHANNEL_SIZE))
-                val info = runCatching {
+                val info = catching {
                     repository.getItemsInfo(session.userId, listed.flatMap { listOfNotNull(it.Id, it.SeriesId) })
                 }.getOrDefault(emptyMap())
                 showInfo = info
@@ -225,7 +226,7 @@ class WatchNextSyncer @Inject constructor(
                         context.contentResolver.delete(TvContractCompat.buildWatchNextProgramUri(row.id), null, null)
                     }
                 }
-                val channelIds = runCatching { syncChannels(session, continueWatching, upNext, overviews) }
+                val channelIds = catching { syncChannels(session, continueWatching, upNext, overviews) }
                     .onFailure { Log.w(TAG, "channels failed", it) }
                     .getOrDefault(emptySet())
                 val keep = (wanted.keys + channelIds).map { safe(it) + "-" }
@@ -251,8 +252,8 @@ class WatchNextSyncer @Inject constructor(
     suspend fun refresh() {
         if (!supported()) return
         val session = sessionManager.sessionFlow.first() ?: return
-        val items = runCatching { repository.getContinueWatching(session.userId) }.getOrNull() ?: return
-        val upNext = runCatching { repository.getNextUp(session.userId) }.getOrDefault(emptyList())
+        val items = catching { repository.getContinueWatching(session.userId) }.getOrNull() ?: return
+        val upNext = catching { repository.getNextUp(session.userId) }.getOrDefault(emptyList())
         sync(session, items, upNext)
     }
 
@@ -384,7 +385,7 @@ class WatchNextSyncer @Inject constructor(
         upNext: List<BaseItemDto>,
         overviews: Map<String, String>,
     ): Set<String> {
-        val watchlist = runCatching { repository.getWatchlistItems(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
+        val watchlist = catching { repository.getWatchlistItems(session.userId, CHANNEL_SIZE) }.getOrDefault(emptyList())
         dropChannel("latest")
         val lists = buildMap {
             put("continue", continueWatching)

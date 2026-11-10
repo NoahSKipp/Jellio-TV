@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.player
 
+import com.jellio.tv.data.catching
 import com.jellio.tv.ui.i18n.Strings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,7 +118,7 @@ class PlayerViewModel @Inject constructor(
                 slowTranscode = false,
             )
             failoverJob = viewModelScope.launch {
-                val target = runCatching {
+                val target = catching {
                     repository.resolvePlayback(
                         userId = session.userId,
                         itemId = id,
@@ -156,7 +157,7 @@ class PlayerViewModel @Inject constructor(
                 if (playable.isEmpty() && repository.canDirectPlay(source, ignoreAudio = true) && directRetriedSourceIds.add(sourceId)) {
                     android.util.Log.w("JellioPlayer", "server remux failed before the first frame, playing source $sourceId as is")
                     _failover.value = FailoverNotice(attempt = triedSourceIds.size + 1, sourceLabel = sourceLabel(source), slowTranscode = false)
-                    val target = runCatching {
+                    val target = catching {
                         repository.resolvePlayback(
                             userId = session.userId,
                             itemId = id,
@@ -309,7 +310,7 @@ class PlayerViewModel @Inject constructor(
 
     private fun syncSubtitleStyleToServer(style: SubtitleStyle) {
         viewModelScope.launch {
-            runCatching {
+            catching {
                 repository.saveSubtitleStyle(
                     com.jellio.tv.data.model.SubtitleStyleDto(
                         size = style.size,
@@ -445,8 +446,8 @@ class PlayerViewModel @Inject constructor(
                     null
                 }
                 // Warms the cached user and transcode policy while the item loads.
-                launch { runCatching { repository.getUser(session.userId) } }
-                launch { runCatching { repository.loadVideoTranscodePolicy() } }
+                launch { catching { repository.getUser(session.userId) } }
+                launch { catching { repository.loadVideoTranscodePolicy() } }
                 // The loading art goes up at once from what the row or title
                 // page already knew, not after the server answers.
                 if (prewarmed == null) {
@@ -465,12 +466,12 @@ class PlayerViewModel @Inject constructor(
                 val earlyTarget = if (earlyTicks != null) {
                     async {
                         repository.takePrefetchedPlayback(itemId, mediaSourceId, earlyTicks)?.also { targetFrom = "prefetched" }
-                            ?: runCatching { repository.resolvePlayback(session.userId, itemId, mediaSourceId, earlyTicks) }.getOrNull()?.also { targetFrom = "early" }
+                            ?: catching { repository.resolvePlayback(session.userId, itemId, mediaSourceId, earlyTicks) }.getOrNull()?.also { targetFrom = "early" }
                     }
                 } else {
                     null
                 }
-                val earlyAudio = if (prewarmed == null) async { runCatching { repository.getAudioLanguagePreference(session.userId) }.getOrNull() } else null
+                val earlyAudio = if (prewarmed == null) async { catching { repository.getAudioLanguagePreference(session.userId) }.getOrNull() } else null
                 val item = prewarmed?.item ?: repository.getItemDetails(session.userId, itemId)
                 currentItem = item
                 PlayStartTrace.mark(itemId, "details", if (prewarmed != null) "prewarmed" else "")
@@ -519,7 +520,7 @@ class PlayerViewModel @Inject constructor(
                         transcodeSkippedFor = itemId
                     }
                     target.mediaSource.Id?.let { transcodeSkipped.add(it) }
-                    val others = runCatching { repository.getMediaSources(session.userId, itemId, reason = "transcode check") }.getOrDefault(emptyList())
+                    val others = catching { repository.getMediaSources(session.userId, itemId, reason = "transcode check") }.getOrDefault(emptyList())
                         .filter { it.Id != null && it.Id !in transcodeSkipped && !BadStreams.isBad(itemId, it) && !VideoTranscodePolicy.needsReencode(it) }
                     // One known to copy (probed, or by its name) before one nothing is known about.
                     val copyable = others.firstOrNull { videoInfoOf(it) != null } ?: others.firstOrNull()
@@ -583,7 +584,7 @@ class PlayerViewModel @Inject constructor(
                 // Children of this load: a newer load or leaving cancels them.
                 if (item.Type == "Episode") {
                     launch {
-                        val next = runCatching { repository.getNextEpisode(session.userId, item) }.getOrNull()
+                        val next = catching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
                         }
@@ -603,7 +604,7 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 launch {
-                    val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "player") }.getOrNull()
+                    val sources = catching { repository.getMediaSources(session.userId, itemId, reason = "player") }.getOrNull()
                     if (sources != null && sources.size > 1) {
                         _uiState.value = _uiState.value.copy(sourceOptions = sources)
                     }
@@ -613,7 +614,7 @@ class PlayerViewModel @Inject constructor(
                 if (isEpisode && seriesId != null) {
                     _uiState.value = _uiState.value.copy(seriesId = seriesId)
                     launch {
-                        val seasons = runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList())
+                        val seasons = catching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList())
                         if (seasons.isNotEmpty()) {
                             val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
                             _uiState.value = _uiState.value.copy(seasons = ordered)
@@ -801,7 +802,7 @@ class PlayerViewModel @Inject constructor(
                 val index = stream.Index ?: return@mapNotNull null
                 val label = stream.DisplayTitle ?: stream.Language ?: Strings.get("player_subtitle_fallback")
                 val url = if (isText) {
-                    runCatching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
+                    catching { repository.buildSubtitleUrl(itemId, resolvedMediaSourceId, stream, offsetTicks) }.getOrNull()
                 } else {
                     null
                 }
@@ -1077,7 +1078,7 @@ class PlayerViewModel @Inject constructor(
         val request = ++episodeRequest
         _uiState.value = _uiState.value.copy(selectedSeasonId = seasonId)
         viewModelScope.launch {
-            val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }
+            val episodes = catching { repository.getEpisodes(seriesId, session.userId, seasonId) }
                 .getOrDefault(emptyList())
                 .map { buildEpisodePanelEntry(session, it) }
             if (request != episodeRequest) return@launch
@@ -1131,7 +1132,7 @@ class PlayerViewModel @Inject constructor(
         val nextId = _uiState.value.upNextInfo?.itemId ?: return
         if (prewarmedPlayback?.itemId == nextId) return
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
+            catching {
                 val nextItem = repository.getItemDetails(session.userId, nextId)
                 val audioPref = repository.getAudioLanguagePreference(session.userId)
                 val startTicks = nextItem.UserData?.PlaybackPositionTicks ?: 0L
@@ -1155,7 +1156,7 @@ class PlayerViewModel @Inject constructor(
     // its Up Next card appears so autoplay starts instantaneously without delay.
     fun preloadUpNextSources(session: Session) {
         val nextId = _uiState.value.upNextInfo?.itemId ?: return
-        viewModelScope.launch { runCatching { repository.getMediaSources(session.userId, nextId, reason = "up next") } }
+        viewModelScope.launch { catching { repository.getMediaSources(session.userId, nextId, reason = "up next") } }
         prewarmNextEpisode(session)
     }
 
@@ -1178,8 +1179,8 @@ class PlayerViewModel @Inject constructor(
         hasCreditedRealWatch = true
         val id = itemId ?: return
         val userId = playbackSession?.userId ?: return
-        viewModelScope.launch { runCatching { repository.creditRealWatch(id) } }
-        viewModelScope.launch { runCatching { repository.setPlayed(userId, id, true) } }
+        viewModelScope.launch { catching { repository.creditRealWatch(id) } }
+        viewModelScope.launch { catching { repository.setPlayed(userId, id, true) } }
     }
 
     private var lastReportedDurationSeconds = 0.0
@@ -1190,14 +1191,14 @@ class PlayerViewModel @Inject constructor(
         lastReportedDurationSeconds = candidateSeconds
         val id = itemId ?: return
         viewModelScope.launch {
-            runCatching { repository.reportRealDuration(id, (candidateSeconds * 10_000_000L).toLong()) }
+            catching { repository.reportRealDuration(id, (candidateSeconds * 10_000_000L).toLong()) }
         }
     }
 
     fun startSleepTimer(minutes: Int) {
         val endMs = System.currentTimeMillis() + minutes * 60_000L
         _uiState.value = _uiState.value.copy(sleepTimerEndTimeMs = endMs)
-        viewModelScope.launch { runCatching { repository.startSleepTimer(minutes) } }
+        viewModelScope.launch { catching { repository.startSleepTimer(minutes) } }
     }
 
     fun cancelSleepTimer() {

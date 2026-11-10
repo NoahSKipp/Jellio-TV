@@ -1,5 +1,6 @@
 package com.jellio.tv.data.recommend
 
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.ui.home.HomeSection
 import com.jellio.tv.ui.i18n.Strings
@@ -176,7 +177,7 @@ private suspend fun buildSeedRows(
     // Fired together, same as home.js's Promise.allSettled: awaiting these
     // one by one was adding seconds to Home load.
     val entriesPerSeed = seeds.map { seed ->
-        async { runCatching { source.getRecommendationCandidates(seed, POOL_LIMIT) }.getOrNull() }
+        async { catching { source.getRecommendationCandidates(seed, POOL_LIMIT) }.getOrNull() }
     }.awaitAll()
 
     val rows = mutableListOf<HomeSection>()
@@ -194,7 +195,7 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
     val genres = topGenres(history).take(MAX_GENRE_ROWS)
     val rows = mutableListOf<HomeSection>()
     genres.forEach { genre ->
-        val items = runCatching {
+        val items = catching {
             dedupe(source.getGenreItems(genre, ROW_SIZE).filter(::notPlayed), exclude)
         }.getOrDefault(emptyList())
         if (items.isNotEmpty()) {
@@ -210,8 +211,8 @@ private suspend fun buildTopGenreRows(source: RecommendationDataSource, history:
 private fun notDisliked(seed: BaseItemDto): Boolean = seed.UserData?.Likes != false
 
 suspend fun buildRecommendationRows(source: RecommendationDataSource, exclude: MutableSet<String>): List<HomeSection> = coroutineScope {
-    val historyDeferred = async { runCatching { source.getRecentlyCompleted(HISTORY_SAMPLE_LIMIT) }.getOrDefault(emptyList()) }
-    val nextUpDeferred = async { runCatching { source.getNextUp(NEXTUP_SEED_LIMIT) }.getOrDefault(emptyList()) }
+    val historyDeferred = async { catching { source.getRecentlyCompleted(HISTORY_SAMPLE_LIMIT) }.getOrDefault(emptyList()) }
+    val nextUpDeferred = async { catching { source.getNextUp(NEXTUP_SEED_LIMIT) }.getOrDefault(emptyList()) }
     val history = historyDeferred.await()
     val nextUp = nextUpDeferred.await()
 

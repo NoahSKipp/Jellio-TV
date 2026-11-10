@@ -19,6 +19,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.JellioNotificationDto
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
@@ -41,10 +42,10 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
     // Manga lives on the web and desktop only, so its alerts stay there.
     fun load() {
         viewModelScope.launch {
-            _items.value = runCatching { api.getJellioNotifications() }
+            _items.value = catching { api.getJellioNotifications() }
                 .getOrDefault(emptyList())
                 .filter { it.Kind != "manga" && !it.Id.orEmpty().startsWith("changelog:") }
-            runCatching { api.markJellioNotificationsRead() }
+            catching { api.markJellioNotificationsRead() }
         }
     }
 
@@ -52,14 +53,14 @@ class NotificationsViewModel @Inject constructor(private val api: JellyfinApi) :
         val current = _items.value ?: return
         _items.value = current.filterNot { it.Id == id }
         viewModelScope.launch {
-            runCatching { api.deleteJellioNotification(id) }
+            catching { api.deleteJellioNotification(id) }
         }
     }
 
     fun clearAll() {
         _items.value = emptyList()
         viewModelScope.launch {
-            runCatching { api.clearJellioNotifications() }
+            catching { api.clearJellioNotifications() }
         }
     }
 }

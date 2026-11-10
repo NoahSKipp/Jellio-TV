@@ -38,6 +38,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +66,7 @@ class ScreenOverlayViewModel @Inject constructor(
 
     suspend fun runWhileStarted() {
         while (coroutineContext.isActive) {
-            val pending = runCatching { repository.getPendingOverlays(after) }.getOrNull()
+            val pending = catching { repository.getPendingOverlays(after) }.getOrNull()
             if (pending != null) {
                 val first = after < 0
                 after = pending.Latest
@@ -86,7 +87,7 @@ class ScreenOverlayViewModel @Inject constructor(
             while (_current.value == null && queue.isNotEmpty()) {
                 val next = queue.removeFirst()
                 if (!next.imageUrl.isNullOrBlank()) {
-                    runCatching {
+                    catching {
                         kotlinx.coroutines.withTimeoutOrNull(6000L) {
                             val request = coil3.request.ImageRequest.Builder(context)
                                 .data(next.imageUrl)

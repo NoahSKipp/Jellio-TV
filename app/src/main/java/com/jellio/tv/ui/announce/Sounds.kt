@@ -26,6 +26,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.PendingSoundDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -55,7 +56,7 @@ class SoundViewModel @Inject constructor(
 
     suspend fun pollWhileStarted() {
         while (coroutineContext.isActive) {
-            val pending = runCatching { repository.getPendingSounds(after) }
+            val pending = catching { repository.getPendingSounds(after) }
                 .onFailure { android.util.Log.w("JellioSounds", "pending sounds poll failed", it) }
                 .getOrNull()
             if (pending != null) {
