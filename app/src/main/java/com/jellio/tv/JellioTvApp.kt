@@ -401,7 +401,6 @@ private fun JellioTvApp(
                     session = session,
                     itemId = current.itemId,
                     imageUrl = { itemId, tag, imageType, maxWidth -> appViewModel.rawImageUrl(session, itemId, tag, imageType, maxWidth) },
-                    onBack = { routeStack = routeStack.dropLast(1) },
                     onNavigateToDetail = onNavigateToDetail,
                     onNavigateToDetailReplace = onNavigateToDetailReplace,
                     onNavigateToPerson = onNavigateToPerson,
@@ -506,13 +505,6 @@ private fun JellioTvApp(
                     onViewProfile = { push(JellioRoute.Profile()) },
                     onOpenSettings = { switchTab(JellioRoute.Settings) },
                     onSignOut = { appViewModel.logout() },
-                    onOpenGroupWatch = {
-                        openQuickHub(QuickHubTab.GROUP_WATCH)
-                    },
-                    onOpenNotifications = { showNotifications = true },
-                    onOpenNowPlaying = {
-                        openQuickHub(QuickHubTab.NOW_PLAYING)
-                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -577,9 +569,6 @@ private fun JellioTvApp(
                         showNowPlayingDrawer = false
                         push(JellioRoute.LivePlayer(channelId))
                     },
-                    onJoinWatchParty = {
-                        openQuickHub(QuickHubTab.GROUP_WATCH)
-                    },
                     onResumeLocal = {
                         showNowPlayingDrawer = false
                         nowPlayingLocalPaused?.let { paused ->
@@ -592,9 +581,6 @@ private fun JellioTvApp(
                     onOpenLiveTv = {
                         showNowPlayingDrawer = false
                         switchTab(JellioRoute.LiveTv)
-                    },
-                    onOpenGroupWatch = {
-                        openQuickHub(QuickHubTab.GROUP_WATCH)
                     },
                     onRefreshNowPlaying = {
                         appViewModel.nowPlayingManager.refresh()

@@ -31,8 +31,6 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val quickConnectCode: String? = null,
-    val quickConnectSecret: String? = null,
-    val isQuickConnectPolling: Boolean = false,
     val forgotPasswordUsername: String = "",
     val isRequestingReset: Boolean = false,
     val isRedeemingReset: Boolean = false,
@@ -254,8 +252,6 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
                 isLoading = true,
                 error = null,
                 quickConnectCode = null,
-                quickConnectSecret = null,
-                isQuickConnectPolling = false,
             )
             val result = repository.initiateQuickConnect(serverAddress)
             if (result == null || result.Code.isNullOrBlank() || result.Secret.isNullOrBlank()) {
@@ -269,14 +265,12 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 quickConnectCode = result.Code,
-                quickConnectSecret = secret,
-                isQuickConnectPolling = true,
             )
             while (isActive) {
                 kotlinx.coroutines.delay(2000L)
                 val check = repository.checkQuickConnect(secret)
                 if (check?.Authenticated == true) {
-                    _uiState.value = _uiState.value.copy(isQuickConnectPolling = false, isLoading = true)
+                    _uiState.value = _uiState.value.copy(isLoading = true)
                     when (val authResult = repository.authenticateWithQuickConnect(serverAddress, secret)) {
                         is LoginResult.Success -> {
                             return@launch
@@ -299,10 +293,8 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
         quickConnectJob = null
         _uiState.value = _uiState.value.copy(
             mode = if (_uiState.value.canReturnToProfiles) LoginMode.PROFILE_PICKER else LoginMode.MANUAL,
-            isQuickConnectPolling = false,
             isLoading = false,
             quickConnectCode = null,
-            quickConnectSecret = null,
             error = null,
         )
     }

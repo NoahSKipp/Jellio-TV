@@ -503,7 +503,6 @@ internal fun RatingChip(
     rating: Double?,
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
-    badgeFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
     badgeWidth: Dp = 24.dp,
     badgeHeight: Dp = 11.dp,
     badgeSize: Dp? = null,

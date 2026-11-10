@@ -65,9 +65,6 @@ fun AccountSwitcherOverlay(
     onViewProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     onSignOut: () -> Unit,
-    onOpenGroupWatch: () -> Unit = {},
-    onOpenNotifications: () -> Unit = {},
-    onOpenNowPlaying: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AccountSwitcherViewModel = hiltViewModel(),
 ) {

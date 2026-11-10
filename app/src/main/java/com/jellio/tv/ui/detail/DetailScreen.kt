@@ -143,7 +143,6 @@ fun DetailScreen(
     session: Session,
     itemId: String,
     imageUrl: (itemId: String, tag: String?, imageType: String, maxWidth: Int) -> String,
-    onBack: () -> Unit,
     onNavigateToDetail: (String) -> Unit,
     onNavigateToDetailReplace: (String) -> Unit = onNavigateToDetail,
     onNavigateToPerson: (String) -> Unit,
@@ -226,7 +225,6 @@ fun DetailScreen(
                         Box(modifier = Modifier.onFocusChanged { heroHasFocus = it.hasFocus }) {
                             CompositionLocalProvider(LocalBringIntoViewSpec provides NoOpBringIntoViewSpec) {
                                 DetailHero(
-                                    session = session,
                                     item = item,
                                     state = uiState,
                                     availableEditions = availableEditions,
@@ -283,8 +281,6 @@ fun DetailScreen(
                     if (showSeasons) {
                         item {
                             SeasonsSection(
-                                session = session,
-                                seriesId = item.SeriesId ?: item.Id,
                                 state = uiState,
                                 imageUrl = imageUrl,
                                 currentEpisodeId = if (item.Type == "Episode") item.Id else null,
@@ -395,7 +391,6 @@ private fun EpisodeMenuRow(label: String, onClick: () -> Unit, modifier: Modifie
 
 @Composable
 private fun DetailHero(
-    session: Session,
     item: BaseItemDto,
     state: DetailUiState,
     imageUrl: (String, String?, String, Int) -> String,
@@ -790,8 +785,6 @@ private fun IconActionButton(
 
 @Composable
 private fun SeasonsSection(
-    session: Session,
-    seriesId: String,
     state: DetailUiState,
     imageUrl: (String, String?, String, Int) -> String,
     currentEpisodeId: String? = null,

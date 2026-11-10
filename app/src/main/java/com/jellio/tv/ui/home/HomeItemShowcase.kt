@@ -328,7 +328,6 @@ internal fun TmdbBadge(
     width: Dp = 26.dp,
     height: Dp = 11.dp,
     size: Dp? = null,
-    fontSize: androidx.compose.ui.unit.TextUnit = 10.sp,
     tint: Color? = null,
 ) {
     val finalWidth = size?.let { it * 2.33f } ?: width
