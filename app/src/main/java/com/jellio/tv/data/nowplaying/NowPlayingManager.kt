@@ -46,9 +46,13 @@ class NowPlayingManager @Inject constructor(
         _localPaused.value = media
     }
 
+    private var pollIntervalMs = 12000L
+    @Volatile private var inBackground = false
+
     fun startPolling(session: Session, intervalMs: Long = 12000L) {
         lastSession = session
-        if (session.accessToken.isEmpty()) return
+        pollIntervalMs = intervalMs
+        if (session.accessToken.isEmpty() || inBackground) return
         if (pollJob?.isActive == true) return
         pollJob = scope.launch {
             while (isActive) {
@@ -56,6 +60,18 @@ class NowPlayingManager @Inject constructor(
                 delay(intervalMs)
             }
         }
+    }
+
+    // The app left the screen: stop asking the server until it is back.
+    fun onAppStopped() {
+        inBackground = true
+        pollJob?.cancel()
+        pollJob = null
+    }
+
+    fun onAppStarted() {
+        inBackground = false
+        lastSession?.let { startPolling(it, pollIntervalMs) }
     }
 
     fun stopPolling() {

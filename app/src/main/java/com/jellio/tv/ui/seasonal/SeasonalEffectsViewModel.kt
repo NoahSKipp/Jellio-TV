@@ -1,15 +1,14 @@
 package com.jellio.tv.ui.seasonal
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -22,17 +21,19 @@ class SeasonalEffectsViewModel @Inject constructor(
     private val _activeTheme = MutableStateFlow<String?>(null)
     val activeTheme: StateFlow<String?> = _activeTheme.asStateFlow()
 
-    private var started = false
+    private var lastRefreshAt = 0L
 
-    fun start() {
-        if (started) return
-        started = true
-        viewModelScope.launch {
-            while (isActive) {
-                val config = repository.getJellioConfig()
-                _activeTheme.value = activeSeasonalTheme(Calendar.getInstance(), config)
-                delay(REFRESH_INTERVAL_MS)
+    // Runs only while the app is in the foreground.
+    suspend fun runWhileStarted() {
+        while (currentCoroutineContext().isActive) {
+            val since = android.os.SystemClock.elapsedRealtime() - lastRefreshAt
+            if (lastRefreshAt != 0L && since < REFRESH_INTERVAL_MS) {
+                delay(REFRESH_INTERVAL_MS - since)
+                continue
             }
+            lastRefreshAt = android.os.SystemClock.elapsedRealtime()
+            val config = repository.getJellioConfig()
+            _activeTheme.value = activeSeasonalTheme(Calendar.getInstance(), config)
         }
     }
 }

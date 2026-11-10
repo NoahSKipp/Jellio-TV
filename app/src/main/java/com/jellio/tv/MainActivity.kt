@@ -35,6 +35,9 @@ class MainActivity : ComponentActivity() {
     var onQuickHubShortcut: (() -> Unit)? = null
     var isQuickHubSuppressed: Boolean = false
 
+    @javax.inject.Inject
+    lateinit var nowPlayingManager: com.jellio.tv.data.nowplaying.NowPlayingManager
+
     private val quickHubGate = QuickHubKeyGate()
     private var quickHubHoldJob: kotlinx.coroutines.Job? = null
     private var quickHubHeldDown: KeyEvent? = null
@@ -116,6 +119,16 @@ class MainActivity : ComponentActivity() {
     private fun resetQuickHubGesture() {
         cancelQuickHubHold()
         quickHubGate.onFocusLost()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        nowPlayingManager.onAppStarted()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        nowPlayingManager.onAppStopped()
     }
 
     override fun onPause() {

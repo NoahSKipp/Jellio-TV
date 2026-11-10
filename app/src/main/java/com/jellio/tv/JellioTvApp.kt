@@ -204,7 +204,10 @@ private fun JellioTvApp(
         }
     }
 
-    LaunchedEffect(Unit) { seasonalEffectsViewModel.start() }
+    val appLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(appLifecycle) {
+        appLifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { seasonalEffectsViewModel.runWhileStarted() }
+    }
     val seasonalTheme by seasonalEffectsViewModel.activeTheme.collectAsState()
     val sidebarFocusRequester = remember { FocusRequester() }
     var sidebarHasRealFocus by remember { mutableStateOf(false) }

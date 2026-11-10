@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -34,6 +35,7 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,31 +59,34 @@ class AnnouncementViewModel @Inject constructor(
     private val _current = MutableStateFlow<Announcement?>(null)
     val current: StateFlow<Announcement?> = _current.asStateFlow()
     private val queue = ArrayDeque<Announcement>()
-    private var polling = false
+    private var lastPollAt = 0L
 
-    fun start() {
-        if (polling) return
-        polling = true
-        viewModelScope.launch {
-            while (isActive) {
-                catching { repository.getJellioNotifications() }.onSuccess { list ->
-                    val seen = prefs.getStringSet("seen", emptySet()).orEmpty().toMutableSet()
-                    val now = System.currentTimeMillis()
-                    list.filter { it.Kind == "announcement" && it.Id !in seen && !it.Id.startsWith("changelog:") }
-                        .sortedBy { it.CreatedUtc.orEmpty() }
-                        .forEach { entry ->
-                            seen.add(entry.Id)
-                            val created = runCatching { Instant.parse(entry.CreatedUtc.orEmpty().let { if (it.endsWith("Z")) it else it + "Z" }).toEpochMilli() }.getOrNull()
-                            val text = entry.Name?.trim().orEmpty()
-                            val image = entry.ImageId?.let { repository.announcementImageUrl(it) }
-                            if ((text.isNotEmpty() || image != null) && (created == null || now - created < MAX_AGE_MS)) {
-                                queue.addLast(Announcement(text, image))
-                            }
+    // Runs only while the app is in the foreground; coming back polls at
+    // once if the last poll is older than the interval.
+    suspend fun runWhileStarted() {
+        while (currentCoroutineContext().isActive) {
+            val since = android.os.SystemClock.elapsedRealtime() - lastPollAt
+            if (lastPollAt != 0L && since < POLL_MS) {
+                delay(POLL_MS - since)
+                continue
+            }
+            lastPollAt = android.os.SystemClock.elapsedRealtime()
+            catching { repository.getJellioNotifications() }.onSuccess { list ->
+                val seen = prefs.getStringSet("seen", emptySet()).orEmpty().toMutableSet()
+                val now = System.currentTimeMillis()
+                list.filter { it.Kind == "announcement" && it.Id !in seen && !it.Id.startsWith("changelog:") }
+                    .sortedBy { it.CreatedUtc.orEmpty() }
+                    .forEach { entry ->
+                        seen.add(entry.Id)
+                        val created = runCatching { Instant.parse(entry.CreatedUtc.orEmpty().let { if (it.endsWith("Z")) it else it + "Z" }).toEpochMilli() }.getOrNull()
+                        val text = entry.Name?.trim().orEmpty()
+                        val image = entry.ImageId?.let { repository.announcementImageUrl(it) }
+                        if ((text.isNotEmpty() || image != null) && (created == null || now - created < MAX_AGE_MS)) {
+                            queue.addLast(Announcement(text, image))
                         }
-                    prefs.edit().putStringSet("seen", seen.toList().takeLast(200).toSet()).apply()
-                    if (_current.value == null) showNext()
-                }
-                delay(POLL_MS)
+                    }
+                prefs.edit().putStringSet("seen", seen.toList().takeLast(200).toSet()).apply()
+                if (_current.value == null) showNext()
             }
         }
     }
@@ -104,7 +109,10 @@ data class Announcement(val text: String, val imageUrl: String?)
 // other screen, gone after a few seconds without needing the remote.
 @Composable
 fun AnnouncementToast(modifier: Modifier = Modifier, viewModel: AnnouncementViewModel = hiltViewModel()) {
-    LaunchedEffect(Unit) { viewModel.start() }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { viewModel.runWhileStarted() }
+    }
     val message by viewModel.current.collectAsState()
     val announcement = message ?: return
     Row(
