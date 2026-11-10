@@ -312,18 +312,18 @@ private fun PersonHeroHeader(
                 model = details.backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().then(if (canBlur) Modifier.blur(24.dp) else Modifier),
+                modifier = Modifier.matchParentSize().then(if (canBlur) Modifier.blur(24.dp) else Modifier),
             )
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(JellioBg.copy(alpha = if (canBlur) 0.45f else 0.62f)),
             )
         }
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.horizontalGradient(
                         0f to JellioBg.copy(alpha = 0.92f),
@@ -335,11 +335,12 @@ private fun PersonHeroHeader(
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .background(
                     Brush.verticalGradient(
                         0f to JellioBg.copy(alpha = 0.35f),
-                        0.55f to Color.Transparent,
+                        0.45f to Color.Transparent,
+                        0.8f to JellioBg.copy(alpha = 0.75f),
                         1f to JellioBg,
                     ),
                 ),
