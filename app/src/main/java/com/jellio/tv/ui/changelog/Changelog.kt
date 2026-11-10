@@ -111,6 +111,7 @@ val CHANGELOG_RELEASES = listOf(
             ChangelogFeature(Icons.Filled.Sync, "Smarter Stream Recovery", "Slow starts and buffering switches only skip a stream for two hours instead of two days, silent slideshows and early stalls are detected like on the web, and today's episodes stay marked upcoming until a stream is found."),
             ChangelogFeature(Icons.Filled.Groups, "Watch Party Polish", "Starting, joining or leaving a group keeps focus inside Watch Party instead of jumping to Now Playing, and skip segments come from one server source shared with the web player."),
             ChangelogFeature(Icons.Filled.Info, "Clearer Messages Everywhere", "Sign-in problems, playback outlooks and subtitle options are shown as translated messages instead of raw errors, and the feed refreshes after switching profiles."),
+            ChangelogFeature(Icons.Filled.Tv, "Clock on Home", "The time now shows at the top right of Home, above the Now Playing pill. Pick 24-hour, 12-hour or off in Settings > Display."),
             ChangelogFeature(Icons.Filled.AutoAwesome, "Readable Actor Pages", "Person pages blur and dim the backdrop behind the biography and fade it smoothly into the page, so the text stays readable on any artwork."),
         ),
     ),
