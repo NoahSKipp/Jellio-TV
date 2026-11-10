@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.settings
 
+import com.jellio.tv.ui.common.SidePanel
 import com.jellio.tv.ui.common.dismissOnBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -1103,78 +1104,51 @@ private fun QuickHubButtonPickerOverlay(
     onRecordNew: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
     val firstRowFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .dismissOnBack(onDismiss)
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(440.dp)
-                .fillMaxSize()
-                .background(JellioBgElevated)
-                .padding(top = 48.dp, bottom = 48.dp),
-        ) {
-            Text(
-                text = string("settings_quick_hub_button"),
-                color = JellioText,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-            )
-            LazyColumn {
-                items(com.jellio.tv.data.prefs.QuickHubButton.entries) { btn ->
-                    val customLabel = if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode != 0) {
-                        com.jellio.tv.data.prefs.QuickHubPreferences.customKeyLabel.ifBlank {
-                            com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode)
+    SidePanel(title = string("settings_quick_hub_button"), width = 440.dp, onDismiss = onDismiss) {
+        LazyColumn {
+            items(com.jellio.tv.data.prefs.QuickHubButton.entries) { btn ->
+                val customLabel = if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode != 0) {
+                    com.jellio.tv.data.prefs.QuickHubPreferences.customKeyLabel.ifBlank {
+                        com.jellio.tv.data.prefs.QuickHubPreferences.getKeyDisplayName(com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode)
+                    }
+                } else null
+
+                val label = if (customLabel != null) {
+                    "${string(btn.labelKey)} ($customLabel)"
+                } else {
+                    string(btn.labelKey)
+                }
+
+                val desc = if (customLabel != null) {
+                    formatString(btn.subKey, customLabel)
+                } else {
+                    string(btn.subKey)
+                }
+
+                ShortcutPickerRow(
+                    label = label,
+                    description = desc,
+                    isSelected = btn == selected,
+                    onClick = {
+                        if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode == 0) {
+                            onRecordNew()
+                        } else {
+                            onSelect(btn)
                         }
-                    } else null
-
-                    val label = if (customLabel != null) {
-                        "${string(btn.labelKey)} ($customLabel)"
-                    } else {
-                        string(btn.labelKey)
-                    }
-
-                    val desc = if (customLabel != null) {
-                        formatString(btn.subKey, customLabel)
-                    } else {
-                        string(btn.subKey)
-                    }
-
-                    ShortcutPickerRow(
-                        label = label,
-                        description = desc,
-                        isSelected = btn == selected,
-                        onClick = {
-                            if (btn == com.jellio.tv.data.prefs.QuickHubButton.CUSTOM && com.jellio.tv.data.prefs.QuickHubPreferences.customKeyCode == 0) {
-                                onRecordNew()
-                            } else {
-                                onSelect(btn)
-                            }
-                        },
-                        focusRequester = if (btn == com.jellio.tv.data.prefs.QuickHubButton.entries.first()) firstRowFocusRequester else null,
-                    )
-                }
-                item {
-                    SettingsDivider()
-                    ShortcutPickerRow(
-                        label = string("settings_quick_hub_record_btn"),
-                        description = string("settings_quick_hub_record_btn_desc"),
-                        isSelected = false,
-                        onClick = onRecordNew,
-                    )
-                }
+                    },
+                    focusRequester = if (btn == com.jellio.tv.data.prefs.QuickHubButton.entries.first()) firstRowFocusRequester else null,
+                )
+            }
+            item {
+                SettingsDivider()
+                ShortcutPickerRow(
+                    label = string("settings_quick_hub_record_btn"),
+                    description = string("settings_quick_hub_record_btn_desc"),
+                    isSelected = false,
+                    onClick = onRecordNew,
+                )
             }
         }
     }
@@ -1187,45 +1161,18 @@ private fun QuickHubTriggerPickerOverlay(
     onSelect: (com.jellio.tv.data.prefs.QuickHubTrigger) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
     val firstRowFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .dismissOnBack(onDismiss)
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(420.dp)
-                .fillMaxSize()
-                .background(JellioBgElevated)
-                .padding(top = 48.dp, bottom = 48.dp),
-        ) {
-            Text(
-                text = string("settings_quick_hub_trigger"),
-                color = JellioText,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-            )
-            LazyColumn {
-                items(com.jellio.tv.data.prefs.QuickHubTrigger.entries) { trg ->
-                    ShortcutPickerRow(
-                        label = string(trg.labelKey),
-                        description = string(trg.subKey),
-                        isSelected = trg == selected,
-                        onClick = { onSelect(trg) },
-                        focusRequester = if (trg == com.jellio.tv.data.prefs.QuickHubTrigger.entries.first()) firstRowFocusRequester else null,
-                    )
-                }
+    SidePanel(title = string("settings_quick_hub_trigger"), width = 420.dp, onDismiss = onDismiss) {
+        LazyColumn {
+            items(com.jellio.tv.data.prefs.QuickHubTrigger.entries) { trg ->
+                ShortcutPickerRow(
+                    label = string(trg.labelKey),
+                    description = string(trg.subKey),
+                    isSelected = trg == selected,
+                    onClick = { onSelect(trg) },
+                    focusRequester = if (trg == com.jellio.tv.data.prefs.QuickHubTrigger.entries.first()) firstRowFocusRequester else null,
+                )
             }
         }
     }
@@ -1655,44 +1602,17 @@ private fun DisplayLanguagePickerOverlay(
     onSelect: (com.jellio.tv.data.prefs.AppLanguage) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
     val firstRowFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .dismissOnBack(onDismiss)
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(360.dp)
-                .fillMaxSize()
-                .background(JellioBgElevated)
-                .padding(top = 48.dp, bottom = 48.dp),
-        ) {
-            Text(
-                text = string("settings_display_language"),
-                color = JellioText,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-            )
-            LazyColumn {
-                items(com.jellio.tv.data.prefs.AppLanguage.entries) { lang ->
-                    LanguagePickerRow(
-                        label = "${lang.nativeName} (${lang.label})",
-                        isSelected = lang == selectedLanguage,
-                        onClick = { onSelect(lang) },
-                        focusRequester = if (lang == com.jellio.tv.data.prefs.AppLanguage.entries.first()) firstRowFocusRequester else null,
-                    )
-                }
+    SidePanel(title = string("settings_display_language"), width = 360.dp, onDismiss = onDismiss) {
+        LazyColumn {
+            items(com.jellio.tv.data.prefs.AppLanguage.entries) { lang ->
+                LanguagePickerRow(
+                    label = "${lang.nativeName} (${lang.label})",
+                    isSelected = lang == selectedLanguage,
+                    onClick = { onSelect(lang) },
+                    focusRequester = if (lang == com.jellio.tv.data.prefs.AppLanguage.entries.first()) firstRowFocusRequester else null,
+                )
             }
         }
     }
@@ -1706,57 +1626,30 @@ private fun LanguagePickerOverlay(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
     val firstRowFocusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .dismissOnBack(onDismiss)
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Column(
-            modifier = Modifier
-                .width(360.dp)
-                .fillMaxSize()
-                .background(JellioBgElevated)
-                .padding(top = 48.dp, start = 0.dp, end = 0.dp, bottom = 48.dp),
-        ) {
-            Text(
-                text = title,
-                color = JellioText,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-            )
-            LazyColumn {
-                if (isSubtitle) {
-                    item {
-                        LanguagePickerRow(
-                            label = string("settings_subtitles_off"),
-                            isSelected = selectedCode == "off",
-                            onClick = { onSelect("off") },
-                            focusRequester = firstRowFocusRequester,
-                        )
-                    }
-                }
+    SidePanel(title = title, width = 360.dp, onDismiss = onDismiss) {
+        LazyColumn {
+            if (isSubtitle) {
                 item {
                     LanguagePickerRow(
-                        label = string("settings_no_preference"),
-                        isSelected = if (isSubtitle) selectedCode.isNullOrEmpty() else selectedCode == null,
-                        onClick = { onSelect(if (isSubtitle) "" else null) },
-                        focusRequester = if (!isSubtitle) firstRowFocusRequester else remember { FocusRequester() },
+                        label = string("settings_subtitles_off"),
+                        isSelected = selectedCode == "off",
+                        onClick = { onSelect("off") },
+                        focusRequester = firstRowFocusRequester,
                     )
                 }
-                items(LANGUAGE_OPTIONS) { option: LanguageOption ->
-                    LanguagePickerRow(label = com.jellio.tv.data.model.languageName(option.code), isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
-                }
+            }
+            item {
+                LanguagePickerRow(
+                    label = string("settings_no_preference"),
+                    isSelected = if (isSubtitle) selectedCode.isNullOrEmpty() else selectedCode == null,
+                    onClick = { onSelect(if (isSubtitle) "" else null) },
+                    focusRequester = if (!isSubtitle) firstRowFocusRequester else remember { FocusRequester() },
+                )
+            }
+            items(LANGUAGE_OPTIONS) { option: LanguageOption ->
+                LanguagePickerRow(label = com.jellio.tv.data.model.languageName(option.code), isSelected = selectedCode == option.code, onClick = { onSelect(option.code) })
             }
         }
     }
