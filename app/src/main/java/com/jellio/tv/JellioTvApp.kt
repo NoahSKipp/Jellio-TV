@@ -55,7 +55,9 @@ import com.jellio.tv.ui.update.AppUpdateViewModel
 import com.jellio.tv.ui.update.BootSplashMark
 import com.jellio.tv.ui.update.UpdateToast
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 internal fun JellioTvRoot(
@@ -101,6 +103,9 @@ internal fun JellioTvRoot(
     }
 }
 
+private const val SPLASH_MIN_MS = 350L
+private const val SPLASH_MAX_MS = 1_200L
+
 @Composable
 private fun AppBootGate(
     session: Session,
@@ -112,19 +117,23 @@ private fun AppBootGate(
     libraryWarmupViewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val libraries by appViewModel.libraries.collectAsState()
-    var minSplashTimeElapsed by remember { mutableStateOf(false) }
+    var splashDone by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(1_200)
-        minSplashTimeElapsed = true
+        val shownAt = android.os.SystemClock.uptimeMillis()
+        withTimeoutOrNull(SPLASH_MAX_MS) { homeViewModel.uiState.first { !it.isLoading } }
+        val left = SPLASH_MIN_MS - (android.os.SystemClock.uptimeMillis() - shownAt)
+        if (left > 0) delay(left)
+        splashDone = true
     }
     // Loads Home for each user and language; HomeScreen only refreshes on return.
     LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) { homeViewModel.load(session) }
     LaunchedEffect(libraries) {
         libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
     }
-    // Home draws its own skeletons while rows load, so the splash only
-    // waits for the logo, not for Home's data.
-    if (!minSplashTimeElapsed) {
+    // Held until Home has its snapshot or first rows, never shorter than a
+    // glance at the logo nor longer than the old fixed hold; past that Home
+    // draws its own skeletons.
+    if (!splashDone) {
         Box(modifier = Modifier.fillMaxSize().background(JellioBg)) {
             BootSplashMark(modifier = Modifier.fillMaxSize())
         }
