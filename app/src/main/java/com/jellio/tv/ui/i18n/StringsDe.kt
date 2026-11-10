@@ -16,6 +16,7 @@ internal object StringsDe {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsDe {
         m["player_start_over_unavailable"] = "Neustart nicht möglich, dieser Stream ist nicht mehr verfügbar."
         m["player_subtitle_fallback"] = "Untertitel"
         m["player_subtitle_unavailable"] = "Diese Untertitelspur ist nicht mehr verfügbar."
-        m["player_subtitle_switch_failed"] = "Untertitelwechsel fehlgeschlagen: {0}"
         m["player_audio_unavailable"] = "Diese Audiospur ist nicht mehr verfügbar."
-        m["player_audio_switch_failed"] = "Audiowechsel fehlgeschlagen: {0}"
         m["player_stream_unavailable"] = "Dieser Stream ist nicht mehr verfügbar."
         m["player_stream_switch_failed"] = "Stream konnte nicht gewechselt werden. Prüfe deine Verbindung und versuche es erneut."
         m["playback_err_5xx_title"] = "Serverfehler"
@@ -913,7 +912,6 @@ internal object StringsDe {
         m["player_failover_none_worked"] = "Keiner der Streams hat funktioniert"
         m["player_failover_none_worked_many"] = "Für diesen Titel wurden {0} Streams versucht, keiner davon lief. Versuch es später noch einmal oder wähle auf der Seite des Titels unter Stream wechseln einen aus."
         m["player_failover_no_other"] = "Dieser Stream konnte nicht abgespielt werden und es gibt keinen anderen zum Ausprobieren. Versuch es später noch einmal."
-        m["player_start_over_failed"] = "Neustart fehlgeschlagen: {0}"
         m["player_dialogue_boost_enabled"] = "Dialoganhebung eingeschaltet (Nachtmodus mit Dynamikkompression)"
         m["player_dialogue_boost_disabled"] = "Dialoganhebung ausgeschaltet"
         m["player_subtitle_image"] = "Bild"
@@ -955,5 +953,15 @@ internal object StringsDe {
         m["outlook_reason_interlaced"] = "Video im Zeilensprungverfahren"
         m["outlook_reason_image_subtitles"] = "Bilduntertitel"
         m["outlook_reason_other"] = "muss umgewandelt werden"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Wird gesendet..."
+        m["auth_server_not_found"] = "Unter dieser Adresse wurde kein Jellyfin-Server gefunden."
+        m["auth_server_error"] = "Auf dem Server ist ein Fehler aufgetreten. Versuche es später erneut."
+        m["auth_wrong_credentials"] = "Falscher Benutzername oder falsches Passwort."
+        m["player_start_over_error"] = "Neustart fehlgeschlagen. Versuche es erneut."
+        m["player_subtitle_switch_error"] = "Untertitel konnten nicht gewechselt werden. Versuche es erneut."
+        m["player_audio_switch_error"] = "Die Tonspur konnte nicht gewechselt werden. Versuche es erneut."
     }
 }

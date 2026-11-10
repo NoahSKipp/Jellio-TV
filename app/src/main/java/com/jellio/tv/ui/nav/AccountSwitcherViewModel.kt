@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.LoginResult
+import com.jellio.tv.ui.auth.message
 import com.jellio.tv.data.model.UserDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.auth.RememberedProfile
@@ -70,16 +71,16 @@ class AccountSwitcherViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(busyUserId = userId, error = null)
             val result = kotlinx.coroutines.withTimeoutOrNull(QUICK_SIGN_IN_TIMEOUT_MS) {
                 repository.quickSignIn(session.serverAddress, userId)
-            } ?: LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_server_timeout"))
+            } ?: LoginResult.Failure(com.jellio.tv.data.LoginFailure.TIMEOUT)
             when (result) {
                 is LoginResult.Success -> _uiState.value = _uiState.value.copy(busyUserId = null)
                 is LoginResult.Failure -> {
-                    android.util.Log.w("JellioSwitch", "quick sign in failed: ${result.message}")
+                    android.util.Log.w("JellioSwitch", "quick sign in failed: ${result.reason}")
                     // A saved sign-in the server turned down has been forgotten.
                     val stillSaved = repository.getRememberedUsers(session.serverAddress).containsKey(userId)
                     _uiState.value = _uiState.value.copy(
                         busyUserId = null,
-                        error = result.message,
+                        error = result.reason.message(),
                         remembered = if (stillSaved) _uiState.value.remembered else _uiState.value.remembered.filter { it.userId != userId },
                     )
                 }

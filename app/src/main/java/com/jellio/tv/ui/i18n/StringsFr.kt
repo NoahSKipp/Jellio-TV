@@ -16,6 +16,7 @@ internal object StringsFr {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsFr {
         m["player_start_over_unavailable"] = "Impossible de recommencer, cette source n'est plus disponible."
         m["player_subtitle_fallback"] = "Sous-titre"
         m["player_subtitle_unavailable"] = "Cette piste de sous-titres n'est plus disponible."
-        m["player_subtitle_switch_failed"] = "Échec du changement de sous-titres : {0}"
         m["player_audio_unavailable"] = "Cette piste audio n'est plus disponible."
-        m["player_audio_switch_failed"] = "Échec du changement de piste audio : {0}"
         m["player_stream_unavailable"] = "Cette source n'est plus disponible."
         m["player_stream_switch_failed"] = "Impossible de changer de source. Vérifiez votre connexion et réessayez."
         m["playback_err_5xx_title"] = "Erreur serveur"
@@ -913,7 +912,6 @@ internal object StringsFr {
         m["player_failover_none_worked"] = "Aucun des flux n'a fonctionné"
         m["player_failover_none_worked_many"] = "{0} flux ont été essayés pour ce titre et aucun n'a pu être lu. Réessaie plus tard, ou choisis-en un via Changer de flux sur la page du titre."
         m["player_failover_no_other"] = "Ce flux n'a pas pu être lu et il n'y en a pas d'autre à essayer. Réessaie plus tard."
-        m["player_start_over_failed"] = "Impossible de recommencer : {0}"
         m["player_dialogue_boost_enabled"] = "Amélioration des dialogues activée (mode nuit avec compression dynamique)"
         m["player_dialogue_boost_disabled"] = "Amélioration des dialogues désactivée"
         m["player_subtitle_image"] = "image"
@@ -955,5 +953,15 @@ internal object StringsFr {
         m["outlook_reason_interlaced"] = "vidéo entrelacée"
         m["outlook_reason_image_subtitles"] = "sous-titres image"
         m["outlook_reason_other"] = "conversion nécessaire"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Envoi..."
+        m["auth_server_not_found"] = "Aucun serveur Jellyfin trouvé à cette adresse."
+        m["auth_server_error"] = "Le serveur a rencontré un problème. Réessayez plus tard."
+        m["auth_wrong_credentials"] = "Nom d'utilisateur ou mot de passe incorrect."
+        m["player_start_over_error"] = "Impossible de reprendre depuis le début. Réessayez."
+        m["player_subtitle_switch_error"] = "Impossible de changer les sous-titres. Réessayez."
+        m["player_audio_switch_error"] = "Impossible de changer la piste audio. Réessayez."
     }
 }

@@ -3,7 +3,9 @@ package com.jellio.tv.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.LoginFailure
 import com.jellio.tv.data.LoginResult
+import com.jellio.tv.data.loginFailureOf
 import com.jellio.tv.data.model.UserDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,7 +112,7 @@ class LoginViewModel @Inject constructor(
             repository.resolveServerAddress(serverAddress)
                 .onSuccess { loadProfiles(it) }
                 .onFailure {
-                    _uiState.value = LoginUiState(mode = LoginMode.SERVER_ENTRY, serverAddress = serverAddress, error = it.message)
+                    _uiState.value = LoginUiState(mode = LoginMode.SERVER_ENTRY, serverAddress = serverAddress, error = loginFailureOf(it, LoginFailure.SERVER_UNREACHABLE).message())
                 }
         }
     }
@@ -127,7 +129,7 @@ class LoginViewModel @Inject constructor(
                         mode = LoginMode.MANUAL,
                         busyUserId = null,
                         manualPrefillUsername = name,
-                        error = result.message,
+                        error = result.reason.message(),
                         remembered = _uiState.value.remembered.filterNot { it.userId == userId },
                     )
                 }
@@ -152,7 +154,7 @@ class LoginViewModel @Inject constructor(
                         mode = LoginMode.MANUAL,
                         busyUserId = null,
                         manualPrefillUsername = user.Name,
-                        error = result.message,
+                        error = result.reason.message(),
                     )
                 }
             }
@@ -188,7 +190,7 @@ class LoginViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRequestingReset = true, resetStatus = "Sending…")
+            _uiState.value = _uiState.value.copy(isRequestingReset = true, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_sending"))
             val ok = repository.requestPasswordReset(_uiState.value.serverAddress, username)
             _uiState.value = if (ok) {
                 _uiState.value.copy(
@@ -216,7 +218,7 @@ class LoginViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_resetting"))
             when (val result = repository.redeemPasswordReset(_uiState.value.serverAddress, _uiState.value.forgotPasswordUsername, pin, newPassword)) {
                 is LoginResult.Success -> Unit
-                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isRedeemingReset = false, resetStatus = result.message)
+                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isRedeemingReset = false, resetStatus = result.reason.message())
             }
         }
     }
@@ -236,7 +238,7 @@ class LoginViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             when (val result = repository.connectAndLogin(serverAddress, username, password)) {
                 is LoginResult.Success -> Unit
-                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isLoading = false, error = result.message)
+                is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isLoading = false, error = result.reason.message())
             }
         }
     }
@@ -282,7 +284,7 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
                         is LoginResult.Failure -> {
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
-                                error = authResult.message,
+                                error = authResult.reason.message(),
                             )
                             return@launch
                         }
@@ -310,6 +312,8 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
         quickConnectJob?.cancel()
     }
 }
+
+fun LoginFailure.message(): String = com.jellio.tv.ui.i18n.Strings.get(key)
 
 object LoginHandoff {
     @Volatile private var username: String? = null

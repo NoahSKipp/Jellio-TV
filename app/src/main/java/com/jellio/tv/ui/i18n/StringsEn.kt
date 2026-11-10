@@ -16,6 +16,7 @@ internal object StringsEn {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsEn {
         m["player_start_over_unavailable"] = "Could not start over, that stream is no longer available."
         m["player_subtitle_fallback"] = "Subtitle"
         m["player_subtitle_unavailable"] = "That subtitle track is no longer available."
-        m["player_subtitle_switch_failed"] = "Subtitle switch failed: {0}"
         m["player_audio_unavailable"] = "That audio track is no longer available."
-        m["player_audio_switch_failed"] = "Audio switch failed: {0}"
         m["player_stream_unavailable"] = "That stream is no longer available."
         m["player_stream_switch_failed"] = "Could not switch streams. Check your connection and try again."
         m["playback_err_5xx_title"] = "Server error"
@@ -913,7 +912,6 @@ internal object StringsEn {
         m["player_failover_none_worked"] = "None of the streams worked"
         m["player_failover_none_worked_many"] = "{0} streams were tried for this title and none of them played. Try again later, or pick one from Change stream on the title's page."
         m["player_failover_no_other"] = "This stream couldn't be played and there's no other one to try. Try again later."
-        m["player_start_over_failed"] = "Could not start over: {0}"
         m["player_dialogue_boost_enabled"] = "Dialogue Boost enabled (night mode dynamic compression)"
         m["player_dialogue_boost_disabled"] = "Dialogue Boost disabled"
         m["player_subtitle_image"] = "image"
@@ -955,5 +953,15 @@ internal object StringsEn {
         m["outlook_reason_interlaced"] = "interlaced video"
         m["outlook_reason_image_subtitles"] = "image subtitles"
         m["outlook_reason_other"] = "needs converting"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Sending..."
+        m["auth_server_not_found"] = "Couldn't find a Jellyfin server at that address."
+        m["auth_server_error"] = "The server ran into a problem. Try again later."
+        m["auth_wrong_credentials"] = "Wrong username or password."
+        m["player_start_over_error"] = "Could not start over. Try again."
+        m["player_subtitle_switch_error"] = "Could not switch subtitles. Try again."
+        m["player_audio_switch_error"] = "Could not switch the audio track. Try again."
     }
 }

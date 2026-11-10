@@ -126,7 +126,7 @@ private val KNOWN_ANTHOLOGIES = listOf(
 
 sealed interface LoginResult {
     data object Success : LoginResult
-    data class Failure(val message: String) : LoginResult
+    data class Failure(val reason: LoginFailure) : LoginResult
 }
 
 data class SeriesPlayTarget(val episode: BaseItemDto, val resume: Boolean)
@@ -282,7 +282,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun resolveServerAddress(input: String): Result<String> {
         val trimmed = input.trim().trimEnd('/')
-        if (trimmed.isEmpty()) return Result.failure(IllegalArgumentException("Enter your server address"))
+        if (trimmed.isEmpty()) return Result.failure(ServerAddressException(LoginFailure.ENTER_SERVER, "no address"))
         val hasScheme = trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)
         val first = com.jellio.tv.di.normalizeServerAddress(trimmed)
         val candidates = if (hasScheme) {
@@ -298,12 +298,13 @@ class JellioRepository @Inject constructor(
         }
         sessionManager.saveServerAddress(first)
         val tried = candidates.joinToString(" and ")
-        return Result.failure(java.io.IOException("Couldn't reach a Jellyfin server. Tried $tried."))
+        android.util.Log.w("JellioAuth", "no Jellyfin server answered, tried $tried")
+        return Result.failure(ServerAddressException(LoginFailure.SERVER_NOT_FOUND, "tried $tried"))
     }
 
     suspend fun connectAndLogin(serverAddress: String, username: String, password: String): LoginResult {
         val normalized = resolveServerAddress(serverAddress).getOrElse {
-            return LoginResult.Failure(it.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
+            return LoginResult.Failure(loginFailureOf(it, LoginFailure.SERVER_UNREACHABLE))
         }
         return try {
             val result = api.authenticateByName(AuthenticateByNameRequest(username, password))
@@ -312,7 +313,8 @@ class JellioRepository @Inject constructor(
             rememberUser(normalized, result.User.Id, result.AccessToken, result.User.Name, result.User.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure(err.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
+            android.util.Log.w("JellioAuth", "sign in failed", err)
+            LoginResult.Failure(loginFailureOf(err, LoginFailure.SERVER_UNREACHABLE))
         }
     }
 
@@ -340,9 +342,9 @@ class JellioRepository @Inject constructor(
     suspend fun quickSignIn(serverAddress: String, userId: String): LoginResult {
         val normalized = com.jellio.tv.di.normalizeServerAddress(serverAddress)
         val entry = rememberedUsersStore.getRememberedUsers(normalized)[userId]
-            ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_no_remembered_signin"))
+            ?: return LoginResult.Failure(LoginFailure.NO_REMEMBERED_SIGNIN)
         // The server dropped this sign-in earlier: the profile stays, the password is needed.
-        if (entry.accessToken.isBlank()) return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
+        if (entry.accessToken.isBlank()) return LoginResult.Failure(LoginFailure.SESSION_EXPIRED)
         sessionManager.saveServerAddress(normalized)
         return try {
             val authorization = com.jellio.tv.data.network.buildEmbyAuthorizationHeader(
@@ -359,12 +361,12 @@ class JellioRepository @Inject constructor(
             // Only a token the server actually rejects is forgotten.
             if (err.code() == 401 || err.code() == 403) {
                 rememberedUsersStore.forgetUser(normalized, userId)
-                LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_saved_signin_expired"))
+                LoginResult.Failure(LoginFailure.SAVED_SIGNIN_EXPIRED)
             } else {
-                LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_switch_profile_error"))
+                LoginResult.Failure(LoginFailure.SWITCH_PROFILE_ERROR)
             }
         } catch (err: Exception) {
-            LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_server_try_again"))
+            LoginResult.Failure(LoginFailure.SERVER_TRY_AGAIN)
         }
     }
 
@@ -394,16 +396,16 @@ class JellioRepository @Inject constructor(
         return try {
             val redeemed = api.redeemPasswordResetPin(ForgotPasswordPinRequest(pin))
             if (!redeemed.Success) {
-                return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_code_invalid"))
+                return LoginResult.Failure(LoginFailure.RESET_CODE_INVALID)
             }
             val loginResult = connectAndLogin(serverAddress, username, "")
             if (loginResult is LoginResult.Failure) return loginResult
             val userId = sessionManager.sessionFlow.first()?.userId
-                ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_finish_error"))
+                ?: return LoginResult.Failure(LoginFailure.RESET_FINISH_ERROR)
             updatePassword(userId, "", newPassword)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_reset_try_again"))
+            LoginResult.Failure(LoginFailure.RESET_TRY_AGAIN)
         }
     }
 
@@ -1955,17 +1957,18 @@ class JellioRepository @Inject constructor(
     suspend fun authenticateWithQuickConnect(serverAddress: String, secret: String): LoginResult {
         return try {
             val normalized = resolveServerAddress(serverAddress).getOrElse {
-                return LoginResult.Failure(it.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_server_unreachable"))
+                return LoginResult.Failure(loginFailureOf(it, LoginFailure.SERVER_UNREACHABLE))
             }
             val result = api.authenticateWithQuickConnect(com.jellio.tv.data.model.QuickConnectAuthBody(secret))
-            val user = result.User ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_invalid_user_response"))
-            val token = result.AccessToken ?: return LoginResult.Failure(com.jellio.tv.ui.i18n.Strings.get("auth_missing_token"))
+            val user = result.User ?: return LoginResult.Failure(LoginFailure.INVALID_USER_RESPONSE)
+            val token = result.AccessToken ?: return LoginResult.Failure(LoginFailure.MISSING_TOKEN)
             clearCache()
             sessionManager.saveSession(normalized, token, user.Id, user.Name)
             rememberUser(normalized, user.Id, token, user.Name, user.PrimaryImageTag)
             LoginResult.Success
         } catch (err: Exception) {
-            LoginResult.Failure(err.message ?: com.jellio.tv.ui.i18n.Strings.get("auth_quick_connect_failed"))
+            android.util.Log.w("JellioAuth", "Quick Connect sign in failed", err)
+            LoginResult.Failure(loginFailureOf(err, LoginFailure.QUICK_CONNECT_FAILED, rejected = LoginFailure.QUICK_CONNECT_FAILED))
         }
     }
 

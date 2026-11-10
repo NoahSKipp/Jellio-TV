@@ -16,6 +16,7 @@ internal object StringsPl {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsPl {
         m["player_start_over_unavailable"] = "Nie można rozpocząć od nowa, to źródło nie jest już dostępne."
         m["player_subtitle_fallback"] = "Napisy"
         m["player_subtitle_unavailable"] = "Ta ścieżka napisów nie jest już dostępna."
-        m["player_subtitle_switch_failed"] = "Zmiana napisów nie powiodła się: {0}"
         m["player_audio_unavailable"] = "Ta ścieżka dźwiękowa nie jest już dostępna."
-        m["player_audio_switch_failed"] = "Zmiana ścieżki dźwiękowej nie powiodła się: {0}"
         m["player_stream_unavailable"] = "To źródło nie jest już dostępne."
         m["player_stream_switch_failed"] = "Nie udało się zmienić źródła. Sprawdź połączenie i spróbuj ponownie."
         m["playback_err_5xx_title"] = "Błąd serwera"
@@ -913,7 +912,6 @@ internal object StringsPl {
         m["player_failover_none_worked"] = "Żaden ze strumieni nie zadziałał"
         m["player_failover_none_worked_many"] = "Wypróbowane strumienie dla tego tytułu: {0}. Żaden się nie odtworzył. Spróbuj później lub wybierz jeden w Zmień źródło na stronie tytułu."
         m["player_failover_no_other"] = "Nie udało się odtworzyć tego strumienia i nie ma innego do wypróbowania. Spróbuj później."
-        m["player_start_over_failed"] = "Nie można rozpocząć od nowa: {0}"
         m["player_dialogue_boost_enabled"] = "Wzmocnienie dialogów włączone (tryb nocny z kompresją dynamiki)"
         m["player_dialogue_boost_disabled"] = "Wzmocnienie dialogów wyłączone"
         m["player_subtitle_image"] = "obraz"
@@ -955,5 +953,15 @@ internal object StringsPl {
         m["outlook_reason_interlaced"] = "wideo z przeplotem"
         m["outlook_reason_image_subtitles"] = "napisy graficzne"
         m["outlook_reason_other"] = "wymaga konwersji"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Wysyłanie..."
+        m["auth_server_not_found"] = "Nie znaleziono serwera Jellyfin pod tym adresem."
+        m["auth_server_error"] = "Serwer napotkał problem. Spróbuj ponownie później."
+        m["auth_wrong_credentials"] = "Nieprawidłowa nazwa użytkownika lub hasło."
+        m["player_start_over_error"] = "Nie udało się zacząć od nowa. Spróbuj ponownie."
+        m["player_subtitle_switch_error"] = "Nie udało się zmienić napisów. Spróbuj ponownie."
+        m["player_audio_switch_error"] = "Nie udało się zmienić ścieżki dźwiękowej. Spróbuj ponownie."
     }
 }

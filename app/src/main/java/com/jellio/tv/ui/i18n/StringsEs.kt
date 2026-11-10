@@ -16,6 +16,7 @@ internal object StringsEs {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsEs {
         m["player_start_over_unavailable"] = "No se pudo reiniciar, esa fuente ya no está disponible."
         m["player_subtitle_fallback"] = "Subtítulo"
         m["player_subtitle_unavailable"] = "Esa pista de subtítulos ya no está disponible."
-        m["player_subtitle_switch_failed"] = "Error al cambiar subtítulos: {0}"
         m["player_audio_unavailable"] = "Esa pista de audio ya no está disponible."
-        m["player_audio_switch_failed"] = "Error al cambiar audio: {0}"
         m["player_stream_unavailable"] = "Esa fuente ya no está disponible."
         m["player_stream_switch_failed"] = "No se pudo cambiar de fuente. Comprueba tu conexión e inténtalo de nuevo."
         m["playback_err_5xx_title"] = "Error del servidor"
@@ -913,7 +912,6 @@ internal object StringsEs {
         m["player_failover_none_worked"] = "Ninguno de los streams funcionó"
         m["player_failover_none_worked_many"] = "Se probaron {0} streams para este título y ninguno se reprodujo. Inténtalo más tarde o elige uno en Cambiar stream en la página del título."
         m["player_failover_no_other"] = "Este stream no se pudo reproducir y no hay otro que probar. Inténtalo más tarde."
-        m["player_start_over_failed"] = "No se pudo reiniciar: {0}"
         m["player_dialogue_boost_enabled"] = "Realce de diálogo activado (modo noche con compresión dinámica)"
         m["player_dialogue_boost_disabled"] = "Realce de diálogo desactivado"
         m["player_subtitle_image"] = "imagen"
@@ -955,5 +953,15 @@ internal object StringsEs {
         m["outlook_reason_interlaced"] = "vídeo entrelazado"
         m["outlook_reason_image_subtitles"] = "subtítulos de imagen"
         m["outlook_reason_other"] = "necesita conversión"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Enviando..."
+        m["auth_server_not_found"] = "No se encontró ningún servidor Jellyfin en esa dirección."
+        m["auth_server_error"] = "El servidor tuvo un problema. Inténtalo de nuevo más tarde."
+        m["auth_wrong_credentials"] = "Usuario o contraseña incorrectos."
+        m["player_start_over_error"] = "No se pudo empezar desde el principio. Inténtalo de nuevo."
+        m["player_subtitle_switch_error"] = "No se pudieron cambiar los subtítulos. Inténtalo de nuevo."
+        m["player_audio_switch_error"] = "No se pudo cambiar la pista de audio. Inténtalo de nuevo."
     }
 }

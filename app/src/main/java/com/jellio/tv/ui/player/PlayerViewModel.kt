@@ -21,7 +21,9 @@ import com.jellio.tv.data.playback.mergeSkipSegments
 import com.jellio.tv.data.playback.skipSegmentsComplete
 import com.jellio.tv.data.playback.VideoTranscodePolicy
 import com.jellio.tv.data.playback.outlookReason
+import com.jellio.tv.ui.common.LoadFailure
 import com.jellio.tv.ui.common.displayText
+import com.jellio.tv.ui.common.loadFailureOf
 import com.jellio.tv.data.playback.videoInfoOf
 import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.prefs.SubtitleStylePreferences
@@ -349,6 +351,12 @@ class PlayerViewModel @Inject constructor(
     private var playbackSession: Session? = null
     private var hasCheckedPreviousEpisodes = false
     private var toastSeq = 0L
+
+    // The exception goes to the log; the viewer gets a translated reason.
+    private fun actionFailedText(err: Throwable, key: String): String {
+        android.util.Log.w("JellioPlayer", "$key", err)
+        return Strings.get(if (loadFailureOf(err) == LoadFailure.Unreachable) "error_server_unreachable" else key)
+    }
 
     fun showToast(message: String) {
         toastSeq++
@@ -768,7 +776,7 @@ class PlayerViewModel @Inject constructor(
                     if (err is IllegalStateException) {
                         Strings.get("player_start_over_unavailable")
                     } else {
-                        Strings.format("player_start_over_failed", err.message ?: err.toString())
+                        actionFailedText(err, "player_start_over_error")
                     },
                 )
             }
@@ -902,7 +910,7 @@ class PlayerViewModel @Inject constructor(
                     if (err is IllegalStateException) {
                         Strings.get("player_subtitle_unavailable")
                     } else {
-                        Strings.format("player_subtitle_switch_failed", err.message ?: "")
+                        actionFailedText(err, "player_subtitle_switch_error")
                     },
                 )
             }
@@ -951,7 +959,7 @@ class PlayerViewModel @Inject constructor(
                     if (err is IllegalStateException) {
                         Strings.get("player_audio_unavailable")
                     } else {
-                        Strings.format("player_audio_switch_failed", err.message ?: "")
+                        actionFailedText(err, "player_audio_switch_error")
                     },
                 )
             }

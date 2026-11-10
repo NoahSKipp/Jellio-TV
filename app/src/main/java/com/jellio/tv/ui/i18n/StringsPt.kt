@@ -16,6 +16,7 @@ internal object StringsPt {
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
+        fillErrors(m)
         m
     }
 
@@ -782,9 +783,7 @@ internal object StringsPt {
         m["player_start_over_unavailable"] = "Não foi possível recomeçar, essa fonte não está mais disponível."
         m["player_subtitle_fallback"] = "Legenda"
         m["player_subtitle_unavailable"] = "Essa faixa de legendas não está mais disponível."
-        m["player_subtitle_switch_failed"] = "Falha ao trocar legendas: {0}"
         m["player_audio_unavailable"] = "Essa faixa de áudio não está mais disponível."
-        m["player_audio_switch_failed"] = "Falha ao trocar áudio: {0}"
         m["player_stream_unavailable"] = "Essa fonte não está mais disponível."
         m["player_stream_switch_failed"] = "Não foi possível trocar de fonte. Verifique sua conexão e tente novamente."
         m["playback_err_5xx_title"] = "Erro do servidor"
@@ -913,7 +912,6 @@ internal object StringsPt {
         m["player_failover_none_worked"] = "Nenhum dos streams funcionou"
         m["player_failover_none_worked_many"] = "Foram tentados {0} streams para este título e nenhum foi reproduzido. Tente de novo mais tarde ou escolha um em Alterar stream na página do título."
         m["player_failover_no_other"] = "Este stream não pôde ser reproduzido e não há outro para tentar. Tente de novo mais tarde."
-        m["player_start_over_failed"] = "Não foi possível recomeçar: {0}"
         m["player_dialogue_boost_enabled"] = "Aprimoramento de diálogo ativado (modo noturno com compressão dinâmica)"
         m["player_dialogue_boost_disabled"] = "Aprimoramento de diálogo desativado"
         m["player_subtitle_image"] = "imagem"
@@ -955,5 +953,15 @@ internal object StringsPt {
         m["outlook_reason_interlaced"] = "vídeo entrelaçado"
         m["outlook_reason_image_subtitles"] = "legendas em imagem"
         m["outlook_reason_other"] = "precisa de conversão"
+    }
+
+    private fun fillErrors(m: HashMap<String, String>) {
+        m["auth_sending"] = "Enviando..."
+        m["auth_server_not_found"] = "Nenhum servidor Jellyfin encontrado nesse endereço."
+        m["auth_server_error"] = "O servidor encontrou um problema. Tente novamente mais tarde."
+        m["auth_wrong_credentials"] = "Usuário ou senha incorretos."
+        m["player_start_over_error"] = "Não foi possível recomeçar. Tente novamente."
+        m["player_subtitle_switch_error"] = "Não foi possível trocar as legendas. Tente novamente."
+        m["player_audio_switch_error"] = "Não foi possível trocar a faixa de áudio. Tente novamente."
     }
 }
