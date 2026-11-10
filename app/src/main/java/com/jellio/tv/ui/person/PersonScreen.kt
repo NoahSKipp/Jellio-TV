@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -47,6 +48,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -302,13 +304,20 @@ private fun PersonHeroHeader(
     var isBioExpanded by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxWidth().heightIn(min = 380.dp.scaled())) {
-        // Cinematic backdrop art with gradient overlays
+        // The backdrop is someone else's title art, so it only sets the mood:
+        // blurred and dimmed behind the text, a little clearer on the far right.
         if (!details.backdropUrl.isNullOrBlank()) {
+            val canBlur = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
             AsyncImage(
                 model = details.backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().then(if (canBlur) Modifier.blur(24.dp) else Modifier),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(JellioBg.copy(alpha = if (canBlur) 0.45f else 0.62f)),
             )
         }
 
@@ -316,10 +325,10 @@ private fun PersonHeroHeader(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, JellioBg.copy(alpha = 0.7f), JellioBg),
-                        startY = 0f,
-                        endY = Float.POSITIVE_INFINITY,
+                    Brush.horizontalGradient(
+                        0f to JellioBg.copy(alpha = 0.92f),
+                        0.55f to JellioBg.copy(alpha = 0.72f),
+                        1f to JellioBg.copy(alpha = 0.25f),
                     ),
                 ),
         )
@@ -328,13 +337,10 @@ private fun PersonHeroHeader(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            JellioBg.copy(alpha = 0.95f),
-                            JellioBg.copy(alpha = 0.75f),
-                            Color.Transparent,
-                        ),
-                        endX = 1300f,
+                    Brush.verticalGradient(
+                        0f to JellioBg.copy(alpha = 0.35f),
+                        0.55f to Color.Transparent,
+                        1f to JellioBg,
                     ),
                 ),
         )
@@ -414,12 +420,12 @@ private fun PersonHeroHeader(
             Column(
                 modifier = Modifier
                     .padding(start = 28.dp)
-                    .widthIn(max = 840.dp),
+                    .widthIn(max = 760.dp),
             ) {
                 // Name
                 Text(
                     text = details.name,
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.headlineLarge.copy(shadow = HeroTextShadow),
                     fontWeight = FontWeight.Bold,
                     color = JellioText,
                 )
@@ -464,8 +470,8 @@ private fun PersonHeroHeader(
 
                     Text(
                         text = annotatedBio,
-                        color = JellioTextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
+                        color = JellioText.copy(alpha = 0.86f),
+                        style = MaterialTheme.typography.bodyMedium.copy(shadow = HeroTextShadow),
                         maxLines = if (isBioExpanded) 20 else 3,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 10.dp),
@@ -506,14 +512,14 @@ private fun MetadataBadge(text: String, accent: Boolean = false, modifier: Modif
     Box(
         modifier = modifier
             .background(
-                if (accent) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+                if (accent) Color.White.copy(alpha = 0.22f) else JellioBg.copy(alpha = 0.55f),
                 RoundedCornerShape(999.dp),
             )
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
             text = text,
-            color = if (accent) Color.White else JellioTextSecondary,
+            color = if (accent) Color.White else JellioText.copy(alpha = 0.85f),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (accent) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
@@ -666,3 +672,5 @@ private fun PersonCreditCard(
         }
     }
 }
+
+private val HeroTextShadow = Shadow(color = Color.Black.copy(alpha = 0.6f), offset = Offset(0f, 2f), blurRadius = 8f)
