@@ -774,10 +774,10 @@ class HomeViewModel @Inject constructor(
         _uiState.value = state.copy(rows = updatedRows)
     }
 
-    private fun handleAutoRemovedWatchlist(userId: String) {
-        val autoRemoved = repository.lastAutoRemovedWatchlistIds.value
-        if (autoRemoved.isEmpty()) return
-        autoRemoved.forEach { removedFromWatchlist[it] = true }
+    // The server takes watched titles off the watchlist; its answer says so.
+    private fun dropFromWatchlistRows(userId: String, itemId: String) {
+        val autoRemoved = setOf(itemId)
+        removedFromWatchlist[itemId] = true
         val state = _uiState.value
         val updatedRows = state.rows.mapNotNull { row ->
             if (row is PosterHomeRow && row.section.key.startsWith("watchlist")) {
@@ -799,9 +799,7 @@ class HomeViewModel @Inject constructor(
             runCatching { repository.setPlayed(session.userId, item.Id, next) }
                 .onSuccess { updated ->
                     updateItem(item.Id) { it.copy(UserData = updated) }
-                    if (next) {
-                        handleAutoRemovedWatchlist(session.userId)
-                    }
+                    if (next && !updated.IsFavorite) dropFromWatchlistRows(session.userId, item.Id)
                 }
                 .onFailure {
                     updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(Played = prevPlayed)) }
@@ -828,7 +826,7 @@ class HomeViewModel @Inject constructor(
         removeItemFromRows(item.Id)
         viewModelScope.launch {
             runCatching { repository.setPlayed(session.userId, item.Id, true) }
-                .onSuccess { handleAutoRemovedWatchlist(session.userId) }
+                .onSuccess { updated -> if (!updated.IsFavorite) dropFromWatchlistRows(session.userId, item.Id) }
                 .onFailure {
                     removedItemIds.remove(item.Id)
                     _uiState.value = _uiState.value.copy(rows = before)
@@ -886,7 +884,6 @@ class HomeViewModel @Inject constructor(
                     }
                 },
             )
-            handleAutoRemovedWatchlist(session.userId)
         }
     }
 

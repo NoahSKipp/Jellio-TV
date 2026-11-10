@@ -3,6 +3,7 @@ package com.jellio.tv.ui.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
+import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.PersonDto
@@ -452,13 +453,13 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.setPlayed(session.userId, item.Id, next) }
                 .onSuccess { updated ->
-                    val wasAutoRemoved = item.Id in repository.lastAutoRemovedWatchlistIds.value
                     val curItem = _uiState.value.item
                     val syncedItem = curItem?.copy(UserData = updated)
                     if (syncedItem != null) repository.seedPreviews(listOf(syncedItem))
                     _uiState.value = _uiState.value.copy(
                         isWatched = updated.Played,
-                        isWatchlisted = if (wasAutoRemoved) false else _uiState.value.isWatchlisted,
+                        // The server drops watched titles from the watchlist and answers with the result.
+                        isWatchlisted = updated.IsFavorite,
                         item = syncedItem ?: curItem,
                     )
                     applyEpisodeUpdate(item.Id, updated)
@@ -592,7 +593,7 @@ class DetailViewModel @Inject constructor(
             runCatching { repository.setPlayed(session.userId, episode.Id, next) }
                 .onSuccess { updated ->
                     applyEpisodeUpdate(episode.Id, updated)
-                    checkAutoRemovedWatchlist()
+                    refreshWatchlisted(session)
                 }
                 .onFailure {
                     val revertedData = (episode.UserData ?: UserItemDataDto()).copy(Played = prevPlayed)
@@ -622,7 +623,7 @@ class DetailViewModel @Inject constructor(
                 id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)
             }
             applyEpisodeUpdates(updates)
-            checkAutoRemovedWatchlist()
+            refreshWatchlisted(session)
         }
     }
 
@@ -641,14 +642,17 @@ class DetailViewModel @Inject constructor(
                 id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)
             }
             applyEpisodeUpdates(updates)
-            checkAutoRemovedWatchlist()
+            refreshWatchlisted(session)
         }
     }
 
-    private fun checkAutoRemovedWatchlist() {
-        val currentItemId = _uiState.value.item?.Id
-        if (currentItemId != null && currentItemId in repository.lastAutoRemovedWatchlistIds.value) {
-            _uiState.value = _uiState.value.copy(isWatchlisted = false)
+    // Watching the last episode can take the series off the watchlist on the server.
+    private suspend fun refreshWatchlisted(session: Session) {
+        val currentItemId = _uiState.value.item?.Id ?: return
+        if (!_uiState.value.isWatchlisted) return
+        val fresh = catching { repository.getItem(session.userId, currentItemId) }.getOrNull() ?: return
+        if (_uiState.value.item?.Id == currentItemId) {
+            _uiState.value = _uiState.value.copy(isWatchlisted = fresh.UserData?.IsFavorite ?: _uiState.value.isWatchlisted)
         }
     }
 

@@ -58,9 +58,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -250,8 +247,6 @@ class JellioRepository @Inject constructor(
 
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
 
-    private val _lastAutoRemovedWatchlistIds = MutableStateFlow<Set<String>>(emptySet())
-    val lastAutoRemovedWatchlistIds: StateFlow<Set<String>> = _lastAutoRemovedWatchlistIds.asStateFlow()
 
     fun isRemoveFromWatchlistAfterWatchingEnabled(): Boolean =
         watchlistPreferences.isRemoveFromWatchlistAfterWatchingEnabled()
