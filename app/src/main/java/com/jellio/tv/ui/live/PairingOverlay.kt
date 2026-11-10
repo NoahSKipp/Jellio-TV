@@ -38,7 +38,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.common.primaryButtonColors
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary

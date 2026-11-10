@@ -202,7 +202,7 @@ private fun AvatarUploadTile(busy: Boolean, onClick: () -> Unit, focusRequester:
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(imageVector = Icons.Filled.AddAPhoto, contentDescription = com.jellio.tv.ui.i18n.Strings.get("avatar_upload_prompt"), tint = JellioText)
+            Icon(imageVector = Icons.Filled.AddAPhoto, contentDescription = com.jellio.tv.data.i18n.Strings.get("avatar_upload_prompt"), tint = JellioText)
             Text(text = com.jellio.tv.ui.i18n.string("avatar_upload_btn"), color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
         }
     }

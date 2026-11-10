@@ -62,7 +62,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
-import com.jellio.tv.ui.i18n.genreDisplayName
+import com.jellio.tv.data.i18n.genreDisplayName
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -102,7 +102,7 @@ import com.jellio.tv.BuildConfig
 import com.jellio.tv.di.normalizeServerAddress
 import com.jellio.tv.ui.perf.MotionLevel
 import com.jellio.tv.ui.perf.MotionPolicy
-import com.jellio.tv.ui.player.PlayerPrefs
+import com.jellio.tv.data.prefs.PlayerPrefs
 import com.jellio.tv.data.model.LanguageOption
 import com.jellio.tv.data.model.LANGUAGE_OPTIONS
 import com.jellio.tv.data.model.languageName
@@ -553,12 +553,12 @@ fun SettingsScreen(
                                         if (query.isBlank()) return@Surface
                                         val matchedEnabled = selectedGenres.find { it.equals(query, ignoreCase = true) }
                                         if (matchedEnabled != null) {
-                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.format("settings_custom_genres_enabled_exists", matchedEnabled)
+                                            customGenreFeedback = com.jellio.tv.data.i18n.Strings.format("settings_custom_genres_enabled_exists", matchedEnabled)
                                             return@Surface
                                         }
                                         val matchedCustom = customGenres.find { it.name.equals(query, ignoreCase = true) }
                                         if (matchedCustom != null) {
-                                            customGenreFeedback = com.jellio.tv.ui.i18n.Strings.format("settings_custom_genres_custom_exists", matchedCustom.name)
+                                            customGenreFeedback = com.jellio.tv.data.i18n.Strings.format("settings_custom_genres_custom_exists", matchedCustom.name)
                                             return@Surface
                                         }
                                         viewModel.searchGenre(query)
@@ -2135,7 +2135,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
             }
             is ManualCheckResult.UpdateFound -> {
                 Text(
-                    text = com.jellio.tv.ui.i18n.Strings.format("tv_update_available", current.version),
+                    text = com.jellio.tv.data.i18n.Strings.format("tv_update_available", current.version),
                     color = JellioText,
                     modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
                 )
@@ -2152,7 +2152,7 @@ private fun UpdateCheckRow(viewModel: AppUpdateViewModel) {
                     ),
                 ) {
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get(if (updateState.downloading) "update_downloading" else "update_install"),
+                        text = com.jellio.tv.data.i18n.Strings.get(if (updateState.downloading) "update_downloading" else "update_install"),
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }
@@ -2188,9 +2188,9 @@ private fun MotionRow() {
         },
     ) {
         SettingsRowText(
-            label = com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_animations") + labelOf(preference),
-            description = com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_animations_desc") +
-                (profile?.let { com.jellio.tv.ui.i18n.Strings.get("settings_seasonal_device_tier") + it.describe() + "." } ?: ""),
+            label = com.jellio.tv.data.i18n.Strings.get("settings_seasonal_animations") + labelOf(preference),
+            description = com.jellio.tv.data.i18n.Strings.get("settings_seasonal_animations_desc") +
+                (profile?.let { com.jellio.tv.data.i18n.Strings.get("settings_seasonal_device_tier") + it.describe() + "." } ?: ""),
         )
         Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(24.dp))
     }

@@ -199,7 +199,7 @@ internal fun episodeLabel(item: BaseItemDto): String {
     if (!item.Type.equals("Episode", ignoreCase = true)) return ""
     val season = item.ParentIndexNumber ?: return ""
     val episode = item.IndexNumber ?: return ""
-    return com.jellio.tv.ui.i18n.seasonEpisodeTag(season, episode)
+    return com.jellio.tv.data.i18n.seasonEpisodeTag(season, episode)
 }
 
 private fun remainingLabel(item: BaseItemDto): String {
@@ -207,7 +207,7 @@ private fun remainingLabel(item: BaseItemDto): String {
     val posTicks = item.UserData?.PlaybackPositionTicks ?: return ""
     if (runTicks <= 0 || posTicks <= 0 || posTicks >= runTicks) return ""
     val minutes = Math.round((runTicks - posTicks).toDouble() / TICKS_PER_MINUTE)
-    return if (minutes > 0) com.jellio.tv.ui.i18n.Strings.format("card_minutes_left", minutes) else ""
+    return if (minutes > 0) com.jellio.tv.data.i18n.Strings.format("card_minutes_left", minutes) else ""
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -383,7 +383,7 @@ fun PosterCard(
                     }
                     if (progress && episode.isNotEmpty()) {
                         com.jellio.tv.ui.common.FocusMarqueeText(
-                            text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }?.let { com.jellio.tv.ui.i18n.episodeDisplayName(it, item.IndexNumber) }).joinToString(" \u00B7 "),
+                            text = listOfNotNull(episode, item.Name?.takeIf { it.isNotBlank() }?.let { com.jellio.tv.data.i18n.episodeDisplayName(it, item.IndexNumber) }).joinToString(" \u00B7 "),
                             focused = isFocused,
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 13.sp,
@@ -571,29 +571,29 @@ fun CardOptionsMenu(
     val actions = buildList {
         when {
             comingSoon -> {
-                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
-                onRemoveFromComingSoon?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_upcoming"), it, danger = true)) }
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_go_to_details"), it)) }
+                onRemoveFromComingSoon?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_remove_upcoming"), it, danger = true)) }
             }
             continueWatching -> {
-                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_details"), it)) }
-                onGoToSeries?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_series"), it)) }
-                onPlayManually?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_play_manually"), it)) }
-                onStartOver?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_start_beginning"), it)) }
-                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_continue"), it, danger = true)) }
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_go_to_details"), it)) }
+                onGoToSeries?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_go_to_series"), it)) }
+                onPlayManually?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_play_manually"), it)) }
+                onStartOver?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_start_beginning"), it)) }
+                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_remove_continue"), it, danger = true)) }
             }
             upNext -> {
-                onGoToDetails?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("card_go_to_details"), it)) }
-                onGoToSeries?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_go_to_series"), it)) }
+                onGoToDetails?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("card_go_to_details"), it)) }
+                onGoToSeries?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_go_to_series"), it)) }
                 // Jellyfin can't hide one episode from Next Up; marking it
                 // played is what drops it off the row.
-                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_up_next"), it, danger = true)) }
+                onRemoveFromRow?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_remove_up_next"), it, danger = true)) }
                 // Hides the whole show server side, so its next episode
                 // doesn't take its place.
-                onRemoveShowFromRow?.let { add(MenuAction(com.jellio.tv.ui.i18n.Strings.get("menu_remove_show_up_next"), it, danger = true)) }
+                onRemoveShowFromRow?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("menu_remove_show_up_next"), it, danger = true)) }
             }
             else -> {
-                onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) com.jellio.tv.ui.i18n.Strings.get("menu_remove_watchlist") else com.jellio.tv.ui.i18n.Strings.get("menu_add_watchlist"), it)) }
-                onToggleWatched?.let { add(MenuAction(if (isPlayed) com.jellio.tv.ui.i18n.Strings.get("detail_mark_unwatched") else com.jellio.tv.ui.i18n.Strings.get("detail_mark_watched"), it)) }
+                onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) com.jellio.tv.data.i18n.Strings.get("menu_remove_watchlist") else com.jellio.tv.data.i18n.Strings.get("menu_add_watchlist"), it)) }
+                onToggleWatched?.let { add(MenuAction(if (isPlayed) com.jellio.tv.data.i18n.Strings.get("detail_mark_unwatched") else com.jellio.tv.data.i18n.Strings.get("detail_mark_watched"), it)) }
             }
         }
     }

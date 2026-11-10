@@ -1,7 +1,7 @@
 package com.jellio.tv.ui.player
 
 import com.jellio.tv.data.playback.SkipSegments
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 
 // How long before the end an episode without credits data offers its next one.
 internal const val NEAR_END_UP_NEXT_SECONDS = 30.0

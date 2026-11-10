@@ -43,7 +43,7 @@ class TopPicksPaginationTest {
 
         val exclude = mutableSetOf<String>()
         val sections = buildRecommendationRows(source, exclude)
-        val topPicksSection = sections.firstOrNull { it.title == com.jellio.tv.ui.i18n.Strings.get("home_top_picks") }
+        val topPicksSection = sections.firstOrNull { it.title == com.jellio.tv.data.i18n.Strings.get("home_top_picks") }
 
         assertNotNull(topPicksSection)
         assertEquals(2, topPicksSection!!.items.size)

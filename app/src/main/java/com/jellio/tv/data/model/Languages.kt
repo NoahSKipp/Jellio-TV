@@ -79,10 +79,10 @@ private val FALLBACK_ENGLISH_NAMES = mapOf(
 )
 
 fun languageName(code: String?): String {
-    if (code.isNullOrEmpty()) return com.jellio.tv.ui.i18n.Strings.get("lang_unknown")
+    if (code.isNullOrEmpty()) return com.jellio.tv.data.i18n.Strings.get("lang_unknown")
     val lower = code.lowercase()
     val key = KEY_BY_CODE[lower]
-    return if (key != null) com.jellio.tv.ui.i18n.Strings.get(key) else (FALLBACK_ENGLISH_NAMES[lower] ?: code.uppercase())
+    return if (key != null) com.jellio.tv.data.i18n.Strings.get(key) else (FALLBACK_ENGLISH_NAMES[lower] ?: code.uppercase())
 }
 
 data class LanguageOption(val code: String, val name: String)

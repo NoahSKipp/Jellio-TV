@@ -781,7 +781,7 @@ private fun StepOverscanContent(
                     color = JellioText,
                 )
                 Text(
-                    text = com.jellio.tv.ui.i18n.Strings.format("tv_margin", currentPercent),
+                    text = com.jellio.tv.data.i18n.Strings.format("tv_margin", currentPercent),
                     style = MaterialTheme.typography.bodySmall,
                     color = JellioTextSecondary,
                     modifier = Modifier.padding(top = 2.dp),

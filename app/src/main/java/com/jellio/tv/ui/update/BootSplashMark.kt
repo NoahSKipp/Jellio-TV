@@ -31,7 +31,7 @@ fun BootSplashMark(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(10.dp.scaled()))
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_loading"),
+                text = com.jellio.tv.data.i18n.Strings.get("tv_loading"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
             )

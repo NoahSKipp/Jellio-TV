@@ -1,4 +1,4 @@
-package com.jellio.tv.ui.i18n
+package com.jellio.tv.data.i18n
 
 internal object StringsFr {
     val MAP: Map<String, String> by lazy {

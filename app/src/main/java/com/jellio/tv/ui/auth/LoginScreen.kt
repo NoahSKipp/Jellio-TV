@@ -429,7 +429,7 @@ private fun ProfileTile(
                     modifier = Modifier.align(Alignment.TopEnd).size(28.dp),
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Filled.Close, contentDescription = com.jellio.tv.ui.i18n.Strings.get("action_forget_profile"), modifier = Modifier.size(14.dp))
+                        Icon(imageVector = Icons.Filled.Close, contentDescription = com.jellio.tv.data.i18n.Strings.get("action_forget_profile"), modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -580,7 +580,7 @@ private fun ForgotUsernameForm(
         modifier = Modifier.width(420.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = com.jellio.tv.ui.i18n.Strings.get("auth_reset_password"), style = MaterialTheme.typography.titleLarge)
+        Text(text = com.jellio.tv.data.i18n.Strings.get("auth_reset_password"), style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(24.dp))
         JellioTextField(
             value = username,
@@ -598,7 +598,7 @@ private fun ForgotUsernameForm(
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("auth_send_reset_code"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+            Text(text = com.jellio.tv.data.i18n.Strings.get("auth_send_reset_code"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
     }
 }
@@ -616,7 +616,7 @@ private fun ForgotPinForm(
         modifier = Modifier.width(420.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = com.jellio.tv.ui.i18n.Strings.get("auth_reset_password"), style = MaterialTheme.typography.titleLarge)
+        Text(text = com.jellio.tv.data.i18n.Strings.get("auth_reset_password"), style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(24.dp))
         JellioTextField(
             value = pin,
@@ -650,7 +650,7 @@ private fun ForgotPinForm(
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
             colors = com.jellio.tv.ui.common.primaryButtonColors(),
         ) {
-            Text(text = com.jellio.tv.ui.i18n.Strings.get("auth_reset_password"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+            Text(text = com.jellio.tv.data.i18n.Strings.get("auth_reset_password"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.player
 
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
+import com.jellio.tv.data.prefs.PlayerPrefs
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,10 +79,10 @@ import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.model.subtitleBackgroundOption
 import com.jellio.tv.data.model.subtitleSizeOption
 import com.jellio.tv.ui.detail.FilterChipRow
-import com.jellio.tv.ui.detail.QUALITY_ORDER
+import com.jellio.tv.data.streams.QUALITY_ORDER
 import com.jellio.tv.ui.detail.SourceCard
 import com.jellio.tv.ui.detail.sourceAudioLanguages
-import com.jellio.tv.ui.detail.sourceQuality
+import com.jellio.tv.data.streams.sourceQuality
 import com.jellio.tv.data.model.languageName
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
@@ -703,7 +704,7 @@ internal fun EpisodesPanel(
                             )
                         ),
                     ) {
-                        Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                        Text(text = com.jellio.tv.data.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -775,7 +776,7 @@ internal fun EpisodeRow(
                 }
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.title), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = com.jellio.tv.data.i18n.episodeDisplayName(episode.title), color = JellioText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (episode.overview != null) {
                     Text(
                         text = episode.overview,

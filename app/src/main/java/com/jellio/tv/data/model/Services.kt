@@ -68,4 +68,4 @@ fun groupByService(items: List<BaseItemDto>): Map<String, List<BaseItemDto>> {
 }
 
 fun rowTitle(collection: BaseItemDto, service: String, kind: String): String =
-    com.jellio.tv.ui.i18n.catalogDisplayName(collection.Name, kind, service)
+    com.jellio.tv.data.i18n.catalogDisplayName(collection.Name, kind, service)

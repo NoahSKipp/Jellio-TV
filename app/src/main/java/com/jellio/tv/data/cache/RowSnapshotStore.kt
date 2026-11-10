@@ -3,11 +3,11 @@ package com.jellio.tv.data.cache
 import android.content.Context
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.CalendarEntryDto
-import com.jellio.tv.ui.home.ComingSoonHomeRow
-import com.jellio.tv.ui.home.HomeRow
-import com.jellio.tv.ui.home.HomeSection
-import com.jellio.tv.ui.home.PosterHomeRow
-import com.jellio.tv.ui.home.StudioHubsHomeRow
+import com.jellio.tv.data.model.ComingSoonHomeRow
+import com.jellio.tv.data.model.HomeRow
+import com.jellio.tv.data.model.HomeSection
+import com.jellio.tv.data.model.PosterHomeRow
+import com.jellio.tv.data.model.StudioHubsHomeRow
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi

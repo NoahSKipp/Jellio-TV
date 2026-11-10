@@ -112,7 +112,7 @@ fun FeedScreen(
                 val groups = remember(visible, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) { groupByDay(visible) }
                 Column(modifier = Modifier.fillMaxSize().padding(top = 28.dp)) {
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get("tv_feed"),
+                        text = com.jellio.tv.data.i18n.Strings.get("tv_feed"),
                         color = JellioText,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -135,7 +135,7 @@ fun FeedScreen(
                         Box(modifier = Modifier.width(420.dp).fillMaxHeight()) {
                             if (visible.isEmpty()) {
                                 Text(
-                                    text = com.jellio.tv.ui.i18n.Strings.get("tv_feed_empty_filtered"),
+                                    text = com.jellio.tv.data.i18n.Strings.get("tv_feed_empty_filtered"),
                                     color = JellioTextSecondary,
                                     modifier = Modifier.padding(start = 48.dp, top = 8.dp),
                                 )
@@ -169,13 +169,13 @@ private fun groupByDay(entries: List<FeedEntryDto>): List<FeedGroup> {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     fun label(entry: FeedEntryDto): String {
-        val day = runCatching { Instant.parse(entry.OccurredAtUtc).atZone(zone).toLocalDate() }.getOrNull() ?: return com.jellio.tv.ui.i18n.Strings.get("feed_earlier")
+        val day = runCatching { Instant.parse(entry.OccurredAtUtc).atZone(zone).toLocalDate() }.getOrNull() ?: return com.jellio.tv.data.i18n.Strings.get("feed_earlier")
         val daysAgo = ChronoUnit.DAYS.between(day, today)
         return when {
-            daysAgo <= 0L -> com.jellio.tv.ui.i18n.Strings.get("calendar_today")
-            daysAgo == 1L -> com.jellio.tv.ui.i18n.Strings.get("time_yesterday")
-            daysAgo < 7L -> com.jellio.tv.ui.i18n.Strings.get("feed_this_week")
-            else -> com.jellio.tv.ui.i18n.Strings.get("time_earlier")
+            daysAgo <= 0L -> com.jellio.tv.data.i18n.Strings.get("calendar_today")
+            daysAgo == 1L -> com.jellio.tv.data.i18n.Strings.get("time_yesterday")
+            daysAgo < 7L -> com.jellio.tv.data.i18n.Strings.get("feed_this_week")
+            else -> com.jellio.tv.data.i18n.Strings.get("time_earlier")
         }
     }
     return entries.groupBy(::label).map { (label, list) -> FeedGroup(label, list) }
@@ -446,7 +446,7 @@ private fun FeedSpotlight(
                         )
                     }
                     if (shown.Kind == "Badge") {
-                        val desc = com.jellio.tv.ui.i18n.badgeDisplayDescription(shown.BadgeId, shown.BadgeDescription)
+                        val desc = com.jellio.tv.data.i18n.badgeDisplayDescription(shown.BadgeId, shown.BadgeDescription)
                         if (desc.isNotBlank()) {
                             Text(
                                 text = desc,
@@ -543,20 +543,20 @@ private fun FeedFilterChip(label: String, count: Int, off: Boolean, onClick: () 
 
 // "hosted Movie night · Arrival and 2 more", as the web Feed writes it.
 private fun partyActivityText(entry: FeedEntryDto) = androidx.compose.ui.text.buildAnnotatedString {
-    append(com.jellio.tv.ui.i18n.Strings.get("feed_party_lead") + " ")
-    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(entry.PartyName ?: com.jellio.tv.ui.i18n.Strings.get("tv_group_watch")) }
+    append(com.jellio.tv.data.i18n.Strings.get("feed_party_lead") + " ")
+    withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(entry.PartyName ?: com.jellio.tv.data.i18n.Strings.get("tv_group_watch")) }
     val title = if (entry.ItemType == "Episode" && entry.SeriesName != null) entry.SeriesName else entry.ItemName
     if (title != null) {
         append(" · ")
         withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.SemiBold)) { append(title) }
-        if (entry.PartyTitleCount > 1) append(" " + com.jellio.tv.ui.i18n.Strings.format("feed_party_more", entry.PartyTitleCount - 1))
+        if (entry.PartyTitleCount > 1) append(" " + com.jellio.tv.data.i18n.Strings.format("feed_party_more", entry.PartyTitleCount - 1))
     }
 }
 
 private fun partyDetail(entry: FeedEntryDto): String {
     val others = entry.PartyMembers.orEmpty().filter { it != entry.UserName }
     return listOfNotNull(
-        others.takeIf { it.isNotEmpty() }?.let { com.jellio.tv.ui.i18n.Strings.format("feed_party_with", it.joinToString(", ")) },
+        others.takeIf { it.isNotEmpty() }?.let { com.jellio.tv.data.i18n.Strings.format("feed_party_with", it.joinToString(", ")) },
         entry.PartyReactions?.takeIf { it.isNotEmpty() }?.joinToString(" "),
     ).joinToString(" · ")
 }

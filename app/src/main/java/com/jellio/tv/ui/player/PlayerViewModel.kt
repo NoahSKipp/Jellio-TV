@@ -1,7 +1,7 @@
 package com.jellio.tv.ui.player
 
 import com.jellio.tv.data.catching
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
@@ -505,7 +505,7 @@ class PlayerViewModel @Inject constructor(
                     PlayStartTrace.mark(itemId, "audio renegotiated", "index=$preferredAudio")
                 }
                 val episodeCode = if (item.ParentIndexNumber != null && item.IndexNumber != null) {
-                    com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) + " · "
+                    com.jellio.tv.data.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) + " · "
                 } else {
                     ""
                 }
@@ -699,7 +699,7 @@ class PlayerViewModel @Inject constructor(
     private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {
         val thumbnailUrl = episodeThumbnailUrl(session, episode)
         val title = if (episode.IndexNumber != null && episode.ParentIndexNumber != null) {
-            com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) + " · " + episode.Name.orEmpty()
+            com.jellio.tv.data.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) + " · " + episode.Name.orEmpty()
         } else {
             episode.Name.orEmpty()
         }
@@ -710,7 +710,7 @@ class PlayerViewModel @Inject constructor(
             overview = episode.Overview?.takeIf { it.isNotBlank() },
             seriesName = episode.SeriesName,
             episodeName = episode.Name.orEmpty(),
-            episodeCode = com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber).takeIf { it.isNotEmpty() },
+            episodeCode = com.jellio.tv.data.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber).takeIf { it.isNotEmpty() },
         )
     }
 
@@ -747,7 +747,7 @@ class PlayerViewModel @Inject constructor(
             year = item.ProductionYear?.toString(),
             officialRating = item.OfficialRating,
             isEpisode = isEpisode,
-            episodeCode = if (isEpisode && hasEpisodeCode) com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) else null,
+            episodeCode = if (isEpisode && hasEpisodeCode) com.jellio.tv.data.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber) else null,
             episodeTitle = if (isEpisode) item.Name else null,
             overview = item.Overview,
         )
@@ -1098,7 +1098,7 @@ class PlayerViewModel @Inject constructor(
             itemId = episode.Id,
             title = episode.Name.orEmpty(),
             thumbnailUrl = thumbnailUrl,
-            episodeCode = if (hasCode) com.jellio.tv.ui.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) else null,
+            episodeCode = if (hasCode) com.jellio.tv.data.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber) else null,
             rating = episode.CommunityRating?.let { "%.1f".format(it) },
             overview = episode.Overview,
         )

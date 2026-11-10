@@ -1,5 +1,9 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.data.model.ComingSoonHomeRow
+import com.jellio.tv.data.model.HomeSection
+import com.jellio.tv.data.model.PosterHomeRow
+import com.jellio.tv.data.model.StudioHubsHomeRow
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.animation.core.Animatable
@@ -555,20 +559,20 @@ private fun HomeRowEditorBar(
                 icon = Icons.Filled.ArrowUpward,
                 enabled = canMoveUp,
                 onClick = onMoveUp,
-                contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_up"),
+                contentDescription = com.jellio.tv.data.i18n.Strings.get("home_move_row_up"),
             )
             HomeRowEditorButton(
                 icon = Icons.Filled.ArrowDownward,
                 enabled = canMoveDown,
                 onClick = onMoveDown,
-                contentDescription = com.jellio.tv.ui.i18n.Strings.get("home_move_row_down"),
+                contentDescription = com.jellio.tv.data.i18n.Strings.get("home_move_row_down"),
             )
             HomeRowEditorButton(
                 icon = if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                 enabled = true,
                 active = hidden,
                 onClick = onToggleHidden,
-                contentDescription = com.jellio.tv.ui.i18n.Strings.get(if (hidden) "row_show" else "row_hide"),
+                contentDescription = com.jellio.tv.data.i18n.Strings.get(if (hidden) "row_show" else "row_hide"),
             )
         }
     }

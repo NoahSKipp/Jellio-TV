@@ -65,7 +65,7 @@ class AccountSwitcherViewModel @Inject constructor(
             val saved = repository.getRememberedUsers(session.serverAddress)[userId]
             if (saved != null && saved.accessToken.isBlank()) {
                 saved.name.takeIf { it.isNotBlank() }?.let(com.jellio.tv.ui.auth.LoginHandoff::put)
-                com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
+                com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.data.i18n.Strings.get("auth_session_expired"))
                 onNeedsPassword()
                 return@launch
             }
@@ -103,7 +103,7 @@ class AccountSwitcherViewModel @Inject constructor(
                 is LoginResult.Success -> Unit
                 is LoginResult.Failure -> _uiState.value = _uiState.value.copy(
                     busyUserId = null,
-                    error = com.jellio.tv.ui.i18n.Strings.get("auth_switch_profile_error"),
+                    error = com.jellio.tv.data.i18n.Strings.get("auth_switch_profile_error"),
                 )
             }
         }

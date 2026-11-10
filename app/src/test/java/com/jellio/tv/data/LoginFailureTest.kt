@@ -39,7 +39,7 @@ class LoginFailureTest {
 
     @Test
     fun everyReasonHasAString() {
-        val en = com.jellio.tv.ui.i18n.Strings.tableFor(com.jellio.tv.data.prefs.AppLanguage.ENGLISH)
+        val en = com.jellio.tv.data.i18n.Strings.tableFor(com.jellio.tv.data.prefs.AppLanguage.ENGLISH)
         LoginFailure.entries.forEach { assert(en.containsKey(it.key)) { "missing ${it.key}" } }
     }
 }

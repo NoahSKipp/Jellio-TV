@@ -1,6 +1,6 @@
 package com.jellio.tv.data.model
 
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 
 fun greetingFor(hour: Int): String = when {
     hour in 5..11 -> Strings.get("home_greeting_morning")

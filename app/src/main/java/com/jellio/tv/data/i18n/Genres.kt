@@ -1,4 +1,4 @@
-package com.jellio.tv.ui.i18n
+package com.jellio.tv.data.i18n
 
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.prefs.DisplayPreferences

@@ -2,16 +2,16 @@ package com.jellio.tv
 
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
-import com.jellio.tv.ui.common.clearVerifiedTodayStreamIds
-import com.jellio.tv.ui.common.episodeReleaseLabel
-import com.jellio.tv.ui.common.filterReleasedItems
-import com.jellio.tv.ui.common.isPendingTodayRelease
-import com.jellio.tv.ui.common.isReleasedToday
-import com.jellio.tv.ui.common.isTodayItemStreamVerified
-import com.jellio.tv.ui.common.isUnreleasedByDate
-import com.jellio.tv.ui.common.isUnreleasedItem
-import com.jellio.tv.ui.common.markTodayItemHasStream
-import com.jellio.tv.ui.common.seasonEpisodeReleaseLabels
+import com.jellio.tv.data.clearVerifiedTodayStreamIds
+import com.jellio.tv.data.episodeReleaseLabel
+import com.jellio.tv.data.filterReleasedItems
+import com.jellio.tv.data.isPendingTodayRelease
+import com.jellio.tv.data.isReleasedToday
+import com.jellio.tv.data.isTodayItemStreamVerified
+import com.jellio.tv.data.isUnreleasedByDate
+import com.jellio.tv.data.isUnreleasedItem
+import com.jellio.tv.data.markTodayItemHasStream
+import com.jellio.tv.data.seasonEpisodeReleaseLabels
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

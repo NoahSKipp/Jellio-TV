@@ -96,8 +96,8 @@ import com.jellio.tv.ui.common.dismissOnBack
 import com.jellio.tv.ui.common.formatPlaybackTime
 import com.jellio.tv.ui.common.formatRelativeTime
 import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
-import com.jellio.tv.ui.i18n.Strings
-import com.jellio.tv.ui.i18n.displayLocale
+import com.jellio.tv.data.i18n.Strings
+import com.jellio.tv.data.i18n.displayLocale
 import com.jellio.tv.ui.notify.NotificationsViewModel
 import com.jellio.tv.ui.notify.messageFor
 import com.jellio.tv.ui.notify.subtitleFor
@@ -1325,7 +1325,7 @@ private fun drawerPartyItemTitle(item: PartyItemDto?): String? {
     item ?: return null
     if (item.Type == "Episode" && item.SeriesName != null) {
         val code = if (item.SeasonNumber != null && item.EpisodeNumber != null) {
-            " " + com.jellio.tv.ui.i18n.seasonEpisodeTag(item.SeasonNumber, item.EpisodeNumber)
+            " " + com.jellio.tv.data.i18n.seasonEpisodeTag(item.SeasonNumber, item.EpisodeNumber)
         } else {
             ""
         }

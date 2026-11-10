@@ -122,7 +122,7 @@ fun HomeItemShowcase(
             val status = (series ?: details).Status
             if (status.equals("Continuing", ignoreCase = true)) {
                 Text(
-                    text = com.jellio.tv.ui.i18n.Strings.get("home_editorial_ongoing").uppercase(),
+                    text = com.jellio.tv.data.i18n.Strings.get("home_editorial_ongoing").uppercase(),
                     color = JellioText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -258,18 +258,18 @@ private fun ShowcaseMetadata(details: BaseItemDto, series: BaseItemDto?, isEpiso
             if (isEpisode) {
                 val label = episodeLabel(details)
                 if (label.isNotEmpty()) add(label)
-                details.Name?.takeIf { it.isNotBlank() && label.isNotEmpty() }?.let { add(com.jellio.tv.ui.i18n.episodeDisplayName(it, details.IndexNumber)) }
+                details.Name?.takeIf { it.isNotBlank() && label.isNotEmpty() }?.let { add(com.jellio.tv.data.i18n.episodeDisplayName(it, details.IndexNumber)) }
             } else {
                 when (details.Type?.lowercase(Locale.US)) {
-                    "movie" -> add(com.jellio.tv.ui.i18n.Strings.get("search_filter_movies"))
-                    "series" -> add(com.jellio.tv.ui.i18n.Strings.get("nav_shows"))
-                    "boxset" -> add(com.jellio.tv.ui.i18n.Strings.get("detail_collection"))
+                    "movie" -> add(com.jellio.tv.data.i18n.Strings.get("search_filter_movies"))
+                    "series" -> add(com.jellio.tv.data.i18n.Strings.get("nav_shows"))
+                    "boxset" -> add(com.jellio.tv.data.i18n.Strings.get("detail_collection"))
                 }
             }
-            (details.Genres?.firstOrNull() ?: series?.Genres?.firstOrNull())?.takeIf { it.isNotBlank() }?.let { add(com.jellio.tv.ui.i18n.genreDisplayName(it)) }
+            (details.Genres?.firstOrNull() ?: series?.Genres?.firstOrNull())?.takeIf { it.isNotBlank() }?.let { add(com.jellio.tv.data.i18n.genreDisplayName(it)) }
             details.RunTimeTicks?.let { ticks ->
                 val minutes = (ticks / TICKS_PER_MINUTE).toInt()
-                if (minutes > 0) add(com.jellio.tv.ui.i18n.formatDurationMinutes(minutes))
+                if (minutes > 0) add(com.jellio.tv.data.i18n.formatDurationMinutes(minutes))
             }
             val year = details.ProductionYear?.toString() ?: details.PremiereDate?.take(4)
             if (!year.isNullOrBlank()) {

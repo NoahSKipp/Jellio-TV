@@ -71,7 +71,7 @@ import com.jellio.tv.ui.home.PosterCard
 import com.jellio.tv.ui.home.PosterWidth
 import com.jellio.tv.ui.home.SkeletonPoster
 import com.jellio.tv.ui.home.rememberCardOptionsHost
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -303,10 +303,10 @@ fun SearchScreen(
                         val title = when (row.Kind) {
                             "similar" -> com.jellio.tv.ui.i18n.formatString("search_suggest_similar", answer.MatchedTitle ?: uiState.query)
                             "person" -> com.jellio.tv.ui.i18n.formatString("search_suggest_person", row.Name ?: "")
-                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", com.jellio.tv.ui.i18n.genreDisplayName(row.Name ?: ""))
+                            else -> com.jellio.tv.ui.i18n.formatString("search_suggest_genre", com.jellio.tv.data.i18n.genreDisplayName(row.Name ?: ""))
                         }
                         com.jellio.tv.ui.home.PosterRow(
-                            section = com.jellio.tv.ui.home.HomeSection(title = title, items = row.Items),
+                            section = com.jellio.tv.data.model.HomeSection(title = title, items = row.Items),
                             imageUrl = imageUrl,
                             onItemClick = onItemClick,
                         )

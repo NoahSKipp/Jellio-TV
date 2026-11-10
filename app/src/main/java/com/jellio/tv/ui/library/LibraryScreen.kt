@@ -46,7 +46,7 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ErrorState
 import com.jellio.tv.ui.common.InlineErrorState
 import com.jellio.tv.ui.common.ScreenSpinner
-import com.jellio.tv.ui.home.HomeSection
+import com.jellio.tv.data.model.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowListModal
 import com.jellio.tv.ui.home.rememberCardOptionsHost
@@ -93,7 +93,7 @@ fun LibraryScreen(
 
         val featuredRow = remember(uiState.coverflowItems, uiState.coverflowBadge, uiState.editorial) {
             uiState.coverflowItems.takeIf { it.isNotEmpty() }?.let { items ->
-                HomeSection(uiState.coverflowBadge ?: uiState.editorial?.tagline ?: com.jellio.tv.ui.i18n.Strings.get("library_featured"), items)
+                HomeSection(uiState.coverflowBadge ?: uiState.editorial?.tagline ?: com.jellio.tv.data.i18n.Strings.get("library_featured"), items)
             }
         }
 
@@ -155,7 +155,7 @@ fun LibraryScreen(
                     ) {
                         item(key = "header") {
                             LibraryHeader(
-                                title = uiState.title.ifEmpty { com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType) },
+                                title = uiState.title.ifEmpty { com.jellio.tv.data.i18n.libraryDisplayName(library.Name, library.CollectionType) },
                                 showFilters = uiState.genreOptions.isNotEmpty() || uiState.mainRow != null,
                                 genres = uiState.genreOptions,
                                 selectedSort = uiState.selectedSort,
@@ -232,7 +232,7 @@ fun LibraryScreen(
             when (target) {
                 LibraryFilterFieldTarget.Sort -> LibraryFilterFieldOverlay(
                     title = com.jellio.tv.ui.i18n.string("library_sort_by"),
-                    options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(com.jellio.tv.ui.i18n.Strings.get(it.key), it.value) },
+                    options = LIBRARY_SORT_OPTIONS.map { LibraryFilterOption(com.jellio.tv.data.i18n.Strings.get(it.key), it.value) },
                     selectedValue = uiState.selectedSort,
                     onSelect = { value ->
                         sortFieldFocusRequester.requestFocus()
@@ -246,8 +246,8 @@ fun LibraryScreen(
                 )
                 LibraryFilterFieldTarget.Genre -> LibraryFilterFieldOverlay(
                     title = com.jellio.tv.ui.i18n.string("library_filter_genre"),
-                    options = listOf(LibraryFilterOption(com.jellio.tv.ui.i18n.Strings.get("library_all_genres"), null)) +
-                        uiState.genreOptions.map { LibraryFilterOption(com.jellio.tv.ui.i18n.genreDisplayName(it), it) },
+                    options = listOf(LibraryFilterOption(com.jellio.tv.data.i18n.Strings.get("library_all_genres"), null)) +
+                        uiState.genreOptions.map { LibraryFilterOption(com.jellio.tv.data.i18n.genreDisplayName(it), it) },
                     selectedValue = uiState.selectedGenre,
                     onSelect = { value ->
                         genreFieldFocusRequester.requestFocus()
@@ -316,8 +316,8 @@ private fun LibraryFilterFields(
     sortFieldFocusRequester: FocusRequester,
     genreFieldFocusRequester: FocusRequester,
 ) {
-    val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort")
-    val genreLabel = selectedGenre?.let { com.jellio.tv.ui.i18n.genreDisplayName(it) } ?: com.jellio.tv.ui.i18n.Strings.get("library_all_genres")
+    val sortLabel = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == selectedSort }?.let { com.jellio.tv.data.i18n.Strings.get(it.key) } ?: com.jellio.tv.data.i18n.Strings.get("library_sort")
+    val genreLabel = selectedGenre?.let { com.jellio.tv.data.i18n.genreDisplayName(it) } ?: com.jellio.tv.data.i18n.Strings.get("library_all_genres")
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.padding(bottom = 12.dp),

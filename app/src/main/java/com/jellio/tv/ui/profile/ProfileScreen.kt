@@ -87,7 +87,7 @@ fun ProfileScreen(
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
             uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = com.jellio.tv.ui.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
+                Text(text = com.jellio.tv.data.i18n.Strings.get("status_loading"), color = JellioTextSecondary)
             }
             uiState.error != null -> ErrorState(
                 message = com.jellio.tv.ui.i18n.string("profile_load_error"),
@@ -123,7 +123,7 @@ fun ProfileScreen(
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
                                                 Icon(Icons.Filled.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                Text(text = com.jellio.tv.ui.i18n.Strings.get("settings_private_profile"), modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
+                                                Text(text = com.jellio.tv.data.i18n.Strings.get("settings_private_profile"), modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
                                             }
                                         }
                                     }
@@ -149,7 +149,7 @@ fun ProfileScreen(
                             Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(Icons.Filled.VisibilityOff, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(32.dp))
-                                    Text(text = com.jellio.tv.ui.i18n.Strings.get("profile_is_private"), color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
+                                    Text(text = com.jellio.tv.data.i18n.Strings.get("profile_is_private"), color = JellioTextSecondary, modifier = Modifier.padding(top = 12.dp))
                                 }
                             }
                         }
@@ -157,7 +157,7 @@ fun ProfileScreen(
                         item { StatsRow(achievements.MoviesCompleted, achievements.EpisodesCompleted, achievements.TotalCompleted, achievements.BestBingeStreak) }
                         item {
                             Text(
-                                text = com.jellio.tv.ui.i18n.Strings.format("tv_badges_count", achievements.Badges.count { it.Unlocked }, achievements.Badges.size),
+                                text = com.jellio.tv.data.i18n.Strings.format("tv_badges_count", achievements.Badges.count { it.Unlocked }, achievements.Badges.size),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 12.dp),
                             )
@@ -167,14 +167,14 @@ fun ProfileScreen(
                         }
                         item {
                             Text(
-                                text = com.jellio.tv.ui.i18n.Strings.get("tv_recent_activity"),
+                                text = com.jellio.tv.data.i18n.Strings.get("tv_recent_activity"),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 12.dp),
                             )
                         }
                         if (achievements.RecentActivity.isEmpty()) {
                             item {
-                                Text(text = com.jellio.tv.ui.i18n.Strings.get("feed_nothing_here"), color = JellioTextSecondary, modifier = Modifier.padding(start = 48.dp))
+                                Text(text = com.jellio.tv.data.i18n.Strings.get("feed_nothing_here"), color = JellioTextSecondary, modifier = Modifier.padding(start = 48.dp))
                             }
                         } else {
                             items(achievements.RecentActivity) { entry ->
@@ -195,7 +195,7 @@ fun ProfileScreen(
                                 colors = com.jellio.tv.ui.common.dangerButtonColors(),
                                 modifier = Modifier.padding(start = 48.dp, top = 32.dp, bottom = 48.dp),
                             ) {
-                                Text(text = com.jellio.tv.ui.i18n.Strings.get("nav_log_out"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
+                                Text(text = com.jellio.tv.data.i18n.Strings.get("nav_log_out"), modifier = Modifier.padding(horizontal = 32.dp, vertical = 14.dp))
                             }
                         }
                     } else {
@@ -251,7 +251,7 @@ private fun BioSection(
                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
                     colors = com.jellio.tv.ui.common.primaryButtonColors(),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get(if (isSaving) "profile_saving" else "profile_save"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.data.i18n.Strings.get(if (isSaving) "profile_saving" else "profile_save"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
                 Surface(
                     onClick = onCancel,
@@ -259,14 +259,14 @@ private fun BioSection(
                     colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
                     modifier = Modifier.padding(start = 8.dp),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.data.i18n.Strings.get("action_cancel"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         } else if (!bio.isNullOrEmpty()) {
             Text(text = bio, color = JellioTextSecondary, modifier = Modifier.clickableIfOwner(isOwner, onEdit))
         } else if (isOwner) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_add_bio"),
+                text = com.jellio.tv.data.i18n.Strings.get("tv_add_bio"),
                 color = JellioTextSecondary,
                 modifier = Modifier.clickableIfOwner(isOwner, onEdit),
             )
@@ -280,10 +280,10 @@ private fun Modifier.clickableIfOwner(isOwner: Boolean, onClick: () -> Unit): Mo
 @Composable
 private fun StatsRow(movies: Int, episodes: Int, total: Int, bestBinge: Int) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 8.dp)) {
-        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_movies"), movies.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_episodes"), episodes.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_total_watched"), total.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.ui.i18n.Strings.get("profile_stat_best_binge"), bestBinge.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_movies"), movies.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_episodes"), episodes.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_total_watched"), total.toString(), Modifier.weight(1f))
+        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_best_binge"), bestBinge.toString(), Modifier.weight(1f))
     }
 }
 
@@ -332,11 +332,11 @@ private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
         ) {
             Icon(
                 if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
-                contentDescription = com.jellio.tv.ui.i18n.badgeDisplayDescription(badge.Id, badge.Description),
+                contentDescription = com.jellio.tv.data.i18n.badgeDisplayDescription(badge.Id, badge.Description),
                 tint = if (badge.Unlocked) color else JellioTextSecondary,
             )
             Text(
-                text = com.jellio.tv.ui.i18n.badgeDisplayName(badge.Id, badge.Name),
+                text = com.jellio.tv.data.i18n.badgeDisplayName(badge.Id, badge.Name),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

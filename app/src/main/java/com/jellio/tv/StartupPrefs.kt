@@ -21,7 +21,7 @@ object StartupPrefs {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 com.jellio.tv.data.prefs.QuickHubPreferences.init(app)
-                com.jellio.tv.ui.player.PlayerPrefs.init(app)
+                com.jellio.tv.data.prefs.PlayerPrefs.init(app)
                 com.jellio.tv.ui.player.BadStreams.init(app)
                 com.jellio.tv.ui.onboarding.OnboardingPrefs.init(app)
             } finally {

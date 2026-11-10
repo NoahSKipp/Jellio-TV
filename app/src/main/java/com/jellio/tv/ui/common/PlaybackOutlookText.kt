@@ -3,7 +3,7 @@ package com.jellio.tv.ui.common
 import com.jellio.tv.data.playback.OutlookReason
 import com.jellio.tv.data.playback.OutlookTone
 import com.jellio.tv.data.playback.PlaybackOutlook
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 
 fun OutlookReason.displayText(): String = Strings.get(
     when (this) {

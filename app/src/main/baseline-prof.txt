@@ -19,8 +19,8 @@ Lcom/jellio/tv/data/model/BaseItemDto;
 # Home Screen & Lazy Rows
 Lcom/jellio/tv/ui/home/HomeScreenKt;
 Lcom/jellio/tv/ui/home/HomeViewModel;
-Lcom/jellio/tv/ui/home/HomeSection;
-Lcom/jellio/tv/ui/home/PosterHomeRow;
+Lcom/jellio/tv/data/model/HomeSection;
+Lcom/jellio/tv/data/model/PosterHomeRow;
 Lcom/jellio/tv/ui/home/PosterCardKt;
 Lcom/jellio/tv/ui/home/HeroCarouselKt;
 
@@ -33,7 +33,7 @@ Lcom/jellio/tv/ui/library/LibraryViewModel;
 # Playback & Audio
 Lcom/jellio/tv/ui/player/PlayerScreenKt;
 Lcom/jellio/tv/ui/player/PlayerViewModel;
-Lcom/jellio/tv/ui/player/PlayerPrefs;
+Lcom/jellio/tv/data/prefs/PlayerPrefs;
 Lcom/jellio/tv/ui/player/JellioLoadControlKt;
 
 # Navigation & Search
@@ -89,8 +89,8 @@ HSPLcom/jellio/tv/JellioTvAppKt*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeViewModel*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeLoadPolicyKt*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeUiState*;->**(**)**
-HSPLcom/jellio/tv/ui/home/HomeSection*;->**(**)**
-HSPLcom/jellio/tv/ui/home/*HomeRow*;->**(**)**
+HSPLcom/jellio/tv/data/model/HomeSection*;->**(**)**
+HSPLcom/jellio/tv/data/model/*HomeRow*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeScreenKt*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeSkeletonKt*;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeItemShowcaseKt*;->**(**)**
@@ -151,10 +151,10 @@ HSPLcom/jellio/tv/data/cache/HomeSnapshotJsonAdapter;->**(**)**
 HSPLcom/jellio/tv/ui/home/HomeCustomizationDtoJsonAdapter;->**(**)**
 
 # Strings read while composing Home
-HSPLcom/jellio/tv/ui/i18n/Strings;->**(**)**
-HSPLcom/jellio/tv/ui/i18n/StringsEn;->**(**)**
+HSPLcom/jellio/tv/data/i18n/Strings;->**(**)**
+HSPLcom/jellio/tv/data/i18n/StringsEn;->**(**)**
 HSPLcom/jellio/tv/ui/i18n/StringsKt*;->**(**)**
-HSPLcom/jellio/tv/ui/i18n/Genres;->**(**)**
+HSPLcom/jellio/tv/data/i18n/Genres;->**(**)**
 
 # Retrofit, OkHttp, Okio and Moshi on every request
 HSPLretrofit2/**;->**(**)**

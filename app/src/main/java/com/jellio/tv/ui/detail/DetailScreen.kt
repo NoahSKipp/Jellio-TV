@@ -96,8 +96,8 @@ import com.jellio.tv.data.model.TrailerDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
-import com.jellio.tv.ui.common.episodeReleaseLabel
-import com.jellio.tv.ui.common.seasonEpisodeReleaseLabels
+import com.jellio.tv.data.episodeReleaseLabel
+import com.jellio.tv.data.seasonEpisodeReleaseLabels
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioRarityLegendary
@@ -117,7 +117,7 @@ private val HeroHeight = 480.dp
 private fun formatRuntime(ticks: Long?): String {
     if (ticks == null || ticks <= 0) return ""
     val totalMinutes = (ticks / 600000000L).toInt()
-    return com.jellio.tv.ui.i18n.formatDurationMinutes(totalMinutes)
+    return com.jellio.tv.data.i18n.formatDurationMinutes(totalMinutes)
 }
 
 private val PREMIERE_DATE_FORMATS = listOf(
@@ -132,7 +132,7 @@ private fun formatPremiereDate(raw: String?): String? {
         val parser = SimpleDateFormat(pattern, Locale.US)
         parser.timeZone = TimeZone.getTimeZone("UTC")
         val date = runCatching { parser.parse(raw) }.getOrNull() ?: continue
-        return DateFormat.getDateInstance(DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(date)
+        return DateFormat.getDateInstance(DateFormat.SHORT, com.jellio.tv.data.i18n.displayLocale()).format(date)
     }
     return null
 }
@@ -488,7 +488,7 @@ private fun DetailHero(
 
             val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
             val titleText = if (item.Type == "Episode" && hasEpisodeCode) {
-                "${com.jellio.tv.ui.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber)} \u00B7 ${com.jellio.tv.ui.i18n.episodeDisplayName(item.Name, item.IndexNumber)}"
+                "${com.jellio.tv.data.i18n.seasonEpisodeTag(item.ParentIndexNumber, item.IndexNumber)} \u00B7 ${com.jellio.tv.data.i18n.episodeDisplayName(item.Name, item.IndexNumber)}"
             } else {
                 item.Name.orEmpty()
             }
@@ -528,7 +528,7 @@ private fun DetailHero(
             MediaTechBadgesRow(item = item, modifier = Modifier.padding(top = 10.dp))
 
             item.Genres?.takeIf { it.isNotEmpty() }?.let {
-                Text(text = it.joinToString(", ") { g -> com.jellio.tv.ui.i18n.genreDisplayName(g) }, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
+                Text(text = it.joinToString(", ") { g -> com.jellio.tv.data.i18n.genreDisplayName(g) }, color = JellioTextSecondary, modifier = Modifier.padding(top = 6.dp))
             }
 
             (season?.Overview?.takeIf { it.isNotBlank() } ?: item.Overview)?.let {
@@ -836,7 +836,7 @@ private fun SeasonsSection(
                         ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
-                        Text(text = com.jellio.tv.ui.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                        Text(text = com.jellio.tv.data.i18n.seasonDisplayName(season), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                     }
                 }
             }
@@ -940,7 +940,7 @@ private fun EpisodeCard(
                     }
                     episode.IndexNumber?.let {
                         Text(
-                            text = com.jellio.tv.ui.i18n.seasonEpisodeTag(null, it),
+                            text = com.jellio.tv.data.i18n.seasonEpisodeTag(null, it),
                             color = JellioText,
                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
                                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
@@ -991,7 +991,7 @@ private fun EpisodeCard(
                     }
                 }
                 Column(modifier = Modifier.padding(12.dp)) {
-                    com.jellio.tv.ui.common.FocusMarqueeText(text = com.jellio.tv.ui.i18n.episodeDisplayName(episode.Name, episode.IndexNumber), focused = cardFocused, color = JellioText)
+                    com.jellio.tv.ui.common.FocusMarqueeText(text = com.jellio.tv.data.i18n.episodeDisplayName(episode.Name, episode.IndexNumber), focused = cardFocused, color = JellioText)
                     episode.Overview?.let {
                         Text(text = it, color = JellioTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     }

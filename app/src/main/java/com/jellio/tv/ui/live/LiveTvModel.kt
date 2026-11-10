@@ -1,6 +1,6 @@
 package com.jellio.tv.ui.live
 
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.data.model.LiveChannelDto
 import com.jellio.tv.data.model.LiveProgramDto
 import kotlinx.coroutines.sync.Mutex

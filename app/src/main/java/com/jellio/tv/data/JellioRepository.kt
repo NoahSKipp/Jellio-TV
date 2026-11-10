@@ -44,11 +44,6 @@ import com.jellio.tv.data.session.RememberedUserEntry
 import com.jellio.tv.data.session.RememberedUsersStore
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.data.session.SessionManager
-import com.jellio.tv.ui.common.isReleasedToday
-import com.jellio.tv.ui.common.isTodayItemStreamVerified
-import com.jellio.tv.ui.common.isUnreleasedByDate
-import com.jellio.tv.ui.common.isUnreleasedItem
-import com.jellio.tv.ui.common.markTodayItemHasStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -452,7 +447,7 @@ class JellioRepository @Inject constructor(
         val tvView = views.firstOrNull { it.CollectionType == "tvshows" }
         val realAnimeView = views.firstOrNull { ANIME_VIEW_NAME.containsMatchIn(it.Name ?: "") }
 
-        val animeEntry = realAnimeView ?: tvView?.copy(Name = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"))
+        val animeEntry = realAnimeView ?: tvView?.copy(Name = com.jellio.tv.data.i18n.Strings.get("library_anime_title"))
         val liveTvView = views.firstOrNull { it.CollectionType == "livetv" }
 
         return listOfNotNull(moviesView, tvView, animeEntry, liveTvView)
@@ -1189,27 +1184,27 @@ class JellioRepository @Inject constructor(
 
         val uniqueTmdbCount = dedupedCredits.distinctBy { it.tmdbId }.size
         val tabs = mutableListOf<DepartmentTab>()
-        tabs.add(DepartmentTab("All", com.jellio.tv.ui.i18n.Strings.get("person_tab_all"), uniqueTmdbCount))
+        tabs.add(DepartmentTab("All", com.jellio.tv.data.i18n.Strings.get("person_tab_all"), uniqueTmdbCount))
 
         val actingCount = dedupedCredits.count { it.department == "Acting" }
         if (actingCount > 0) {
-            tabs.add(DepartmentTab("Acting", com.jellio.tv.ui.i18n.Strings.get("person_tab_acting"), actingCount))
+            tabs.add(DepartmentTab("Acting", com.jellio.tv.data.i18n.Strings.get("person_tab_acting"), actingCount))
         }
         val directingCount = dedupedCredits.count { it.department == "Directing" }
         if (directingCount > 0) {
-            tabs.add(DepartmentTab("Directing", com.jellio.tv.ui.i18n.Strings.get("person_tab_directing"), directingCount))
+            tabs.add(DepartmentTab("Directing", com.jellio.tv.data.i18n.Strings.get("person_tab_directing"), directingCount))
         }
         val writingCount = dedupedCredits.count { it.department == "Writing" }
         if (writingCount > 0) {
-            tabs.add(DepartmentTab("Writing", com.jellio.tv.ui.i18n.Strings.get("person_tab_writing"), writingCount))
+            tabs.add(DepartmentTab("Writing", com.jellio.tv.data.i18n.Strings.get("person_tab_writing"), writingCount))
         }
         val productionCount = dedupedCredits.count { it.department == "Production" }
         if (productionCount > 0) {
-            tabs.add(DepartmentTab("Production", com.jellio.tv.ui.i18n.Strings.get("person_tab_production"), productionCount))
+            tabs.add(DepartmentTab("Production", com.jellio.tv.data.i18n.Strings.get("person_tab_production"), productionCount))
         }
         val otherCount = dedupedCredits.count { it.department == "Other" }
         if (otherCount > 0) {
-            tabs.add(DepartmentTab("Other", com.jellio.tv.ui.i18n.Strings.get("person_tab_other"), otherCount))
+            tabs.add(DepartmentTab("Other", com.jellio.tv.data.i18n.Strings.get("person_tab_other"), otherCount))
         }
 
         return RichPersonDetails(
@@ -1260,8 +1255,8 @@ class JellioRepository @Inject constructor(
         }
         val knownFor = credits.take(10)
         val tabs = listOf(
-            DepartmentTab("All", com.jellio.tv.ui.i18n.Strings.get("person_tab_all"), credits.size),
-            DepartmentTab("Acting", com.jellio.tv.ui.i18n.Strings.get("person_tab_acting"), credits.size),
+            DepartmentTab("All", com.jellio.tv.data.i18n.Strings.get("person_tab_all"), credits.size),
+            DepartmentTab("Acting", com.jellio.tv.data.i18n.Strings.get("person_tab_acting"), credits.size),
         )
         return RichPersonDetails(
             id = personId,
@@ -1582,7 +1577,7 @@ class JellioRepository @Inject constructor(
     }
 
     private fun hasStreamInfo(source: MediaSourceDto): Boolean {
-        if (com.jellio.tv.ui.detail.sourceQuality(source) != null) return true
+        if (com.jellio.tv.data.streams.sourceQuality(source) != null) return true
         if ((source.Size ?: 0L) >= 1024L * 1024L) return true
 
         val hasProbedStream = source.MediaStreams?.any { s ->
@@ -2205,7 +2200,7 @@ class JellioRepository @Inject constructor(
     internal fun canDirectPlayAudio(codec: String?): Boolean {
         val c = codec?.lowercase() ?: return false
         if (c in SOFTWARE_AUDIO_CODECS) return true
-        if (com.jellio.tv.ui.player.PlayerPrefs.audioPassthrough && c in DIRECT_PLAY_AUDIO_CODECS) return true
+        if (com.jellio.tv.data.prefs.PlayerPrefs.audioPassthrough && c in DIRECT_PLAY_AUDIO_CODECS) return true
         val mimeType = when (c) {
             "ac3" -> "audio/ac3"
             "eac3" -> "audio/eac3"

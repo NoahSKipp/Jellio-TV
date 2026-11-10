@@ -102,7 +102,7 @@ class LoginViewModel @Inject constructor(
 
     fun submitServerAddress(serverAddress: String) {
         if (serverAddress.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = com.jellio.tv.ui.i18n.Strings.get("auth_enter_server"))
+            _uiState.value = _uiState.value.copy(error = com.jellio.tv.data.i18n.Strings.get("auth_enter_server"))
             return
         }
         viewModelScope.launch {
@@ -184,36 +184,36 @@ class LoginViewModel @Inject constructor(
 
     fun requestPasswordReset(username: String) {
         if (username.isBlank()) {
-            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_enter_username"))
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_enter_username"))
             return
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRequestingReset = true, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_sending"))
+            _uiState.value = _uiState.value.copy(isRequestingReset = true, resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_sending"))
             val ok = repository.requestPasswordReset(_uiState.value.serverAddress, username)
             _uiState.value = if (ok) {
                 _uiState.value.copy(
                     mode = LoginMode.FORGOT_PIN,
                     forgotPasswordUsername = username,
                     isRequestingReset = false,
-                    resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_reset_code_sent"),
+                    resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_reset_code_sent"),
                 )
             } else {
-                _uiState.value.copy(isRequestingReset = false, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_reset_request_error"))
+                _uiState.value.copy(isRequestingReset = false, resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_reset_request_error"))
             }
         }
     }
 
     fun redeemPasswordReset(pin: String, newPassword: String, confirmPassword: String) {
         if (pin.isBlank() || newPassword.isBlank()) {
-            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_enter_code_and_password"))
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_enter_code_and_password"))
             return
         }
         if (newPassword != confirmPassword) {
-            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.ui.i18n.Strings.get("settings_passwords_mismatch"))
+            _uiState.value = _uiState.value.copy(resetStatus = com.jellio.tv.data.i18n.Strings.get("settings_passwords_mismatch"))
             return
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = com.jellio.tv.ui.i18n.Strings.get("auth_resetting"))
+            _uiState.value = _uiState.value.copy(isRedeemingReset = true, resetStatus = com.jellio.tv.data.i18n.Strings.get("auth_resetting"))
             when (val result = repository.redeemPasswordReset(_uiState.value.serverAddress, _uiState.value.forgotPasswordUsername, pin, newPassword)) {
                 is LoginResult.Success -> Unit
                 is LoginResult.Failure -> _uiState.value = _uiState.value.copy(isRedeemingReset = false, resetStatus = result.reason.message())
@@ -257,7 +257,7 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
             if (result == null || result.Code.isNullOrBlank() || result.Secret.isNullOrBlank()) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = com.jellio.tv.ui.i18n.Strings.get("auth_quick_connect_start_error"),
+                    error = com.jellio.tv.data.i18n.Strings.get("auth_quick_connect_start_error"),
                 )
                 return@launch
             }
@@ -305,7 +305,7 @@ private var quickConnectJob: kotlinx.coroutines.Job? = null
     }
 }
 
-fun LoginFailure.message(): String = com.jellio.tv.ui.i18n.Strings.get(key)
+fun LoginFailure.message(): String = com.jellio.tv.data.i18n.Strings.get(key)
 
 object LoginHandoff {
     @Volatile private var username: String? = null

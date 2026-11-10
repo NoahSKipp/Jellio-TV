@@ -61,13 +61,13 @@ fun JellioRoute.iconScale(): Float = when (this) {
 }
 
 fun JellioRoute.label(): String = when (this) {
-    is JellioRoute.Profile -> com.jellio.tv.ui.i18n.Strings.get("nav_profile")
-    is JellioRoute.Home -> com.jellio.tv.ui.i18n.Strings.get("nav_home")
-    JellioRoute.Search -> com.jellio.tv.ui.i18n.Strings.get("nav_search")
-    JellioRoute.Feed -> com.jellio.tv.ui.i18n.Strings.get("nav_feed")
-    is JellioRoute.LibraryTab -> com.jellio.tv.ui.i18n.libraryDisplayName(name, collectionType)
-    JellioRoute.Settings -> com.jellio.tv.ui.i18n.Strings.get("nav_settings")
-    JellioRoute.LiveTv -> com.jellio.tv.ui.i18n.Strings.get("nav_live_tv")
+    is JellioRoute.Profile -> com.jellio.tv.data.i18n.Strings.get("nav_profile")
+    is JellioRoute.Home -> com.jellio.tv.data.i18n.Strings.get("nav_home")
+    JellioRoute.Search -> com.jellio.tv.data.i18n.Strings.get("nav_search")
+    JellioRoute.Feed -> com.jellio.tv.data.i18n.Strings.get("nav_feed")
+    is JellioRoute.LibraryTab -> com.jellio.tv.data.i18n.libraryDisplayName(name, collectionType)
+    JellioRoute.Settings -> com.jellio.tv.data.i18n.Strings.get("nav_settings")
+    JellioRoute.LiveTv -> com.jellio.tv.data.i18n.Strings.get("nav_live_tv")
     is JellioRoute.Detail, is JellioRoute.Person, is JellioRoute.Service, is JellioRoute.Player, is JellioRoute.LivePlayer -> ""
 }
 

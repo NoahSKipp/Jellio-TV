@@ -99,7 +99,7 @@ class AppViewModel @Inject constructor(
         }
         syncPlayManager.leaveLocally()
         com.jellio.tv.ui.auth.LoginHandoff.put(expired.userName)
-        com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.ui.i18n.Strings.get("auth_session_expired"))
+        com.jellio.tv.ui.auth.LoginHandoff.putNotice(com.jellio.tv.data.i18n.Strings.get("auth_session_expired"))
         repository.logoutExpired(expired.serverAddress, expired.userId)
     }
 

@@ -243,7 +243,7 @@ class ServiceViewModel @Inject constructor(
                 .sortedByDescending { it.CommunityRating ?: 0.0 }
                 .take(SERVICE_ROW_LIMIT)
             if (items.size < GENRE_ROW_MIN_ITEMS) null
-            else ServiceRow(title = com.jellio.tv.ui.i18n.Strings.format("service_genre_on", com.jellio.tv.ui.i18n.genreDisplayName(genre), serviceName), kind = MIXED_KIND, items = items, collectionId = "")
+            else ServiceRow(title = com.jellio.tv.data.i18n.Strings.format("service_genre_on", com.jellio.tv.data.i18n.genreDisplayName(genre), serviceName), kind = MIXED_KIND, items = items, collectionId = "")
         }
     }
 

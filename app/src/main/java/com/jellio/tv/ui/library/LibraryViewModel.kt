@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.JellioRepository
 import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.ui.i18n.genreDisplayName
+import com.jellio.tv.data.i18n.genreDisplayName
 import com.jellio.tv.data.model.ShowsEditorial
 import com.jellio.tv.data.model.animeTimeOfDay
 import com.jellio.tv.data.model.moviesTimeOfDay
@@ -19,7 +19,7 @@ import com.jellio.tv.data.cache.toHomeSection
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.LoadFailure
 import com.jellio.tv.ui.common.loadFailureOf
-import com.jellio.tv.ui.home.HomeSection
+import com.jellio.tv.data.model.HomeSection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -136,9 +136,9 @@ class LibraryViewModel @Inject constructor(
         mainRowFailed = false
         loadJob = viewModelScope.launch {
             val libTitle = if (repository.isAnimeLibrary(library)) {
-                com.jellio.tv.ui.i18n.Strings.get("library_anime_title")
+                com.jellio.tv.data.i18n.Strings.get("library_anime_title")
             } else {
-                com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType)
+                com.jellio.tv.data.i18n.libraryDisplayName(library.Name, library.CollectionType)
             }
             if (!isReturningVisit) {
                 val cached = catching { rowSnapshotStore.loadLibrarySnapshot(session.userId, library.Id) }.getOrNull()
@@ -227,7 +227,7 @@ class LibraryViewModel @Inject constructor(
                 ).filterNot { isAnime(it) }
             },
         )
-        val libTitle = com.jellio.tv.ui.i18n.libraryDisplayName(library.Name, library.CollectionType)
+        val libTitle = com.jellio.tv.data.i18n.libraryDisplayName(library.Name, library.CollectionType)
         // Nothing on screen yet: rows go up as they arrive instead of all at
         // the end, and any one request that hangs is skipped.
         fun publish(coverflow: List<BaseItemDto>, badge: String?, sections: List<HomeSection>) {
@@ -308,7 +308,7 @@ class LibraryViewModel @Inject constructor(
     private fun isAnime(item: BaseItemDto): Boolean =
         animeIds.isNotEmpty() && item.Id.replace("-", "").lowercase() in animeIds
 
-    private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.let { com.jellio.tv.ui.i18n.Strings.get(it.key) } ?: com.jellio.tv.ui.i18n.Strings.get("library_sort_browse")
+    private fun sortLabel(value: String): String = LIBRARY_SORT_OPTIONS.firstOrNull { it.value == value }?.let { com.jellio.tv.data.i18n.Strings.get(it.key) } ?: com.jellio.tv.data.i18n.Strings.get("library_sort_browse")
 
     fun changeSort(session: Session, sort: String) {
         val library = currentLibrary ?: return
@@ -353,7 +353,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     private suspend fun loadAnime(session: Session, libraryId: String) = coroutineScope {
-        val animeTitle = com.jellio.tv.ui.i18n.Strings.get("library_anime_title")
+        val animeTitle = com.jellio.tv.data.i18n.Strings.get("library_anime_title")
         val progressive = _uiState.value.isLoading
         val allCollections = catching { repository.getCollections(session.userId) }
             .onFailure { lastError = it }
@@ -365,7 +365,7 @@ class LibraryViewModel @Inject constructor(
         val collections = allCollections.filter { repository.isAnimeCollection(it) }
 
         if (collections.isEmpty()) {
-            _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"), emptyMessage = com.jellio.tv.ui.i18n.Strings.get("library_anime_empty"))
+            _uiState.value = LibraryUiState(isLoading = false, title = com.jellio.tv.data.i18n.Strings.get("library_anime_title"), emptyMessage = com.jellio.tv.data.i18n.Strings.get("library_anime_empty"))
             return@coroutineScope
         }
 
@@ -411,9 +411,9 @@ class LibraryViewModel @Inject constructor(
             if (progressive) {
                 _uiState.value = LibraryUiState(
                     isLoading = false,
-                    title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
+                    title = com.jellio.tv.data.i18n.Strings.get("library_anime_title"),
                     coverflowItems = coverflowSource,
-                    coverflowBadge = if (coverflowSource.isNotEmpty()) com.jellio.tv.ui.i18n.Strings.get("library_trending_anilist") else null,
+                    coverflowBadge = if (coverflowSource.isNotEmpty()) com.jellio.tv.data.i18n.Strings.get("library_trending_anilist") else null,
                     sections = sections.toList(),
                 )
             }
@@ -437,12 +437,12 @@ class LibraryViewModel @Inject constructor(
             if (failed) {
                 failWholePage(animeTitle, progressive)
             } else {
-                _uiState.value = LibraryUiState(isLoading = false, title = animeTitle, emptyMessage = com.jellio.tv.ui.i18n.Strings.get("library_anime_empty"))
+                _uiState.value = LibraryUiState(isLoading = false, title = animeTitle, emptyMessage = com.jellio.tv.data.i18n.Strings.get("library_anime_empty"))
             }
             return@coroutineScope
         }
 
-        val badge = if (coverflowSource.isNotEmpty()) com.jellio.tv.ui.i18n.Strings.get("library_trending_anilist") else null
+        val badge = if (coverflowSource.isNotEmpty()) com.jellio.tv.data.i18n.Strings.get("library_trending_anilist") else null
         _uiState.value = LibraryUiState(
             isLoading = false,
             title = animeTitle,
@@ -453,7 +453,7 @@ class LibraryViewModel @Inject constructor(
         )
         if (failed) return@coroutineScope
         val snapshot = LibrarySnapshot(
-            title = com.jellio.tv.ui.i18n.Strings.get("library_anime_title"),
+            title = com.jellio.tv.data.i18n.Strings.get("library_anime_title"),
             coverflowItems = coverflowSource,
             coverflowBadge = badge,
             sections = sectionsWithTheme.map { it.toCachedRowDto() },

@@ -59,15 +59,15 @@ private fun comingSoonDateLabel(entry: CalendarEntryDto): String {
     val date = parseEntryDate(entry.Date) ?: return ""
     val diffDays = ((date.time - System.currentTimeMillis()) / (24 * 60 * 60 * 1000)).toInt()
     return when {
-        diffDays <= 0 -> com.jellio.tv.ui.i18n.Strings.get("calendar_today")
-        diffDays == 1 -> com.jellio.tv.ui.i18n.Strings.get("calendar_tomorrow")
-        diffDays < 7 -> com.jellio.tv.ui.i18n.Strings.format("coming_soon_in_days", diffDays)
-        else -> SimpleDateFormat("MMM d", com.jellio.tv.ui.i18n.displayLocale()).format(date)
+        diffDays <= 0 -> com.jellio.tv.data.i18n.Strings.get("calendar_today")
+        diffDays == 1 -> com.jellio.tv.data.i18n.Strings.get("calendar_tomorrow")
+        diffDays < 7 -> com.jellio.tv.data.i18n.Strings.format("coming_soon_in_days", diffDays)
+        else -> SimpleDateFormat("MMM d", com.jellio.tv.data.i18n.displayLocale()).format(date)
     }
 }
 
 private fun comingSoonKindLabel(entry: CalendarEntryDto): String {
-    val strings = com.jellio.tv.ui.i18n.Strings
+    val strings = com.jellio.tv.data.i18n.Strings
     return if (entry.Kind == "episode") {
         val label = strings.get("calendar_new_episode")
         if (!entry.Detail.isNullOrEmpty()) "$label \u00B7 ${entry.Detail}" else label
@@ -92,7 +92,7 @@ fun ComingSoonRow(
 ) {
     if (entries.isEmpty()) return
     Column(modifier = modifier.padding(bottom = RowSpacing)) {
-        RowTitle(text = com.jellio.tv.ui.i18n.Strings.get("tv_coming_soon"))
+        RowTitle(text = com.jellio.tv.data.i18n.Strings.get("tv_coming_soon"))
         val firstCard = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.gestures.LocalBringIntoViewSpec provides com.jellio.tv.ui.common.rememberTvHorizontalBringIntoViewSpec()) {
             LazyRow(

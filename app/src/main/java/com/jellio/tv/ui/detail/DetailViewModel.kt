@@ -10,11 +10,11 @@ import com.jellio.tv.data.model.PersonDto
 import com.jellio.tv.data.model.UserItemDataDto
 import com.jellio.tv.data.prefs.StreamPreferences
 import com.jellio.tv.data.session.Session
-import com.jellio.tv.ui.common.isPendingTodayRelease
-import com.jellio.tv.ui.common.isReleasedToday
-import com.jellio.tv.ui.common.isUnreleasedByDate
-import com.jellio.tv.ui.common.isUnreleasedItem
-import com.jellio.tv.ui.common.markTodayItemHasStream
+import com.jellio.tv.data.isPendingTodayRelease
+import com.jellio.tv.data.isReleasedToday
+import com.jellio.tv.data.isUnreleasedByDate
+import com.jellio.tv.data.isUnreleasedItem
+import com.jellio.tv.data.markTodayItemHasStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -45,7 +45,7 @@ data class DetailUiState(
     val selectedSeason: BaseItemDto? = null,
     val cast: List<PersonDto> = emptyList(),
     val trailers: List<com.jellio.tv.data.model.TrailerDto> = emptyList(),
-    val playLabel: String = com.jellio.tv.ui.i18n.Strings.get("action_play"),
+    val playLabel: String = com.jellio.tv.data.i18n.Strings.get("action_play"),
     val isWatchlisted: Boolean = false,
     val isWatched: Boolean = false,
     val likes: Boolean? = null,
@@ -235,7 +235,7 @@ class DetailViewModel @Inject constructor(
                 if (currentItem != null) {
                     _uiState.value = _uiState.value.copy(isLoading = false, item = currentItem, detailsRetrying = false, detailsFailed = true)
                 } else {
-                    _uiState.value = DetailUiState(isLoading = false, item = null, error = com.jellio.tv.ui.i18n.Strings.get("detail_load_error"))
+                    _uiState.value = DetailUiState(isLoading = false, item = null, error = com.jellio.tv.data.i18n.Strings.get("detail_load_error"))
                 }
             }
         }
@@ -264,7 +264,7 @@ class DetailViewModel @Inject constructor(
         if (loadedItemId != seriesId) return null
         if (target.resume) {
             _uiState.value = _uiState.value.copy(
-                playLabel = com.jellio.tv.ui.i18n.Strings.format("detail_resume_episode", target.episode.ParentIndexNumber ?: 0, target.episode.IndexNumber ?: 0),
+                playLabel = com.jellio.tv.data.i18n.Strings.format("detail_resume_episode", target.episode.ParentIndexNumber ?: 0, target.episode.IndexNumber ?: 0),
             )
         }
         // The episode Play will start: its details and streams load now, so
@@ -529,8 +529,8 @@ class DetailViewModel @Inject constructor(
                 findingStreams = false,
                 streamVerifiedTick = _uiState.value.streamVerifiedTick + 1,
                 streamStatus = when {
-                    sources.isFailure -> com.jellio.tv.ui.i18n.Strings.get("stream_load_error")
-                    sources.getOrNull().isNullOrEmpty() -> com.jellio.tv.ui.i18n.Strings.get("stream_none_found")
+                    sources.isFailure -> com.jellio.tv.data.i18n.Strings.get("stream_load_error")
+                    sources.getOrNull().isNullOrEmpty() -> com.jellio.tv.data.i18n.Strings.get("stream_none_found")
                     else -> null
                 },
             )

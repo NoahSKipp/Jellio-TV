@@ -2,9 +2,9 @@ package com.jellio.tv.ui.watchlist
 
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.UserItemDataDto
-import com.jellio.tv.ui.home.HomeRow
-import com.jellio.tv.ui.home.HomeSection
-import com.jellio.tv.ui.home.PosterHomeRow
+import com.jellio.tv.data.model.HomeRow
+import com.jellio.tv.data.model.HomeSection
+import com.jellio.tv.data.model.PosterHomeRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

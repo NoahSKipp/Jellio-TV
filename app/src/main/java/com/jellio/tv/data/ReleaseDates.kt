@@ -1,8 +1,8 @@
-package com.jellio.tv.ui.common
+package com.jellio.tv.data
 
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.ui.i18n.Strings
-import com.jellio.tv.ui.i18n.displayLocale
+import com.jellio.tv.data.i18n.Strings
+import com.jellio.tv.data.i18n.displayLocale
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date

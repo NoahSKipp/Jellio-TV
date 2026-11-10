@@ -72,14 +72,14 @@ fun UpdateToast(
         ) {
             Text(text = com.jellio.tv.ui.i18n.string("update_available_title"), style = MaterialTheme.typography.titleMedium, color = JellioText)
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.format("tv_update_ready", version),
+                text = com.jellio.tv.data.i18n.Strings.format("tv_update_ready", version),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
                 modifier = Modifier.padding(top = 6.dp, bottom = if (error != null) 8.dp else 18.dp),
             )
             if (error != null) {
                 Text(
-                    text = com.jellio.tv.ui.i18n.Strings.get(error),
+                    text = com.jellio.tv.data.i18n.Strings.get(error),
                     style = MaterialTheme.typography.bodyMedium,
                     color = com.jellio.tv.ui.theme.JellioDanger,
                     modifier = Modifier.padding(bottom = 18.dp),
@@ -99,7 +99,7 @@ fun UpdateToast(
                     colors = com.jellio.tv.ui.common.primaryButtonColors(),
                     modifier = Modifier.focusRequester(downloadFocusRequester),
                 ) {
-                    Text(text = com.jellio.tv.ui.i18n.Strings.get(if (downloading) "update_downloading" else "update_download"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                    Text(text = com.jellio.tv.data.i18n.Strings.get(if (downloading) "update_downloading" else "update_download"), modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
                 }
             }
         }

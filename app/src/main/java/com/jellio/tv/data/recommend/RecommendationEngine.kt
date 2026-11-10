@@ -2,8 +2,8 @@ package com.jellio.tv.data.recommend
 
 import com.jellio.tv.data.catching
 import com.jellio.tv.data.model.BaseItemDto
-import com.jellio.tv.ui.home.HomeSection
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.model.HomeSection
+import com.jellio.tv.data.i18n.Strings
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

@@ -55,7 +55,7 @@ import com.jellio.tv.data.model.serviceColor
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.common.TvVerticalRowBringIntoViewSpec
-import com.jellio.tv.ui.home.HomeSection
+import com.jellio.tv.data.model.HomeSection
 import com.jellio.tv.ui.home.PosterRow
 import com.jellio.tv.ui.home.RowHeaderHeight
 import com.jellio.tv.ui.home.HeaderOverlap
@@ -238,7 +238,7 @@ private fun ServiceHeader(name: String, logoUrl: String?, genres: List<String>, 
         add(ALL_FILTER to com.jellio.tv.ui.i18n.string("search_filter_all"))
         add("movies" to com.jellio.tv.ui.i18n.string("nav_movies"))
         add("tvshows" to com.jellio.tv.ui.i18n.string("nav_shows"))
-        genres.forEach { genre -> add("genre:$genre" to com.jellio.tv.ui.i18n.genreDisplayName(genre)) }
+        genres.forEach { genre -> add("genre:$genre" to com.jellio.tv.data.i18n.genreDisplayName(genre)) }
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,

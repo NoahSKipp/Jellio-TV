@@ -1,5 +1,6 @@
 package com.jellio.tv.ui.home
 
+import com.jellio.tv.data.model.HomeSection
 import com.jellio.tv.ui.common.rowEntry
 import com.jellio.tv.ui.common.RowEntryTarget
 import com.jellio.tv.ui.common.rememberTvRowState
@@ -235,7 +236,7 @@ fun RowExpandButton(onClick: () -> Unit, height: Dp, modifier: Modifier = Modifi
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ViewList,
-                contentDescription = com.jellio.tv.ui.i18n.Strings.get("action_see_all"),
+                contentDescription = com.jellio.tv.data.i18n.Strings.get("action_see_all"),
                 tint = JellioText,
                 modifier = Modifier.size(32.dp),
             )

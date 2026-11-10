@@ -1,7 +1,7 @@
 package com.jellio.tv.ui.live
 
 import com.jellio.tv.data.catching
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

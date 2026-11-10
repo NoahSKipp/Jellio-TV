@@ -203,13 +203,13 @@ fun OverscanCalibrationModal(
                 .padding(32.dp),
         ) {
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_title"),
+                text = com.jellio.tv.data.i18n.Strings.get("tv_overscan_title"),
                 style = MaterialTheme.typography.titleLarge,
                 color = JellioText,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_hint"),
+                text = com.jellio.tv.data.i18n.Strings.get("tv_overscan_hint"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = JellioTextSecondary,
                 textAlign = TextAlign.Center,
@@ -281,7 +281,7 @@ fun OverscanCalibrationModal(
                         },
                 ) {
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_inset"),
+                        text = com.jellio.tv.data.i18n.Strings.get("tv_overscan_inset"),
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )
                 }
@@ -312,7 +312,7 @@ fun OverscanCalibrationModal(
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                     ) {
                         Text(
-                            text = com.jellio.tv.ui.i18n.Strings.get("tv_overscan_reset"),
+                            text = com.jellio.tv.data.i18n.Strings.get("tv_overscan_reset"),
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                         )
                     }
@@ -331,7 +331,7 @@ fun OverscanCalibrationModal(
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
                 ) {
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get("tv_save_apply"),
+                        text = com.jellio.tv.data.i18n.Strings.get("tv_save_apply"),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 10.dp),
                     )

@@ -412,7 +412,7 @@ fun ChangelogPopup(
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = com.jellio.tv.ui.i18n.Strings.format("changelog_previous_versions", previousReleases.size),
+                                text = com.jellio.tv.data.i18n.Strings.format("changelog_previous_versions", previousReleases.size),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             )
                             Icon(
@@ -549,7 +549,7 @@ fun ChangelogPopup(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = com.jellio.tv.ui.i18n.Strings.get("changelog_continue"),
+                        text = com.jellio.tv.data.i18n.Strings.get("changelog_continue"),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                     )
                 }

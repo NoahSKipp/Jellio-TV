@@ -57,7 +57,7 @@ import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.nowplaying.NowPlayingManager
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.di.normalizeServerAddress
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled

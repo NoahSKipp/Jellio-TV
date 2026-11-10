@@ -168,18 +168,18 @@ class SettingsViewModel @Inject constructor(
 
     fun updatePassword(session: Session, currentPassword: String, newPassword: String, confirmPassword: String) {
         if (newPassword.isEmpty() || newPassword != confirmPassword) {
-            _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_passwords_mismatch")
+            _passwordStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_passwords_mismatch")
             return
         }
         viewModelScope.launch {
             _isUpdatingPassword.value = true
-            _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_updating_password")
+            _passwordStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_updating_password")
             try {
                 repository.updatePassword(session.userId, currentPassword, newPassword)
-                _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_password_updated")
+                _passwordStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_password_updated")
                 _passwordUpdateTick.value += 1
             } catch (err: Exception) {
-                _passwordStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_password_update_failed")
+                _passwordStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_password_update_failed")
             } finally {
                 _isUpdatingPassword.value = false
             }
@@ -207,10 +207,10 @@ class SettingsViewModel @Inject constructor(
                 val presets = repository.getAvatarPresets()
                 _avatarPresets.value = presets
                 if (presets.isEmpty()) {
-                    _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_no_preset_avatars")
+                    _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_no_preset_avatars")
                 }
             } catch (err: Exception) {
-                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_load_avatars_error")
+                _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_load_avatars_error")
             }
         }
     }
@@ -226,13 +226,13 @@ class SettingsViewModel @Inject constructor(
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {
             _avatarBusyKey.value = presetId
-            _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_setting_avatar")
+            _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_setting_avatar")
             try {
                 repository.setUserAvatarFromPreset(session.userId, presetId)
-                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_avatar_updated")
+                _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_avatar_updated")
                 _showAvatarPicker.value = false
             } catch (err: Exception) {
-                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_set_avatar_error")
+                _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_set_avatar_error")
                 _avatarBusyKey.value = null
             }
         }
@@ -242,13 +242,13 @@ class SettingsViewModel @Inject constructor(
         if (_avatarBusyKey.value != null) return
         viewModelScope.launch {
             _avatarBusyKey.value = "upload"
-            _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_setting_avatar")
+            _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_setting_avatar")
             try {
                 repository.setUserAvatarFromBytes(session.userId, bytes, contentType)
-                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_avatar_updated")
+                _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_avatar_updated")
                 _showAvatarPicker.value = false
             } catch (err: Exception) {
-                _avatarPickerStatus.value = com.jellio.tv.ui.i18n.Strings.get("settings_set_avatar_error")
+                _avatarPickerStatus.value = com.jellio.tv.data.i18n.Strings.get("settings_set_avatar_error")
                 _avatarBusyKey.value = null
             }
         }
@@ -297,7 +297,7 @@ class SettingsViewModel @Inject constructor(
                 _communityUsers.value = repository.getCommunityUsers()
             }
             catching {
-                _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sortedBy { com.jellio.tv.ui.i18n.genreDisplayName(it) }
+                _allGenres.value = repository.getAllGenres(userId, null, "Movie,Series").sortedBy { com.jellio.tv.data.i18n.genreDisplayName(it) }
             }
         }
     }

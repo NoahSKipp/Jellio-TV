@@ -57,7 +57,7 @@ import com.jellio.tv.ui.common.ErrorState
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.common.LoadFailure
 import com.jellio.tv.ui.common.ScreenSpinner
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -75,7 +75,7 @@ private val accent = Color(0xFFFF9800)
 // A big channel list shows this many rows until a search narrows it.
 private const val PLAYLIST_PREVIEW = 120
 
-internal fun formatClock(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT, com.jellio.tv.ui.i18n.displayLocale()).format(Date(ms))
+internal fun formatClock(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT, com.jellio.tv.data.i18n.displayLocale()).format(Date(ms))
 
 internal fun languageLabel(language: String): String {
     val code = mapOf(

@@ -19,16 +19,16 @@ fun formatRelativeTime(isoUtc: String?): String {
         ?: runCatching { java.time.LocalDate.parse(isoUtc).atStartOfDay(java.time.ZoneOffset.UTC).toInstant() }.getOrNull()
         ?: return ""
     val minutes = ChronoUnit.MINUTES.between(then, Instant.now())
-    if (minutes < 1) return com.jellio.tv.ui.i18n.Strings.get("time_just_now")
-    if (minutes < 60) return if (minutes == 1L) com.jellio.tv.ui.i18n.Strings.get("time_minute_ago") else com.jellio.tv.ui.i18n.Strings.format("time_minutes_ago", minutes)
+    if (minutes < 1) return com.jellio.tv.data.i18n.Strings.get("time_just_now")
+    if (minutes < 60) return if (minutes == 1L) com.jellio.tv.data.i18n.Strings.get("time_minute_ago") else com.jellio.tv.data.i18n.Strings.format("time_minutes_ago", minutes)
     val hours = Math.round(minutes / 60.0)
-    if (hours < 24) return if (hours == 1L) com.jellio.tv.ui.i18n.Strings.get("time_hour_ago") else com.jellio.tv.ui.i18n.Strings.format("time_hours_ago", hours)
+    if (hours < 24) return if (hours == 1L) com.jellio.tv.data.i18n.Strings.get("time_hour_ago") else com.jellio.tv.data.i18n.Strings.format("time_hours_ago", hours)
     val days = Math.round(hours / 24.0)
-    if (days < 30) return if (days == 1L) com.jellio.tv.ui.i18n.Strings.get("time_day_ago") else com.jellio.tv.ui.i18n.Strings.format("time_days_ago", days)
+    if (days < 30) return if (days == 1L) com.jellio.tv.data.i18n.Strings.get("time_day_ago") else com.jellio.tv.data.i18n.Strings.format("time_days_ago", days)
     val months = Math.round(days / 30.0)
-    if (months < 12) return if (months == 1L) com.jellio.tv.ui.i18n.Strings.get("time_month_ago") else com.jellio.tv.ui.i18n.Strings.format("time_months_ago", months)
+    if (months < 12) return if (months == 1L) com.jellio.tv.data.i18n.Strings.get("time_month_ago") else com.jellio.tv.data.i18n.Strings.format("time_months_ago", months)
     val years = Math.round(months / 12.0)
-    return if (years == 1L) com.jellio.tv.ui.i18n.Strings.get("time_year_ago") else com.jellio.tv.ui.i18n.Strings.format("time_years_ago", years)
+    return if (years == 1L) com.jellio.tv.data.i18n.Strings.get("time_year_ago") else com.jellio.tv.data.i18n.Strings.format("time_years_ago", years)
 }
 
 fun rarityColor(rarity: String?): Color = when (rarity?.lowercase()) {
@@ -48,23 +48,23 @@ fun watchActivityText(
     itemName: String?,
     rewatch: Boolean = false,
 ): AnnotatedString = buildAnnotatedString {
-    val verb = com.jellio.tv.ui.i18n.Strings.get(if (rewatch) "activity_rewatched" else "activity_watched")
+    val verb = com.jellio.tv.data.i18n.Strings.get(if (rewatch) "activity_rewatched" else "activity_watched")
     val lang = com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code.lowercase()
     val isEpisode = itemType == "Episode" && !seriesName.isNullOrEmpty()
     val isGerman = lang == "de"
 
     if (isGerman) {
         if (isEpisode) {
-            val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
+            val season = if (seasonNumber != null) com.jellio.tv.data.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
             if (episodeCount > 1) {
                 val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
-                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
+                    com.jellio.tv.data.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
                 } else {
-                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_count", episodeCount)
+                    com.jellio.tv.data.i18n.Strings.format("feed_episodes_count", episodeCount)
                 }
                 append("$season$range ")
             } else if (firstEpisodeNumber != null) {
-                append(season + com.jellio.tv.ui.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
+                append(season + com.jellio.tv.data.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
             }
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
             append(" " + verb.lowercase())
@@ -75,16 +75,16 @@ fun watchActivityText(
     } else {
         append("$verb ")
         if (isEpisode) {
-            val season = if (seasonNumber != null) com.jellio.tv.ui.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
+            val season = if (seasonNumber != null) com.jellio.tv.data.i18n.Strings.format("feed_season_single", seasonNumber) + ", " else ""
             if (episodeCount > 1) {
                 val range = if (firstEpisodeNumber != null && lastEpisodeNumber != null) {
-                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
+                    com.jellio.tv.data.i18n.Strings.format("feed_episodes_range", firstEpisodeNumber, lastEpisodeNumber)
                 } else {
-                    com.jellio.tv.ui.i18n.Strings.format("feed_episodes_count", episodeCount)
+                    com.jellio.tv.data.i18n.Strings.format("feed_episodes_count", episodeCount)
                 }
                 append("$season$range ")
             } else if (firstEpisodeNumber != null) {
-                append(season + com.jellio.tv.ui.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
+                append(season + com.jellio.tv.data.i18n.Strings.format("feed_episode_single", firstEpisodeNumber) + " ")
             }
             withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(seriesName) }
         } else {
@@ -98,8 +98,8 @@ fun badgeActivityText(
     rarity: String?,
     badgeId: String? = null,
 ): AnnotatedString = buildAnnotatedString {
-    val localizedBadge = com.jellio.tv.ui.i18n.badgeDisplayName(badgeId, badgeName)
-    append(com.jellio.tv.ui.i18n.Strings.get("activity_unlocked") + " ")
+    val localizedBadge = com.jellio.tv.data.i18n.badgeDisplayName(badgeId, badgeName)
+    append(com.jellio.tv.data.i18n.Strings.get("activity_unlocked") + " ")
     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = rarityColor(rarity))) {
         append(localizedBadge)
     }

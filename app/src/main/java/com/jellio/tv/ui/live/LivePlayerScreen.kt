@@ -64,7 +64,7 @@ import com.jellio.tv.data.network.buildEmbyAuthorizationHeader
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.ScreenSpinner
 import com.jellio.tv.ui.common.primaryButtonColors
-import com.jellio.tv.ui.i18n.Strings
+import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay

@@ -1,4 +1,4 @@
-package com.jellio.tv.ui.player
+package com.jellio.tv.data.prefs
 
 import android.content.Context
 import androidx.compose.runtime.getValue
