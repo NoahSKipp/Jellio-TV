@@ -33,6 +33,7 @@ import com.jellio.tv.data.model.PersonCreditItem
 import com.jellio.tv.data.model.RichPersonDetails
 import com.jellio.tv.data.model.TmdbPersonDetails
 import com.jellio.tv.data.model.TmdbPersonSearchResponse
+import com.jellio.tv.data.cache.lruMap
 import com.jellio.tv.data.network.JellyfinApi
 import com.jellio.tv.data.network.SharedHttp
 import com.squareup.moshi.Moshi
@@ -170,14 +171,8 @@ private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 private const val RECOMMENDATION_CACHE_TTL_MS = 30 * 60_000L
 
 // Per-title hint maps (prefetch times, last stream lists, empty checks)
-// start over past this size rather than grow for the whole session.
+// keep at most this many titles, least recently used dropped first.
 private const val MAX_HINTS = 500
-
-// These maps only hold hints that can be fetched again, so dropping them
-// all at a size limit is enough to keep them bounded.
-private fun <K, V> MutableMap<K, V>.capAt(max: Int) {
-    if (size > max) clear()
-}
 
 internal class TtlCache {
     private data class Entry(val value: Any?, val expiresAt: Long)
@@ -254,13 +249,13 @@ class JellioRepository @Inject constructor(
 
     private val sourceCache = com.jellio.tv.data.streams.SourceCache<MediaSourceDto>()
     private val sourcesInFlight = ConcurrentHashMap<String, Deferred<List<MediaSourceDto>>>()
-    private val lastSources = ConcurrentHashMap<String, com.jellio.tv.data.streams.LastList<MediaSourceDto>>()
-    private val prefetchedAt = ConcurrentHashMap<String, Long>()
+    private val lastSources = lruMap<String, com.jellio.tv.data.streams.LastList<MediaSourceDto>>(MAX_HINTS)
+    private val prefetchedAt = lruMap<String, Long>(MAX_HINTS)
     // One warm-up request to the server at a time, whoever asks.
     private val prefetchSlots = java.util.concurrent.Semaphore(1)
     // Titles the server said are already warm.
     private val knownWarm = ConcurrentHashMap.newKeySet<String>()
-    private val emptyTodayStreamCheckAt = ConcurrentHashMap<String, Long>()
+    private val emptyTodayStreamCheckAt = lruMap<String, Long>(MAX_HINTS)
 
     fun clearCache() {
         cache.clear()
@@ -557,7 +552,6 @@ class JellioRepository @Inject constructor(
         val hasValid = sources.isNotEmpty()
         markTodayItemHasStream(item.Id, hasValid)
         if (!hasValid) {
-            emptyTodayStreamCheckAt.capAt(MAX_HINTS)
             emptyTodayStreamCheckAt[item.Id] = System.currentTimeMillis()
         } else {
             emptyTodayStreamCheckAt.remove(item.Id)
@@ -718,7 +712,7 @@ class JellioRepository @Inject constructor(
             ).Items,
         )
 
-    private val showcaseCache = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
+    private val showcaseCache = lruMap<String, Pair<Long, BaseItemDto>>(400)
 
     suspend fun getShowcaseItems(userId: String, ids: List<String>): Map<String, BaseItemDto> {
         val now = System.currentTimeMillis()
@@ -726,7 +720,6 @@ class JellioRepository @Inject constructor(
         val missing = ids.filter { it !in fresh }.distinct()
         if (missing.isEmpty()) return fresh
         val fetched = api.getItemsByIds(userId, missing.joinToString(","), SHOWCASE_FIELDS).Items
-        showcaseCache.capAt(400)
         fetched.forEach { showcaseCache[it.Id] = now to it }
         return fresh + fetched.associateBy { it.Id }
     }
@@ -849,13 +842,12 @@ class JellioRepository @Inject constructor(
             fetchItemInfo(userId, itemId, DETAIL_FIELDS)
         }.also {
             previews[it.Id] = it
-            preloaded.capAt(200)
             preloaded[itemId] = System.currentTimeMillis() to it
         }
 
     // Full details fetched while the viewer rests on a card, so the title
     // page can open complete; fresh for a minute, the page still refreshes.
-    private val preloaded = ConcurrentHashMap<String, Pair<Long, BaseItemDto>>()
+    private val preloaded = lruMap<String, Pair<Long, BaseItemDto>>(200)
     private val preloadSlots = java.util.concurrent.Semaphore(2)
 
     fun preloadDetails(itemId: String) {
@@ -870,7 +862,6 @@ class JellioRepository @Inject constructor(
             try {
                 val userId = sessionManager.sessionFlow.first()?.userId ?: return@launch
                 val item = existing ?: fetchItemInfo(userId, itemId, DETAIL_FIELDS).also {
-                    preloaded.capAt(200)
                     preloaded[itemId] = System.currentTimeMillis() to it
                     previews[it.Id] = it
                 }
@@ -923,10 +914,9 @@ class JellioRepository @Inject constructor(
 
     // Items already seen in a row or list, so a title page can draw them
     // at once while the full details load.
-    private val previews = ConcurrentHashMap<String, BaseItemDto>()
+    private val previews = lruMap<String, BaseItemDto>(600)
 
     fun seedPreviews(items: List<BaseItemDto>) {
-        previews.capAt(600)
         items.forEach { previews[it.Id] = it }
     }
 
@@ -1300,12 +1290,11 @@ class JellioRepository @Inject constructor(
     suspend fun getSeasons(seriesId: String, userId: String): List<BaseItemDto> =
         cache.get("seasons:$seriesId", SHORT_CACHE_TTL_MS) { withRetry { api.getSeasons(seriesId, userId).Items } }
             .also {
-                recentLists.capAt(300)
                 recentLists["seasons:$seriesId"] = System.currentTimeMillis() to it
             }
 
     // Seasons and episodes as last seen, to draw a series page at once.
-    private val recentLists = ConcurrentHashMap<String, Pair<Long, List<BaseItemDto>>>()
+    private val recentLists = lruMap<String, Pair<Long, List<BaseItemDto>>>(300)
 
     fun recentSeasons(seriesId: String): List<BaseItemDto>? = recentList("seasons:$seriesId")
 
@@ -1385,7 +1374,6 @@ class JellioRepository @Inject constructor(
             }
         }.also {
             seedPreviews(it)
-            recentLists.capAt(300)
             recentLists["episodes:$seriesId:$seasonId"] = System.currentTimeMillis() to it
         }
 
@@ -1535,7 +1523,6 @@ class JellioRepository @Inject constructor(
                 val sources = fetchMediaSources(userId, itemId)
                 if (sources.isNotEmpty()) {
                     sourceCache.put(itemId, sources, System.currentTimeMillis())
-                    lastSources.capAt(MAX_HINTS)
                     lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, System.currentTimeMillis())
                 }
                 com.jellio.tv.data.streams.StreamLookupLog.lookup(itemId, reason, sources.size, System.currentTimeMillis() - started)
@@ -1602,7 +1589,6 @@ class JellioRepository @Inject constructor(
             if (sources.isNotEmpty()) {
                 val now = System.currentTimeMillis()
                 sourceCache.put(itemId, sources, now)
-                lastSources.capAt(MAX_HINTS)
                 lastSources[itemId] = com.jellio.tv.data.streams.LastList(sources, now)
             }
             sources
@@ -1697,7 +1683,6 @@ class JellioRepository @Inject constructor(
     fun prefetchStreams(itemId: String) {
         val now = System.currentTimeMillis()
         if (isKnownWarm(itemId) || hasRecentStreams(itemId, now)) return
-        prefetchedAt.capAt(MAX_HINTS)
         prefetchedAt[itemId] = now
         prefetchScope.launch {
             // Waits its turn briefly; given up, a later dwell tries again.
@@ -1787,7 +1772,6 @@ class JellioRepository @Inject constructor(
             for (itemId in itemIds) {
                 if (hasRecentStreams(itemId, System.currentTimeMillis())) continue
                 while (!prefetchSlots.tryAcquire()) delay(500)
-                prefetchedAt.capAt(MAX_HINTS)
                 prefetchedAt[itemId] = System.currentTimeMillis()
                 com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
                 try {
