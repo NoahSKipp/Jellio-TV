@@ -117,7 +117,8 @@ private fun AppBootGate(
         delay(1_200)
         minSplashTimeElapsed = true
     }
-    LaunchedEffect(session.userId) { homeViewModel.load(session) }
+    // Loads Home for each user and language; HomeScreen only refreshes on return.
+    LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) { homeViewModel.load(session) }
     LaunchedEffect(libraries) {
         libraries.firstOrNull()?.let { firstLibrary -> libraryWarmupViewModel.load(session, firstLibrary) }
     }

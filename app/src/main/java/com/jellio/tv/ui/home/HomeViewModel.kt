@@ -119,6 +119,8 @@ private fun titleFor(name: String?, kind: String): String =
 private const val COMMUNITY_ROW_KEY = "rec:What Others Are Watching"
 
 private const val HOME_BACKGROUND_RETRIES = 3
+// Coming back to Home this soon after a complete load does not ask again.
+private const val HOME_FRESH_MS = 10_000L
 private const val HOME_RETRY_DELAY_MS = 20_000L
 
 // Warmed in the background while the viewer is still browsing.
@@ -161,6 +163,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private var loadedForUserId: String? = null
+    private var freshAtMs: Long? = null
 
     private val failedFetches = java.util.concurrent.atomic.AtomicInteger()
     @Volatile private var lastFailure: Throwable? = null
@@ -186,7 +189,7 @@ class HomeViewModel @Inject constructor(
         if (loadJob?.isActive == true) return
         homeRetryRound = 0
         if (_uiState.value.rows.isEmpty()) _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-        load(session)
+        load(session, force = true)
     }
 
     private fun scheduleHomeRetry(session: Session) {
@@ -194,15 +197,29 @@ class HomeViewModel @Inject constructor(
         val round = homeRetryRound++
         homeRetryJob = viewModelScope.launch {
             kotlinx.coroutines.delay(HOME_RETRY_DELAY_MS shl round)
-            load(session)
+            load(session, force = true)
         }
     }
 
-    fun load(session: Session) {
+    // Safe to call from every place that shows Home: a load already running
+    // for the same user and language, or one finished moments ago, is reused.
+    fun load(session: Session, force: Boolean = false) {
         nowPlayingManager.startPolling(session)
         val loadKey = "${session.userId}:${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}"
-        val isReturningVisit = loadedForUserId == loadKey
+        val action = decideHomeLoad(
+            key = loadKey,
+            loadedKey = loadedForUserId,
+            inFlight = loadJob?.isActive == true,
+            freshAtMs = freshAtMs,
+            nowMs = android.os.SystemClock.elapsedRealtime(),
+            freshForMs = HOME_FRESH_MS,
+            force = force,
+        )
+        if (action == HomeLoadAction.SKIP) return
+        val isReturningVisit = action == HomeLoadAction.REFRESH
         loadedForUserId = loadKey
+        freshAtMs = null
+        loadJob?.cancel()
         homeRetryJob?.cancel()
         failedFetches.set(0)
         lastFailure = null
@@ -537,6 +554,7 @@ class HomeViewModel @Inject constructor(
                         scheduleHomeRetry(session)
                     } else {
                         homeRetryRound = 0
+                        freshAtMs = android.os.SystemClock.elapsedRealtime()
                         launch {
                             rowSnapshotStore.saveHomeSnapshot(
                                 session.userId,

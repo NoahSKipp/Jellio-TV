@@ -157,8 +157,11 @@ fun HomeScreen(
         editMode = false
     }
 
-    LaunchedEffect(session.userId, com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage) {
-        viewModel.load(session)
+    // The first showing was loaded by the boot gate; coming back refreshes.
+    var shownBefore by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (shownBefore) viewModel.load(session)
+        shownBefore = true
     }
     LaunchedEffect(editMode) { onEditModeChange(editMode) }
     DisposableEffect(Unit) { onDispose { onEditModeChange(false) } }
