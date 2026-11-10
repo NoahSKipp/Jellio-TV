@@ -43,4 +43,51 @@ class HomeLoadPolicyTest {
 
     @Test
     fun userSwitchIsFull() = assertEquals(HomeLoadAction.FULL, decide(key = "u2:en", freshAtMs = 99_000))
+
+    private fun merge(fresh: List<String>, previous: List<String>, loading: Set<String>) =
+        mergeKeepingPending(fresh, previous, { it }) { it in loading }
+
+    @Test
+    fun keepsLoadingRowsInPlace() {
+        val previous = listOf("cw", "rec:a", "catalog:1", "genre:x")
+        assertEquals(
+            listOf("cw", "up", "rec:a", "catalog:1", "genre:x"),
+            merge(listOf("cw", "up"), previous, setOf("rec:a", "catalog:1", "genre:x")),
+        )
+    }
+
+    @Test
+    fun freshRowReplacesItsOldCopyAtTheFreshPosition() {
+        val previous = listOf("cw", "rec:a", "catalog:1", "genre:x")
+        assertEquals(
+            listOf("cw", "rec:a", "catalog:1", "genre:x"),
+            merge(listOf("cw", "catalog:1"), previous, setOf("rec:a", "genre:x")),
+        )
+    }
+
+    @Test
+    fun settledRowsThatAreGoneAreDropped() {
+        val previous = listOf("cw", "watchlist-movies", "rec:a")
+        assertEquals(listOf("cw", "rec:a"), merge(listOf("cw"), previous, setOf("rec:a")))
+    }
+
+    @Test
+    fun newRowsKeepTheirFreshOrder() {
+        val previous = listOf("cw", "rec:old", "genre:x")
+        assertEquals(
+            listOf("cw", "rec:new", "rec:old", "genre:x"),
+            merge(listOf("cw", "rec:new"), previous, setOf("rec:old", "genre:x")),
+        )
+    }
+
+    @Test
+    fun nothingLoadingReturnsFresh() {
+        val fresh = listOf("a", "b")
+        assertEquals(fresh, merge(fresh, listOf("c", "a"), emptySet()))
+    }
+
+    @Test
+    fun emptyFreshKeepsAllLoadingRows() {
+        assertEquals(listOf("a", "c"), merge(emptyList(), listOf("a", "b", "c"), setOf("a", "c")))
+    }
 }
