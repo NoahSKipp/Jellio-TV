@@ -87,6 +87,15 @@ class NowPlayingManager @Inject constructor(
         scope.launch { fetchNowPlaying() }
     }
 
+    // While the hub's Now Playing panel is open: every few seconds, on top
+    // of the regular poll, until the caller is cancelled.
+    suspend fun pollClosely(intervalMs: Long = 4000L) {
+        while (true) {
+            delay(intervalMs)
+            refresh()
+        }
+    }
+
     private suspend fun fetchNowPlaying() {
         catching {
             val list = api.getNowPlaying()

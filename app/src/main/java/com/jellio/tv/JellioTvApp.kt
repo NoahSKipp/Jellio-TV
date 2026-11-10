@@ -596,9 +596,7 @@ private fun JellioTvApp(
                         showNowPlayingDrawer = false
                         switchTab(JellioRoute.LiveTv)
                     },
-                    onRefreshNowPlaying = {
-                        appViewModel.nowPlayingManager.refresh()
-                    },
+                    pollNowPlaying = { appViewModel.nowPlayingManager.pollClosely() },
                     rawImageUrl = memoizedRawImageUrl,
                     modifier = Modifier.fillMaxSize(),
                 )

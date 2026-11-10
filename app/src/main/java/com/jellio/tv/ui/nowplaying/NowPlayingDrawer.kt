@@ -135,20 +135,14 @@ fun NowPlayingDrawer(
     modifier: Modifier = Modifier,
     initialTab: QuickHubTab = QuickHubTab.NOW_PLAYING,
     onOpenLiveTv: () -> Unit = {},
-    onRefreshNowPlaying: () -> Unit = {},
+    pollNowPlaying: suspend () -> Unit = {},
     notificationsViewModel: NotificationsViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onDismiss)
 
     LaunchedEffect(Unit) { notificationsViewModel.load() }
-    val refreshNowPlaying by androidx.compose.runtime.rememberUpdatedState(onRefreshNowPlaying)
-    LaunchedEffect(Unit) {
-        while (isActive) {
-            delay(4000L)
-            refreshNowPlaying()
-        }
-    }
+    LaunchedEffect(Unit) { pollNowPlaying() }
 
     val notifications by notificationsViewModel.items.collectAsState()
     val invites by groupWatchViewModel.invites.collectAsState()
