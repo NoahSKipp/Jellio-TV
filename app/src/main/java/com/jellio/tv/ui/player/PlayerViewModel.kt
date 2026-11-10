@@ -8,7 +8,6 @@ import com.jellio.tv.data.PlaybackTarget
 import com.jellio.tv.data.model.BaseItemDto
 import com.jellio.tv.data.model.MediaSourceDto
 import com.jellio.tv.data.model.MediaStreamDto
-import com.jellio.tv.data.streams.BadKind
 import com.jellio.tv.data.streams.FailoverCounts
 import com.jellio.tv.data.streams.FailoverLoad
 import com.jellio.tv.data.streams.FailoverOutcome
@@ -175,7 +174,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             }
-            if (!notReady) BadStreams.mark(id, source)
+            if (!notReady) BadStreams.mark(id, source, soft = BadStreams.isSoftFailure(reason))
 
             source.Id?.let { if (it !in triedSourceIds) triedSourceIds.add(it) }
             chooseNextStream(session, PendingFailover(id, sourceId, reason, _uiState.value, remuxFailed, notReady), loaded)
@@ -219,7 +218,7 @@ class PlayerViewModel @Inject constructor(
             loaded.sources,
             triedSourceIds,
             id = { it.Id },
-            isBad = { if (BadStreams.isBad(id, it)) BadKind.HARD else null },
+            isBad = { BadStreams.kind(id, it) },
             byLanguage = { orderByLanguage(it, language) },
             needsReencode = if (policy.avoiding) { s -> policy.needsReencode(s) } else null,
             blockReencode = policy.blocking,
@@ -1002,7 +1001,7 @@ class PlayerViewModel @Inject constructor(
             loaded.sources?.filter { it.Id != current },
             triedSourceIds,
             id = { it.Id },
-            isBad = { if (BadStreams.isBad(id, it)) BadKind.HARD else null },
+            isBad = { BadStreams.kind(id, it) },
             byLanguage = { orderByLanguage(it, language) },
             needsReencode = if (policy.avoiding) { s -> policy.needsReencode(s) } else null,
             blockReencode = policy.blocking,
@@ -1010,7 +1009,7 @@ class PlayerViewModel @Inject constructor(
         val outcome = failoverOutcome(loaded, plan) { it.Id }
         logFailoverDecision(PendingFailover(id, current, "buffering switch", _uiState.value, false), plan.counts, loaded, outcome)
         val next = plan.ordered.firstOrNull() ?: return false
-        currentSource?.let { BadStreams.mark(id, it) }
+        currentSource?.let { BadStreams.mark(id, it, soft = true) }
         switchSource(session, next, currentPositionTicks)
         return true
     }

@@ -3,9 +3,13 @@ package com.jellio.tv.ui.player
 import android.content.Context
 import android.content.SharedPreferences
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.streams.BadKind
 
 object BadStreams {
-    private const val LIFETIME_MS = 48L * 60 * 60 * 1000
+    internal const val LIFETIME_MS = 48L * 60 * 60 * 1000
+    // A slow start or a buffering switch is as likely a slow backend as a
+    // dead release, so it is remembered briefly and only by source id.
+    internal const val SOFT_LIFETIME_MS = 2L * 60 * 60 * 1000
     private const val SUBTITLE_CRASH_MIGRATION_KEY = "_v3_desc_poison_cleared"
     private var prefs: SharedPreferences? = null
 
@@ -19,11 +23,32 @@ object BadStreams {
         purgeLegacyAndExpired(store, System.currentTimeMillis())
     }
 
-    // Key strictly by unique source.Id so one failing stream never poisons other
-    // streams on the same title.
-    internal fun keys(itemId: String, source: MediaSourceDto): List<String> = listOfNotNull(
-        source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
-    )
+    // The source id, plus the full release name when the stream names one,
+    // so the same release behind another addon is skipped too.
+    internal fun keys(itemId: String, source: MediaSourceDto): List<String> {
+        val name = source.Name?.trim().orEmpty()
+        return listOfNotNull(
+            source.Id?.takeIf { it.isNotEmpty() }?.let { "$itemId|id:$it" },
+            name.takeIf { it.contains('\n') }?.let { "$itemId|release:$it" },
+        )
+    }
+
+    internal fun markKeys(itemId: String, source: MediaSourceDto, soft: Boolean): List<String> =
+        keys(itemId, source).filter { !soft || it.startsWith("$itemId|id:") }
+
+    // Failures that say more about a slow backend than about the stream.
+    fun isSoftFailure(reason: String): Boolean =
+        reason.startsWith("no picture after") || reason == PlaceholderSign.STALLED_EARLY.reason
+
+    internal fun kindOf(untilMs: List<Long>, now: Long): BadKind? {
+        var kind: BadKind? = null
+        for (until in untilMs) {
+            if (until <= now) continue
+            if (until - now > SOFT_LIFETIME_MS) return BadKind.HARD
+            kind = BadKind.SOFT
+        }
+        return kind
+    }
 
     private fun purgeLegacyAndExpired(store: SharedPreferences, now: Long) {
         val all = store.all
@@ -39,7 +64,7 @@ object BadStreams {
         if (dirty) editor.apply()
     }
 
-    fun mark(itemId: String, source: MediaSourceDto) {
+    fun mark(itemId: String, source: MediaSourceDto, soft: Boolean = false) {
         val store = prefs ?: return
         val now = System.currentTimeMillis()
         val editor = store.edit()
@@ -47,7 +72,8 @@ object BadStreams {
             if (key == SUBTITLE_CRASH_MIGRATION_KEY) return@forEach
             if (key.contains("|name:") || key.contains("|desc:") || (value as? Long ?: 0L) < now) editor.remove(key)
         }
-        keys(itemId, source).forEach { editor.putLong(it, now + LIFETIME_MS) }
+        val until = now + if (soft) SOFT_LIFETIME_MS else LIFETIME_MS
+        markKeys(itemId, source, soft).forEach { editor.putLong(it, maxOf(store.getLong(it, 0L), until)) }
         editor.apply()
     }
 
@@ -63,6 +89,13 @@ object BadStreams {
         val now = System.currentTimeMillis()
         purgeLegacyAndExpired(store, now)
         return keys(itemId, source).any { store.getLong(it, 0L) > now }
+    }
+
+    fun kind(itemId: String, source: MediaSourceDto): BadKind? {
+        val store = prefs ?: return null
+        val now = System.currentTimeMillis()
+        purgeLegacyAndExpired(store, now)
+        return kindOf(keys(itemId, source).map { store.getLong(it, 0L) }, now)
     }
 }
 

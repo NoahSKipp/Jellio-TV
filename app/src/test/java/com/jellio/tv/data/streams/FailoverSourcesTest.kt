@@ -72,6 +72,19 @@ class FailoverSourcesTest {
     }
 
     @Test
+    fun softMarksAreSkippedAndCountedApartFromHardOnes() {
+        val p = planFailover(
+            all,
+            listOf("s1"),
+            id = { it.id },
+            isBad = { when (it.id) { "s2" -> BadKind.HARD; "s3", "s4" -> BadKind.SOFT; else -> null } },
+            byLanguage = { it },
+        )
+        assertEquals(listOf("s5"), p.ordered.map { it.id })
+        assertEquals(FailoverCounts(5, 1, 1, 2, 1, 1), p.counts)
+    }
+
+    @Test
     fun theNextCandidateFollowsLanguageAndTranscodeRules() {
         val list = listOf(Src("a"), Src("b", lang = "de", reencode = true), Src("c", lang = "de"))
         val p = planFailover(
