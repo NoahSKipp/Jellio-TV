@@ -70,7 +70,6 @@ import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -169,7 +168,7 @@ private fun groupByDay(entries: List<FeedEntryDto>): List<FeedGroup> {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     fun label(entry: FeedEntryDto): String {
-        val day = runCatching { Instant.parse(entry.OccurredAtUtc).atZone(zone).toLocalDate() }.getOrNull() ?: return com.jellio.tv.data.i18n.Strings.get("feed_earlier")
+        val day = com.jellio.tv.data.JellyfinDates.parseInstant(entry.OccurredAtUtc)?.atZone(zone)?.toLocalDate() ?: return com.jellio.tv.data.i18n.Strings.get("feed_earlier")
         val daysAgo = ChronoUnit.DAYS.between(day, today)
         return when {
             daysAgo <= 0L -> com.jellio.tv.data.i18n.Strings.get("calendar_today")

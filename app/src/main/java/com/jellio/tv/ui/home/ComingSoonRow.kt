@@ -35,25 +35,8 @@ import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
-private val ISO_FORMATS = listOf(
-    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-    "yyyy-MM-dd'T'HH:mm:ss'Z'",
-    "yyyy-MM-dd",
-)
-
-private fun parseEntryDate(raw: String?): Date? {
-    if (raw == null) return null
-    for (pattern in ISO_FORMATS) {
-        val format = SimpleDateFormat(pattern, Locale.US)
-        format.timeZone = TimeZone.getTimeZone("UTC")
-        val parsed = runCatching { format.parse(raw) }.getOrNull()
-        if (parsed != null) return parsed
-    }
-    return null
-}
+private fun parseEntryDate(raw: String?): Date? = com.jellio.tv.data.JellyfinDates.parseEpochMs(raw)?.let { Date(it) }
 
 private fun comingSoonDateLabel(entry: CalendarEntryDto): String {
     val date = parseEntryDate(entry.Date) ?: return ""

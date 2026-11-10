@@ -1223,6 +1223,5 @@ class PlayerViewModel @Inject constructor(
 }
 
 private fun parseSleepTimerEndTimeMs(endTimeUtc: String?): Long? {
-    endTimeUtc ?: return null
-    return runCatching { java.time.Instant.parse(endTimeUtc).toEpochMilli() }.getOrNull()
+    return com.jellio.tv.data.JellyfinDates.parseEpochMs(endTimeUtc)
 }

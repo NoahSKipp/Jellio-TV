@@ -42,7 +42,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.time.Instant
 import javax.inject.Inject
 
 private const val POLL_MS = 60_000L
@@ -78,7 +77,7 @@ class AnnouncementViewModel @Inject constructor(
                     .sortedBy { it.CreatedUtc.orEmpty() }
                     .forEach { entry ->
                         seen.add(entry.Id)
-                        val created = runCatching { Instant.parse(entry.CreatedUtc.orEmpty().let { if (it.endsWith("Z")) it else it + "Z" }).toEpochMilli() }.getOrNull()
+                        val created = com.jellio.tv.data.JellyfinDates.parseEpochMs(entry.CreatedUtc)
                         val text = entry.Name?.trim().orEmpty()
                         val image = entry.ImageId?.let { repository.announcementImageUrl(it) }
                         if ((text.isNotEmpty() || image != null) && (created == null || now - created < MAX_AGE_MS)) {

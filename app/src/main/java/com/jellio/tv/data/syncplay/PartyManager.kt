@@ -21,8 +21,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.OffsetDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -227,11 +225,6 @@ class PartyManager @Inject constructor(
         _lastIncoming.value?.takeIf { System.currentTimeMillis() - lastIncomingAtMs < 120_000L }
 
     companion object {
-        fun parseTime(value: String?): Long? {
-            if (value.isNullOrEmpty()) return null
-            return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
-                ?: runCatching { OffsetDateTime.parse(value).toInstant().toEpochMilli() }.getOrNull()
-                ?: runCatching { Instant.parse(value + "Z").toEpochMilli() }.getOrNull()
-        }
+        fun parseTime(value: String?): Long? = com.jellio.tv.data.JellyfinDates.parseEpochMs(value)
     }
 }

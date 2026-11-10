@@ -6,7 +6,6 @@ import com.jellio.tv.data.model.LiveProgramDto
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.text.Normalizer
-import java.time.Instant
 
 private val COMBINING_MARKS = Regex("\\p{M}+")
 private val TUNER_BUSY = Regex("tuner|no available|too many|limit")
@@ -88,8 +87,7 @@ fun languageFacets(channels: List<LiveChannel>): List<Pair<String, Int>> =
     channels.mapNotNull { it.language }.groupingBy { it }.eachCount().toList()
         .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
 
-internal fun parseTime(value: String?): Long? =
-    value?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
+internal fun parseTime(value: String?): Long? = com.jellio.tv.data.JellyfinDates.parseEpochMs(value)
 
 fun LiveProgramDto.toProgramme(): LiveProgramme? {
     val start = parseTime(StartDate) ?: return null

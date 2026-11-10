@@ -23,7 +23,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
-private fun parseInstant(raw: String): Long = java.time.Instant.parse(raw).toEpochMilli()
+private fun parseInstant(raw: String): Long? = com.jellio.tv.data.JellyfinDates.parseEpochMs(raw)
 
 const val GOOGLE_TV_TOP_PICKS_SIZE = 6
 
@@ -132,7 +132,7 @@ class WatchNextSyncer @Inject constructor(
     private fun engagedAt(item: BaseItemDto): Long {
         val raw = item.UserData?.LastPlayedDate ?: return System.currentTimeMillis()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return System.currentTimeMillis()
-        return runCatching { parseInstant(raw) }.getOrDefault(System.currentTimeMillis())
+        return runCatching { parseInstant(raw) }.getOrNull() ?: System.currentTimeMillis()
     }
 
     private fun toWatchNextProgram(session: Session, item: BaseItemDto, next: Boolean, engaged: Long, overview: String?): WatchNextProgram? {

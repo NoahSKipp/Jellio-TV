@@ -40,11 +40,7 @@ private fun parseUtcDay(raw: String?): ParsedUtcDay? {
         set(Calendar.MILLISECOND, 0)
     }
     val trimmed = raw.trim()
-    val exact = runCatching {
-        java.time.OffsetDateTime.parse(trimmed).toInstant().toEpochMilli()
-    }.recoverCatching {
-        java.time.Instant.parse(trimmed).toEpochMilli()
-    }.getOrNull()
+    val exact = JellyfinDates.parseEpochMs(trimmed)
     val exactEpochMs = if (exact != null && exact != cal.timeInMillis) exact else null
     return ParsedUtcDay(year, cal.timeInMillis, exactEpochMs)
 }

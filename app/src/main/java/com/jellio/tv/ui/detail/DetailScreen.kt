@@ -109,9 +109,6 @@ import com.jellio.tv.ui.theme.scaled
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.DateFormat
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 private val HeroHeight = 480.dp
 
@@ -121,21 +118,9 @@ private fun formatRuntime(ticks: Long?): String {
     return com.jellio.tv.data.i18n.formatDurationMinutes(totalMinutes)
 }
 
-private val PREMIERE_DATE_FORMATS = listOf(
-    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-    "yyyy-MM-dd'T'HH:mm:ss'Z'",
-    "yyyy-MM-dd",
-)
-
 private fun formatPremiereDate(raw: String?): String? {
-    if (raw == null) return null
-    for (pattern in PREMIERE_DATE_FORMATS) {
-        val parser = SimpleDateFormat(pattern, Locale.US)
-        parser.timeZone = TimeZone.getTimeZone("UTC")
-        val date = runCatching { parser.parse(raw) }.getOrNull() ?: continue
-        return DateFormat.getDateInstance(DateFormat.SHORT, com.jellio.tv.data.i18n.displayLocale()).format(date)
-    }
-    return null
+    val ms = com.jellio.tv.data.JellyfinDates.parseEpochMs(raw) ?: return null
+    return DateFormat.getDateInstance(DateFormat.SHORT, com.jellio.tv.data.i18n.displayLocale()).format(java.util.Date(ms))
 }
 
 @Composable
