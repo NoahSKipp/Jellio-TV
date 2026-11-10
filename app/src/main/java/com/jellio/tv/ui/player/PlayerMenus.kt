@@ -849,7 +849,7 @@ internal fun SubtitleMenu(
                 item {
                     SubtitleStyleGroup(
                         label = com.jellio.tv.ui.i18n.string("player_subtitle_size"),
-                        options = SUBTITLE_SIZES.map { it.value to Strings.get("subtitle_size_" + it.value) },
+                        options = SUBTITLE_SIZES.map { it.value to Strings.get(it.key) },
                         selected = subtitleStyle.size,
                         onSelect = onSetSubtitleSize,
                     )
@@ -857,7 +857,7 @@ internal fun SubtitleMenu(
                 item {
                     SubtitleStyleGroup(
                         label = com.jellio.tv.ui.i18n.string("player_subtitle_bg"),
-                        options = SUBTITLE_BACKGROUNDS.map { it.value to Strings.get("subtitle_bg_" + it.value) },
+                        options = SUBTITLE_BACKGROUNDS.map { it.value to Strings.get(it.key) },
                         selected = subtitleStyle.background,
                         onSelect = onSetSubtitleBackground,
                     )

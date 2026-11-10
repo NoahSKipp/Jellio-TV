@@ -33,15 +33,6 @@ object TranscodeReason {
     const val DOLBY_VISION_5 = "dolby-vision-5"
     const val INTERLACED = "interlaced"
     const val BURN_IN = "burn-in"
-
-    fun describe(reason: String): String = when (reason) {
-        CODEC -> "this TV can't decode the video"
-        HDR_ON_SDR -> "HDR on a non-HDR screen"
-        DOLBY_VISION_5 -> "Dolby Vision without a fallback"
-        INTERLACED -> "interlaced video"
-        BURN_IN -> "an image subtitle"
-        else -> reason
-    }
 }
 
 private val HDR_RANGES = setOf(

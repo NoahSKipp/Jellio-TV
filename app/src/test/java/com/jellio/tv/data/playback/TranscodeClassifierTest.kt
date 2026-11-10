@@ -101,16 +101,18 @@ class TranscodeClassifierTest {
     }
 
     @Test
-    fun outlookWording() {
+    fun outlookVerdicts() {
         val ok = Classification(false, emptyList(), false)
         val okGuess = Classification(false, emptyList(), true)
         val hdr = Classification(true, listOf("hdr-on-sdr"), false)
         val hdrGuess = Classification(true, listOf("hdr-on-sdr"), true)
-        assertEquals(PlaybackOutlook(OutlookTone.Good, "Plays smoothly"), playbackOutlook(ok, "Avoid"))
-        assertEquals(PlaybackOutlook(OutlookTone.Good, "Likely plays smoothly"), playbackOutlook(okGuess, "Block"))
-        assertEquals(PlaybackOutlook(OutlookTone.Warn, "Likely to stutter: HDR on a non-HDR screen"), playbackOutlook(hdr, "Avoid"))
-        assertEquals(PlaybackOutlook(OutlookTone.Warn, "May stutter: HDR on a non-HDR screen"), playbackOutlook(hdrGuess, "Avoid"))
-        assertEquals(PlaybackOutlook(OutlookTone.Block, "Won't play: HDR on a non-HDR screen"), playbackOutlook(hdr, "Block"))
-        assertEquals(PlaybackOutlook(OutlookTone.Block, "Probably won't play: HDR on a non-HDR screen"), playbackOutlook(hdrGuess, "Block"))
+        assertEquals(PlaybackOutlook(OutlookTone.Good, false), playbackOutlook(ok, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Good, true), playbackOutlook(okGuess, "Block"))
+        assertEquals(PlaybackOutlook(OutlookTone.Warn, false, OutlookReason.HDR_ON_SDR), playbackOutlook(hdr, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Warn, true, OutlookReason.HDR_ON_SDR), playbackOutlook(hdrGuess, "Avoid"))
+        assertEquals(PlaybackOutlook(OutlookTone.Block, false, OutlookReason.HDR_ON_SDR), playbackOutlook(hdr, "Block"))
+        assertEquals(PlaybackOutlook(OutlookTone.Block, true, OutlookReason.HDR_ON_SDR), playbackOutlook(hdrGuess, "Block"))
+        assertEquals(OutlookReason.OTHER, outlookReason("something-new"))
+        assertEquals(OutlookReason.IMAGE_SUBTITLES, outlookReason(TranscodeReason.BURN_IN))
     }
 }

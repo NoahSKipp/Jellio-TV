@@ -365,7 +365,7 @@ private fun JellioTvApp(
                 modifier = Modifier.fillMaxSize(),
             )
             is JellioRoute.LibraryTab -> {
-                val library = libraries.firstOrNull { it.Id == current.libraryId && (it.Name ?: "Library") == current.name }
+                val library = libraries.firstOrNull { it.Id == current.libraryId && it.Name.orEmpty() == current.name }
                 if (library != null) {
                     androidx.compose.runtime.key(current.libraryId + current.name) {
                         LibraryScreen(

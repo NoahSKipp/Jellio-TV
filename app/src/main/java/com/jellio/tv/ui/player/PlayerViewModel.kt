@@ -17,10 +17,11 @@ import com.jellio.tv.data.streams.isSourceNotReady
 import com.jellio.tv.data.streams.outcomeLabel
 import com.jellio.tv.data.streams.planFailover
 import com.jellio.tv.data.playback.SkipSegments
-import com.jellio.tv.data.playback.TranscodeReason
 import com.jellio.tv.data.playback.mergeSkipSegments
 import com.jellio.tv.data.playback.skipSegmentsComplete
 import com.jellio.tv.data.playback.VideoTranscodePolicy
+import com.jellio.tv.data.playback.outlookReason
+import com.jellio.tv.ui.common.displayText
 import com.jellio.tv.data.playback.videoInfoOf
 import com.jellio.tv.data.model.SubtitleStyle
 import com.jellio.tv.data.prefs.SubtitleStylePreferences
@@ -525,7 +526,7 @@ class PlayerViewModel @Inject constructor(
                             error = Strings.get("player_stream_unplayable_title"),
                             errorDetail = Strings.format(
                                 "player_stream_unplayable_transcode_off",
-                                classification.reasons.joinToString(", ") { TranscodeReason.describe(it) },
+                                classification.reasons.joinToString(", ") { outlookReason(it).displayText() },
                             ),
                             title = _uiState.value.title,
                             pauseInfo = _uiState.value.pauseInfo,

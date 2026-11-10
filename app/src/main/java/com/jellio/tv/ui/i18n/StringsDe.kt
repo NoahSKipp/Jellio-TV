@@ -15,6 +15,7 @@ internal object StringsDe {
         fillCatalogsAndNav(m)
         fillFeedAndProfile(m)
         fillPlaybackAndAuth(m)
+        fillPlaybackOutlook(m)
         m
     }
 
@@ -939,5 +940,20 @@ internal object StringsDe {
         m["person_credits_count"] = "{0} Credits"
         m["person_read_more"] = "Mehr anzeigen"
         m["person_read_less"] = "Weniger anzeigen"
+    }
+
+    private fun fillPlaybackOutlook(m: HashMap<String, String>) {
+        m["outlook_smooth"] = "Läuft flüssig"
+        m["outlook_likely_smooth"] = "Läuft wahrscheinlich flüssig"
+        m["outlook_likely_stutter"] = "Ruckelt wahrscheinlich: {0}"
+        m["outlook_may_stutter"] = "Könnte ruckeln: {0}"
+        m["outlook_wont_play"] = "Läuft nicht: {0}"
+        m["outlook_probably_wont_play"] = "Läuft wahrscheinlich nicht: {0}"
+        m["outlook_reason_codec"] = "ein Videoformat, das dieser Fernseher nicht abspielen kann"
+        m["outlook_reason_hdr_on_sdr"] = "HDR auf einem Bildschirm ohne HDR"
+        m["outlook_reason_dolby_vision"] = "nur Dolby Vision"
+        m["outlook_reason_interlaced"] = "Video im Zeilensprungverfahren"
+        m["outlook_reason_image_subtitles"] = "Bilduntertitel"
+        m["outlook_reason_other"] = "muss umgewandelt werden"
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
+import com.jellio.tv.ui.common.displayText
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -746,8 +747,8 @@ internal fun SourceCard(
     }
 }
 
-// "Plays smoothly" / "Likely to stutter: ..." / "Won't play: ...", shown
-// while the Video transcode policy is Avoid or Block.
+// Will this stream play smoothly here, shown while the Video transcode
+// policy is Avoid or Block.
 @Composable
 private fun OutlookBadge(outlook: com.jellio.tv.data.playback.PlaybackOutlook) {
     val (color, icon) = when (outlook.tone) {
@@ -764,7 +765,7 @@ private fun OutlookBadge(outlook: com.jellio.tv.data.playback.PlaybackOutlook) {
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Text(
-            text = outlook.text,
+            text = outlook.displayText(),
             color = color,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,

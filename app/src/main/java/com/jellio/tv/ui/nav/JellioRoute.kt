@@ -32,7 +32,7 @@ fun jellioNavItems(libraries: List<com.jellio.tv.data.model.BaseItemDto>): List<
     add(JellioRoute.Search)
     libraries.forEach { library ->
         if (library.CollectionType == "livetv") add(JellioRoute.LiveTv)
-        else add(JellioRoute.LibraryTab(library.Id, library.Name ?: "Library", library.CollectionType))
+        else add(JellioRoute.LibraryTab(library.Id, library.Name.orEmpty(), library.CollectionType))
     }
     add(JellioRoute.Feed)
 }

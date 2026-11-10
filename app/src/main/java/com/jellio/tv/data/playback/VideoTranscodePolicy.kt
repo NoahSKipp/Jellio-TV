@@ -32,30 +32,28 @@ object VideoTranscodePolicy {
 
 enum class OutlookTone { Good, Warn, Block }
 
-data class PlaybackOutlook(val tone: OutlookTone, val text: String)
+enum class OutlookReason { CODEC, HDR_ON_SDR, DOLBY_VISION, INTERLACED, IMAGE_SUBTITLES, OTHER }
 
-private fun shortReason(reason: String?): String = when (reason) {
-    TranscodeReason.CODEC -> "a video format this TV can't play"
-    TranscodeReason.HDR_ON_SDR -> "HDR on a non-HDR screen"
-    TranscodeReason.DOLBY_VISION_5 -> "Dolby Vision only"
-    TranscodeReason.INTERLACED -> "interlaced video"
-    TranscodeReason.BURN_IN -> "image subtitles"
-    else -> "needs converting"
+// guessed: worked out from the stream's name rather than probed details,
+// so the UI words it less certainly.
+data class PlaybackOutlook(val tone: OutlookTone, val guessed: Boolean, val reason: OutlookReason? = null)
+
+fun outlookReason(reason: String?): OutlookReason = when (reason) {
+    TranscodeReason.CODEC -> OutlookReason.CODEC
+    TranscodeReason.HDR_ON_SDR -> OutlookReason.HDR_ON_SDR
+    TranscodeReason.DOLBY_VISION_5 -> OutlookReason.DOLBY_VISION
+    TranscodeReason.INTERLACED -> OutlookReason.INTERLACED
+    TranscodeReason.BURN_IN -> OutlookReason.IMAGE_SUBTITLES
+    else -> OutlookReason.OTHER
 }
 
-// What a viewer cares about: will this play smoothly here? Guesses from a
-// stream's name are worded less certainly than probed details.
+// What a viewer cares about: will this play smoothly here?
 fun playbackOutlook(classification: Classification, policy: String): PlaybackOutlook {
     val guessed = classification.guessed
-    if (!classification.needsVideoTranscode) {
-        return PlaybackOutlook(OutlookTone.Good, if (guessed) "Likely plays smoothly" else "Plays smoothly")
-    }
-    val reason = shortReason(classification.reasons.firstOrNull())
-    return if (policy == "Block") {
-        PlaybackOutlook(OutlookTone.Block, (if (guessed) "Probably won't play: " else "Won't play: ") + reason)
-    } else {
-        PlaybackOutlook(OutlookTone.Warn, (if (guessed) "May stutter: " else "Likely to stutter: ") + reason)
-    }
+    if (!classification.needsVideoTranscode) return PlaybackOutlook(OutlookTone.Good, guessed)
+    val reason = outlookReason(classification.reasons.firstOrNull())
+    val tone = if (policy == "Block") OutlookTone.Block else OutlookTone.Warn
+    return PlaybackOutlook(tone, guessed, reason)
 }
 
 // What this TV's decoders and screen handle, asked once.
