@@ -590,6 +590,8 @@ class PlayerViewModel @Inject constructor(
                         val next = catching { repository.getNextEpisode(session.userId, item) }.getOrNull()
                         if (next != null) {
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
+                            // The stream list is cheap: warm it as soon as the next episode is known.
+                            repository.prefetchStreams(next.Id)
                         }
                     }
                 }
@@ -1131,8 +1133,8 @@ class PlayerViewModel @Inject constructor(
                 }
             }
         }
-        // Warmed from 70% on, late enough to still be fresh when Up Next
-        // comes; the repository skips repeats for a few minutes.
+        // Warmed again from 70% on, so a long episode's list is still fresh
+        // when Up Next comes; the repository skips repeats for a few minutes.
         val expected = _uiState.value.expectedRuntimeMs
         val nextId = _uiState.value.upNextInfo?.itemId
         if (nextId != null && expected > 0 && positionTicks / 10_000 >= expected * 7 / 10) {
