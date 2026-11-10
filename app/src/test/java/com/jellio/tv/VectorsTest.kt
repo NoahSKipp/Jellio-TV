@@ -18,10 +18,10 @@ import com.jellio.tv.data.streams.failoverOutcome
 import com.jellio.tv.data.streams.planFailover
 import com.jellio.tv.data.syncplay.syncDriftMs
 import com.jellio.tv.data.syncplay.syncTargetTicks
-import com.jellio.tv.ui.common.clearVerifiedTodayStreamIds
-import com.jellio.tv.ui.common.isReleasedToday
-import com.jellio.tv.ui.common.isUnreleasedItem
-import com.jellio.tv.ui.common.markTodayItemHasStream
+import com.jellio.tv.data.clearVerifiedTodayStreamIds
+import com.jellio.tv.data.isReleasedToday
+import com.jellio.tv.data.isUnreleasedItem
+import com.jellio.tv.data.markTodayItemHasStream
 import com.jellio.tv.ui.player.BadStreams
 import com.jellio.tv.ui.player.SkipKind
 import com.jellio.tv.ui.player.activeSkipSegment
