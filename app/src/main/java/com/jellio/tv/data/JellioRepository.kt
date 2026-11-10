@@ -77,6 +77,7 @@ import javax.inject.Singleton
 
 private const val PREFETCH_WINDOW_MS = 8 * 60_000L
 private const val PREFETCH_SLOT_WAIT_MS = 3_000L
+private const val PREWARM_RANGE_BYTES = 64L * 1024
 // How long a title page can be drawn from what was last seen of it, while
 // a fresh copy loads behind it.
 private const val PRELOAD_TTL_MS = 30 * 60_000L
@@ -224,7 +225,26 @@ class JellioRepository @Inject constructor(
     private val rememberedUsersStore: RememberedUsersStore,
     private val watchlistPreferences: WatchlistPreferences,
     private val subtitleStylePreferences: com.jellio.tv.data.prefs.SubtitleStylePreferences,
+    apiClient: okhttp3.OkHttpClient,
 ) {
+    // Video streams on the API client's pool and trust settings, so a
+    // connection warmed by either is reused. Without its interceptors:
+    // stream URLs are absolute and carry their token, and a 401 from a
+    // stream must not end the session.
+    val streamClient: okhttp3.OkHttpClient by lazy {
+        apiClient.newBuilder()
+            .apply {
+                interceptors().clear()
+                networkInterceptors().clear()
+            }
+            // Its own dispatcher, so the player never queues behind API calls to the same host.
+            .dispatcher(okhttp3.Dispatcher())
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(0, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
     val sessionFlow: Flow<Session?> = sessionManager.sessionFlow
 
     private val _lastAutoRemovedWatchlistIds = MutableStateFlow<Set<String>>(emptySet())
@@ -1790,22 +1810,45 @@ class JellioRepository @Inject constructor(
 
     // Pre-warms the stream connection and Usenet/nzbdav reader for the upcoming episode.
     fun prewarmStreamUrl(streamUrl: String) {
-        prefetchScope.launch {
-            catching {
-                val conn = java.net.URL(streamUrl).openConnection() as java.net.HttpURLConnection
-                try {
-                    conn.connectTimeout = 8000
-                    conn.readTimeout = 8000
-                    conn.requestMethod = "GET"
-                    conn.setRequestProperty("Range", "bytes=0-65535")
-                    conn.connect()
-                    if (conn.responseCode in 200..206) {
-                        conn.inputStream.use { it.read(ByteArray(8192)) }
-                    }
-                } finally {
-                    conn.disconnect()
+        prefetchScope.launch { warmStreamStart(streamUrl, PREWARM_RANGE_BYTES) }
+    }
+
+    // Reads the head of a stream through the player's client, so the
+    // connection sits warm in the shared pool and the origin has the start
+    // ready. Reading the whole range lets the connection go back to the pool.
+    private suspend fun warmStreamStart(streamUrl: String, bytes: Long) {
+        val request = okhttp3.Request.Builder()
+            .url(streamUrl)
+            .header("Range", "bytes=0-${bytes - 1}")
+            .header("Accept-Encoding", "identity")
+            .header("User-Agent", "Jellio-TV/${com.jellio.tv.data.network.APP_VERSION}")
+            .build()
+        val call = streamClient.newCall(request)
+        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    cont.resumeWith(Result.success(Unit))
                 }
-            }
+
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    runCatching {
+                        response.use {
+                            if (it.code != 200 && it.code != 206) return@use
+                            val source = it.body?.source() ?: return@use
+                            val sink = okio.Buffer()
+                            var left = bytes
+                            while (left > 0) {
+                                val read = source.read(sink, minOf(left, 64L * 1024))
+                                if (read < 0) break
+                                left -= read
+                                sink.clear()
+                            }
+                        }
+                    }
+                    cont.resumeWith(Result.success(Unit))
+                }
+            })
         }
     }
 

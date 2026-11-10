@@ -50,6 +50,7 @@ class PlayerViewModel @Inject constructor(
     val remoteControlManager: com.jellio.tv.data.remote.RemoteControlManager,
 ) : ViewModel() {
     val deviceId: String get() = repository.deviceId
+    val streamClient: okhttp3.OkHttpClient get() = repository.streamClient
 
     private val _failover = MutableStateFlow<FailoverNotice?>(null)
     val failover: StateFlow<FailoverNotice?> = _failover.asStateFlow()

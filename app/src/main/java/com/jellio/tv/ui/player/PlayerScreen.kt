@@ -45,7 +45,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
@@ -126,6 +126,7 @@ fun PlayerScreen(
             uiState.streamUrl != null -> PlayerSurface(
                 session = session,
                 deviceId = viewModel.deviceId,
+                streamClient = viewModel.streamClient,
                 streamUrl = uiState.streamUrl!!,
                 startPositionTicks = uiState.startPositionTicks,
                 resumePercent = uiState.resumePercent,
@@ -215,6 +216,7 @@ fun PlayerScreen(
 internal fun PlayerSurface(
     session: Session,
     deviceId: String,
+    streamClient: okhttp3.Call.Factory,
     streamUrl: String,
     startPositionTicks: Long,
     resumePercent: Int?,
@@ -300,18 +302,8 @@ internal fun PlayerSurface(
         it.streamIndex == selectedSubtitleIndex && it.isTextBased && it.url != null && (!directPlay || it.isExternal)
     }
 
-    val httpDataSourceFactory = remember(session.accessToken) {
-        DefaultHttpDataSource.Factory()
-            .setUserAgent("Jellio-TV/$APP_VERSION")
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(20000)
-            .setDefaultRequestProperties(
-                buildMap {
-                    put("X-Emby-Token", session.accessToken)
-                    put("Authorization", buildEmbyAuthorizationHeader(deviceId, APP_VERSION, session.accessToken))
-                }
-            )
+    val httpDataSourceFactory = remember(session.accessToken, streamClient) {
+        streamDataSourceFactory(streamClient, deviceId, session.accessToken)
     }
 
     // Audio and subtitle sync, read by SyncDelayMediaSource as samples are read.
@@ -1641,3 +1633,15 @@ internal fun PlayerSurface(
         }
     }
 }
+
+// Timeouts, redirects and trust come from the shared stream client.
+@OptIn(UnstableApi::class)
+internal fun streamDataSourceFactory(client: okhttp3.Call.Factory, deviceId: String, accessToken: String): OkHttpDataSource.Factory =
+    OkHttpDataSource.Factory(client)
+        .setUserAgent("Jellio-TV/$APP_VERSION")
+        .setDefaultRequestProperties(
+            mapOf(
+                "X-Emby-Token" to accessToken,
+                "Authorization" to buildEmbyAuthorizationHeader(deviceId, APP_VERSION, accessToken),
+            )
+        )
