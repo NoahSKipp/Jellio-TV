@@ -1047,6 +1047,9 @@ class JellioRepository @Inject constructor(
     // Jellyfin's own Media Segments first, the Intro Skipper's older
     // Timestamps endpoint only when those have neither intro nor credits.
     suspend fun getIntroSkipperSegments(itemId: String): SkipSegments? {
+        // Plugins with the merged endpoint answer here; older ones fall through.
+        val merged = catching { api.getJellioSegments(itemId) }.getOrNull()
+        if (merged != null && merged.isSuccessful) return merged.body()?.toSkipSegments()
         val native = catching { nativeSkipSegments(api.getMediaSegments(itemId).Items) }.getOrNull()
         if (native != null) return native
         return catching { api.getIntroSkipperSegments(itemId).toSkipSegments() }.getOrNull()

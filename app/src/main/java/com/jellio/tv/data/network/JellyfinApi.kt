@@ -160,6 +160,9 @@ interface JellyfinApi {
     @GET("Episode/{itemId}/Timestamps")
     suspend fun getIntroSkipperSegments(@Path("itemId") itemId: String): IntroSkipperSegmentsDto
 
+    @GET("Jellio/segments/{itemId}")
+    suspend fun getJellioSegments(@Path("itemId") itemId: String): retrofit2.Response<com.jellio.tv.data.playback.JellioSegmentsDto>
+
     @GET("MediaSegments/{itemId}")
     suspend fun getMediaSegments(@Path("itemId") itemId: String): com.jellio.tv.data.model.MediaSegmentsResultDto
 
