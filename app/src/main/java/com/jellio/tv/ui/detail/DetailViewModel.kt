@@ -200,7 +200,7 @@ class DetailViewModel @Inject constructor(
 
                 if (item.Type == "Episode" && item.SeriesId != null) {
                     viewModelScope.launch {
-                        runCatching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
+                        catching { repository.getItem(session.userId, item.SeriesId) }.getOrNull()?.let { series ->
                             if (loadedItemId != itemId) return@launch
                             ratingTargetId = series.Id
                             _uiState.value = _uiState.value.copy(likes = series.UserData?.Likes)
@@ -260,7 +260,7 @@ class DetailViewModel @Inject constructor(
     }
 
     private suspend fun resolveSeriesPlay(session: Session, seriesId: String): BaseItemDto? {
-        val target = runCatching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return null
+        val target = catching { repository.resolveSeriesPlayTarget(seriesId, session.userId) }.getOrNull() ?: return null
         if (loadedItemId != seriesId) return null
         if (target.resume) {
             _uiState.value = _uiState.value.copy(
@@ -314,7 +314,7 @@ class DetailViewModel @Inject constructor(
         }
         seasonsJob?.cancel()
         seasonsJob = viewModelScope.launch {
-            val seasons = ordered(runCatching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
+            val seasons = ordered(catching { repository.getSeasons(seriesId, session.userId) }.getOrDefault(emptyList()))
             if (!isCurrentSeries(seriesId, ownerItemId)) return@launch
             if (seasons.isEmpty() && _uiState.value.seasons.isNotEmpty()) return@launch
             _uiState.value = _uiState.value.copy(seasons = seasons)
@@ -341,7 +341,7 @@ class DetailViewModel @Inject constructor(
         episodesJob?.cancel()
         episodesJob = viewModelScope.launch {
             launch {
-                val season = runCatching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
+                val season = catching { repository.getItemDetails(session.userId, seasonId) }.getOrNull() ?: return@launch
                 if (!isCurrentSeries(seriesId, ownerItemId) || _uiState.value.selectedSeasonId != seasonId) return@launch
                 _uiState.value = _uiState.value.copy(
                     selectedSeason = season,
@@ -349,7 +349,7 @@ class DetailViewModel @Inject constructor(
                 )
             }
             launch {
-                val episodes = runCatching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
+                val episodes = catching { repository.getEpisodes(seriesId, session.userId, seasonId) }.getOrNull() ?: return@launch
                 if (!isCurrentSeries(seriesId, ownerItemId) || _uiState.value.selectedSeasonId != seasonId) return@launch
                 repository.seedPreviews(episodes)
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
@@ -420,7 +420,7 @@ class DetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isWatchlisted = next, item = updatedItem)
         repository.seedPreviews(listOf(updatedItem))
         viewModelScope.launch {
-            runCatching { repository.toggleFavorite(session.userId, originalItem) }
+            catching { repository.toggleFavorite(session.userId, originalItem) }
                 .onSuccess { serverValue ->
                     val curItem = _uiState.value.item
                     val syncedItem = curItem?.copy(UserData = (curItem.UserData ?: UserItemDataDto()).copy(IsFavorite = serverValue))
@@ -451,7 +451,7 @@ class DetailViewModel @Inject constructor(
         )
         repository.seedPreviews(listOf(updatedItem))
         viewModelScope.launch {
-            runCatching { repository.setPlayed(session.userId, item.Id, next) }
+            catching { repository.setPlayed(session.userId, item.Id, next) }
                 .onSuccess { updated ->
                     val curItem = _uiState.value.item
                     val syncedItem = curItem?.copy(UserData = updated)
@@ -486,7 +486,7 @@ class DetailViewModel @Inject constructor(
         val next = if (prev == likes) null else likes
         _uiState.value = _uiState.value.copy(likes = next)
         viewModelScope.launch {
-            runCatching { repository.setRating(session.userId, targetId, next) }
+            catching { repository.setRating(session.userId, targetId, next) }
                 .onSuccess { updated ->
                     _uiState.value = _uiState.value.copy(likes = updated.Likes ?: next)
                 }
@@ -513,7 +513,7 @@ class DetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(findingStreams = true, streamStatus = null)
         streamLookupJob?.cancel()
         streamLookupJob = viewModelScope.launch {
-            val sources = runCatching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
+            val sources = catching { repository.getMediaSources(session.userId, itemId, reason = "detail") }
             if (loadedItemId != itemId || _uiState.value.item?.Id != itemId) return@launch
             val currentItem = _uiState.value.item
             if (currentItem?.Type == "Episode" && isReleasedToday(currentItem)) {
@@ -555,7 +555,7 @@ class DetailViewModel @Inject constructor(
     }
 
     private suspend fun getMediaSources(session: Session, itemId: String): List<MediaSourceDto> =
-        runCatching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
+        catching { repository.getMediaSources(session.userId, itemId) }.getOrDefault(emptyList())
 
     fun selectEdition(edition: String) {
         if (_selectedEdition.value != edition) {
@@ -590,7 +590,7 @@ class DetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isWatched = next)
         }
         viewModelScope.launch {
-            runCatching { repository.setPlayed(session.userId, episode.Id, next) }
+            catching { repository.setPlayed(session.userId, episode.Id, next) }
                 .onSuccess { updated ->
                     applyEpisodeUpdate(episode.Id, updated)
                     refreshWatchlisted(session)
@@ -617,7 +617,7 @@ class DetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val results = previous.map { prev ->
-                async { prev.Id to runCatching { repository.setPlayed(session.userId, prev.Id, true) } }
+                async { prev.Id to catching { repository.setPlayed(session.userId, prev.Id, true) } }
             }.awaitAll()
             val updates = results.map { (id, res) ->
                 id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)
@@ -636,7 +636,7 @@ class DetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val results = episodes.map { ep ->
-                async { ep.Id to runCatching { repository.setPlayed(session.userId, ep.Id, true) } }
+                async { ep.Id to catching { repository.setPlayed(session.userId, ep.Id, true) } }
             }.awaitAll()
             val updates = results.map { (id, res) ->
                 id to (res.getOrNull() ?: if (res.isFailure) prevMap[id] else null)

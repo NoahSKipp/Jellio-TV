@@ -673,7 +673,7 @@ class HomeViewModel @Inject constructor(
             persistCurrentSnapshot(session.userId)
 
             viewModelScope.launch {
-                val res = runCatching { repository.toggleFavorite(session.userId, item) }
+                val res = catching { repository.toggleFavorite(session.userId, item) }
                 if (res.isFailure || res.getOrNull() == true) {
                     removedFromWatchlist.remove(item.Id)
                     _uiState.value = beforeState
@@ -707,13 +707,13 @@ class HomeViewModel @Inject constructor(
             persistCurrentSnapshot(session.userId)
 
             viewModelScope.launch {
-                val res = runCatching { repository.toggleFavorite(session.userId, item) }
+                val res = catching { repository.toggleFavorite(session.userId, item) }
                 if (res.isFailure || res.getOrNull() == false) {
                     _uiState.value = beforeState
                     persistCurrentSnapshot(session.userId)
                     _toastMessage.value = com.jellio.tv.ui.i18n.Strings.get("toast_watchlist_error")
                 } else {
-                    runCatching {
+                    catching {
                         val fresh = repository.getWatchlistItems(session.userId).filter { !removedFromWatchlist.containsKey(it.Id) }
                         val movies = fresh.filter { it.Type == "Movie" }
                         val series = fresh.filter { it.Type == "Series" }
@@ -796,7 +796,7 @@ class HomeViewModel @Inject constructor(
         val next = !prevPlayed
         updateItem(item.Id) { it.copy(UserData = (it.UserData ?: UserItemDataDto()).copy(Played = next)) }
         viewModelScope.launch {
-            runCatching { repository.setPlayed(session.userId, item.Id, next) }
+            catching { repository.setPlayed(session.userId, item.Id, next) }
                 .onSuccess { updated ->
                     updateItem(item.Id) { it.copy(UserData = updated) }
                     if (next && !updated.IsFavorite) dropFromWatchlistRows(session.userId, item.Id)
@@ -825,7 +825,7 @@ class HomeViewModel @Inject constructor(
         removedItemIds.add(item.Id)
         removeItemFromRows(item.Id)
         viewModelScope.launch {
-            runCatching { repository.setPlayed(session.userId, item.Id, true) }
+            catching { repository.setPlayed(session.userId, item.Id, true) }
                 .onSuccess { updated -> if (!updated.IsFavorite) dropFromWatchlistRows(session.userId, item.Id) }
                 .onFailure {
                     removedItemIds.remove(item.Id)
@@ -841,7 +841,7 @@ class HomeViewModel @Inject constructor(
         removedItemIds.add(item.Id)
         removeSeriesFromUpNext(seriesId, item.Id)
         viewModelScope.launch {
-            runCatching { repository.hideSeriesFromNextUp(seriesId) }
+            catching { repository.hideSeriesFromNextUp(seriesId) }
                 .onFailure {
                     hiddenSeriesIds.remove(seriesId)
                     removedItemIds.remove(item.Id)
@@ -865,7 +865,7 @@ class HomeViewModel @Inject constructor(
             },
         )
         viewModelScope.launch {
-            val updated = runCatching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull()
+            val updated = catching { repository.clearResumePosition(session.userId, item.Id) }.getOrNull()
             if (updated == null) {
                 removedContinueWatchingIds.remove(item.Id)
                 _uiState.value = _uiState.value.copy(rows = before)
