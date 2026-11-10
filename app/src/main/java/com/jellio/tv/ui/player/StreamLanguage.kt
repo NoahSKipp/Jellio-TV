@@ -1,7 +1,10 @@
 package com.jellio.tv.ui.player
 
 import com.jellio.tv.data.model.MediaSourceDto
+import com.jellio.tv.data.model.normalizeLanguageCode
 import com.jellio.tv.ui.detail.sourceAudioLanguages
+
+private const val MULTI_AUDIO_CODE = "__multi__"
 
 private val MULTI_AUDIO = Regex("\\b(multi|dual)([-.\\s]?audio)?\\b", RegexOption.IGNORE_CASE)
 
@@ -12,16 +15,23 @@ internal fun preferredStreamLanguage(audioPreference: String?, displayLanguage: 
 
 // Streams with the language first, then multi-audio ones; other
 // languages only when neither is left.
-internal fun orderByLanguage(sources: List<MediaSourceDto>, language: String?): List<MediaSourceDto> {
+internal fun orderByLanguage(sources: List<MediaSourceDto>, language: String?): List<MediaSourceDto> =
+    orderByLanguage(sources, language) { source ->
+        sourceAudioLanguages(source).ifEmpty {
+            if (MULTI_AUDIO.containsMatchIn(source.Name.orEmpty())) listOf(MULTI_AUDIO_CODE) else emptyList()
+        }
+    }
+
+internal fun <T> orderByLanguage(sources: List<T>, language: String?, languagesOf: (T) -> List<String>): List<T> {
     val wanted = normalizeLanguage(language) ?: return sources
-    val matches = mutableListOf<MediaSourceDto>()
-    val multi = mutableListOf<MediaSourceDto>()
-    val others = mutableListOf<MediaSourceDto>()
+    val matches = mutableListOf<T>()
+    val multi = mutableListOf<T>()
+    val others = mutableListOf<T>()
     sources.forEach { source ->
-        val languages = sourceAudioLanguages(source).mapNotNull { normalizeLanguage(it) }
+        val languages = languagesOf(source).mapNotNull { normalizeLanguage(it) }
         when {
             wanted in languages -> matches += source
-            languages.isEmpty() && MULTI_AUDIO.containsMatchIn(source.Name.orEmpty()) -> multi += source
+            MULTI_AUDIO_CODE in languages -> multi += source
             else -> others += source
         }
     }
@@ -39,10 +49,5 @@ internal fun sameLanguage(a: String?, b: String?): Boolean {
 }
 
 // "ger", "deu", "de" and "German" all mean the same language: compared as
-// ISO 639-2 codes so the server's and the player's spellings match.
-internal fun normalizeLanguage(code: String?): String? {
-    val raw = code?.trim()?.lowercase()?.ifBlank { null } ?: return null
-    val aliases = mapOf("ger" to "deu", "fre" to "fra", "dut" to "nld", "chi" to "zho", "cze" to "ces", "gre" to "ell", "per" to "fas", "rum" to "ron", "slo" to "slk", "wel" to "cym", "arm" to "hye", "baq" to "eus", "geo" to "kat", "ice" to "isl", "mac" to "mkd", "may" to "msa", "bur" to "mya", "alb" to "sqi", "tib" to "bod")
-    aliases[raw]?.let { return it }
-    return runCatching { java.util.Locale.forLanguageTag(raw.substringBefore('-')).isO3Language }.getOrNull()?.ifBlank { null } ?: raw
-}
+// ISO 639-2/B codes, the same table as the web client's runtime/languages.js.
+internal fun normalizeLanguage(code: String?): String? = normalizeLanguageCode(code).ifEmpty { null }
