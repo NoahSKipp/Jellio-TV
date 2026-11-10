@@ -14,6 +14,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.runBlocking
+import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -117,12 +118,9 @@ object NetworkModule {
     fun provideOkHttpClient(
         @BaseUrlInterceptor baseUrlInterceptor: Interceptor,
         @AuthInterceptor authInterceptor: Interceptor,
-    ): OkHttpClient = OkHttpClient.Builder()
-        .connectionPool(SharedHttp.connectionPool)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+    ): OkHttpClient = SharedHttp.serverBase.newBuilder()
+        // The default 5 per host queued Home's rows behind each other and the pollers.
+        .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
         .addInterceptor(baseUrlInterceptor)
         .addInterceptor(authInterceptor)
         // A call can ask for a longer wait with this header (following a pasted page to its stream can take
@@ -138,19 +136,6 @@ object NetworkModule {
         }
         .apply {
             if (BuildConfig.DEBUG) addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
-        }
-        .apply {
-            try {
-                val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
-                    override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                    override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-                })
-                val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
-                sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-                sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
-                hostnameVerifier { _, _ -> true }
-            } catch (_: Exception) {}
         }
         .build()
 

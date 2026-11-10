@@ -25,7 +25,6 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -44,14 +43,9 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
             maxRequestsPerHost = 32
         }
 
-        val imageOkHttpClient = OkHttpClient.Builder()
-            .connectionPool(com.jellio.tv.data.network.SharedHttp.connectionPool)
+        val imageOkHttpClient = com.jellio.tv.data.network.SharedHttp.serverBase.newBuilder()
             .dispatcher(imageDispatcher)
             .retryOnConnectionFailure(true)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val original = chain.request()
                 val token = sessionManager.getCachedAccessToken()
@@ -81,19 +75,6 @@ class JellioTvApplication : Application(), SingletonImageLoader.Factory {
                 } else {
                     chain.proceed(req)
                 }
-            }
-            .apply {
-                try {
-                    val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
-                        override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                        override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
-                        override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-                    })
-                    val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
-                    sslContext.init(null, trustAllCerts, java.security.SecureRandom())
-                    sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
-                    hostnameVerifier { _, _ -> true }
-                } catch (_: Exception) {}
             }
             .build()
 
