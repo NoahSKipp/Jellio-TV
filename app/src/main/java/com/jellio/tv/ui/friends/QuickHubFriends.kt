@@ -74,15 +74,15 @@ fun QuickHubFriends(
     onAddingChange: (Boolean) -> Unit,
     onOpenFriend: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // Called right before focus is moved or an element under it goes away.
+    onFocusShift: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
     val addFocus = remember { FocusRequester() }
-    val backFocus = remember { FocusRequester() }
     val firstRequestFocus = remember { FocusRequester() }
     var requestHandled by remember { mutableStateOf(false) }
     var incomingCount by remember { mutableIntStateOf(state.incoming.size) }
-    var wasAdding by remember { mutableStateOf(adding) }
     val listState = rememberLazyListState()
 
     val watching = remember(sessions) {
@@ -92,16 +92,7 @@ fun QuickHubFriends(
     val monthPattern = remember(locale) { android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMM") }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
-    LaunchedEffect(adding) {
-        if (adding) viewModel.loadPeople("")
-        if (adding == wasAdding) return@LaunchedEffect
-        wasAdding = adding
-        // The button that was pressed is gone: focus lands on the other mode's anchor.
-        repeat(10) {
-            if (runCatching { (if (adding) backFocus else addFocus).requestFocus() }.isSuccess) return@LaunchedEffect
-            delay(50)
-        }
-    }
+    LaunchedEffect(adding) { if (adding) viewModel.loadPeople("") }
     // A handled request leaves the list and takes focus with it.
     LaunchedEffect(state.incoming.size) {
         val count = state.incoming.size
@@ -122,8 +113,58 @@ fun QuickHubFriends(
     DisposableEffect(Unit) { onDispose { viewModel.clearMessage() } }
 
     Column(modifier = modifier.fillMaxSize()) {
+        // The header and its action stay in place in every mode, so the pressed
+        // button never leaves the screen: "Add friend" turns into "Back".
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        ) {
+            Text(
+                text = when {
+                    adding -> Strings.get("friends_tab_find")
+                    state.loaded -> Strings.format("friends_section_title", state.friends.size)
+                    else -> Strings.get("friends_title")
+                },
+                color = JellioText,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            FriendPill(
+                label = Strings.get(if (adding) "nav_back" else "friends_add"),
+                icon = if (adding) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.PersonAdd,
+                onClick = { onAddingChange(!adding) },
+                modifier = Modifier.focusRequester(addFocus),
+            )
+            if (!adding && state.incoming.isNotEmpty()) {
+                FriendPill(
+                    label = Strings.format("friends_requests_count", state.incoming.size),
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                            runCatching { firstRequestFocus.requestFocus() }
+                        }
+                    },
+                )
+            }
+        }
+        state.messageKey?.let { key ->
+            Text(
+                text = Strings.get(key),
+                color = JellioDanger,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         if (adding) {
-            AddFriendList(session = session, viewModel = viewModel, onBack = { onAddingChange(false) }, backFocus = backFocus)
+            AddFriendList(
+                session = session,
+                viewModel = viewModel,
+                anchorFocus = addFocus,
+                onFocusShift = onFocusShift,
+            )
         } else if (state.loaded && state.friends.isEmpty() && state.incoming.isEmpty()) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -144,54 +185,8 @@ fun QuickHubFriends(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 24.dp),
                 )
-                Spacer(modifier = Modifier.height(20.dp))
-                FriendPill(
-                    label = Strings.get("friends_add"),
-                    icon = Icons.Filled.PersonAdd,
-                    onClick = { onAddingChange(true) },
-                    modifier = Modifier.focusRequester(addFocus),
-                )
             }
         } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            ) {
-                Text(
-                    text = if (state.loaded) Strings.format("friends_section_title", state.friends.size) else Strings.get("friends_title"),
-                    color = JellioText,
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                FriendPill(
-                    label = Strings.get("friends_add"),
-                    icon = Icons.Filled.PersonAdd,
-                    onClick = { onAddingChange(true) },
-                    modifier = Modifier.focusRequester(addFocus),
-                )
-                if (state.incoming.isNotEmpty()) {
-                    FriendPill(
-                        label = Strings.format("friends_requests_count", state.incoming.size),
-                        onClick = {
-                            scope.launch {
-                                listState.animateScrollToItem(0)
-                                runCatching { firstRequestFocus.requestFocus() }
-                            }
-                        },
-                    )
-                }
-            }
-            state.messageKey?.let { key ->
-                Text(
-                    text = Strings.get(key),
-                    color = JellioDanger,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -227,6 +222,9 @@ fun QuickHubFriends(
                                 label = Strings.get("friends_accept"),
                                 primary = true,
                                 onClick = {
+                                    // Focus moves to a button that stays before this row goes away.
+                                    onFocusShift()
+                                    runCatching { addFocus.requestFocus() }
                                     requestHandled = true
                                     viewModel.accept(request.RequestId)
                                 },
@@ -237,6 +235,8 @@ fun QuickHubFriends(
                                 label = Strings.get("friends_decline"),
                                 primary = false,
                                 onClick = {
+                                    onFocusShift()
+                                    runCatching { addFocus.requestFocus() }
                                     requestHandled = true
                                     viewModel.decline(request.RequestId)
                                 },
@@ -300,61 +300,23 @@ private fun FriendRow(
 private fun AddFriendList(
     session: Session,
     viewModel: FriendsViewModel,
-    onBack: () -> Unit,
-    backFocus: FocusRequester,
+    anchorFocus: FocusRequester,
+    onFocusShift: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val people = state.people?.filter { isFindable(it.Status) }
     var peopleCount by remember { mutableIntStateOf(people?.size ?: 0) }
 
-    // A person who became a friend leaves the list; focus returns to Back.
+    // A person who became a friend leaves the list; focus returns to the header action.
     LaunchedEffect(people?.size) {
         val count = people?.size ?: 0
         if (count < peopleCount) {
             delay(150)
-            runCatching { backFocus.requestFocus() }
+            runCatching { anchorFocus.requestFocus() }
         }
         peopleCount = count
     }
 
-    Surface(
-        onClick = onBack,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color.White.copy(alpha = 0.08f),
-            contentColor = JellioText,
-            focusedContainerColor = Color.White.copy(alpha = 0.24f),
-            focusedContentColor = Color.White,
-        ),
-        border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
-        ),
-        modifier = Modifier.focusRequester(backFocus),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = Strings.get("nav_back"),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-        }
-    }
-    SectionLabel(Strings.get("friends_tab_find"))
-    state.messageKey?.let { key ->
-        Text(
-            text = Strings.get(key),
-            color = JellioDanger,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-    }
     when {
         people == null -> Text(text = Strings.get("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(vertical = 8.dp))
         people.isEmpty() -> Text(text = Strings.get("friends_people_empty"), color = JellioTextSecondary, modifier = Modifier.padding(vertical = 8.dp))
@@ -369,7 +331,16 @@ private fun AddFriendList(
                     name = person.UserName,
                     avatarUrl = viewModel.avatarUrl(session, person.UserId, person.PrimaryImageTag),
                     subtitle = null,
-                    onClick = { if (!sent) viewModel.sendRequest(person.UserId) },
+                    onClick = {
+                        if (!sent) {
+                            // A pending request from this person becomes a friendship and the row goes away.
+                            if (relationOf(person.Status) == FriendRelation.Incoming) {
+                                onFocusShift()
+                                runCatching { anchorFocus.requestFocus() }
+                            }
+                            viewModel.sendRequest(person.UserId)
+                        }
+                    },
                 ) {
                     // One row stays focused through "Add friend" to "Request sent".
                     Icon(

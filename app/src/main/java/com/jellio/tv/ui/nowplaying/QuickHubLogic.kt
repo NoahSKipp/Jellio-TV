@@ -25,3 +25,13 @@ fun quickHubPillExpanded(selected: Boolean, focused: Boolean): Boolean = selecte
 
 fun quickHubPillWeight(selected: Boolean, focused: Boolean): Float =
     if (quickHubPillExpanded(selected, focused)) PILL_WEIGHT_EXPANDED else PILL_WEIGHT_COMPACT
+
+// Tabs select when a pill gains focus. When the focused button of a tab goes
+// away focus can fall onto the first pill; a short guard after such a change
+// keeps that from switching tabs.
+const val FOCUS_SHIFT_GUARD_MS = 800L
+
+fun quickHubMaySelectTab(nowMs: Long, blockedUntilMs: Long): Boolean = nowMs >= blockedUntilMs
+
+// Focus that was in the hub and is now nowhere is brought back to the active tab.
+fun quickHubShouldRecoverFocus(hadFocus: Boolean, hasFocus: Boolean): Boolean = hadFocus && !hasFocus

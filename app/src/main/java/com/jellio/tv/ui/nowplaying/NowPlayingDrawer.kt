@@ -193,6 +193,28 @@ fun NowPlayingDrawer(
     val tabNotificationsFocus = remember { FocusRequester() }
     val tabGroupWatchFocus = remember { FocusRequester() }
     val tabFriendsFocus = remember { FocusRequester() }
+    var tabSelectBlockedUntil by remember { mutableStateOf(0L) }
+    var hubHadFocus by remember { mutableStateOf(false) }
+    var hubHasFocus by remember { mutableStateOf(false) }
+    fun selectTab(tab: QuickHubTab) {
+        if (quickHubMaySelectTab(android.os.SystemClock.uptimeMillis(), tabSelectBlockedUntil)) selectedTab = tab
+    }
+    fun activeTabRequester(): FocusRequester = when (selectedTab) {
+        QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus
+        QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus
+        QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus
+        QuickHubTab.FRIENDS -> tabFriendsFocus
+    }
+    // If the focused element of a tab is removed focus can end up nowhere in the
+    // hub (and then behind it): bring it back to the active tab.
+    LaunchedEffect(hubHasFocus) {
+        if (!quickHubShouldRecoverFocus(hubHadFocus, hubHasFocus)) return@LaunchedEffect
+        delay(120)
+        repeat(15) {
+            if (runCatching { activeTabRequester().requestFocus() }.isSuccess) return@LaunchedEffect
+            delay(50)
+        }
+    }
 
     LaunchedEffect(Unit) {
         repeat(25) {
@@ -222,6 +244,10 @@ fun NowPlayingDrawer(
                     }
                     FocusRequester.Cancel
                 }
+            }
+            .onFocusChanged {
+                hubHasFocus = it.hasFocus
+                if (it.hasFocus) hubHadFocus = true
             }
             .focusGroup(),
         contentAlignment = Alignment.CenterEnd,
@@ -346,7 +372,7 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.NOW_PLAYING,
                         badgeCount = nowPlayingCount,
                         badgeColor = Color.White.copy(alpha = 0.22f),
-                        onSelect = { selectedTab = QuickHubTab.NOW_PLAYING },
+                        onSelect = { selectTab(QuickHubTab.NOW_PLAYING) },
                         modifier = Modifier
                             .focusRequester(tabNowPlayingFocus),
                     )
@@ -357,7 +383,7 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.NOTIFICATIONS,
                         badgeCount = notificationsCount,
                         badgeColor = Color(0xFFFF3B30),
-                        onSelect = { selectedTab = QuickHubTab.NOTIFICATIONS },
+                        onSelect = { selectTab(QuickHubTab.NOTIFICATIONS) },
                         modifier = Modifier
                             .focusRequester(tabNotificationsFocus),
                     )
@@ -371,7 +397,7 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.GROUP_WATCH,
                         badgeCount = groupWatchBadgeCount,
                         badgeColor = if (activeGroup != null) Color(0xFF22C55E) else Color.White.copy(alpha = 0.22f),
-                        onSelect = { selectedTab = QuickHubTab.GROUP_WATCH },
+                        onSelect = { selectTab(QuickHubTab.GROUP_WATCH) },
                         modifier = Modifier
                             .focusRequester(tabGroupWatchFocus),
                     )
@@ -383,7 +409,7 @@ fun NowPlayingDrawer(
                             selected = selectedTab == QuickHubTab.FRIENDS,
                             badgeCount = friendsState.incoming.size,
                             badgeColor = Color(0xFFFF3B30),
-                            onSelect = { selectedTab = QuickHubTab.FRIENDS },
+                            onSelect = { selectTab(QuickHubTab.FRIENDS) },
                             modifier = Modifier.focusRequester(tabFriendsFocus),
                         )
                     }
@@ -697,6 +723,7 @@ fun NowPlayingDrawer(
                             adding = friendsAdding,
                             onAddingChange = { friendsAdding = it },
                             onOpenFriend = { id -> onOpenProfile?.invoke(id) },
+                            onFocusShift = { tabSelectBlockedUntil = android.os.SystemClock.uptimeMillis() + FOCUS_SHIFT_GUARD_MS },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

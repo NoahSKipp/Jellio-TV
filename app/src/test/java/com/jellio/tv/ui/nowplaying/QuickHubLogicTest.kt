@@ -38,4 +38,18 @@ class QuickHubLogicTest {
         assertFalse(quickHubBackLeavesAddList(QuickHubTab.FRIENDS, false))
         assertFalse(quickHubBackLeavesAddList(QuickHubTab.NOTIFICATIONS, true))
     }
+
+    @Test
+    fun tabSelectionIsBlockedOnlyDuringTheGuard() {
+        assertTrue(quickHubMaySelectTab(nowMs = 1_000, blockedUntilMs = 0))
+        assertFalse(quickHubMaySelectTab(nowMs = 1_000, blockedUntilMs = 1_800))
+        assertTrue(quickHubMaySelectTab(nowMs = 1_800, blockedUntilMs = 1_800))
+    }
+
+    @Test
+    fun focusIsRecoveredOnlyAfterItWasInTheHub() {
+        assertFalse(quickHubShouldRecoverFocus(hadFocus = false, hasFocus = false))
+        assertFalse(quickHubShouldRecoverFocus(hadFocus = true, hasFocus = true))
+        assertTrue(quickHubShouldRecoverFocus(hadFocus = true, hasFocus = false))
+    }
 }
