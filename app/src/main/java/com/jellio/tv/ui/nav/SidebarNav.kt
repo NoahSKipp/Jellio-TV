@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +56,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.ui.theme.JellioBg
+import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import com.jellio.tv.ui.theme.scaled
@@ -76,6 +78,8 @@ fun SidebarNav(
     enabled: Boolean = true,
     profileAvatarUrl: String? = null,
     profileName: String? = null,
+    // A dot on the profile entry: friend requests are waiting.
+    profileBadge: Boolean = false,
     restoreFocusRequester: FocusRequester? = null,
     forceCollapsed: Boolean = false,
     // False while a panel is open over the screen, so Left from inside
@@ -155,6 +159,7 @@ fun SidebarNav(
                 iconScale = route.iconScale(),
                 label = if (isSelfProfile && !profileName.isNullOrBlank()) profileName else route.label(),
                 avatarUrl = if (isSelfProfile) profileAvatarUrl else null,
+                badge = isSelfProfile && profileBadge,
                 isSelected = matchesSelected,
                 expanded = visuallyExpanded,
                 enabled = enabled,
@@ -182,6 +187,7 @@ private fun SidebarItem(
     homeFocusRequester: FocusRequester? = null,
     iconScale: Float = 1f,
     avatarUrl: String? = null,
+    badge: Boolean = false,
     height: androidx.compose.ui.unit.Dp = SidebarItemHeight,
     focusable: Boolean = true,
 ) {
@@ -250,6 +256,16 @@ private fun SidebarItem(
                         contentDescription = if (!expanded) label else null,
                         tint = LocalContentColor.current,
                         modifier = Modifier.size(SidebarIconSize.scaled() * iconScale),
+                    )
+                }
+                if (badge) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .offset(x = 14.dp, y = (-14).dp)
+                            .size(11.dp)
+                            .background(JellioDanger, CircleShape)
+                            .border(2.dp, JellioBg, CircleShape),
                     )
                 }
             }

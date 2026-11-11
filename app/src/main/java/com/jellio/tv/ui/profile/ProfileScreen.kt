@@ -52,6 +52,11 @@ import coil3.compose.AsyncImage
 import com.jellio.tv.data.model.BadgeDto
 import com.jellio.tv.data.model.GroupedActivityEntryDto
 import com.jellio.tv.data.session.Session
+import com.jellio.tv.ui.friends.FriendProfileButton
+import com.jellio.tv.ui.friends.FriendsPanel
+import com.jellio.tv.ui.friends.FriendsSection
+import com.jellio.tv.ui.friends.FriendsViewModel
+import kotlinx.coroutines.delay
 import com.jellio.tv.ui.common.ErrorState
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.common.formatRelativeTime
@@ -73,7 +78,9 @@ fun ProfileScreen(
     onNavigateToDetail: (String) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenProfile: (String) -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
+    friendsViewModel: FriendsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val targetUserId = userId ?: session.userId
@@ -83,6 +90,20 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(targetUserId) { viewModel.load(session, userId) }
+
+    var showFriends by remember { mutableStateOf(false) }
+    val friendsFocus = remember { FocusRequester() }
+    // Back from the panel lands on the section that opened it.
+    var friendsWasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(showFriends) {
+        if (showFriends) {
+            friendsWasOpen = true
+        } else if (friendsWasOpen) {
+            friendsWasOpen = false
+            delay(120)
+            runCatching { friendsFocus.requestFocus() }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize().background(JellioBg)) {
         when {
@@ -114,6 +135,9 @@ fun ProfileScreen(
                                 )
                                 Column(modifier = Modifier.padding(start = 16.dp)) {
                                     Text(text = user?.Name ?: "", style = MaterialTheme.typography.titleLarge)
+                                    if (!uiState.isOwner) {
+                                        FriendProfileButton(userId = targetUserId, viewModel = friendsViewModel, modifier = Modifier.padding(top = 6.dp))
+                                    }
                                     if (uiState.isOwner && profile?.IsPrivate == true) {
                                         Surface(
                                             onClick = {},
@@ -140,6 +164,17 @@ fun ProfileScreen(
                                 onDraftChange = { viewModel.updateBioDraft(it) },
                                 onSave = { viewModel.saveBio() },
                                 onCancel = { viewModel.cancelEditingBio() },
+                            )
+                        }
+                    }
+
+                    if (uiState.isOwner) {
+                        item {
+                            FriendsSection(
+                                session = session,
+                                viewModel = friendsViewModel,
+                                onOpen = { showFriends = true },
+                                focusRequester = friendsFocus,
                             )
                         }
                     }
@@ -203,6 +238,14 @@ fun ProfileScreen(
                     }
                 }
             }
+        }
+        if (showFriends) {
+            FriendsPanel(
+                session = session,
+                viewModel = friendsViewModel,
+                onDismiss = { showFriends = false },
+                onOpenProfile = onOpenProfile,
+            )
         }
     }
 }
