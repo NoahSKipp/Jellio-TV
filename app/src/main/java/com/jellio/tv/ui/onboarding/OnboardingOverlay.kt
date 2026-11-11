@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,13 +79,6 @@ import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 import kotlinx.coroutines.delay
 
-private enum class OnboardingStep {
-    LANGUAGE,
-    PLAYBACK,
-    OVERSCAN,
-    SUMMARY,
-}
-
 @Composable
 fun OnboardingOverlay(
     userId: String,
@@ -99,13 +93,7 @@ fun OnboardingOverlay(
     val hasSharedAccountSettings = !initialAudioLang.isNullOrBlank() || (!initialSubtitleLang.isNullOrBlank() && initialSubtitleLang != "off")
 
     // Determine the list of relevant steps: if Web set it up, skip audio/subtitle and only show TV-specific settings
-    val steps = remember(hasSharedAccountSettings) {
-        if (hasSharedAccountSettings) {
-            listOf(OnboardingStep.LANGUAGE, OnboardingStep.OVERSCAN, OnboardingStep.SUMMARY)
-        } else {
-            listOf(OnboardingStep.LANGUAGE, OnboardingStep.PLAYBACK, OnboardingStep.OVERSCAN, OnboardingStep.SUMMARY)
-        }
-    }
+    val steps = remember(hasSharedAccountSettings) { onboardingSteps(hasSharedAccountSettings) }
 
     var stepIndex by remember { mutableIntStateOf(0) }
     val currentStep = steps.getOrElse(stepIndex) { OnboardingStep.SUMMARY }
@@ -352,6 +340,14 @@ fun OnboardingOverlay(
                                     )
                                     DisplayPreferences.setOverscan(context, currentOverscan)
                                 },
+                                nextFocusRequester = nextFocusRequester,
+                                backFocusRequester = backFocusRequester,
+                            )
+                        }
+                        OnboardingStep.QUICK_HUB -> {
+                            StepQuickHubContent(
+                                // Leaves room for the header, progress bar and footer buttons.
+                                maxBodyHeight = maxOf(maxHeight - 210.dp, 200.dp),
                                 nextFocusRequester = nextFocusRequester,
                                 backFocusRequester = backFocusRequester,
                             )
@@ -892,6 +888,12 @@ private fun StepSummaryContent(
                 icon = Icons.Filled.Tv,
                 label = string("onboarding_step_overscan"),
                 value = if (overscan == 0) string("onboarding_overscan_fullscreen") else formatString("onboarding_overscan_inset", overscan),
+            )
+
+            SummaryItemRow(
+                icon = Icons.Filled.Widgets,
+                label = string("onboarding_quick_hub_summary_label"),
+                value = quickHubSummaryValue(),
             )
 
             SummaryItemRow(
