@@ -102,6 +102,15 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.1.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Groups, "Friends in Quick Hub", "A new Friends tab in Quick Hub shows your friends and what they are watching right now, lets you accept or decline requests, and find and add new friends without leaving the hub."),
+            ChangelogFeature(Icons.Filled.Tune, "Slimmer Quick Hub Tabs", "The tab row stays compact: tabs show their icon and badge, and the label appears on the tab you select or focus."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.1.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.1.0",
