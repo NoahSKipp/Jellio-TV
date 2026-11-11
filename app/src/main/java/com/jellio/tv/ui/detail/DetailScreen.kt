@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.ThumbDown
@@ -97,6 +98,9 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
+import com.jellio.tv.ui.friends.FriendWatchlistPickerDialog
+import com.jellio.tv.ui.friends.FriendsViewModel
+import com.jellio.tv.ui.friends.canShareType
 import com.jellio.tv.data.episodeReleaseLabel
 import com.jellio.tv.data.seasonEpisodeReleaseLabels
 import com.jellio.tv.ui.theme.JellioBg
@@ -136,8 +140,11 @@ fun DetailScreen(
     onPlayDirect: (itemId: String, mediaSourceId: String?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DetailViewModel = hiltViewModel(),
+    friendsViewModel: FriendsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val friendsState by friendsViewModel.state.collectAsState()
+    var friendPickerOpen by remember { mutableStateOf(false) }
     val availableEditions by viewModel.availableEditions.collectAsState()
     val selectedEdition by viewModel.selectedEdition.collectAsState()
     val context = LocalContext.current
@@ -256,6 +263,11 @@ fun DetailScreen(
                                 null
                             },
                             onToggleWatchlist = { viewModel.toggleWatchlist(session) },
+                            onAddToFriend = if (canShareType(item.Type) && friendsState.available && friendsState.friends.isNotEmpty()) {
+                                { friendPickerOpen = true }
+                            } else {
+                                null
+                            },
                             onToggleWatched = { viewModel.toggleWatched(session) },
                             onLike = { viewModel.setLike(session, true) },
                             onDislike = { viewModel.setLike(session, false) },
@@ -293,6 +305,18 @@ fun DetailScreen(
                     }
                 }
             }
+        }
+
+        val pickerItem = uiState.item
+        if (friendPickerOpen && pickerItem != null) {
+            FriendWatchlistPickerDialog(
+                item = pickerItem,
+                viewModel = friendsViewModel,
+                onDismiss = {
+                    friendPickerOpen = false
+                    runCatching { playButtonFocusRequester.requestFocus() }
+                },
+            )
         }
 
         val menuTarget = episodeMenuTarget
@@ -385,6 +409,7 @@ private fun DetailHero(
     onPlay: () -> Unit,
     onChangeStream: (() -> Unit)?,
     onToggleWatchlist: () -> Unit,
+    onAddToFriend: (() -> Unit)? = null,
     onToggleWatched: () -> Unit,
     onLike: () -> Unit,
     onDislike: () -> Unit,
@@ -604,6 +629,14 @@ private fun DetailHero(
                             contentDescription = com.jellio.tv.ui.i18n.string("nav_watchlist"),
                             onClick = onToggleWatchlist,
                         )
+                        if (onAddToFriend != null) {
+                            IconActionButton(
+                                icon = Icons.Filled.PersonAdd,
+                                active = false,
+                                contentDescription = com.jellio.tv.ui.i18n.string("friends_add_to_friend_watchlist"),
+                                onClick = onAddToFriend,
+                            )
+                        }
                         IconActionButton(
                             icon = Icons.Filled.Check,
                             active = state.isWatched,

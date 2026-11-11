@@ -98,8 +98,11 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     initialEditMode: Boolean = false,
     viewModel: HomeViewModel = hiltViewModel(),
+    friendsViewModel: com.jellio.tv.ui.friends.FriendsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val friendsState by friendsViewModel.state.collectAsState()
+    var friendShareTarget by remember { mutableStateOf<BaseItemDto?>(null) }
     val nowPlayingSessions by viewModel.nowPlayingSessions.collectAsState()
     val nowPlayingActiveCount by viewModel.nowPlayingActiveCount.collectAsState()
     val nowPlayingLocalPaused by viewModel.nowPlayingLocalPaused.collectAsState()
@@ -412,8 +415,15 @@ fun HomeScreen(
                     }
                 } else null,
                 onToggleWatched = if (!continueWatching && !upNext) { { viewModel.toggleWatched(session, itemWithFavorite) } } else null,
+                onAddToFriendWatchlist = if (!continueWatching && !upNext && com.jellio.tv.ui.friends.canShareType(item.Type) && friendsState.available && friendsState.friends.isNotEmpty()) {
+                    { friendShareTarget = item }
+                } else null,
                 onDismiss = { cardMenuTarget = null },
             )
+        }
+
+        friendShareTarget?.let { shared ->
+            com.jellio.tv.ui.friends.FriendWatchlistPickerDialog(item = shared, viewModel = friendsViewModel, onDismiss = { friendShareTarget = null })
         }
 
         comingSoonMenuTarget?.let { entry ->
