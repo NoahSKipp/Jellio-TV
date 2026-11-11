@@ -102,6 +102,16 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.1.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Tune, "Quick Hub in the Setup", "The first-run setup now has a Quick Hub step: it shows what the hub holds (now playing, notifications, group invites and friends) and lets you pick the shortcut, with the recommended choice marked for your Fire TV or Google TV remote."),
+            ChangelogFeature(Icons.Filled.Groups, "Steadier Friends Tab", "Adding friends and answering requests in the Quick Hub no longer throws you back to Now Playing, and focus can no longer slip behind the hub."),
+            ChangelogFeature(Icons.Filled.Settings, "Settings Start on the Menu", "Settings now opens with the d-pad on its first menu section, so you can navigate right away."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.1.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.1.1",
