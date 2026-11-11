@@ -156,7 +156,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     appUpdateViewModel: AppUpdateViewModel = hiltViewModel(),
+    friendsViewModel: com.jellio.tv.ui.friends.FriendsViewModel = hiltViewModel(),
 ) {
+    val friendsState by friendsViewModel.state.collectAsState()
+    var showRequestsPicker by remember { mutableStateOf(false) }
     val rememberStream by viewModel.rememberStream.collectAsState()
     val removeFromWatchlistAfterWatching by viewModel.removeFromWatchlistAfterWatching.collectAsState()
     val audioLanguage by viewModel.audioLanguage.collectAsState()
@@ -185,6 +188,9 @@ fun SettingsScreen(
     LaunchedEffect(session.userId) {
         viewModel.load(session)
         viewModel.loadRecommendations(session.userId)
+    }
+    LaunchedEffect(session.userId, friendsState.loaded) {
+        if (friendsState.available && friendsState.loaded) friendsViewModel.loadSettings()
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -278,6 +284,23 @@ fun SettingsScreen(
                         checked = isPrivate,
                         onToggle = { viewModel.setPrivate(!isPrivate) },
                     )
+                    // Hidden on a plugin without friends.
+                    val friendSettings = friendsState.settings
+                    if (friendsState.available && friendsState.loaded && friendSettings != null) {
+                        SettingsDivider()
+                        SettingsToggleRow(
+                            label = string("friends_setting_add"),
+                            description = string("friends_setting_add_desc"),
+                            checked = friendSettings.FriendsCanAddToWatchlist,
+                            onToggle = { friendsViewModel.setCanAdd(!friendSettings.FriendsCanAddToWatchlist) },
+                        )
+                        SettingsDivider()
+                        SettingsPickerRow(
+                            label = string("friends_setting_requests"),
+                            value = string(if (friendSettings.FriendRequestsFrom == "nobody") "friends_requests_nobody" else "friends_requests_everyone"),
+                            onClick = { showRequestsPicker = true },
+                        )
+                    }
                 }
 
                 SettingsSection(title = string("settings_security"), icon = Icons.Filled.Key, form = true) {
@@ -948,6 +971,17 @@ fun SettingsScreen(
                 openField = null
             },
             onDismiss = { openField = null },
+        )
+    }
+
+    if (showRequestsPicker) {
+        FriendRequestsPickerOverlay(
+            selected = friendsState.settings?.FriendRequestsFrom ?: "everyone",
+            onSelect = { value ->
+                friendsViewModel.setRequestsFrom(value)
+                showRequestsPicker = false
+            },
+            onDismiss = { showRequestsPicker = false },
         )
     }
 
@@ -1634,6 +1668,30 @@ private fun DisplayLanguagePickerOverlay(
         }
     }
 }
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun FriendRequestsPickerOverlay(
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val firstRowFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { firstRowFocusRequester.requestFocus() }
+    SidePanel(title = string("friends_setting_requests"), width = 360.dp, onDismiss = onDismiss) {
+        LanguagePickerRow(
+            label = string("friends_requests_everyone"),
+            isSelected = selected != "nobody",
+            onClick = { onSelect("everyone") },
+            focusRequester = firstRowFocusRequester,
+        )
+        LanguagePickerRow(
+            label = string("friends_requests_nobody"),
+            isSelected = selected == "nobody",
+            onClick = { onSelect("nobody") },
+        )
+    }
+}
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun LanguagePickerOverlay(
