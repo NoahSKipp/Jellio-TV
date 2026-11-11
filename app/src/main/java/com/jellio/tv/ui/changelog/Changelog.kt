@@ -102,6 +102,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.1.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Groups, "Friends and Shared Watchlists", "Send friend requests from profiles, manage friends from your own profile, and add movies and series to a friend's watchlist from the title page or the card menu. Titles friends added show their avatar on the card."),
+            ChangelogFeature(Icons.Filled.Notifications, "Friend Notifications in Quick Hub", "Friend requests can be accepted or declined right in the Quick Hub, and titles friends add to your watchlist appear there with the poster and who added them, with an Undo."),
+            ChangelogFeature(Icons.Filled.Info, "New Notifications Pill", "When you open Jellio TV with unread notifications, a small pill drops down from the top for three seconds to tell you how many."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Previous and Next Episode", "Two new buttons beside rewind, play and forward jump to the previous or the next episode, so you can skip around a season without leaving the player."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.0.0",
         title = "Jellio TV 1.0",
         subtitle = "Version 1.0.0",
