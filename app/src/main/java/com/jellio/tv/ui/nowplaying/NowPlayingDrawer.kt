@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,6 +67,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -318,7 +321,7 @@ fun NowPlayingDrawer(
                     }
                 }
 
-                // 3-Tab Switcher Row
+                // Tab switcher row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -333,7 +336,6 @@ fun NowPlayingDrawer(
                         badgeColor = Color.White.copy(alpha = 0.22f),
                         onSelect = { selectedTab = QuickHubTab.NOW_PLAYING },
                         modifier = Modifier
-                            .weight(1f)
                             .focusRequester(tabNowPlayingFocus),
                     )
 
@@ -345,7 +347,6 @@ fun NowPlayingDrawer(
                         badgeColor = Color(0xFFFF3B30),
                         onSelect = { selectedTab = QuickHubTab.NOTIFICATIONS },
                         modifier = Modifier
-                            .weight(1f)
                             .focusRequester(tabNotificationsFocus),
                     )
 
@@ -360,7 +361,6 @@ fun NowPlayingDrawer(
                         badgeColor = if (activeGroup != null) Color(0xFF22C55E) else Color.White.copy(alpha = 0.22f),
                         onSelect = { selectedTab = QuickHubTab.GROUP_WATCH },
                         modifier = Modifier
-                            .weight(1f)
                             .focusRequester(tabGroupWatchFocus),
                     )
                 }
@@ -670,8 +670,9 @@ fun NowPlayingDrawer(
 }
 }
 
+// Icon and badge only; the label appears while the tab is selected or focused.
 @Composable
-private fun QuickHubTabPill(
+private fun RowScope.QuickHubTabPill(
     label: String,
     icon: ImageVector,
     selected: Boolean,
@@ -680,6 +681,13 @@ private fun QuickHubTabPill(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var focused by remember { mutableStateOf(false) }
+    val expanded = quickHubPillExpanded(selected, focused)
+    val width by animateFloatAsState(
+        targetValue = quickHubPillWeight(selected, focused),
+        animationSpec = tween(180),
+        label = "quickHubPillWidth",
+    )
     Surface(
         onClick = onSelect,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
@@ -694,11 +702,15 @@ private fun QuickHubTabPill(
             border = if (selected) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))) else Border.None,
             focusedBorder = Border(BorderStroke(2.dp, Color.White)),
         ),
-        modifier = modifier.onFocusChanged {
-            if (it.isFocused) {
-                onSelect()
-            }
-        },
+        modifier = modifier
+            .weight(width)
+            .semantics { contentDescription = label }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) {
+                    onSelect()
+                }
+            },
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,
@@ -712,17 +724,19 @@ private fun QuickHubTabPill(
                 contentDescription = null,
                 modifier = Modifier.size(15.dp),
             )
-            Spacer(modifier = Modifier.width(5.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
+            if (expanded) {
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
             if (badgeCount > 0) {
                 Spacer(modifier = Modifier.width(5.dp))
                 Box(
