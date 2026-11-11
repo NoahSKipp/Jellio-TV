@@ -3,6 +3,14 @@ package com.jellio.tv.ui.player
 import com.jellio.tv.data.playback.SkipSegments
 import com.jellio.tv.data.i18n.Strings
 
+// A skip intro / credits prompt leaves by itself after this long on screen.
+internal const val SKIP_PROMPT_VISIBLE_MS = 15_000L
+
+// Prompts sit in the bottom right corner; while the transport controls are up
+// they move above them.
+internal const val PROMPT_BOTTOM_CORNER_DP = 40
+internal const val PROMPT_BOTTOM_ABOVE_CONTROLS_DP = 148
+
 // How long before the end an episode without credits data offers its next one.
 internal const val NEAR_END_UP_NEXT_SECONDS = 30.0
 

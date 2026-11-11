@@ -866,6 +866,17 @@ internal fun PlayerSurface(
     fun dismissPrompt() {
         if (skipPromptVisible) dismissedSkipKind = activeSkip?.kind else if (nearEndUpNextVisible) nearEndUpNextDismissed = true
     }
+    // Like the other prompts it does not stay: gone after 15 seconds on screen.
+    LaunchedEffect(skipPromptVisible, activeSkip?.kind) {
+        if (!skipPromptVisible) return@LaunchedEffect
+        delay(SKIP_PROMPT_VISIBLE_MS)
+        dismissedSkipKind = activeSkip?.kind
+    }
+    val promptBottom by androidx.compose.animation.core.animateDpAsState(
+        targetValue = (if (controlsVisible) PROMPT_BOTTOM_ABOVE_CONTROLS_DP else PROMPT_BOTTOM_CORNER_DP).dp,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "promptBottom",
+    )
     LaunchedEffect(nearEndUpNextVisible) {
         if (nearEndUpNextVisible && !nearEndUpNextAnnounced) {
             nearEndUpNextAnnounced = true
@@ -1277,7 +1288,7 @@ internal fun PlayerSurface(
                 onDismiss = { dismissPrompt() },
                 takeFocus = !controlsVisible,
                 focusKey = activeSkip.kind,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = promptBottom),
             )
         }
         if (nearEndUpNextVisible && upNextInfo != null) {
@@ -1297,7 +1308,7 @@ internal fun PlayerSurface(
                 onDismiss = { dismissPrompt() },
                 takeFocus = !controlsVisible,
                 focusKey = upNextInfo.itemId,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = 148.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 48.dp, bottom = promptBottom),
             )
         }
 
