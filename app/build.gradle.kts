@@ -31,7 +31,7 @@ android {
         applicationId = "com.jellio.tv"
         minSdk = 24
         targetSdk = 36
-        versionName = "1.1.1"
+        versionName = "1.1.2"
         versionCode = versionCodeOf(versionName!!)
     }
 
