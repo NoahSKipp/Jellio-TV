@@ -60,4 +60,8 @@ internal fun fillFriendsPt(m: HashMap<String, String>) {
     m["friends_setting_requests"] = "Quem me pode enviar pedidos de amizade"
     m["friends_requests_everyone"] = "Todos"
     m["friends_requests_nobody"] = "Ninguém"
+    m["quick_hub_tab_friends"] = "Amigos"
+    m["friends_watching_now"] = "A ver {0} agora"
+    m["friends_since"] = "Amigos desde {0}"
+    m["friends_requests_count"] = "Pedidos ({0})"
 }

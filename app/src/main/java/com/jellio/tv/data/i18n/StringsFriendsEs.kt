@@ -60,4 +60,8 @@ internal fun fillFriendsEs(m: HashMap<String, String>) {
     m["friends_setting_requests"] = "Quién puede enviarme solicitudes"
     m["friends_requests_everyone"] = "Todos"
     m["friends_requests_nobody"] = "Nadie"
+    m["quick_hub_tab_friends"] = "Amigos"
+    m["friends_watching_now"] = "Viendo {0} ahora"
+    m["friends_since"] = "Amigos desde {0}"
+    m["friends_requests_count"] = "Solicitudes ({0})"
 }

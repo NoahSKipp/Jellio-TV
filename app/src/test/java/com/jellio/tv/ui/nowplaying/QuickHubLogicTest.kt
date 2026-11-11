@@ -21,4 +21,21 @@ class QuickHubLogicTest {
         assertEquals(PILL_WEIGHT_EXPANDED, quickHubPillWeight(selected = false, focused = true), 0f)
         assertTrue(PILL_WEIGHT_EXPANDED > PILL_WEIGHT_COMPACT)
     }
+
+    @Test
+    fun friendsTabIsHiddenWithoutThePlugin() {
+        assertTrue(QuickHubTab.FRIENDS in visibleQuickHubTabs(true))
+        assertFalse(QuickHubTab.FRIENDS in visibleQuickHubTabs(false))
+        assertEquals(3, visibleQuickHubTabs(false).size)
+        assertEquals(QuickHubTab.NOW_PLAYING, resolveQuickHubTab(QuickHubTab.FRIENDS, false))
+        assertEquals(QuickHubTab.FRIENDS, resolveQuickHubTab(QuickHubTab.FRIENDS, true))
+        assertEquals(QuickHubTab.GROUP_WATCH, resolveQuickHubTab(QuickHubTab.GROUP_WATCH, false))
+    }
+
+    @Test
+    fun backLeavesTheAddListBeforeClosing() {
+        assertTrue(quickHubBackLeavesAddList(QuickHubTab.FRIENDS, true))
+        assertFalse(quickHubBackLeavesAddList(QuickHubTab.FRIENDS, false))
+        assertFalse(quickHubBackLeavesAddList(QuickHubTab.NOTIFICATIONS, true))
+    }
 }

@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -103,6 +104,7 @@ import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.data.i18n.displayLocale
 import com.jellio.tv.ui.friends.FriendNotificationCard
 import com.jellio.tv.ui.friends.FriendsViewModel
+import com.jellio.tv.ui.friends.QuickHubFriends
 import com.jellio.tv.ui.friends.isFriendKind
 import com.jellio.tv.ui.notify.NotificationsViewModel
 import com.jellio.tv.ui.notify.messageFor
@@ -119,12 +121,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private val DrawerWidth = 500.dp
-
-enum class QuickHubTab {
-    NOW_PLAYING,
-    NOTIFICATIONS,
-    GROUP_WATCH,
-}
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -149,8 +145,19 @@ fun NowPlayingDrawer(
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
     friendsViewModel: FriendsViewModel = hiltViewModel(),
 ) {
-    BackHandler(onBack = onDismiss)
+    val friendsState by friendsViewModel.state.collectAsState()
+    val friendsAvailable = friendsState.available
+    var selectedTab by remember { mutableStateOf(resolveQuickHubTab(initialTab, friendsAvailable)) }
+    var friendsAdding by remember { mutableStateOf(false) }
+    val onBack: () -> Unit = {
+        if (quickHubBackLeavesAddList(selectedTab, friendsAdding)) friendsAdding = false else onDismiss()
+    }
+    BackHandler(onBack = onBack)
 
+    LaunchedEffect(selectedTab) { if (selectedTab != QuickHubTab.FRIENDS) friendsAdding = false }
+    LaunchedEffect(friendsAvailable) {
+        if (!friendsAvailable && selectedTab == QuickHubTab.FRIENDS) selectedTab = QuickHubTab.NOW_PLAYING
+    }
     LaunchedEffect(Unit) { notificationsViewModel.load() }
     LaunchedEffect(Unit) { pollNowPlaying() }
 
@@ -174,8 +181,6 @@ fun NowPlayingDrawer(
         }
     }
 
-    var selectedTab by remember { mutableStateOf(initialTab) }
-
     val nowPlayingCount = sessions.size + (if (localPaused != null) 1 else 0)
     val notificationsCount = notificationBadgeCount(notifications?.count { !it.Read } ?: 0, invites.size)
     val groupWatchBadgeCount = if (activeGroup != null) {
@@ -187,14 +192,16 @@ fun NowPlayingDrawer(
     val tabNowPlayingFocus = remember { FocusRequester() }
     val tabNotificationsFocus = remember { FocusRequester() }
     val tabGroupWatchFocus = remember { FocusRequester() }
+    val tabFriendsFocus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         repeat(25) {
             val focused = runCatching {
-                when (initialTab) {
+                when (selectedTab) {
                     QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus.requestFocus()
                     QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus.requestFocus()
                     QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus.requestFocus()
+                    QuickHubTab.FRIENDS -> tabFriendsFocus.requestFocus()
                 }
             }.isSuccess
             if (focused) return@LaunchedEffect
@@ -205,7 +212,7 @@ fun NowPlayingDrawer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .dismissOnBack(onDismiss)
+            .dismissOnBack(onBack)
             .background(Color.Black.copy(alpha = 0.70f))
             .pointerInput(Unit) { detectTapGestures { onDismiss() } }
             .focusProperties {
@@ -286,6 +293,11 @@ fun NowPlayingDrawer(
                                             Strings.get("party_title")
                                         }
                                     }
+                                    QuickHubTab.FRIENDS -> if (friendsState.incoming.isNotEmpty()) {
+                                        Strings.format("friends_section_requests", friendsState.incoming.size)
+                                    } else {
+                                        Strings.get("friends_title")
+                                    }
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = JellioTextSecondary,
@@ -363,6 +375,18 @@ fun NowPlayingDrawer(
                         modifier = Modifier
                             .focusRequester(tabGroupWatchFocus),
                     )
+
+                    if (friendsAvailable) {
+                        QuickHubTabPill(
+                            label = Strings.get("quick_hub_tab_friends"),
+                            icon = Icons.Filled.People,
+                            selected = selectedTab == QuickHubTab.FRIENDS,
+                            badgeCount = friendsState.incoming.size,
+                            badgeColor = Color(0xFFFF3B30),
+                            onSelect = { selectedTab = QuickHubTab.FRIENDS },
+                            modifier = Modifier.focusRequester(tabFriendsFocus),
+                        )
+                    }
                 }
 
                 // Drawer Body
@@ -370,6 +394,7 @@ fun NowPlayingDrawer(
                     QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus
                     QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus
                     QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus
+                    QuickHubTab.FRIENDS -> tabFriendsFocus
                 }
 
                 Box(
@@ -660,6 +685,18 @@ fun NowPlayingDrawer(
                             groups = groups,
                             invites = invites,
                             onRefresh = { gwRefreshKey++ },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+
+                    QuickHubTab.FRIENDS -> {
+                        QuickHubFriends(
+                            session = session,
+                            sessions = sessions,
+                            viewModel = friendsViewModel,
+                            adding = friendsAdding,
+                            onAddingChange = { friendsAdding = it },
+                            onOpenFriend = { id -> onOpenProfile?.invoke(id) },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

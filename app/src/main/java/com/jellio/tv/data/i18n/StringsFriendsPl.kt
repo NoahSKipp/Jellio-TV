@@ -60,4 +60,8 @@ internal fun fillFriendsPl(m: HashMap<String, String>) {
     m["friends_setting_requests"] = "Kto może wysyłać mi zaproszenia"
     m["friends_requests_everyone"] = "Wszyscy"
     m["friends_requests_nobody"] = "Nikt"
+    m["quick_hub_tab_friends"] = "Znajomi"
+    m["friends_watching_now"] = "Ogląda teraz: {0}"
+    m["friends_since"] = "Znajomi od {0}"
+    m["friends_requests_count"] = "Zaproszenia ({0})"
 }
