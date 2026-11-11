@@ -149,6 +149,8 @@ fun OnboardingOverlay(
                 .focusProperties { onExit = { FocusRequester.Cancel } },
             contentAlignment = Alignment.Center,
         ) {
+            // The scope's maxHeight cannot be read from the nested layouts below.
+            val wizardMaxHeight = maxHeight
             // Draw alignment brackets for Overscan step
             if (currentStep == OnboardingStep.OVERSCAN) {
                 val insetX = maxWidth * (currentOverscan / 100f) / 2f
@@ -347,7 +349,7 @@ fun OnboardingOverlay(
                         OnboardingStep.QUICK_HUB -> {
                             StepQuickHubContent(
                                 // Leaves room for the header, progress bar and footer buttons.
-                                maxBodyHeight = maxOf(maxHeight - 210.dp, 200.dp),
+                                maxBodyHeight = maxOf(wizardMaxHeight - 210.dp, 200.dp),
                                 nextFocusRequester = nextFocusRequester,
                                 backFocusRequester = backFocusRequester,
                             )
