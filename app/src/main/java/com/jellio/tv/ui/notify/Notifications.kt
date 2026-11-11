@@ -73,8 +73,24 @@ internal fun messageFor(n: JellioNotificationDto): String = when (n.Kind) {
     "party_scheduled" -> com.jellio.tv.data.i18n.Strings.format("party_notice_scheduled", n.Detail ?: com.jellio.tv.data.i18n.Strings.get("tv_someone"), n.Name.orEmpty(), partyNoticeWhen(n.Date))
     "party_starting" -> com.jellio.tv.data.i18n.Strings.format("party_notice_starting", n.Name.orEmpty())
     "episode" -> com.jellio.tv.data.i18n.Strings.format("notify_out_now", (n.Name ?: com.jellio.tv.data.i18n.Strings.get("notify_new_item")) + (n.Detail?.let { " $it" } ?: ""))
+    "friend_request" -> com.jellio.tv.data.i18n.Strings.format("friends_notice_request", friendSender(n))
+    "friend_accepted" -> com.jellio.tv.data.i18n.Strings.format("friends_notice_accepted", friendSender(n))
+    "watchlist_added" -> {
+        val count = com.jellio.tv.ui.friends.watchlistAddedCount(n.Detail)
+        if (count > 1) {
+            com.jellio.tv.data.i18n.Strings.format("friends_notice_added_many", friendSender(n), count)
+        } else {
+            com.jellio.tv.data.i18n.Strings.format("friends_notice_added_one", friendSender(n), n.Name.orEmpty())
+        }
+    }
     else -> com.jellio.tv.data.i18n.Strings.format("notify_available_to_watch", n.Name ?: com.jellio.tv.data.i18n.Strings.get("notify_new_item"))
 }
+
+// A friend request carries the sender's name in Name too.
+private fun friendSender(n: JellioNotificationDto): String =
+    n.FromUserName?.takeIf { it.isNotBlank() }
+        ?: (if (n.Kind == "watchlist_added") null else n.Name?.takeIf { it.isNotBlank() })
+        ?: com.jellio.tv.data.i18n.Strings.get("tv_someone")
 
 private fun partyNoticeWhen(date: String?): String {
     val at = com.jellio.tv.data.syncplay.PartyManager.parseTime(date) ?: return ""
@@ -87,6 +103,8 @@ internal fun subtitleFor(n: JellioNotificationDto): String = when (n.Kind) {
     "announcement" -> com.jellio.tv.data.i18n.Strings.get("notify_from_server")
     "party_scheduled", "party_starting" -> com.jellio.tv.data.i18n.Strings.get("party_notice_sub")
     "episode" -> com.jellio.tv.data.i18n.Strings.get("calendar_new_episode")
+    "friend_request", "friend_accepted" -> com.jellio.tv.data.i18n.Strings.get("friends_notice_sub")
+    "watchlist_added" -> com.jellio.tv.data.i18n.Strings.get("friends_notice_sub_watchlist")
     else -> com.jellio.tv.data.i18n.Strings.get("notify_now_streaming")
 }
 

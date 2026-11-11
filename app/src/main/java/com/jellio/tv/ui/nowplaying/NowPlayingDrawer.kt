@@ -98,6 +98,9 @@ import com.jellio.tv.ui.common.formatRelativeTime
 import com.jellio.tv.ui.groupwatch.GroupWatchViewModel
 import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.data.i18n.displayLocale
+import com.jellio.tv.ui.friends.FriendNotificationCard
+import com.jellio.tv.ui.friends.FriendsViewModel
+import com.jellio.tv.ui.friends.isFriendKind
 import com.jellio.tv.ui.notify.NotificationsViewModel
 import com.jellio.tv.ui.notify.messageFor
 import com.jellio.tv.ui.notify.notificationBadgeCount
@@ -136,9 +139,12 @@ fun NowPlayingDrawer(
     modifier: Modifier = Modifier,
     initialTab: QuickHubTab = QuickHubTab.NOW_PLAYING,
     onOpenLiveTv: () -> Unit = {},
+    onOpenWatchlist: () -> Unit = {},
+    onOpenProfile: ((String) -> Unit)? = null,
     pollNowPlaying: suspend () -> Unit = {},
     notificationsViewModel: NotificationsViewModel = hiltViewModel(),
     groupWatchViewModel: GroupWatchViewModel = hiltViewModel(),
+    friendsViewModel: FriendsViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onDismiss)
 
@@ -452,6 +458,7 @@ fun NowPlayingDrawer(
                                         onHandoff = { onHandoff(sess) },
                                         onTuneIn = { channelId -> onTuneIn(channelId) },
                                         onDetails = { itemId -> onNavigateToDetail(itemId) },
+                                        onOpenProfile = onOpenProfile,
                                         rawImageUrl = rawImageUrl,
                                     )
                                 }
@@ -581,6 +588,24 @@ fun NowPlayingDrawer(
                                 // Notification cards
                                 if (notifList != null) {
                                     items(notifList, key = { it.Id }) { n ->
+                                        if (isFriendKind(n.Kind)) {
+                                            FriendNotificationCard(
+                                                notification = n,
+                                                session = session,
+                                                viewModel = friendsViewModel,
+                                                rawImageUrl = rawImageUrl,
+                                                onOpenItem = { id ->
+                                                    onDismiss()
+                                                    onNavigateToDetail(id)
+                                                },
+                                                onOpenWatchlist = {
+                                                    onDismiss()
+                                                    onOpenWatchlist()
+                                                },
+                                                onDismiss = { notificationsViewModel.delete(n.Id) },
+                                            )
+                                            return@items
+                                        }
                                         val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
                                         val isStreamLink = n.Kind == "streamlink" || n.Kind == "streamlink_removed"
                                         val isParty = n.Kind == "party_scheduled" || n.Kind == "party_starting"
@@ -1469,6 +1494,7 @@ private fun SessionCard(
     onTuneIn: (String) -> Unit,
     onDetails: (String) -> Unit,
     rawImageUrl: (String, String?, String, Int) -> String,
+    onOpenProfile: ((String) -> Unit)? = null,
 ) {
     val item = session.Item ?: return
     val isLive = session.Activity == "watching_live"
@@ -1760,6 +1786,17 @@ private fun SessionCard(
                         modifier = Modifier.weight(1f),
                     )
                 }
+
+                // Another viewer's card: their profile, where friends can be added.
+                val profileId = session.UserId
+                if (onOpenProfile != null && !isOwnSession && !profileId.isNullOrBlank()) {
+                    DrawerActionButton(
+                        label = Strings.get("friends_view_profile"),
+                        primary = false,
+                        onClick = { onOpenProfile(profileId) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -1922,7 +1959,7 @@ private fun NotificationCard(
 }
 
 @Composable
-private fun DrawerActionButton(
+internal fun DrawerActionButton(
     label: String,
     primary: Boolean,
     onClick: () -> Unit,
