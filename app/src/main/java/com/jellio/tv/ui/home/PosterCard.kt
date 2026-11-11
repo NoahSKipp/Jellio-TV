@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -419,11 +420,21 @@ fun PosterCard(
                     }
                 }
                 val watchers = item.Watchers
+                val addedBy = item.AddedBy
+                // Friends' additions take the top corner; the watchers move below.
+                val topEndInset = if (!addedBy.isNullOrEmpty()) 34.dp else 6.dp
+                if (!addedBy.isNullOrEmpty()) {
+                    AddedByBadge(
+                        people = addedBy,
+                        userImageUrl = userImageUrl,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                    )
+                }
                 if (!watchers.isNullOrEmpty()) {
                     WatchersBadge(
                         watchers = watchers,
                         userImageUrl = userImageUrl,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(start = 6.dp, top = topEndInset, end = 6.dp, bottom = 6.dp),
                     )
                 }
                 if (!progress) {
@@ -431,8 +442,8 @@ fun PosterCard(
                         RatingChip(
                             rating = rating,
                             modifier = Modifier
-                                .align(if (!watchers.isNullOrEmpty() && badge == null) Alignment.TopStart else Alignment.TopEnd)
-                                .padding(6.dp),
+                                .align(if ((!watchers.isNullOrEmpty() || !addedBy.isNullOrEmpty()) && badge == null) Alignment.TopStart else Alignment.TopEnd)
+                                .padding(start = 6.dp, top = if (!addedBy.isNullOrEmpty() && badge != null) 34.dp else 6.dp, end = 6.dp, bottom = 6.dp),
                         )
                     }
                 }
@@ -562,6 +573,7 @@ fun CardOptionsMenu(
     onRemoveShowFromRow: (() -> Unit)? = null,
     onToggleWatchlist: (() -> Unit)? = null,
     onToggleWatched: (() -> Unit)? = null,
+    onAddToFriendWatchlist: (() -> Unit)? = null,
     comingSoon: Boolean = false,
     onRemoveFromComingSoon: (() -> Unit)? = null,
     onDismiss: () -> Unit,
@@ -594,6 +606,7 @@ fun CardOptionsMenu(
             else -> {
                 onToggleWatchlist?.let { add(MenuAction(if (isWatchlisted) com.jellio.tv.data.i18n.Strings.get("menu_remove_watchlist") else com.jellio.tv.data.i18n.Strings.get("menu_add_watchlist"), it)) }
                 onToggleWatched?.let { add(MenuAction(if (isPlayed) com.jellio.tv.data.i18n.Strings.get("detail_mark_unwatched") else com.jellio.tv.data.i18n.Strings.get("detail_mark_watched"), it)) }
+                onAddToFriendWatchlist?.let { add(MenuAction(com.jellio.tv.data.i18n.Strings.get("friends_add_to_friend_watchlist"), it)) }
             }
         }
     }
@@ -694,6 +707,32 @@ private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, modifier: Mod
         modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp),
     ) {
         Text(text = label, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+    }
+}
+
+// Friends who put the title on the watchlist: a small bookmark, then their
+// pictures stacked like the watchers'.
+@Composable
+private fun AddedByBadge(
+    people: List<com.jellio.tv.data.model.CommunityWatcherDto>,
+    userImageUrl: ((String, String?) -> String)?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Bookmark,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .size(22.dp)
+                .background(Color.Black.copy(alpha = 0.62f), CircleShape)
+                .padding(4.dp),
+        )
+        WatchersBadge(watchers = people, userImageUrl = userImageUrl)
     }
 }
 

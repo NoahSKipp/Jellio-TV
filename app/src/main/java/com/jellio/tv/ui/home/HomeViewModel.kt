@@ -116,6 +116,7 @@ private const val HOME_BACKGROUND_RETRIES = 3
 // Coming back to Home this soon after a complete load does not ask again.
 private const val HOME_FRESH_MS = 10_000L
 private const val HOME_RETRY_DELAY_MS = 20_000L
+private const val ADDED_BY_WAIT_MS = 2_500L
 
 // Warmed in the background while the viewer is still browsing.
 private const val CONTINUE_PREFETCH_COUNT = 6
@@ -128,6 +129,7 @@ class HomeViewModel @Inject constructor(
     private val recommendationPreferences: RecommendationPreferences,
     private val rowSnapshotStore: RowSnapshotStore,
     val nowPlayingManager: com.jellio.tv.data.nowplaying.NowPlayingManager,
+    private val friendsRepository: com.jellio.tv.data.FriendsRepository,
 ) : ViewModel() {
     val nowPlayingSessions = nowPlayingManager.sessions
     val nowPlayingActiveCount = nowPlayingManager.activeCount
@@ -233,6 +235,8 @@ class HomeViewModel @Inject constructor(
                     val customizationDeferred = async { catching { customizationStore.load() }.getOrDefault(HomeCustomizationDto()) }
                     val animeIdsDeferred = async { repository.getAnimeIds() }
                     val watchlistDeferred = async { orNullOnFailure { repository.getWatchlistItems(session.userId) } }
+                    // Who added what, held in memory; never holds the rows up for long.
+                    val addedByDeferred = async { kotlinx.coroutines.withTimeoutOrNull(ADDED_BY_WAIT_MS) { friendsRepository.refreshAddedBy() } }
 
                     if (snapshotRead != null) {
                         val cachedSnapshot = snapshotRead.await()
@@ -334,10 +338,13 @@ class HomeViewModel @Inject constructor(
                     val greeting = greetingText(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user?.Name)
                     // Titles taken off the watchlist here stay off even if a refresh
                     // still gets the older list back.
-                    val watchlist = (
-                        watchlistDeferred.await()
-                            ?: (previousSection("watchlist-movies")?.items.orEmpty() + previousSection("watchlist-shows")?.items.orEmpty())
-                        ).filter { removedFromWatchlist[it.Id] == null }
+                    addedByDeferred.await()
+                    val watchlist = friendsRepository.withAddedBy(
+                        (
+                            watchlistDeferred.await()
+                                ?: (previousSection("watchlist-movies")?.items.orEmpty() + previousSection("watchlist-shows")?.items.orEmpty())
+                            ).filter { removedFromWatchlist[it.Id] == null },
+                    )
                     val existingComingSoon = (_uiState.value.rows + previousRows).filterIsInstance<ComingSoonHomeRow>().firstOrNull()
                     val topRows = buildList<HomeRow> {
                         if (continueWatching.isNotEmpty()) {
@@ -708,7 +715,7 @@ class HomeViewModel @Inject constructor(
                     _toastMessage.value = com.jellio.tv.data.i18n.Strings.get("toast_watchlist_error")
                 } else {
                     catching {
-                        val fresh = repository.getWatchlistItems(session.userId).filter { !removedFromWatchlist.containsKey(it.Id) }
+                        val fresh = friendsRepository.withAddedBy(repository.getWatchlistItems(session.userId).filter { !removedFromWatchlist.containsKey(it.Id) })
                         val movies = fresh.filter { it.Type == "Movie" }
                         val series = fresh.filter { it.Type == "Series" }
                         updateWatchlistRows(movies, series)
