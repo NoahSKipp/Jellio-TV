@@ -10,6 +10,7 @@ internal object StringsDe {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillFriendsDe(m)
         fillBufferSwitch(m)
         fillBadges(m)
         fillCatalogsAndNav(m)

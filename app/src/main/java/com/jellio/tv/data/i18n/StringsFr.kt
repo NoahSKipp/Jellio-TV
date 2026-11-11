@@ -10,6 +10,7 @@ internal object StringsFr {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillFriendsFr(m)
         fillBufferSwitch(m)
         fillBadges(m)
         fillCatalogsAndNav(m)

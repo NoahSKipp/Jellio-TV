@@ -10,6 +10,7 @@ internal object StringsPt {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillFriendsPt(m)
         fillBufferSwitch(m)
         fillBadges(m)
         fillCatalogsAndNav(m)

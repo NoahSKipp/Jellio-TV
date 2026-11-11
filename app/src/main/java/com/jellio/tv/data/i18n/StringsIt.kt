@@ -10,6 +10,7 @@ internal object StringsIt {
         fill4(m)
         fillLive(m)
         fillParty(m)
+        fillFriendsIt(m)
         fillBufferSwitch(m)
         fillBadges(m)
         fillCatalogsAndNav(m)
