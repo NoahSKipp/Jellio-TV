@@ -85,6 +85,9 @@ data class PlayerUiState(
     val reencodingVideo: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
+    // An episode of a series, and the one before it once known.
+    val isEpisode: Boolean = false,
+    val previousEpisodeId: String? = null,
     val skipSegments: SkipSegments? = null,
     // Every skip data source has answered; until then a missing credits
     // range may still arrive.

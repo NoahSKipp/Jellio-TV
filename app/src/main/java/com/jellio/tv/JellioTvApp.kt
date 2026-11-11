@@ -450,6 +450,10 @@ private fun JellioTvApp(
                 startPositionTicks = current.startPositionTicks,
                 onBack = { routeStack = routeStack.dropLast(1) },
                 onPlayNext = { nextItemId -> onPlayId(nextItemId, true) },
+                onPlayPrevious = { previousId ->
+                    routeStack = routeStack.dropLast(1)
+                    playItem(previousId, null, 0L)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.LiveTv -> com.jellio.tv.ui.live.LiveTvScreen(

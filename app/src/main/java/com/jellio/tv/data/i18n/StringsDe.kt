@@ -218,6 +218,7 @@ internal object StringsDe {
         m["player_forward_10s"] = "10 Sekunden vor"
         m["player_minutes_short"] = "%d Min."
         m["player_next_episode"] = "Nächste Episode"
+        m["player_previous_episode"] = "Vorherige Episode"
         m["player_or_stop_after"] = "Oder stoppen nach"
         m["player_percent_watched"] = "%d%% angesehen"
         m["player_play_next_episode"] = "Nächste Episode abspielen"

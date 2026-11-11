@@ -26,6 +26,7 @@ fun PlayerScreen(
     mediaSourceId: String?,
     onBack: () -> Unit,
     onPlayNext: (String) -> Unit,
+    onPlayPrevious: (String) -> Unit,
     modifier: Modifier = Modifier,
     startPositionTicks: Long? = null,
     viewModel: PlayerViewModel = hiltViewModel(),
@@ -144,6 +145,12 @@ fun PlayerScreen(
                 onPlayNext = { nextId ->
                     PlayStartTrace.begin(if (nextId == uiState.upNextInfo?.itemId) "next episode" else "player")
                     onPlayNext(nextId)
+                },
+                isEpisode = uiState.isEpisode,
+                previousEpisodeId = uiState.previousEpisodeId,
+                onPlayPrevious = { previousId ->
+                    PlayStartTrace.begin("player")
+                    onPlayPrevious(previousId)
                 },
                 onPlayStartTraced = { viewModel.reportPlayStart(it) },
                 onStartSleepTimer = { minutes -> viewModel.startSleepTimer(minutes) },

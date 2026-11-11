@@ -218,6 +218,7 @@ internal object StringsPl {
         m["player_forward_10s"] = "Do przodu o 10 sekund"
         m["player_minutes_short"] = "%d min"
         m["player_next_episode"] = "Następny odcinek"
+        m["player_previous_episode"] = "Poprzedni odcinek"
         m["player_or_stop_after"] = "Lub zatrzymaj po"
         m["player_percent_watched"] = "%d%% obejrzane"
         m["player_play_next_episode"] = "Odtwórz następny odcinek"

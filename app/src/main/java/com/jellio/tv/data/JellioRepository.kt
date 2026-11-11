@@ -1041,6 +1041,29 @@ class JellioRepository @Inject constructor(
         return if (isUnreleasedByDate(next) || (isReleasedToday(next) && !hasValidStreamForTodayItem(userId, next))) null else next
     }
 
+    private val previousEpisodes = lruMap<String, BaseItemDto>(200)
+
+    // The episode before this one, remembered per episode; null for the first.
+    suspend fun getPreviousEpisode(userId: String, item: BaseItemDto): BaseItemDto? {
+        if (item.Type != "Episode") return null
+        previousEpisodes[item.Id]?.let { return it }
+        val seriesId = item.SeriesId ?: return null
+        val seasonId = item.SeasonId
+        if (seasonId != null) {
+            val episodes = getEpisodes(seriesId, userId, seasonId)
+            val index = episodes.indexOfFirst { it.Id == item.Id }
+            if (index > 0) return episodes[index - 1].also { previousEpisodes[item.Id] = it }
+        }
+        val seasons = getSeasons(seriesId, userId)
+        val seasonIndex = seasons.indexOfFirst { it.Id == seasonId }
+        for (i in earlierSeasonIndexes(seasons.map { isSpecialsSeason(it) }, seasonIndex)) {
+            val last = getEpisodes(seriesId, userId, seasons[i].Id).lastOrNull() ?: continue
+            previousEpisodes[item.Id] = last
+            return last
+        }
+        return null
+    }
+
     suspend fun getCommunitySkipSegments(itemId: String): SkipSegments? =
         catching { api.getCommunityIntroCredits(itemId).toSkipSegments() }.getOrNull()
 

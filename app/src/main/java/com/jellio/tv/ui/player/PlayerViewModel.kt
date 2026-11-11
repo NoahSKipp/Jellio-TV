@@ -582,6 +582,7 @@ class PlayerViewModel @Inject constructor(
                     selectedAudioStreamIndex = preferredAudio,
                     directPlay = target.directPlay,
                     reencodingVideo = VideoTranscodePolicy.avoiding && classification.needsVideoTranscode,
+                    isEpisode = isEpisode && item.SeriesId != null,
                 )
 
                 // Children of this load: a newer load or leaving cancels them.
@@ -593,6 +594,10 @@ class PlayerViewModel @Inject constructor(
                             // The stream list is cheap: warm it as soon as the next episode is known.
                             repository.prefetchStreams(next.Id)
                         }
+                    }
+                    launch {
+                        val previous = catching { repository.getPreviousEpisode(session.userId, item) }.getOrNull()
+                        if (previous != null) _uiState.value = _uiState.value.copy(previousEpisodeId = previous.Id)
                     }
                 }
 

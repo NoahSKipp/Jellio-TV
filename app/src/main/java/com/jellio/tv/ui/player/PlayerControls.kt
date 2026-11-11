@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -89,6 +91,9 @@ internal fun PlayerControls(
     onOpenAudioMenu: () -> Unit,
     onOpenSourceMenu: () -> Unit,
     onOpenEpisodesMenu: () -> Unit,
+    episodeNav: EpisodeNav = EpisodeNav(show = false, hasPrevious = false, hasNext = false),
+    onPreviousEpisode: () -> Unit = {},
+    onNextEpisode: () -> Unit = {},
     inGroup: Boolean = false,
     onOpenReactMenu: () -> Unit = {},
 ) {
@@ -105,6 +110,15 @@ internal fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.align(Alignment.Center),
         ) {
+            if (episodeNav.show) {
+                TransportButton(
+                    icon = Icons.Filled.SkipPrevious,
+                    label = Strings.get("player_previous_episode"),
+                    size = 56.dp,
+                    onClick = onPreviousEpisode,
+                    modifier = Modifier.focusProperties { canFocus = episodeNav.hasPrevious }.alpha(if (episodeNav.hasPrevious) 1f else 0f),
+                )
+            }
             TransportButton(icon = Icons.Filled.Replay10, label = Strings.get("player_back_10s"), size = 68.dp, onClick = { onSkip(-SEEK_STEP_MS) })
             TransportButton(
                 icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -114,6 +128,15 @@ internal fun PlayerControls(
                 modifier = Modifier.focusRequester(playPauseFocusRequester),
             )
             TransportButton(icon = Icons.Filled.Forward10, label = Strings.get("player_forward_10s"), size = 68.dp, onClick = { onSkip(SEEK_STEP_MS) })
+            if (episodeNav.show) {
+                TransportButton(
+                    icon = Icons.Filled.SkipNext,
+                    label = Strings.get("player_next_episode"),
+                    size = 56.dp,
+                    onClick = onNextEpisode,
+                    modifier = Modifier.focusProperties { canFocus = episodeNav.hasNext }.alpha(if (episodeNav.hasNext) 1f else 0f),
+                )
+            }
         }
 
         Column(
