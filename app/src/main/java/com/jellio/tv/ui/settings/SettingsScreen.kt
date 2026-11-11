@@ -201,6 +201,23 @@ fun SettingsScreen(
     val categoryFocus = remember { SettingsCategory.entries.associateWith { FocusRequester() } }
     val contentFocus = remember { FocusRequester() }
     var contentHasFocus by remember { mutableStateOf(false) }
+    var focusSeen by remember { mutableStateOf(false) }
+    // Settings opens on its first menu section, so the d-pad starts where the
+    // menu is. Another screen closing at the same moment can take focus back,
+    // so it is asked again once if nothing in here has had it yet.
+    LaunchedEffect(Unit) {
+        repeat(3) {
+            var granted = false
+            repeat(25) {
+                if (!granted) {
+                    granted = runCatching { categoryFocus.getValue(SettingsCategory.ACCOUNT).requestFocus() }.isSuccess
+                    if (!granted) delay(40)
+                }
+            }
+            delay(300)
+            if (focusSeen) return@LaunchedEffect
+        }
+    }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
         val currentCategoryFocus = categoryFocus.getValue(category)
         Column(modifier = Modifier.width(310.dp)) {
@@ -216,7 +233,10 @@ fun SettingsScreen(
                         label = entry.label,
                         icon = entry.icon,
                         selected = entry == category,
-                        onFocus = { category = entry },
+                        onFocus = {
+                            focusSeen = true
+                            category = entry
+                        },
                         onClick = { runCatching { contentFocus.requestFocus() } },
                         modifier = Modifier
                             .focusRequester(categoryFocus.getValue(entry))
@@ -231,7 +251,10 @@ fun SettingsScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxSize()
-                .onFocusChanged { contentHasFocus = it.hasFocus }
+                .onFocusChanged {
+                    contentHasFocus = it.hasFocus
+                    if (it.hasFocus) focusSeen = true
+                }
                 .onPreviewKeyEvent { event ->
                     if (!contentHasFocus) return@onPreviewKeyEvent false
                     if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
