@@ -29,6 +29,8 @@ import com.jellio.tv.ui.auth.LoginScreen
 import com.jellio.tv.ui.detail.DetailScreen
 import com.jellio.tv.ui.detail.StreamPickerOverlay
 import com.jellio.tv.ui.feed.FeedScreen
+import com.jellio.tv.ui.friends.FriendsViewModel
+import com.jellio.tv.ui.friends.badgeVisible
 import com.jellio.tv.ui.home.HomeScreen
 import com.jellio.tv.ui.home.HomeViewModel
 import com.jellio.tv.ui.library.LibraryScreen
@@ -105,6 +107,7 @@ internal fun JellioTvRoot(
 
 private const val SPLASH_MIN_MS = 350L
 private const val SPLASH_MAX_MS = 1_200L
+private const val FRIENDS_POLL_MS = 60_000L
 
 @Composable
 private fun AppBootGate(
@@ -157,6 +160,7 @@ private fun JellioTvApp(
     onDeepLinkConsumed: () -> Unit,
     onPlayerActiveChanged: (Boolean) -> Unit = {},
     seasonalEffectsViewModel: SeasonalEffectsViewModel = hiltViewModel(),
+    friendsViewModel: FriendsViewModel = hiltViewModel(),
 ) {
     var routeStack by remember { mutableStateOf(listOf<JellioRoute>(JellioRoute.Home())) }
     // Home keeps its scroll positions and focused card while a title's page is open.
@@ -167,6 +171,14 @@ private fun JellioTvApp(
         onPlayerActiveChanged(route is JellioRoute.Player || route is JellioRoute.LivePlayer)
     }
     var showAccountSwitcher by remember { mutableStateOf(false) }
+    val friendsState by friendsViewModel.state.collectAsState()
+    LaunchedEffect(session.userId) {
+        friendsViewModel.onSession(session)
+        while (true) {
+            delay(FRIENDS_POLL_MS)
+            friendsViewModel.refresh()
+        }
+    }
     // A profile switch swaps the session under the open switcher: close it.
     LaunchedEffect(session.userId) { showAccountSwitcher = false }
     var showNotifications by remember { mutableStateOf(false) }
@@ -333,6 +345,7 @@ private fun JellioTvApp(
                 itemImageUrl = memoizedRawImageUrl,
                 onNavigateToDetail = onNavigateToDetail,
                 onLogout = { appViewModel.logout() },
+                onOpenProfile = { id -> push(JellioRoute.Profile(id)) },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.Feed -> FeedScreen(
@@ -509,6 +522,7 @@ private fun JellioTvApp(
                 },
                 profileAvatarUrl = appViewModel.userImageUrl(session, session.userId, null, 200),
                 profileName = session.userName,
+                profileBadge = badgeVisible(friendsState.incoming.size),
                 restoreFocusRequester = sidebarFocusRequester,
                 forceCollapsed = sidebarForceCollapsed,
                 onFocusChange = { sidebarHasRealFocus = it },
@@ -599,6 +613,14 @@ private fun JellioTvApp(
                     onOpenLiveTv = {
                         showNowPlayingDrawer = false
                         switchTab(JellioRoute.LiveTv)
+                    },
+                    onOpenWatchlist = {
+                        showNowPlayingDrawer = false
+                        switchTab(JellioRoute.Home())
+                    },
+                    onOpenProfile = { id ->
+                        showNowPlayingDrawer = false
+                        push(JellioRoute.Profile(id))
                     },
                     pollNowPlaying = { appViewModel.nowPlayingManager.pollClosely() },
                     rawImageUrl = memoizedRawImageUrl,
