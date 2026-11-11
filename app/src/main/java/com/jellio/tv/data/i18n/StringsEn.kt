@@ -869,6 +869,8 @@ internal object StringsEn {
         m["notifications_unread_many"] = "{0} unread"
         m["notifications_count_one"] = "1 Notification"
         m["notifications_count_many"] = "{0} Notifications"
+        m["new_notifications_pill_one"] = "You have 1 new notification"
+        m["new_notifications_pill_many"] = "You have {0} new notifications"
         m["settings_cat_shortcuts"] = "Remote & Shortcuts"
         m["settings_quick_hub_section"] = "Quick Hub Shortcut"
         m["settings_quick_hub_section_desc"] = "Configure the remote button shortcut to toggle the Quick Hub from anywhere in Jellio TV."

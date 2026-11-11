@@ -869,6 +869,8 @@ internal object StringsFr {
         m["notifications_unread_many"] = "{0} non lus"
         m["notifications_count_one"] = "1 notification"
         m["notifications_count_many"] = "{0} notifications"
+        m["new_notifications_pill_one"] = "Vous avez 1 nouvelle notification"
+        m["new_notifications_pill_many"] = "Vous avez {0} nouvelles notifications"
         m["settings_cat_shortcuts"] = "Télécommande et raccourcis"
         m["settings_quick_hub_section"] = "Raccourci Hub Rapide"
         m["settings_quick_hub_section_desc"] = "Configurez le raccourci de la télécommande pour ouvrir le Hub Rapide depuis n'importe où dans Jellio TV."

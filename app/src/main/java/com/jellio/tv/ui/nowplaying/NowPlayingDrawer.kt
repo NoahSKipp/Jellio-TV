@@ -100,6 +100,7 @@ import com.jellio.tv.data.i18n.Strings
 import com.jellio.tv.data.i18n.displayLocale
 import com.jellio.tv.ui.notify.NotificationsViewModel
 import com.jellio.tv.ui.notify.messageFor
+import com.jellio.tv.ui.notify.notificationBadgeCount
 import com.jellio.tv.ui.notify.subtitleFor
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
@@ -167,7 +168,7 @@ fun NowPlayingDrawer(
     var selectedTab by remember { mutableStateOf(initialTab) }
 
     val nowPlayingCount = sessions.size + (if (localPaused != null) 1 else 0)
-    val notificationsCount = invites.size + (notifications?.count { !it.Read } ?: 0)
+    val notificationsCount = notificationBadgeCount(notifications?.count { !it.Read } ?: 0, invites.size)
     val groupWatchBadgeCount = if (activeGroup != null) {
         1
     } else {

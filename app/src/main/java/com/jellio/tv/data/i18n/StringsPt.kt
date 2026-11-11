@@ -869,6 +869,8 @@ internal object StringsPt {
         m["notifications_unread_many"] = "{0} não lidas"
         m["notifications_count_one"] = "1 notificação"
         m["notifications_count_many"] = "{0} notificações"
+        m["new_notifications_pill_one"] = "Você tem 1 nova notificação"
+        m["new_notifications_pill_many"] = "Você tem {0} novas notificações"
         m["settings_cat_shortcuts"] = "Controle remoto e atalhos"
         m["settings_quick_hub_section"] = "Atalho do Hub Rápido"
         m["settings_quick_hub_section_desc"] = "Configure o atalho do controle remoto para abrir o Hub Rápido de qualquer lugar no Jellio TV."

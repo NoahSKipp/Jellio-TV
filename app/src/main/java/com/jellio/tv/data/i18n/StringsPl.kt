@@ -869,6 +869,8 @@ internal object StringsPl {
         m["notifications_unread_many"] = "{0} nieprzeczytanych"
         m["notifications_count_one"] = "1 powiadomienie"
         m["notifications_count_many"] = "{0} powiadomień"
+        m["new_notifications_pill_one"] = "Masz 1 nowe powiadomienie"
+        m["new_notifications_pill_many"] = "Nowe powiadomienia: {0}"
         m["settings_cat_shortcuts"] = "Pilot i skróty"
         m["settings_quick_hub_section"] = "Skrót do Szybkiego Centrum"
         m["settings_quick_hub_section_desc"] = "Skonfiguruj skrót pilota, aby otwierać Szybkie Centrum z dowolnego miejsca w Jellio TV."

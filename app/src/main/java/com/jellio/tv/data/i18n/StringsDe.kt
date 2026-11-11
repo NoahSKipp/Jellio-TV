@@ -869,6 +869,8 @@ internal object StringsDe {
         m["notifications_unread_many"] = "{0} ungelesen"
         m["notifications_count_one"] = "1 Benachrichtigung"
         m["notifications_count_many"] = "{0} Benachrichtigungen"
+        m["new_notifications_pill_one"] = "Du hast 1 neue Benachrichtigung"
+        m["new_notifications_pill_many"] = "Du hast {0} neue Benachrichtigungen"
         m["settings_cat_shortcuts"] = "Fernbedienung & Tasten"
         m["settings_quick_hub_section"] = "Quick-Hub Tastenkürzel"
         m["settings_quick_hub_section_desc"] = "Konfigurieren Sie das Fernbedienungskürzel, um den Quick-Hub von überall in Jellio TV aufzurufen."

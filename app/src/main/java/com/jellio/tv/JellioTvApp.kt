@@ -631,6 +631,10 @@ private fun JellioTvApp(
         // Announcements from the server, over everything (Home, the
         // player, any screen).
         com.jellio.tv.ui.announce.AnnouncementToast(modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter))
+        com.jellio.tv.ui.notify.NewNotificationsPill(
+            immersive = route.isImmersive(),
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter),
+        )
         com.jellio.tv.ui.announce.SoundPlayerHost()
         com.jellio.tv.ui.announce.ScreenOverlayHost()
         com.jellio.tv.ui.groupwatch.GroupWatchHost(

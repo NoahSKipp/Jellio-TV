@@ -869,6 +869,8 @@ internal object StringsEs {
         m["notifications_unread_many"] = "{0} sin leer"
         m["notifications_count_one"] = "1 notificación"
         m["notifications_count_many"] = "{0} notificaciones"
+        m["new_notifications_pill_one"] = "Tienes 1 notificación nueva"
+        m["new_notifications_pill_many"] = "Tienes {0} notificaciones nuevas"
         m["settings_cat_shortcuts"] = "Control remoto y atajos"
         m["settings_quick_hub_section"] = "Atajo del Centro Rápido"
         m["settings_quick_hub_section_desc"] = "Configura el atajo del control remoto para alternar el Centro Rápido desde cualquier lugar en Jellio TV."

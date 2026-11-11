@@ -869,6 +869,8 @@ internal object StringsIt {
         m["notifications_unread_many"] = "{0} non lette"
         m["notifications_count_one"] = "1 notifica"
         m["notifications_count_many"] = "{0} notifiche"
+        m["new_notifications_pill_one"] = "Hai 1 nuova notifica"
+        m["new_notifications_pill_many"] = "Hai {0} nuove notifiche"
         m["settings_cat_shortcuts"] = "Telecomando e scorciatoie"
         m["settings_quick_hub_section"] = "Scorciatoia Hub Rapido"
         m["settings_quick_hub_section_desc"] = "Configura la scorciatoia del telecomando per aprire l'Hub Rapido da qualsiasi schermata in Jellio TV."
