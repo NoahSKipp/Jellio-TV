@@ -530,6 +530,42 @@ interface JellyfinApi {
     @POST("Jellio/profile/subtitles")
     suspend fun saveSubtitleStyle(@Body body: com.jellio.tv.data.model.SubtitleStyleDto): ProfileDto
 
+    @GET("Jellio/friends")
+    suspend fun getFriends(): com.jellio.tv.data.model.FriendsListDto
+
+    @GET("Jellio/friends/status/{userId}")
+    suspend fun getFriendStatus(@Path("userId") userId: String): com.jellio.tv.data.model.FriendStatusDto
+
+    @GET("Jellio/friends/people")
+    suspend fun findFriendPeople(@Query("query") query: String): List<com.jellio.tv.data.model.FriendPersonDto>
+
+    @POST("Jellio/friends/requests")
+    suspend fun sendFriendRequest(@Body body: com.jellio.tv.data.model.FriendRequestBody): retrofit2.Response<com.jellio.tv.data.model.FriendStatusResultDto>
+
+    @POST("Jellio/friends/requests/{requestId}/accept")
+    suspend fun acceptFriendRequest(@Path("requestId") requestId: String): retrofit2.Response<com.jellio.tv.data.model.FriendStatusResultDto>
+
+    @POST("Jellio/friends/requests/{requestId}/decline")
+    suspend fun declineFriendRequest(@Path("requestId") requestId: String): retrofit2.Response<com.jellio.tv.data.model.FriendStatusResultDto>
+
+    @DELETE("Jellio/friends/requests/{requestId}")
+    suspend fun cancelFriendRequest(@Path("requestId") requestId: String): retrofit2.Response<com.jellio.tv.data.model.FriendStatusResultDto>
+
+    @DELETE("Jellio/friends/{userId}")
+    suspend fun removeFriend(@Path("userId") userId: String): com.jellio.tv.data.model.FriendStatusResultDto
+
+    @POST("Jellio/friends/{userId}/mute")
+    suspend fun muteFriend(@Path("userId") userId: String, @Body body: com.jellio.tv.data.model.FriendMuteBody): com.jellio.tv.data.model.FriendMuteResultDto
+
+    @POST("Jellio/watchlist/friends")
+    suspend fun addToFriendWatchlists(@Body body: com.jellio.tv.data.model.WatchlistFriendsBody): com.jellio.tv.data.model.WatchlistFriendsResponseDto
+
+    @GET("Jellio/watchlist/added-by")
+    suspend fun getWatchlistAddedBy(): com.jellio.tv.data.model.AddedByResponseDto
+
+    @POST("Jellio/profile/friends-settings")
+    suspend fun setFriendsSettings(@Body body: com.jellio.tv.data.model.FriendsSettingsBody): com.jellio.tv.data.model.FriendsSettingsDto
+
     @GET("Jellio/achievements/{userId}")
     suspend fun getAchievements(@Path("userId") userId: String): AchievementsDto
 

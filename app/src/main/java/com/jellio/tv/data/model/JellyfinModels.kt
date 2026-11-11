@@ -170,6 +170,8 @@ data class BaseItemDto(
     val Watchers: List<CommunityWatcherDto>? = null,
     val Chapters: List<ChapterInfoDto>? = null,
     val LocationType: String? = null,
+    // Friends who put this title on the reader's watchlist (Watchlist rows only).
+    val AddedBy: List<CommunityWatcherDto>? = null,
 )
 
 @Immutable
@@ -322,6 +324,10 @@ data class JellioNotificationDto(
     val Detail: String? = null,
     val Read: Boolean = false,
     val Date: String? = null,
+    // Friends: who the notification is from (friend_request, friend_accepted, watchlist_added).
+    val FromUserId: String? = null,
+    val FromUserName: String? = null,
+    val FromImageTag: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
@@ -629,6 +635,8 @@ data class ProfileDto(
     @Json(name = "selectedGenres") val selectedGenres: List<String>? = null,
     @Json(name = "customGenres") val customGenres: List<CustomGenreItem>? = null,
     @Json(name = "subtitleStyle") val subtitleStyle: SubtitleStyleDto? = null,
+    val FriendsCanAddToWatchlist: Boolean = true,
+    val FriendRequestsFrom: String = "everyone",
 )
 
 @JsonClass(generateAdapter = true)
