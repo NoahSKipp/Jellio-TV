@@ -6,17 +6,29 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.tv.material3.Border
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,6 +77,7 @@ import com.jellio.tv.ui.common.watchActivityText
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
 import com.jellio.tv.ui.theme.JellioBorder
+import com.jellio.tv.ui.theme.JellioRarityRare
 import com.jellio.tv.ui.theme.JellioText
 import com.jellio.tv.ui.theme.JellioTextSecondary
 
@@ -85,6 +98,9 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     val targetUserId = userId ?: session.userId
     val contentFocusRequester = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var focusedBadge by remember { mutableStateOf<BadgeDto?>(null) }
     LaunchedEffect(uiState.isLoading, uiState.error) {
         if (!uiState.isLoading && uiState.error == null) contentFocusRequester.requestFocus()
     }
@@ -122,38 +138,34 @@ fun ProfileScreen(
                 val achievements = uiState.achievements
                 val bannerImageUrl = remember(targetUserId) { bannerUrl(targetUserId) }
 
-                LazyColumn(modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
-                    item { ProfileBanner(bannerUrl = bannerImageUrl) }
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().focusRequester(contentFocusRequester).focusRestorer()) {
                     item {
-                        Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 20.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                AsyncImage(
-                                    model = userImageUrl(targetUserId, user?.PrimaryImageTag, 200),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(72.dp).clip(CircleShape).background(JellioBgElevated),
-                                )
-                                Column(modifier = Modifier.padding(start = 16.dp)) {
-                                    Text(text = user?.Name ?: "", style = MaterialTheme.typography.titleLarge)
-                                    if (!uiState.isOwner) {
-                                        FriendProfileButton(userId = targetUserId, viewModel = friendsViewModel, modifier = Modifier.padding(top = 6.dp))
-                                    }
-                                    if (uiState.isOwner && profile?.IsPrivate == true) {
-                                        Surface(
-                                            onClick = {},
-                                            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                            colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, contentColor = JellioTextSecondary, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-                                            modifier = Modifier.padding(top = 4.dp),
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                                Icon(Icons.Filled.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                Text(text = com.jellio.tv.data.i18n.Strings.get("settings_private_profile"), modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
-                                            }
-                                        }
-                                    }
+                        ProfileHeader(
+                            bannerUrl = bannerImageUrl,
+                            avatarUrl = userImageUrl(targetUserId, user?.PrimaryImageTag, 240),
+                            name = user?.Name ?: "",
+                            onFocused = { scope.launch { listState.animateScrollToItem(0) } },
+                        ) {
+                            if (!uiState.isOwner) {
+                                FriendProfileButton(userId = targetUserId, viewModel = friendsViewModel, modifier = Modifier.padding(top = 6.dp))
+                            }
+                            if (uiState.isOwner && profile?.IsPrivate == true) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .background(Color.White.copy(alpha = 0.12f))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                ) {
+                                    Icon(Icons.Filled.VisibilityOff, contentDescription = null, tint = JellioTextSecondary, modifier = Modifier.size(14.dp))
+                                    Text(text = com.jellio.tv.data.i18n.Strings.get("settings_private_profile"), color = JellioTextSecondary, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall)
                                 }
                             }
-
+                        }
+                    }
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 48.dp, vertical = 4.dp)) {
                             BioSection(
                                 bio = profile?.Bio,
                                 isOwner = uiState.isOwner,
@@ -190,15 +202,41 @@ fun ProfileScreen(
                         }
                     } else if (achievements != null) {
                         item { StatsRow(achievements.MoviesCompleted, achievements.EpisodesCompleted, achievements.TotalCompleted, achievements.BestBingeStreak) }
+                        val shownBadges = if (uiState.isOwner) achievements.Badges else achievements.Badges.filter { it.Unlocked }
                         item {
+                            val unlocked = achievements.Badges.count { it.Unlocked }
                             Text(
-                                text = com.jellio.tv.data.i18n.Strings.format("tv_badges_count", achievements.Badges.count { it.Unlocked }, achievements.Badges.size),
+                                text = if (uiState.isOwner) {
+                                    com.jellio.tv.data.i18n.Strings.format("tv_badges_count", unlocked, achievements.Badges.size)
+                                } else {
+                                    com.jellio.tv.data.i18n.Strings.get("feed_filter_badges") + " ($unlocked)"
+                                },
                                 style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 12.dp),
+                                modifier = Modifier.padding(start = 48.dp, top = 28.dp, bottom = 4.dp),
+                            )
+                            // What the focused badge is, and how to earn it.
+                            val info = focusedBadge
+                            Text(
+                                text = info?.let { com.jellio.tv.data.i18n.badgeDisplayDescription(it.Id, it.Description) }.orEmpty(),
+                                color = JellioTextSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 48.dp, end = 48.dp, bottom = 8.dp).heightIn(min = 20.dp),
                             )
                         }
-                        item {
-                            BadgesGrid(badges = achievements.Badges, modifier = Modifier.padding(horizontal = 40.dp))
+                        if (shownBadges.isEmpty()) {
+                            item {
+                                Text(text = com.jellio.tv.data.i18n.Strings.get("feed_nothing_here"), color = JellioTextSecondary, modifier = Modifier.padding(start = 48.dp))
+                            }
+                        }
+                        items(shownBadges.chunked(BADGE_COLUMNS)) { rowBadges ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 42.dp)) {
+                                rowBadges.forEach { badge ->
+                                    BadgeTile(badge, onFocused = { focusedBadge = badge }, modifier = Modifier.weight(1f))
+                                }
+                                repeat(BADGE_COLUMNS - rowBadges.size) { Spacer(Modifier.weight(1f)) }
+                            }
                         }
                         item {
                             Text(
@@ -250,10 +288,20 @@ fun ProfileScreen(
     }
 }
 
+private const val BADGE_COLUMNS = 6
+
+// Banner fading into the page, with the avatar and name sitting on it. The
+// avatar takes focus so the d-pad can always climb back to the top.
 @Composable
-private fun ProfileBanner(bannerUrl: String) {
+private fun ProfileHeader(
+    bannerUrl: String,
+    avatarUrl: String,
+    name: String,
+    onFocused: () -> Unit,
+    extras: @Composable () -> Unit,
+) {
     var showFallback by remember(bannerUrl) { mutableStateOf(false) }
-    Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 4.2f)) {
+    Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 6.2f)) {
         if (showFallback) {
             Box(modifier = Modifier.fillMaxSize().background(JellioBgElevated))
         } else {
@@ -264,6 +312,42 @@ private fun ProfileBanner(bannerUrl: String) {
                 onError = { showFallback = true },
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.45f to JellioBg.copy(alpha = 0.35f),
+                    1f to JellioBg,
+                ),
+            ),
+        )
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 48.dp, end = 48.dp, bottom = 8.dp),
+        ) {
+            Surface(
+                onClick = {},
+                shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                colors = ClickableSurfaceDefaults.colors(containerColor = JellioBgElevated, focusedContainerColor = JellioBgElevated),
+                border = ClickableSurfaceDefaults.border(
+                    border = Border(BorderStroke(3.dp, Color.White.copy(alpha = 0.25f)), shape = CircleShape),
+                    focusedBorder = Border(BorderStroke(3.dp, Color.White), shape = CircleShape),
+                ),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+                modifier = Modifier.onFocusChanged { if (it.hasFocus) onFocused() },
+            ) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(104.dp).clip(CircleShape),
+                )
+            }
+            Column(modifier = Modifier.padding(start = 20.dp, bottom = 6.dp)) {
+                Text(text = name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                extras()
+            }
         }
     }
 }
@@ -322,68 +406,85 @@ private fun Modifier.clickableIfOwner(isOwner: Boolean, onClick: () -> Unit): Mo
 
 @Composable
 private fun StatsRow(movies: Int, episodes: Int, total: Int, bestBinge: Int) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 8.dp)) {
-        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_movies"), movies.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_episodes"), episodes.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_total_watched"), total.toString(), Modifier.weight(1f))
-        StatTile(com.jellio.tv.data.i18n.Strings.get("profile_stat_best_binge"), bestBinge.toString(), Modifier.weight(1f))
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 44.dp, vertical = 8.dp)) {
+        StatTile(Icons.Filled.Movie, com.jellio.tv.data.i18n.Strings.get("profile_stat_movies"), movies.toString(), Modifier.weight(1f))
+        StatTile(Icons.Filled.Tv, com.jellio.tv.data.i18n.Strings.get("profile_stat_episodes"), episodes.toString(), Modifier.weight(1f))
+        StatTile(Icons.Filled.CheckCircle, com.jellio.tv.data.i18n.Strings.get("profile_stat_total_watched"), total.toString(), Modifier.weight(1f))
+        StatTile(Icons.Filled.LocalFireDepartment, com.jellio.tv.data.i18n.Strings.get("profile_stat_best_binge"), bestBinge.toString(), Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .padding(4.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(JellioBgElevated)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(text = label, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
-    }
-}
-
-@Composable
-private fun BadgesGrid(badges: List<BadgeDto>, modifier: Modifier = Modifier) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        badges.forEach { badge -> BadgeTile(badge, modifier = Modifier.width(120.dp)) }
-    }
-}
-
-@Composable
-private fun BadgeTile(badge: BadgeDto, modifier: Modifier = Modifier) {
-    val color = if (badge.Unlocked) rarityColor(badge.Rarity) else JellioBorder
+private fun StatTile(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         onClick = {},
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(16.dp)),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = color.copy(alpha = if (badge.Unlocked) 0.18f else 0.08f),
-            contentColor = if (badge.Unlocked) JellioText else JellioTextSecondary,
-            focusedContainerColor = Color.White.copy(alpha = 0.18f),
+            containerColor = Color.White.copy(alpha = 0.07f),
+            contentColor = JellioText,
+            focusedContainerColor = Color.White.copy(alpha = 0.16f),
             focusedContentColor = JellioText,
         ),
-        modifier = modifier.padding(6.dp),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(BorderStroke(2.dp, Color.White), shape = RoundedCornerShape(16.dp)),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
+        modifier = modifier.padding(4.dp),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
-                contentDescription = com.jellio.tv.data.i18n.badgeDisplayDescription(badge.Id, badge.Description),
-                tint = if (badge.Unlocked) color else JellioTextSecondary,
-            )
+            Icon(icon, contentDescription = null, tint = JellioRarityRare, modifier = Modifier.size(22.dp))
+            Text(text = value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+            Text(text = label, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun BadgeTile(badge: BadgeDto, onFocused: () -> Unit, modifier: Modifier = Modifier) {
+    val color = if (badge.Unlocked) rarityColor(badge.Rarity) else JellioBorder
+    val shape = RoundedCornerShape(16.dp)
+    Surface(
+        onClick = {},
+        shape = ClickableSurfaceDefaults.shape(shape = shape),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (badge.Unlocked) color.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+            contentColor = if (badge.Unlocked) JellioText else JellioTextSecondary.copy(alpha = 0.7f),
+            focusedContainerColor = if (badge.Unlocked) color.copy(alpha = 0.34f) else Color.White.copy(alpha = 0.14f),
+            focusedContentColor = JellioText,
+        ),
+        border = ClickableSurfaceDefaults.border(
+            border = Border(BorderStroke(1.dp, color.copy(alpha = if (badge.Unlocked) 0.55f else 0.25f)), shape = shape),
+            focusedBorder = Border(BorderStroke(2.dp, Color.White), shape = shape),
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+        modifier = modifier.padding(5.dp).onFocusChanged { if (it.hasFocus) onFocused() },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().height(112.dp).padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(color.copy(alpha = if (badge.Unlocked) 0.28f else 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (badge.Unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
+                    contentDescription = com.jellio.tv.data.i18n.badgeDisplayDescription(badge.Id, badge.Description),
+                    tint = if (badge.Unlocked) color else JellioTextSecondary.copy(alpha = 0.7f),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
             Text(
                 text = com.jellio.tv.data.i18n.badgeDisplayName(badge.Id, badge.Name),
                 style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
         }
     }
