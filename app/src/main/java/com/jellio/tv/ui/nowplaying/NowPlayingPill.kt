@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -100,30 +98,12 @@ fun NowPlayingPill(
         exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 2 },
         modifier = modifier,
     ) {
-        val pillShape = RoundedCornerShape(24.dp)
         Surface(
             onClick = onClick,
-            shape = ClickableSurfaceDefaults.shape(shape = pillShape),
-            scale = ClickableSurfaceDefaults.scale(
-                focusedScale = 1.04f,
-                pressedScale = 0.97f,
-            ),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color.Black.copy(alpha = 0.70f),
-                focusedContainerColor = Color.White.copy(alpha = 0.22f),
-                contentColor = JellioText,
-                focusedContentColor = Color.White,
-            ),
-            border = ClickableSurfaceDefaults.border(
-                border = Border(
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
-                    shape = pillShape,
-                ),
-                focusedBorder = Border(
-                    border = BorderStroke(2.dp, Color.White),
-                    shape = pillShape,
-                ),
-            ),
+            shape = ClickableSurfaceDefaults.shape(shape = HomePillStyle.shape),
+            scale = HomePillStyle.scale(),
+            colors = HomePillStyle.colors(),
+            border = HomePillStyle.border(),
             modifier = Modifier
                 .onFocusChanged { isFocused = it.isFocused }
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
