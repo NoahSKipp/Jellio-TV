@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
@@ -101,6 +102,17 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "1.1.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Widgets, "Quick Hub Pill", "A pill on Home always opens the Quick Hub when nothing is playing and becomes the Now Playing pill while someone watches. A badge counts unread notifications, group invites and friend requests."),
+            ChangelogFeature(Icons.Filled.Tune, "Steadier Quick Hub", "Tabs change only with Left, Right or OK, and removing a card moves focus to the next one instead of jumping away."),
+            ChangelogFeature(Icons.Filled.Sync, "Watchlist Stays Current", "Watchlist rows on Home update while you watch, and the Watchlist row on the Google TV home screen follows."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Skip Prompts in the Corner", "Skip Intro and Skip Credits sit in the corner and go away after 15 seconds."),
+        ),
+    ),
     ChangelogRelease(
         version = "1.1.2",
         title = "What's New in Jellio TV",
