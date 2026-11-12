@@ -399,16 +399,51 @@ class WatchNextSyncer @Inject constructor(
             val limit = if (spec.key == "picks") GOOGLE_TV_TOP_PICKS_SIZE else CHANNEL_SIZE
             val items = lists[spec.key]?.take(limit) ?: return@forEach
             val id = channelId(spec) ?: return@forEach
-            context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(id), null, null)
-            items.forEachIndexed { index, item ->
-                val overview = overviews[item.Id] ?: item.SeriesId?.let { overviews[it] }
-                val program = toPreviewProgram(session, id, item, items.size - index, overview) ?: return@forEachIndexed
-                context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
-                shown += item.Id
-            }
+            shown += replaceChannelPrograms(session, id, items, overviews)
+            if (spec.key == WATCHLIST_KEY) channelPrefs.edit().putString(WATCHLIST_SIGNATURE, signatureOf(items)).apply()
         }
         Log.i(TAG, "channels: " + lists.entries.joinToString { it.key + " " + it.value.size.coerceAtMost(if (it.key == "picks") GOOGLE_TV_TOP_PICKS_SIZE else CHANNEL_SIZE) })
         return shown
+    }
+
+    private fun signatureOf(items: List<BaseItemDto>): String = items.joinToString(",") { it.Id }
+
+    private fun replaceChannelPrograms(
+        session: Session,
+        channelId: Long,
+        items: List<BaseItemDto>,
+        overviews: Map<String, String>,
+    ): Set<String> {
+        context.contentResolver.delete(TvContractCompat.buildPreviewProgramsUriForChannel(channelId), null, null)
+        val shown = mutableSetOf<String>()
+        items.forEachIndexed { index, item ->
+            val overview = overviews[item.Id] ?: item.SeriesId?.let { overviews[it] }
+            val program = toPreviewProgram(session, channelId, item, items.size - index, overview) ?: return@forEachIndexed
+            context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+            shown += item.Id
+        }
+        return shown
+    }
+
+    // Home's own check on every open: the Watchlist row on the launcher is
+    // rewritten only when the list differs from what was last pushed.
+    suspend fun updateWatchlist(session: Session, watchlist: List<BaseItemDto>) {
+        if (!supported()) return
+        val items = watchlist.take(CHANNEL_SIZE)
+        val signature = signatureOf(items)
+        if (channelPrefs.getString(WATCHLIST_SIGNATURE, null) == signature) return
+        locked {
+            runCatching {
+                val spec = CHANNELS.first { it.key == WATCHLIST_KEY }
+                val id = channelId(spec) ?: return@runCatching
+                val info = catching { repository.getItemsInfo(session.userId, items.flatMap { listOfNotNull(it.Id, it.SeriesId) }) }
+                    .getOrDefault(emptyMap())
+                showInfo = info
+                val overviews = info.mapNotNull { (key, found) -> found.Overview?.takeIf { it.isNotBlank() }?.let { key to it } }.toMap()
+                replaceChannelPrograms(session, id, items, overviews)
+                channelPrefs.edit().putString(WATCHLIST_SIGNATURE, signature).apply()
+            }.onFailure { Log.w(TAG, "watchlist channel failed", it) }
+        }
     }
 
     private class Row(val id: Long, val browsable: Boolean, val engagedAt: Long)
@@ -447,6 +482,8 @@ class WatchNextSyncer @Inject constructor(
         const val TAG = "JellioWatchNext"
         const val MAX_ROWS = 5
         const val CHANNEL_SIZE = 15
+        private const val WATCHLIST_KEY = "watchlist"
+        private const val WATCHLIST_SIGNATURE = "watchlist_signature"
         private val CHANNELS = listOf(
             ChannelSpec("continue", "Continue Watching"),
             ChannelSpec("nextup", "Next Up"),
