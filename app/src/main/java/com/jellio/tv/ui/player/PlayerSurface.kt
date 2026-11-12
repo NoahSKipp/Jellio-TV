@@ -866,10 +866,15 @@ internal fun PlayerSurface(
     fun dismissPrompt() {
         if (skipPromptVisible) dismissedSkipKind = activeSkip?.kind else if (nearEndUpNextVisible) nearEndUpNextDismissed = true
     }
-    // Like the other prompts it does not stay: gone after 15 seconds on screen.
+    // Counts down on the button like the Up Next card and leaves at zero.
+    var skipCountdown by remember { mutableStateOf(SKIP_PROMPT_SECONDS) }
     LaunchedEffect(skipPromptVisible, activeSkip?.kind) {
         if (!skipPromptVisible) return@LaunchedEffect
-        delay(SKIP_PROMPT_VISIBLE_MS)
+        skipCountdown = SKIP_PROMPT_SECONDS
+        while (skipCountdown > 0) {
+            delay(1_000)
+            skipCountdown -= 1
+        }
         dismissedSkipKind = activeSkip?.kind
     }
     val promptBottom by androidx.compose.animation.core.animateDpAsState(
@@ -1282,7 +1287,7 @@ internal fun PlayerSurface(
             PlayerPrompt(
                 eyebrow = activeSkip.eyebrow,
                 title = activeSkip.label,
-                actionLabel = Strings.get("player_skip"),
+                actionLabel = if (skipCountdown > 0) Strings.format("player_skip_countdown", skipCountdown) else Strings.get("player_skip"),
                 actionIcon = Icons.Filled.SkipNext,
                 onAction = { userSeek((activeSkip.targetSeconds * 1000).toLong()) },
                 onDismiss = { dismissPrompt() },

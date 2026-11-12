@@ -937,6 +937,7 @@ internal object StringsEs {
         m["player_skip_intro"] = "Omitir intro"
         m["player_skip_credits"] = "Omitir créditos"
         m["player_skip"] = "Omitir"
+        m["player_skip_countdown"] = "Omitir ({seconds})"
         m["player_failover_failed"] = "Ese stream no funcionó"
         m["player_failover_slow_transcode"] = "El servidor no pudo recodificar ese stream lo bastante rápido"
         m["player_failover_none_worked"] = "Ninguno de los streams funcionó"

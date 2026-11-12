@@ -937,6 +937,7 @@ internal object StringsIt {
         m["player_skip_intro"] = "Salta intro"
         m["player_skip_credits"] = "Salta titoli di coda"
         m["player_skip"] = "Salta"
+        m["player_skip_countdown"] = "Salta ({seconds})"
         m["player_failover_failed"] = "Quello stream non ha funzionato"
         m["player_failover_slow_transcode"] = "Il server non è riuscito a ricodificare quello stream abbastanza in fretta"
         m["player_failover_none_worked"] = "Nessuno degli stream ha funzionato"

@@ -937,6 +937,7 @@ internal object StringsFr {
         m["player_skip_intro"] = "Passer l'intro"
         m["player_skip_credits"] = "Passer le générique"
         m["player_skip"] = "Passer"
+        m["player_skip_countdown"] = "Passer ({seconds})"
         m["player_failover_failed"] = "Ce flux n'a pas fonctionné"
         m["player_failover_slow_transcode"] = "Le serveur n'a pas pu réencoder ce flux assez vite"
         m["player_failover_none_worked"] = "Aucun des flux n'a fonctionné"

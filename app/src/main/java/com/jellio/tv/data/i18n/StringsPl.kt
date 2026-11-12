@@ -937,6 +937,7 @@ internal object StringsPl {
         m["player_skip_intro"] = "Pomiń czołówkę"
         m["player_skip_credits"] = "Pomiń napisy końcowe"
         m["player_skip"] = "Pomiń"
+        m["player_skip_countdown"] = "Pomiń ({seconds})"
         m["player_failover_failed"] = "Ten strumień nie zadziałał"
         m["player_failover_slow_transcode"] = "Serwer nie zdążył ponownie zakodować tego strumienia"
         m["player_failover_none_worked"] = "Żaden ze strumieni nie zadziałał"

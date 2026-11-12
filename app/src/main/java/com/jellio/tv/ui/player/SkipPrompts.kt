@@ -3,8 +3,9 @@ package com.jellio.tv.ui.player
 import com.jellio.tv.data.playback.SkipSegments
 import com.jellio.tv.data.i18n.Strings
 
-// A skip intro / credits prompt leaves by itself after this long on screen.
-internal const val SKIP_PROMPT_VISIBLE_MS = 15_000L
+// A skip intro / credits prompt counts down this many seconds on screen and
+// then leaves by itself, like the Up Next card's countdown.
+internal const val SKIP_PROMPT_SECONDS = 15
 
 // Prompts sit in the bottom right corner; while the transport controls are up
 // they move above them.

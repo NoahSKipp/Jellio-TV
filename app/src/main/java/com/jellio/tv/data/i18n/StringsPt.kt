@@ -937,6 +937,7 @@ internal object StringsPt {
         m["player_skip_intro"] = "Pular abertura"
         m["player_skip_credits"] = "Pular créditos"
         m["player_skip"] = "Pular"
+        m["player_skip_countdown"] = "Pular ({seconds})"
         m["player_failover_failed"] = "Esse stream não funcionou"
         m["player_failover_slow_transcode"] = "O servidor não conseguiu recodificar esse stream rápido o suficiente"
         m["player_failover_none_worked"] = "Nenhum dos streams funcionou"

@@ -937,6 +937,7 @@ internal object StringsDe {
         m["player_skip_intro"] = "Intro überspringen"
         m["player_skip_credits"] = "Abspann überspringen"
         m["player_skip"] = "Überspringen"
+        m["player_skip_countdown"] = "Überspringen ({seconds})"
         m["player_failover_failed"] = "Dieser Stream hat nicht funktioniert"
         m["player_failover_slow_transcode"] = "Der Server konnte diesen Stream nicht schnell genug neu kodieren"
         m["player_failover_none_worked"] = "Keiner der Streams hat funktioniert"

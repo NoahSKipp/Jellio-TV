@@ -937,6 +937,7 @@ internal object StringsEn {
         m["player_skip_intro"] = "Skip Intro"
         m["player_skip_credits"] = "Skip Credits"
         m["player_skip"] = "Skip"
+        m["player_skip_countdown"] = "Skip ({seconds})"
         m["player_failover_failed"] = "That stream didn't work"
         m["player_failover_slow_transcode"] = "The server couldn't re-encode that stream fast enough"
         m["player_failover_none_worked"] = "None of the streams worked"
