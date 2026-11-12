@@ -233,7 +233,7 @@ fun HomeScreen(
                 }
 
                 if (com.jellio.tv.data.prefs.DisplayPreferences.showNowPlayingPill) {
-                    com.jellio.tv.ui.nowplaying.NowPlayingPill(
+                    com.jellio.tv.ui.nowplaying.QuickHubEntry(
                         activeCount = nowPlayingActiveCount,
                         topSession = nowPlayingSessions.firstOrNull(),
                         localPaused = nowPlayingLocalPaused,
