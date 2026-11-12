@@ -964,8 +964,8 @@ private fun GroupWatchTabContent(
     var createError by remember { mutableStateOf<String?>(null) }
 
     // Creating, joining or leaving swaps the card, and the focused button
-    // goes with it. Without a new target the next key press lands on the
-    // first tab (which selects Now Playing) or behind the hub.
+    // goes with it. The state button is the target of that swap, and the
+    // anchor for a dismissed invite.
     val stateFocus = remember { FocusRequester() }
     val inviteRows = rememberQuickHubRowFocus()
     val inviteKeys = invites.map { groupWatchInviteKey(it) }
