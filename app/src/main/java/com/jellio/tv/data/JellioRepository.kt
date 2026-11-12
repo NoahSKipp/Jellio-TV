@@ -1185,6 +1185,12 @@ class JellioRepository @Inject constructor(
 
     suspend fun logFailover(body: com.jellio.tv.data.model.FailoverLogBody) = streams.logFailover(body)
 
+    // Skips the short cache: a friend or another device may have changed the list.
+    suspend fun getFreshWatchlistItems(userId: String, limit: Int = 100): List<BaseItemDto> {
+        cache.invalidatePrefix("watchlist:$userId:")
+        return getWatchlistItems(userId, limit)
+    }
+
     suspend fun toggleFavorite(userId: String, item: BaseItemDto): Boolean {
         val isFavorite = item.UserData?.IsFavorite ?: false
         val result = if (isFavorite) {

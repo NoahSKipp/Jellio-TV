@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,8 @@ import kotlinx.coroutines.launch
 private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
 @OptIn(ExperimentalFoundationApi::class)
+private const val WATCHLIST_POLL_MS = 20_000L
+
 @Composable
 fun HomeScreen(
     session: Session,
@@ -169,6 +172,16 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         if (shownBefore) viewModel.load(session)
         shownBefore = true
+    }
+    // Every open, then every so often while Home is up.
+    val homeLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(homeLifecycle, session.userId) {
+        homeLifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                viewModel.refreshWatchlist(session)
+                kotlinx.coroutines.delay(WATCHLIST_POLL_MS)
+            }
+        }
     }
     LaunchedEffect(editMode) { onEditModeChange(editMode) }
     DisposableEffect(Unit) { onDispose { onEditModeChange(false) } }

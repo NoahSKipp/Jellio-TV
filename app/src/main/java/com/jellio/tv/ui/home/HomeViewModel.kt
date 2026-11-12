@@ -726,6 +726,34 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private var watchlistJob: kotlinx.coroutines.Job? = null
+
+    // Home asks on every open and while it stays up: whatever was added or
+    // taken off the watchlist elsewhere (a friend, another device) redraws
+    // the rows, and the Google TV Watchlist row is brought in line.
+    fun refreshWatchlist(session: Session) {
+        if (loadJob?.isActive == true || watchlistJob?.isActive == true) return
+        watchlistJob = viewModelScope.launch {
+            val fresh = catching { repository.getFreshWatchlistItems(session.userId) }.getOrNull() ?: return@launch
+            launch { catching { watchNextSyncer.updateWatchlist(session, fresh) } }
+            val state = _uiState.value
+            if (state.isLoading || state.rows.isEmpty()) return@launch
+            val visible = fresh.filter { !removedFromWatchlist.containsKey(it.Id) }
+            val movies = visible.filter { it.Type == "Movie" }
+            val series = visible.filter { it.Type == "Series" }
+            fun shown(key: String) = (state.rows.firstOrNull { it.key == key } as? PosterHomeRow)?.section?.items.orEmpty().map { it.Id }
+            if (!watchlistIdsChanged(shown("watchlist-movies"), movies.map { it.Id }) &&
+                !watchlistIdsChanged(shown("watchlist-shows"), series.map { it.Id })
+            ) {
+                return@launch
+            }
+            kotlinx.coroutines.withTimeoutOrNull(ADDED_BY_WAIT_MS) { friendsRepository.refreshAddedBy() }
+            val marked = friendsRepository.withAddedBy(visible)
+            updateWatchlistRows(marked.filter { it.Type == "Movie" }, marked.filter { it.Type == "Series" })
+            persistCurrentSnapshot(session.userId)
+        }
+    }
+
     private fun insertWatchlistRow(rows: List<HomeRow>, newRow: PosterHomeRow): List<HomeRow> {
         val key = newRow.section.key
         val targetIndex = if (key == "watchlist-movies") {
