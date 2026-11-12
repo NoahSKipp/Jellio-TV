@@ -55,6 +55,7 @@ fun FriendNotificationCard(
     onOpenItem: (String) -> Unit,
     onOpenWatchlist: () -> Unit,
     onDismiss: () -> Unit,
+    leadFocus: Modifier = Modifier,
 ) {
     val kind = notification.Kind
     val sender = notification.FromUserName ?: notification.Name.orEmpty()
@@ -153,7 +154,7 @@ fun FriendNotificationCard(
                                 viewModel.accept(requestId)
                                 onDismiss()
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).then(leadFocus),
                         )
                         DrawerActionButton(
                             label = Strings.get("friends_decline"),
@@ -175,7 +176,7 @@ fun FriendNotificationCard(
                                 onClick = {
                                     if (target == NoticeTarget.Watchlist) onOpenWatchlist() else itemId?.let(onOpenItem)
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).then(leadFocus),
                             )
                         }
                         if (count == 1 && itemId != null) {
@@ -186,7 +187,7 @@ fun FriendNotificationCard(
                                 onClick = {
                                     viewModel.undoWatchlistAdd(session, itemId) { onDismiss() }
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).then(if (target == NoticeTarget.None) leadFocus else Modifier),
                             )
                         }
                         DrawerActionButton(
@@ -194,7 +195,9 @@ fun FriendNotificationCard(
                             icon = Icons.Filled.Close,
                             primary = target == NoticeTarget.None,
                             onClick = onDismiss,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).then(
+                                if (target == NoticeTarget.None && !(count == 1 && itemId != null)) leadFocus else Modifier,
+                            ),
                         )
                     }
                     else -> DrawerActionButton(
@@ -202,7 +205,7 @@ fun FriendNotificationCard(
                         icon = Icons.Filled.Close,
                         primary = true,
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(leadFocus),
                     )
                 }
             }

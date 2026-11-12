@@ -1,6 +1,10 @@
 package com.jellio.tv.ui.nowplaying
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 /**
  * Focus and selection model of the Quick Hub.
@@ -67,3 +71,24 @@ class QuickHubTabFocus {
         QuickHubTab.FRIENDS -> friends
     }
 }
+
+// A stable requester per row key. A row attaches its requester to its first
+// button; a removal moves focus to the neighbour before the state changes.
+class QuickHubRowFocus {
+    private val requesters = HashMap<String, FocusRequester>()
+
+    fun requesterFor(key: String): FocusRequester = requesters.getOrPut(key) { FocusRequester() }
+
+    fun modifierFor(key: String): Modifier = Modifier.focusRequester(requesterFor(key))
+
+    // `keys` is the displayed order. The next row takes focus, else the previous
+    // one, else `header`. A requester whose row is not composed is skipped.
+    fun moveAfterRemoval(keys: List<String>, removed: String, header: FocusRequester? = null) {
+        val target = quickHubFocusAfterRemoval(keys, removed)?.let { requesters[it] }
+        if (target != null && runCatching { target.requestFocus() }.isSuccess) return
+        if (header != null) runCatching { header.requestFocus() }
+    }
+}
+
+@Composable
+fun rememberQuickHubRowFocus(): QuickHubRowFocus = remember { QuickHubRowFocus() }

@@ -29,11 +29,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +53,7 @@ import com.jellio.tv.data.model.FriendEntryDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.nowplaying.DrawerActionButton
+import com.jellio.tv.ui.nowplaying.rememberQuickHubRowFocus
 import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
@@ -78,9 +76,8 @@ fun QuickHubFriends(
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
     val addFocus = remember { FocusRequester() }
-    val firstRequestFocus = remember { FocusRequester() }
-    var requestHandled by remember { mutableStateOf(false) }
-    var incomingCount by remember { mutableIntStateOf(state.incoming.size) }
+    val requestRows = rememberQuickHubRowFocus()
+    val incomingIds = state.incoming.map { it.RequestId }
     val listState = rememberLazyListState()
 
     val watching = remember(sessions) {
@@ -91,19 +88,8 @@ fun QuickHubFriends(
 
     LaunchedEffect(Unit) { viewModel.refresh() }
     LaunchedEffect(adding) { if (adding) viewModel.loadPeople("") }
-    // A handled request leaves the list and takes focus with it.
-    LaunchedEffect(state.incoming.size) {
-        val count = state.incoming.size
-        if (requestHandled && count < incomingCount) {
-            requestHandled = false
-            delay(200)
-            if (count > 0) runCatching { firstRequestFocus.requestFocus() } else runCatching { addFocus.requestFocus() }
-        }
-        incomingCount = count
-    }
     LaunchedEffect(state.messageKey) {
         if (state.messageKey != null) {
-            requestHandled = false
             delay(4000)
             viewModel.clearMessage()
         }
@@ -142,7 +128,7 @@ fun QuickHubFriends(
                     onClick = {
                         scope.launch {
                             listState.animateScrollToItem(0)
-                            runCatching { firstRequestFocus.requestFocus() }
+                            state.incoming.firstOrNull()?.let { runCatching { requestRows.requesterFor(it.RequestId).requestFocus() } }
                         }
                     },
                 )
@@ -193,7 +179,6 @@ fun QuickHubFriends(
                 if (state.incoming.isNotEmpty()) {
                     item(key = "header-in") { SectionLabel(Strings.get("friends_incoming")) }
                     items(state.incoming, key = { "in:" + it.RequestId }) { request ->
-                        val isFirst = request.RequestId == state.incoming.firstOrNull()?.RequestId
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -219,20 +204,17 @@ fun QuickHubFriends(
                                 label = Strings.get("friends_accept"),
                                 primary = true,
                                 onClick = {
-                                    // Focus moves to a button that stays before this row goes away.
-                                    runCatching { addFocus.requestFocus() }
-                                    requestHandled = true
+                                    requestRows.moveAfterRemoval(incomingIds, request.RequestId, addFocus)
                                     viewModel.accept(request.RequestId)
                                 },
-                                modifier = if (isFirst) Modifier.focusRequester(firstRequestFocus) else Modifier,
+                                modifier = requestRows.modifierFor(request.RequestId),
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             DrawerActionButton(
                                 label = Strings.get("friends_decline"),
                                 primary = false,
                                 onClick = {
-                                    runCatching { addFocus.requestFocus() }
-                                    requestHandled = true
+                                    requestRows.moveAfterRemoval(incomingIds, request.RequestId, addFocus)
                                     viewModel.decline(request.RequestId)
                                 },
                             )
@@ -299,17 +281,8 @@ private fun AddFriendList(
 ) {
     val state by viewModel.state.collectAsState()
     val people = state.people?.filter { isFindable(it.Status) }
-    var peopleCount by remember { mutableIntStateOf(people?.size ?: 0) }
-
-    // A person who became a friend leaves the list; focus returns to the header action.
-    LaunchedEffect(people?.size) {
-        val count = people?.size ?: 0
-        if (count < peopleCount) {
-            delay(150)
-            runCatching { anchorFocus.requestFocus() }
-        }
-        peopleCount = count
-    }
+    val personRows = rememberQuickHubRowFocus()
+    val personIds = people?.map { it.UserId }.orEmpty()
 
     when {
         people == null -> Text(text = Strings.get("status_loading"), color = JellioTextSecondary, modifier = Modifier.padding(vertical = 8.dp))
@@ -329,11 +302,12 @@ private fun AddFriendList(
                         if (!sent) {
                             // A pending request from this person becomes a friendship and the row goes away.
                             if (relationOf(person.Status) == FriendRelation.Incoming) {
-                                runCatching { anchorFocus.requestFocus() }
+                                personRows.moveAfterRemoval(personIds, person.UserId, anchorFocus)
                             }
                             viewModel.sendRequest(person.UserId)
                         }
                     },
+                    modifier = personRows.modifierFor(person.UserId),
                 ) {
                     // One row stays focused through "Add friend" to "Request sent".
                     Icon(
@@ -362,6 +336,7 @@ private fun QuickRow(
     avatarUrl: String?,
     subtitle: String?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     trailing: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(12.dp)
@@ -378,7 +353,7 @@ private fun QuickRow(
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(BorderStroke(2.dp, Color.White), shape = shape),
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

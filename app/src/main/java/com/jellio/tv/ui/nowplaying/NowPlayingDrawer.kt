@@ -128,6 +128,14 @@ import kotlinx.coroutines.launch
 
 private val DrawerWidth = 500.dp
 
+private const val LOCAL_PAUSED_KEY = "local_paused"
+
+private fun nowPlayingSessionKey(session: NowPlayingSessionDto): String = session.Id ?: session.hashCode().toString()
+
+private fun notificationInviteKey(invite: GroupWatchInviteDto): String = "invite_${invite.Id}"
+
+private fun groupWatchInviteKey(invite: GroupWatchInviteDto): String = "gw_invite_${invite.Id}"
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NowPlayingDrawer(
@@ -204,6 +212,14 @@ fun NowPlayingDrawer(
     fun handBackToSelectedPill() {
         scope.launch { runCatching { activeTabRequester().requestFocus() } }
     }
+    val nowPlayingRows = rememberQuickHubRowFocus()
+    val notificationRows = rememberQuickHubRowFocus()
+    val clearAllFocus = remember { FocusRequester() }
+    val nowPlayingKeys = buildList {
+        if (localPaused != null) add(LOCAL_PAUSED_KEY)
+        sessions.forEach { add(nowPlayingSessionKey(it)) }
+    }
+    val notificationKeys = invites.map { notificationInviteKey(it) } + notifications.orEmpty().map { it.Id }
     val bodyFocus = remember { FocusRequester() }
     val recoveryLimiter = remember { QuickHubRecoveryLimiter() }
     // Focus that was in the hub and is now nowhere (its node was removed): the
@@ -513,16 +529,20 @@ fun NowPlayingDrawer(
                                         modifier = Modifier.fillMaxSize(),
                                     ) {
                                     if (localPaused != null) {
-                                        item(key = "local_paused") {
+                                        item(key = LOCAL_PAUSED_KEY) {
                                             LocalPausedCard(
                                                 media = localPaused,
                                                 onResume = onResumeLocal,
-                                                onDismiss = onDismissLocal,
+                                                onDismiss = {
+                                                    nowPlayingRows.moveAfterRemoval(nowPlayingKeys, LOCAL_PAUSED_KEY)
+                                                    onDismissLocal()
+                                                },
+                                                leadFocus = nowPlayingRows.modifierFor(LOCAL_PAUSED_KEY),
                                             )
                                         }
                                     }
 
-                                    items(sessions, key = { it.Id ?: it.hashCode().toString() }) { sess ->
+                                    items(sessions, key = { nowPlayingSessionKey(it) }) { sess ->
                                         SessionCard(
                                             session = sess,
                                             currentSession = session,
@@ -531,6 +551,7 @@ fun NowPlayingDrawer(
                                             onDetails = { itemId -> onNavigateToDetail(itemId) },
                                             onOpenProfile = onOpenProfile,
                                             rawImageUrl = rawImageUrl,
+                                            leadFocus = nowPlayingRows.modifierFor(nowPlayingSessionKey(sess)),
                                         )
                                     }
                                 }
@@ -621,6 +642,7 @@ fun NowPlayingDrawer(
                                                         border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))),
                                                         focusedBorder = Border(BorderStroke(2.dp, Color.White)),
                                                     ),
+                                                    modifier = Modifier.focusRequester(clearAllFocus),
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
@@ -645,14 +667,18 @@ fun NowPlayingDrawer(
                                     }
 
                                     // Group watch invites
-                                    items(invites, key = { "invite_${it.Id}" }) { invite ->
+                                    items(invites, key = { notificationInviteKey(it) }) { invite ->
                                         DrawerInviteCard(
                                             invite = invite,
                                             onJoin = {
                                                 groupWatchViewModel.joinInvite(invite)
                                                 onDismiss()
                                             },
-                                            onDismiss = { groupWatchViewModel.dismissInvite(invite) },
+                                            onDismiss = {
+                                                notificationRows.moveAfterRemoval(notificationKeys, notificationInviteKey(invite), clearAllFocus)
+                                                groupWatchViewModel.dismissInvite(invite)
+                                            },
+                                            leadFocus = notificationRows.modifierFor(notificationInviteKey(invite)),
                                         )
                                     }
 
@@ -673,7 +699,11 @@ fun NowPlayingDrawer(
                                                         onDismiss()
                                                         onOpenWatchlist()
                                                     },
-                                                    onDismiss = { notificationsViewModel.delete(n.Id) },
+                                                    onDismiss = {
+                                                        notificationRows.moveAfterRemoval(notificationKeys, n.Id, clearAllFocus)
+                                                        notificationsViewModel.delete(n.Id)
+                                                    },
+                                                    leadFocus = notificationRows.modifierFor(n.Id),
                                                 )
                                                 return@items
                                             }
@@ -709,8 +739,10 @@ fun NowPlayingDrawer(
                                                     }
                                                 },
                                                 onDismiss = {
+                                                    notificationRows.moveAfterRemoval(notificationKeys, n.Id, clearAllFocus)
                                                     notificationsViewModel.delete(n.Id)
                                                 },
+                                                leadFocus = notificationRows.modifierFor(n.Id),
                                                 hasAction = hasAction,
                                                 actionLabel = actionLabel,
                                                 actionIcon = actionIcon,
@@ -842,6 +874,7 @@ private fun DrawerInviteCard(
     invite: GroupWatchInviteDto,
     onJoin: () -> Unit,
     onDismiss: () -> Unit,
+    leadFocus: Modifier = Modifier,
 ) {
     Box(
         modifier = Modifier
@@ -893,7 +926,7 @@ private fun DrawerInviteCard(
                     icon = Icons.Filled.PlayArrow,
                     primary = true,
                     onClick = onJoin,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).then(leadFocus),
                 )
                 DrawerActionButton(
                     label = Strings.get("action_dismiss"),
@@ -930,6 +963,8 @@ private fun GroupWatchTabContent(
     // goes with it. Without a new target the next key press lands on the
     // first tab (which selects Now Playing) or behind the hub.
     val stateFocus = remember { FocusRequester() }
+    val inviteRows = rememberQuickHubRowFocus()
+    val inviteKeys = invites.map { groupWatchInviteKey(it) }
     var lastGroupId by remember { mutableStateOf(activeGroup?.groupId) }
     LaunchedEffect(activeGroup?.groupId) {
         if (activeGroup?.groupId == lastGroupId) return@LaunchedEffect
@@ -1083,11 +1118,15 @@ private fun GroupWatchTabContent(
             }
         } else {
             // Pending Invites
-            items(invites, key = { "gw_invite_${it.Id}" }) { invite ->
+            items(invites, key = { groupWatchInviteKey(it) }) { invite ->
                 DrawerInviteCard(
                     invite = invite,
                     onJoin = { groupWatchViewModel.joinInvite(invite) },
-                    onDismiss = { groupWatchViewModel.dismissInvite(invite) },
+                    onDismiss = {
+                        inviteRows.moveAfterRemoval(inviteKeys, groupWatchInviteKey(invite), stateFocus)
+                        groupWatchViewModel.dismissInvite(invite)
+                    },
+                    leadFocus = inviteRows.modifierFor(groupWatchInviteKey(invite)),
                 )
             }
 
@@ -1502,6 +1541,7 @@ private fun LocalPausedCard(
     media: NowPlayingManager.LocalPausedMedia,
     onResume: () -> Unit,
     onDismiss: () -> Unit,
+    leadFocus: Modifier = Modifier,
 ) {
     Box(
         modifier = Modifier
@@ -1566,7 +1606,7 @@ private fun LocalPausedCard(
                     icon = Icons.Filled.PlayArrow,
                     primary = true,
                     onClick = onResume,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).then(leadFocus),
                 )
                 DrawerActionButton(
                     label = Strings.get("action_dismiss"),
@@ -1588,6 +1628,7 @@ private fun SessionCard(
     onDetails: (String) -> Unit,
     rawImageUrl: (String, String?, String, Int) -> String,
     onOpenProfile: ((String) -> Unit)? = null,
+    leadFocus: Modifier = Modifier,
 ) {
     val item = session.Item ?: return
     val isLive = session.Activity == "watching_live"
@@ -1857,7 +1898,7 @@ private fun SessionCard(
                         icon = Icons.Filled.LiveTv,
                         primary = true,
                         onClick = { onTuneIn(item.Id) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(leadFocus),
                     )
                 } else if (canHandoff) {
                     DrawerActionButton(
@@ -1865,7 +1906,7 @@ private fun SessionCard(
                         icon = Icons.Filled.PlayArrow,
                         primary = true,
                         onClick = onHandoff,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(leadFocus),
                     )
                 }
 
@@ -1876,7 +1917,7 @@ private fun SessionCard(
                         icon = Icons.Filled.Info,
                         primary = isOnlyAction,
                         onClick = { onDetails(item.SeriesId ?: item.Id) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(if (isOnlyAction) leadFocus else Modifier),
                     )
                 }
 
@@ -1887,7 +1928,7 @@ private fun SessionCard(
                         label = Strings.get("friends_view_profile"),
                         primary = false,
                         onClick = { onOpenProfile(profileId) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(if (!canTuneIn && !canHandoff && !canShowDetails) leadFocus else Modifier),
                     )
                 }
             }
@@ -1902,6 +1943,7 @@ private fun NotificationCard(
     rawImageUrl: (String, String?, String, Int) -> String,
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
+    leadFocus: Modifier,
     hasAction: Boolean,
     actionLabel: String,
     actionIcon: ImageVector,
@@ -2028,7 +2070,7 @@ private fun NotificationCard(
                         icon = actionIcon,
                         primary = true,
                         onClick = onOpen,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(leadFocus),
                     )
                     DrawerActionButton(
                         label = Strings.get("notifications_dismiss"),
@@ -2043,7 +2085,7 @@ private fun NotificationCard(
                         icon = Icons.Filled.Close,
                         primary = true,
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).then(leadFocus),
                     )
                 }
             }
