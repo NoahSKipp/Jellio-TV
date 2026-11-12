@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
@@ -102,6 +103,14 @@ fun isBigRelease(version: String): Boolean {
 }
 
 val CHANGELOG_RELEASES = listOf(
+    ChangelogRelease(
+        version = "1.1.4",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.4",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Person, "Redesigned Profiles", "Profiles have a banner header, icon stat tiles and a centred badge grid. You can now move up to the avatar from anywhere, and other people's profiles show only their unlocked badges."),
+        ),
+    ),
     ChangelogRelease(
         version = "1.1.3",
         title = "What's New in Jellio TV",
