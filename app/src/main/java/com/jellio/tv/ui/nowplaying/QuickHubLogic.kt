@@ -20,18 +20,11 @@ fun quickHubBackLeavesAddList(tab: QuickHubTab, adding: Boolean): Boolean = tab 
 const val PILL_WEIGHT_COMPACT = 1f
 const val PILL_WEIGHT_EXPANDED = 2.2f
 
-// Only the selected or focused tab shows its label; the others are icon + badge.
-fun quickHubPillExpanded(selected: Boolean, focused: Boolean): Boolean = selected || focused
+// Only the selected tab shows its label; the others are icon + badge. Focus never selects.
+fun quickHubPillExpanded(selected: Boolean): Boolean = selected
 
-fun quickHubPillWeight(selected: Boolean, focused: Boolean): Float =
-    if (quickHubPillExpanded(selected, focused)) PILL_WEIGHT_EXPANDED else PILL_WEIGHT_COMPACT
-
-// Tabs select when a pill gains focus. When the focused button of a tab goes
-// away focus can fall onto the first pill; a short guard after such a change
-// keeps that from switching tabs.
-const val FOCUS_SHIFT_GUARD_MS = 800L
-
-fun quickHubMaySelectTab(nowMs: Long, blockedUntilMs: Long): Boolean = nowMs >= blockedUntilMs
+fun quickHubPillWeight(selected: Boolean): Float =
+    if (quickHubPillExpanded(selected)) PILL_WEIGHT_EXPANDED else PILL_WEIGHT_COMPACT
 
 // Focus that was in the hub and is now nowhere is brought back to the active tab.
 fun quickHubShouldRecoverFocus(hadFocus: Boolean, hasFocus: Boolean): Boolean = hadFocus && !hasFocus

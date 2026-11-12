@@ -74,8 +74,6 @@ fun QuickHubFriends(
     onAddingChange: (Boolean) -> Unit,
     onOpenFriend: (String) -> Unit,
     modifier: Modifier = Modifier,
-    // Called right before focus is moved or an element under it goes away.
-    onFocusShift: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
@@ -163,7 +161,6 @@ fun QuickHubFriends(
                 session = session,
                 viewModel = viewModel,
                 anchorFocus = addFocus,
-                onFocusShift = onFocusShift,
             )
         } else if (state.loaded && state.friends.isEmpty() && state.incoming.isEmpty()) {
             Column(
@@ -223,7 +220,6 @@ fun QuickHubFriends(
                                 primary = true,
                                 onClick = {
                                     // Focus moves to a button that stays before this row goes away.
-                                    onFocusShift()
                                     runCatching { addFocus.requestFocus() }
                                     requestHandled = true
                                     viewModel.accept(request.RequestId)
@@ -235,7 +231,6 @@ fun QuickHubFriends(
                                 label = Strings.get("friends_decline"),
                                 primary = false,
                                 onClick = {
-                                    onFocusShift()
                                     runCatching { addFocus.requestFocus() }
                                     requestHandled = true
                                     viewModel.decline(request.RequestId)
@@ -301,7 +296,6 @@ private fun AddFriendList(
     session: Session,
     viewModel: FriendsViewModel,
     anchorFocus: FocusRequester,
-    onFocusShift: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     val people = state.people?.filter { isFindable(it.Status) }
@@ -335,7 +329,6 @@ private fun AddFriendList(
                         if (!sent) {
                             // A pending request from this person becomes a friendship and the row goes away.
                             if (relationOf(person.Status) == FriendRelation.Incoming) {
-                                onFocusShift()
                                 runCatching { anchorFocus.requestFocus() }
                             }
                             viewModel.sendRequest(person.UserId)

@@ -8,18 +8,15 @@ import org.junit.Test
 
 class QuickHubLogicTest {
     @Test
-    fun onlySelectedOrFocusedPillShowsItsLabel() {
-        assertFalse(quickHubPillExpanded(selected = false, focused = false))
-        assertTrue(quickHubPillExpanded(selected = true, focused = false))
-        assertTrue(quickHubPillExpanded(selected = false, focused = true))
-        assertTrue(quickHubPillExpanded(selected = true, focused = true))
+    fun onlyTheSelectedPillShowsItsLabel() {
+        assertFalse(quickHubPillExpanded(selected = false))
+        assertTrue(quickHubPillExpanded(selected = true))
     }
 
     @Test
     fun expandedPillTakesMoreWidth() {
-        assertEquals(PILL_WEIGHT_COMPACT, quickHubPillWeight(selected = false, focused = false), 0f)
-        assertEquals(PILL_WEIGHT_EXPANDED, quickHubPillWeight(selected = true, focused = false), 0f)
-        assertEquals(PILL_WEIGHT_EXPANDED, quickHubPillWeight(selected = false, focused = true), 0f)
+        assertEquals(PILL_WEIGHT_COMPACT, quickHubPillWeight(selected = false), 0f)
+        assertEquals(PILL_WEIGHT_EXPANDED, quickHubPillWeight(selected = true), 0f)
         assertTrue(PILL_WEIGHT_EXPANDED > PILL_WEIGHT_COMPACT)
     }
 
@@ -38,13 +35,6 @@ class QuickHubLogicTest {
         assertTrue(quickHubBackLeavesAddList(QuickHubTab.FRIENDS, true))
         assertFalse(quickHubBackLeavesAddList(QuickHubTab.FRIENDS, false))
         assertFalse(quickHubBackLeavesAddList(QuickHubTab.NOTIFICATIONS, true))
-    }
-
-    @Test
-    fun tabSelectionIsBlockedOnlyDuringTheGuard() {
-        assertTrue(quickHubMaySelectTab(nowMs = 1_000, blockedUntilMs = 0))
-        assertFalse(quickHubMaySelectTab(nowMs = 1_000, blockedUntilMs = 1_800))
-        assertTrue(quickHubMaySelectTab(nowMs = 1_800, blockedUntilMs = 1_800))
     }
 
     @Test

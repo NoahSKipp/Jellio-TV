@@ -66,6 +66,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
@@ -189,21 +194,14 @@ fun NowPlayingDrawer(
         invites.size + (parties?.Live?.size ?: 0)
     }
 
-    val tabNowPlayingFocus = remember { FocusRequester() }
-    val tabNotificationsFocus = remember { FocusRequester() }
-    val tabGroupWatchFocus = remember { FocusRequester() }
-    val tabFriendsFocus = remember { FocusRequester() }
-    var tabSelectBlockedUntil by remember { mutableStateOf(0L) }
+    val scope = rememberCoroutineScope()
+    val tabFocus = remember { QuickHubTabFocus() }
     var hubHadFocus by remember { mutableStateOf(false) }
     var hubHasFocus by remember { mutableStateOf(false) }
-    fun selectTab(tab: QuickHubTab) {
-        if (quickHubMaySelectTab(android.os.SystemClock.uptimeMillis(), tabSelectBlockedUntil)) selectedTab = tab
-    }
-    fun activeTabRequester(): FocusRequester = when (selectedTab) {
-        QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus
-        QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus
-        QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus
-        QuickHubTab.FRIENDS -> tabFriendsFocus
+    fun activeTabRequester(): FocusRequester = tabFocus.requesterFor(selectedTab)
+    // A pill that is not the selected tab never keeps focus; the selected pill owns the tab row.
+    fun handBackToSelectedPill() {
+        scope.launch { runCatching { activeTabRequester().requestFocus() } }
     }
     // If the focused element of a tab is removed focus can end up nowhere in the
     // hub (and then behind it): bring it back to the active tab.
@@ -218,14 +216,7 @@ fun NowPlayingDrawer(
 
     LaunchedEffect(Unit) {
         repeat(25) {
-            val focused = runCatching {
-                when (selectedTab) {
-                    QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus.requestFocus()
-                    QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus.requestFocus()
-                    QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus.requestFocus()
-                    QuickHubTab.FRIENDS -> tabFriendsFocus.requestFocus()
-                }
-            }.isSuccess
+            val focused = runCatching { activeTabRequester().requestFocus() }.isSuccess
             if (focused) return@LaunchedEffect
             delay(40)
         }
@@ -363,7 +354,21 @@ fun NowPlayingDrawer(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 18.dp),
+                        .padding(bottom = 18.dp)
+                        .onPreviewKeyEvent { event ->
+                            val step = when (event.key) {
+                                Key.DirectionLeft -> -1
+                                Key.DirectionRight -> 1
+                                else -> return@onPreviewKeyEvent false
+                            }
+                            val target = quickHubNeighbourTab(visibleQuickHubTabs(friendsAvailable), selectedTab, step)
+                                ?: return@onPreviewKeyEvent step > 0
+                            if (event.type == KeyEventType.KeyDown) {
+                                selectedTab = target
+                                runCatching { tabFocus.requesterFor(target).requestFocus() }
+                            }
+                            true
+                        },
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     QuickHubTabPill(
@@ -372,9 +377,9 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.NOW_PLAYING,
                         badgeCount = nowPlayingCount,
                         badgeColor = Color.White.copy(alpha = 0.22f),
-                        onSelect = { selectTab(QuickHubTab.NOW_PLAYING) },
-                        modifier = Modifier
-                            .focusRequester(tabNowPlayingFocus),
+                        onSelect = { selectedTab = QuickHubTab.NOW_PLAYING },
+                        onFallbackFocus = { if (quickHubPillHandsBack(QuickHubTab.NOW_PLAYING, selectedTab)) handBackToSelectedPill() },
+                        modifier = Modifier.focusRequester(tabFocus.requesterFor(QuickHubTab.NOW_PLAYING)),
                     )
 
                     QuickHubTabPill(
@@ -383,9 +388,9 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.NOTIFICATIONS,
                         badgeCount = notificationsCount,
                         badgeColor = Color(0xFFFF3B30),
-                        onSelect = { selectTab(QuickHubTab.NOTIFICATIONS) },
-                        modifier = Modifier
-                            .focusRequester(tabNotificationsFocus),
+                        onSelect = { selectedTab = QuickHubTab.NOTIFICATIONS },
+                        onFallbackFocus = { if (quickHubPillHandsBack(QuickHubTab.NOTIFICATIONS, selectedTab)) handBackToSelectedPill() },
+                        modifier = Modifier.focusRequester(tabFocus.requesterFor(QuickHubTab.NOTIFICATIONS)),
                     )
 
                     val gwTabLabel = Strings.get("quick_hub_tab_group_watch")
@@ -397,9 +402,9 @@ fun NowPlayingDrawer(
                         selected = selectedTab == QuickHubTab.GROUP_WATCH,
                         badgeCount = groupWatchBadgeCount,
                         badgeColor = if (activeGroup != null) Color(0xFF22C55E) else Color.White.copy(alpha = 0.22f),
-                        onSelect = { selectTab(QuickHubTab.GROUP_WATCH) },
-                        modifier = Modifier
-                            .focusRequester(tabGroupWatchFocus),
+                        onSelect = { selectedTab = QuickHubTab.GROUP_WATCH },
+                        onFallbackFocus = { if (quickHubPillHandsBack(QuickHubTab.GROUP_WATCH, selectedTab)) handBackToSelectedPill() },
+                        modifier = Modifier.focusRequester(tabFocus.requesterFor(QuickHubTab.GROUP_WATCH)),
                     )
 
                     if (friendsAvailable) {
@@ -409,19 +414,15 @@ fun NowPlayingDrawer(
                             selected = selectedTab == QuickHubTab.FRIENDS,
                             badgeCount = friendsState.incoming.size,
                             badgeColor = Color(0xFFFF3B30),
-                            onSelect = { selectTab(QuickHubTab.FRIENDS) },
-                            modifier = Modifier.focusRequester(tabFriendsFocus),
+                            onSelect = { selectedTab = QuickHubTab.FRIENDS },
+                            onFallbackFocus = { if (quickHubPillHandsBack(QuickHubTab.FRIENDS, selectedTab)) handBackToSelectedPill() },
+                            modifier = Modifier.focusRequester(tabFocus.requesterFor(QuickHubTab.FRIENDS)),
                         )
                     }
                 }
 
                 // Drawer Body
-                val activeTabFocusRequester = when (selectedTab) {
-                    QuickHubTab.NOW_PLAYING -> tabNowPlayingFocus
-                    QuickHubTab.NOTIFICATIONS -> tabNotificationsFocus
-                    QuickHubTab.GROUP_WATCH -> tabGroupWatchFocus
-                    QuickHubTab.FRIENDS -> tabFriendsFocus
-                }
+                val activeTabFocusRequester = tabFocus.requesterFor(selectedTab)
 
                 Box(
                     modifier = Modifier
@@ -723,7 +724,6 @@ fun NowPlayingDrawer(
                             adding = friendsAdding,
                             onAddingChange = { friendsAdding = it },
                             onOpenFriend = { id -> onOpenProfile?.invoke(id) },
-                            onFocusShift = { tabSelectBlockedUntil = android.os.SystemClock.uptimeMillis() + FOCUS_SHIFT_GUARD_MS },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -734,7 +734,7 @@ fun NowPlayingDrawer(
 }
 }
 
-// Icon and badge only; the label appears while the tab is selected or focused.
+// Icon and badge only; the label appears while the tab is selected.
 @Composable
 private fun RowScope.QuickHubTabPill(
     label: String,
@@ -743,12 +743,12 @@ private fun RowScope.QuickHubTabPill(
     badgeCount: Int,
     badgeColor: Color,
     onSelect: () -> Unit,
+    onFallbackFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val expanded = quickHubPillExpanded(selected, focused)
+    val expanded = quickHubPillExpanded(selected)
     val width by animateFloatAsState(
-        targetValue = quickHubPillWeight(selected, focused),
+        targetValue = quickHubPillWeight(selected),
         animationSpec = tween(180),
         label = "quickHubPillWidth",
     )
@@ -769,12 +769,7 @@ private fun RowScope.QuickHubTabPill(
         modifier = modifier
             .weight(width)
             .semantics { contentDescription = label }
-            .onFocusChanged {
-                focused = it.isFocused
-                if (it.isFocused) {
-                    onSelect()
-                }
-            },
+            .onFocusChanged { if (it.isFocused) onFallbackFocus() },
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,
