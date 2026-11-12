@@ -35,3 +35,44 @@ fun quickHubMaySelectTab(nowMs: Long, blockedUntilMs: Long): Boolean = nowMs >= 
 
 // Focus that was in the hub and is now nowhere is brought back to the active tab.
 fun quickHubShouldRecoverFocus(hadFocus: Boolean, hasFocus: Boolean): Boolean = hadFocus && !hasFocus
+
+// Left and Right move between pills: the neighbouring visible tab, or null at either end.
+fun quickHubNeighbourTab(visible: List<QuickHubTab>, current: QuickHubTab, step: Int): QuickHubTab? {
+    val index = visible.indexOf(current)
+    if (index < 0) return null
+    return visible.getOrNull(index + step)
+}
+
+// A pill that is not the selected tab never keeps focus.
+fun quickHubPillHandsBack(pill: QuickHubTab, selected: QuickHubTab): Boolean = pill != selected
+
+// The row to focus when `removed` is about to leave `keys`: the next one, else the previous one.
+fun <K> quickHubFocusAfterRemoval(keys: List<K>, removed: K): K? {
+    val index = keys.indexOf(removed)
+    if (index < 0) return null
+    return keys.getOrNull(index + 1) ?: keys.getOrNull(index - 1)
+}
+
+enum class QuickHubRecoveryTarget { BODY, SELECTED_PILL }
+
+const val QUICK_HUB_RECOVERY_FIRST_DELAY_MS = 120L
+const val QUICK_HUB_RECOVERY_RETRY_MS = 60L
+const val QUICK_HUB_RECOVERY_BODY_ATTEMPTS = 6
+const val QUICK_HUB_RECOVERY_ATTEMPTS = 8
+
+// The body gets the first attempts while its layout settles; only a body that
+// stays empty hands focus to the selected pill.
+fun quickHubRecoveryTarget(attempt: Int): QuickHubRecoveryTarget =
+    if (attempt < QUICK_HUB_RECOVERY_BODY_ATTEMPTS) QuickHubRecoveryTarget.BODY else QuickHubRecoveryTarget.SELECTED_PILL
+
+// Caps how often recovery may start, so two nodes that keep removing each other's focus cannot loop.
+class QuickHubRecoveryLimiter(private val maxRuns: Int = 4, private val windowMs: Long = 2_000L) {
+    private val starts = ArrayDeque<Long>()
+
+    fun tryAcquire(nowMs: Long): Boolean {
+        while (starts.isNotEmpty() && nowMs - starts.first() >= windowMs) starts.removeFirst()
+        if (starts.size >= maxRuns) return false
+        starts.addLast(nowMs)
+        return true
+    }
+}
