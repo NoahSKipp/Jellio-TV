@@ -1,10 +1,16 @@
 package com.jellio.tv.ui.nowplaying
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Border
 
 /**
  * Focus and selection model of the Quick Hub.
@@ -92,3 +98,16 @@ class QuickHubRowFocus {
 
 @Composable
 fun rememberQuickHubRowFocus(): QuickHubRowFocus = remember { QuickHubRowFocus() }
+
+// The three highlight states, defined once: plain, selected (filled tab pill
+// with its label) and focused (white ring plus a slight scale).
+object QuickHubHighlight {
+    val PillShape = RoundedCornerShape(999.dp)
+    const val FocusScale = 1.02f
+    const val RowFocusScale = 1f
+    const val SelectedFillAlpha = 0.18f
+    const val SelectedBorderAlpha = 0.25f
+    const val PrimaryRestAlpha = 0.86f
+
+    fun focusBorder(shape: Shape): Border = Border(border = BorderStroke(2.dp, Color.White), shape = shape)
+}

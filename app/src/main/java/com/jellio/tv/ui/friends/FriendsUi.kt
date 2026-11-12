@@ -32,6 +32,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.jellio.tv.ui.common.dangerButtonColors
 import com.jellio.tv.ui.common.primaryButtonColors
+import com.jellio.tv.ui.nowplaying.QuickHubHighlight
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
 
@@ -79,6 +80,9 @@ fun FriendPill(
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
         colors = if (danger) dangerButtonColors() else primaryButtonColors(),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = QuickHubHighlight.focusBorder(QuickHubHighlight.PillShape),
+        ),
         modifier = modifier,
     ) {
         Row(

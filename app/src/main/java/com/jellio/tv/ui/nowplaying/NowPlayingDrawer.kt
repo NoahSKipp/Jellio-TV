@@ -356,7 +356,7 @@ fun NowPlayingDrawer(
                     Surface(
                         onClick = onDismiss,
                         shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f, pressedScale = 0.95f),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.FocusScale, pressedScale = 0.95f),
                         colors = ClickableSurfaceDefaults.colors(
                             containerColor = Color.White.copy(alpha = 0.08f),
                             focusedContainerColor = Color.White.copy(alpha = 0.22f),
@@ -364,7 +364,7 @@ fun NowPlayingDrawer(
                             focusedContentColor = JellioText,
                         ),
                         border = ClickableSurfaceDefaults.border(
-                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                            focusedBorder = QuickHubHighlight.focusBorder(CircleShape),
                         ),
                         modifier = Modifier.size(36.dp),
                     ) {
@@ -500,7 +500,7 @@ fun NowPlayingDrawer(
                                             Surface(
                                                 onClick = onDismiss,
                                                 shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                                scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.FocusScale, pressedScale = 0.97f),
                                                 colors = ClickableSurfaceDefaults.colors(
                                                     containerColor = Color.White.copy(alpha = 0.08f),
                                                     focusedContainerColor = Color.White.copy(alpha = 0.22f),
@@ -508,7 +508,7 @@ fun NowPlayingDrawer(
                                                     focusedContentColor = Color.White,
                                                 ),
                                                 border = ClickableSurfaceDefaults.border(
-                                                    focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                                    focusedBorder = QuickHubHighlight.focusBorder(QuickHubHighlight.PillShape),
                                                 ),
                                             ) {
                                                 Text(
@@ -583,7 +583,7 @@ fun NowPlayingDrawer(
                                         Surface(
                                             onClick = onDismiss,
                                             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                            scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.FocusScale, pressedScale = 0.97f),
                                             colors = ClickableSurfaceDefaults.colors(
                                                 containerColor = Color.White.copy(alpha = 0.08f),
                                                 focusedContainerColor = Color.White.copy(alpha = 0.22f),
@@ -591,7 +591,7 @@ fun NowPlayingDrawer(
                                                 focusedContentColor = Color.White,
                                             ),
                                             border = ClickableSurfaceDefaults.border(
-                                                focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                                focusedBorder = QuickHubHighlight.focusBorder(QuickHubHighlight.PillShape),
                                             ),
                                         ) {
                                             Text(
@@ -631,7 +631,7 @@ fun NowPlayingDrawer(
                                                 Surface(
                                                     onClick = { notificationsViewModel.clearAll() },
                                                     shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                                    scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.FocusScale, pressedScale = 0.97f),
                                                     colors = ClickableSurfaceDefaults.colors(
                                                         containerColor = Color.White.copy(alpha = 0.08f),
                                                         focusedContainerColor = Color.White.copy(alpha = 0.22f),
@@ -639,8 +639,8 @@ fun NowPlayingDrawer(
                                                         focusedContentColor = Color.White,
                                                     ),
                                                     border = ClickableSurfaceDefaults.border(
-                                                        border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))),
-                                                        focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                                        border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)), shape = QuickHubHighlight.PillShape),
+                                                        focusedBorder = QuickHubHighlight.focusBorder(QuickHubHighlight.PillShape),
                                                     ),
                                                     modifier = Modifier.focusRequester(clearAllFocus),
                                                 ) {
@@ -807,16 +807,20 @@ private fun RowScope.QuickHubTabPill(
     Surface(
         onClick = onSelect,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f, pressedScale = 0.97f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.FocusScale, pressedScale = 0.97f),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (selected) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.05f),
+            containerColor = if (selected) Color.White.copy(alpha = QuickHubHighlight.SelectedFillAlpha) else Color.White.copy(alpha = 0.05f),
             contentColor = if (selected) Color.White else JellioTextSecondary,
             focusedContainerColor = Color.White.copy(alpha = 0.28f),
             focusedContentColor = Color.White,
         ),
         border = ClickableSurfaceDefaults.border(
-            border = if (selected) Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))) else Border.None,
-            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+            border = if (selected) {
+                Border(BorderStroke(1.dp, Color.White.copy(alpha = QuickHubHighlight.SelectedBorderAlpha)), shape = QuickHubHighlight.PillShape)
+            } else {
+                Border.None
+            },
+            focusedBorder = QuickHubHighlight.focusBorder(QuickHubHighlight.PillShape),
         ),
         modifier = modifier
             .weight(width)
@@ -2106,11 +2110,11 @@ internal fun DrawerActionButton(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = shape),
         scale = ClickableSurfaceDefaults.scale(
-            focusedScale = 1.02f,
+            focusedScale = QuickHubHighlight.FocusScale,
             pressedScale = 0.96f,
         ),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (primary) Color.White else Color.White.copy(alpha = 0.08f),
+            containerColor = if (primary) Color.White.copy(alpha = QuickHubHighlight.PrimaryRestAlpha) else Color.White.copy(alpha = 0.08f),
             focusedContainerColor = if (primary) Color.White else Color.White.copy(alpha = 0.24f),
             contentColor = if (primary) Color.Black else JellioText,
             focusedContentColor = if (primary) Color.Black else Color.White,
@@ -2120,10 +2124,7 @@ internal fun DrawerActionButton(
                 border = BorderStroke(1.dp, if (primary) Color.Transparent else Color.White.copy(alpha = 0.10f)),
                 shape = shape,
             ),
-            focusedBorder = Border(
-                border = BorderStroke(2.dp, Color.White),
-                shape = shape,
-            ),
+            focusedBorder = QuickHubHighlight.focusBorder(shape),
         ),
         modifier = modifier.height(40.dp),
     ) {

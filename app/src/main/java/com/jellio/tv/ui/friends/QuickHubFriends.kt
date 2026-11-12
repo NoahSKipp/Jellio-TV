@@ -1,6 +1,5 @@
 package com.jellio.tv.ui.friends
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -53,6 +51,7 @@ import com.jellio.tv.data.model.FriendEntryDto
 import com.jellio.tv.data.model.NowPlayingSessionDto
 import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.nowplaying.DrawerActionButton
+import com.jellio.tv.ui.nowplaying.QuickHubHighlight
 import com.jellio.tv.ui.nowplaying.rememberQuickHubRowFocus
 import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
@@ -343,7 +342,7 @@ private fun QuickRow(
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = shape),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = QuickHubHighlight.RowFocusScale),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.White.copy(alpha = 0.05f),
             contentColor = JellioText,
@@ -351,7 +350,7 @@ private fun QuickRow(
             focusedContentColor = JellioText,
         ),
         border = ClickableSurfaceDefaults.border(
-            focusedBorder = Border(BorderStroke(2.dp, Color.White), shape = shape),
+            focusedBorder = QuickHubHighlight.focusBorder(shape),
         ),
         modifier = modifier.fillMaxWidth(),
     ) {
