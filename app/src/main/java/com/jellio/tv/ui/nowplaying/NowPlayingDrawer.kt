@@ -63,6 +63,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -203,14 +204,25 @@ fun NowPlayingDrawer(
     fun handBackToSelectedPill() {
         scope.launch { runCatching { activeTabRequester().requestFocus() } }
     }
-    // If the focused element of a tab is removed focus can end up nowhere in the
-    // hub (and then behind it): bring it back to the active tab.
+    val bodyFocus = remember { FocusRequester() }
+    val recoveryLimiter = remember { QuickHubRecoveryLimiter() }
+    // Focus that was in the hub and is now nowhere (its node was removed): the
+    // active body first, the selected pill only when the body stays empty.
     LaunchedEffect(hubHasFocus) {
         if (!quickHubShouldRecoverFocus(hubHadFocus, hubHasFocus)) return@LaunchedEffect
-        delay(120)
-        repeat(15) {
-            if (runCatching { activeTabRequester().requestFocus() }.isSuccess) return@LaunchedEffect
-            delay(50)
+        if (!recoveryLimiter.tryAcquire(android.os.SystemClock.uptimeMillis())) {
+            runCatching { activeTabRequester().requestFocus() }
+            return@LaunchedEffect
+        }
+        delay(QUICK_HUB_RECOVERY_FIRST_DELAY_MS)
+        repeat(QUICK_HUB_RECOVERY_ATTEMPTS) { attempt ->
+            if (hubHasFocus) return@LaunchedEffect
+            val target = when (quickHubRecoveryTarget(attempt)) {
+                QuickHubRecoveryTarget.BODY -> bodyFocus
+                QuickHubRecoveryTarget.SELECTED_PILL -> activeTabRequester()
+            }
+            runCatching { target.requestFocus() }
+            delay(QUICK_HUB_RECOVERY_RETRY_MS)
         }
     }
 
@@ -440,24 +452,109 @@ fun NowPlayingDrawer(
                         }
                         .focusGroup(),
                 ) {
-                    when (selectedTab) {
-                        QuickHubTab.NOW_PLAYING -> {
-                            val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
-                            if (totalCount == 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .focusRequester(bodyFocus)
+                            .focusRestorer()
+                            .focusGroup(),
+                    ) {
+                        when (selectedTab) {
+                            QuickHubTab.NOW_PLAYING -> {
+                                val totalCount = sessions.size + (if (localPaused != null) 1 else 0)
+                                if (totalCount == 0) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Tv,
+                                                contentDescription = null,
+                                                tint = JellioTextSecondary.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(44.dp),
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(
+                                                text = Strings.get("now_playing_empty"),
+                                                color = JellioTextSecondary,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                            )
+                                            Spacer(modifier = Modifier.height(20.dp))
+                                            Surface(
+                                                onClick = onDismiss,
+                                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                                colors = ClickableSurfaceDefaults.colors(
+                                                    containerColor = Color.White.copy(alpha = 0.08f),
+                                                    focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                                    contentColor = JellioText,
+                                                    focusedContentColor = Color.White,
+                                                ),
+                                                border = ClickableSurfaceDefaults.border(
+                                                    focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                                ),
+                                            ) {
+                                                Text(
+                                                    text = Strings.get("action_cancel"),
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                    ),
+                                                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) {
+                                    if (localPaused != null) {
+                                        item(key = "local_paused") {
+                                            LocalPausedCard(
+                                                media = localPaused,
+                                                onResume = onResumeLocal,
+                                                onDismiss = onDismissLocal,
+                                            )
+                                        }
+                                    }
+
+                                    items(sessions, key = { it.Id ?: it.hashCode().toString() }) { sess ->
+                                        SessionCard(
+                                            session = sess,
+                                            currentSession = session,
+                                            onHandoff = { onHandoff(sess) },
+                                            onTuneIn = { channelId -> onTuneIn(channelId) },
+                                            onDetails = { itemId -> onNavigateToDetail(itemId) },
+                                            onOpenProfile = onOpenProfile,
+                                            rawImageUrl = rawImageUrl,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        QuickHubTab.NOTIFICATIONS -> {
+                            val notifList = notifications
+                            val isEmpty = invites.isEmpty() && (notifList == null || notifList.isEmpty())
+                            if (isEmpty) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
-                                            imageVector = Icons.Filled.Tv,
+                                            imageVector = Icons.Filled.Notifications,
                                             contentDescription = null,
                                             tint = JellioTextSecondary.copy(alpha = 0.4f),
                                             modifier = Modifier.size(44.dp),
                                         )
                                         Spacer(modifier = Modifier.height(12.dp))
                                         Text(
-                                            text = Strings.get("now_playing_empty"),
+                                            text = Strings.get("notifications_nothing_new"),
                                             color = JellioTextSecondary,
                                             style = MaterialTheme.typography.bodyMedium,
                                         )
@@ -489,243 +586,166 @@ fun NowPlayingDrawer(
                                 }
                             } else {
                                 LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
                                     contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
                                     modifier = Modifier.fillMaxSize(),
                                 ) {
-                                if (localPaused != null) {
-                                    item(key = "local_paused") {
-                                        LocalPausedCard(
-                                            media = localPaused,
-                                            onResume = onResumeLocal,
-                                            onDismiss = onDismissLocal,
-                                        )
-                                    }
-                                }
-
-                                items(sessions, key = { it.Id ?: it.hashCode().toString() }) { sess ->
-                                    SessionCard(
-                                        session = sess,
-                                        currentSession = session,
-                                        onHandoff = { onHandoff(sess) },
-                                        onTuneIn = { channelId -> onTuneIn(channelId) },
-                                        onDetails = { itemId -> onNavigateToDetail(itemId) },
-                                        onOpenProfile = onOpenProfile,
-                                        rawImageUrl = rawImageUrl,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    QuickHubTab.NOTIFICATIONS -> {
-                        val notifList = notifications
-                        val isEmpty = invites.isEmpty() && (notifList == null || notifList.isEmpty())
-                        if (isEmpty) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Notifications,
-                                        contentDescription = null,
-                                        tint = JellioTextSecondary.copy(alpha = 0.4f),
-                                        modifier = Modifier.size(44.dp),
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = Strings.get("notifications_nothing_new"),
-                                        color = JellioTextSecondary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    Surface(
-                                        onClick = onDismiss,
-                                        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
-                                        colors = ClickableSurfaceDefaults.colors(
-                                            containerColor = Color.White.copy(alpha = 0.08f),
-                                            focusedContainerColor = Color.White.copy(alpha = 0.22f),
-                                            contentColor = JellioText,
-                                            focusedContentColor = Color.White,
-                                        ),
-                                        border = ClickableSurfaceDefaults.border(
-                                            focusedBorder = Border(BorderStroke(2.dp, Color.White)),
-                                        ),
-                                    ) {
-                                        Text(
-                                            text = Strings.get("action_cancel"),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                            ),
-                                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
-                                modifier = Modifier.fillMaxSize(),
-                            ) {
-                                // Clear all header
-                                if (notifList != null && notifList.isNotEmpty()) {
-                                    item(key = "clear_all_header") {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Text(
-                                                text = if (notifList.size == 1) {
-                                                    Strings.get("notifications_count_one")
-                                                } else {
-                                                    Strings.format("notifications_count_many", notifList.size)
-                                                },
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = JellioTextSecondary,
-                                            )
-                                            Surface(
-                                                onClick = { notificationsViewModel.clearAll() },
-                                                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
-                                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
-                                                colors = ClickableSurfaceDefaults.colors(
-                                                    containerColor = Color.White.copy(alpha = 0.08f),
-                                                    focusedContainerColor = Color.White.copy(alpha = 0.22f),
-                                                    contentColor = JellioTextSecondary,
-                                                    focusedContentColor = Color.White,
-                                                ),
-                                                border = ClickableSurfaceDefaults.border(
-                                                    border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))),
-                                                    focusedBorder = Border(BorderStroke(2.dp, Color.White)),
-                                                ),
+                                    // Clear all header
+                                    if (notifList != null && notifList.isNotEmpty()) {
+                                        item(key = "clear_all_header") {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically,
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                Text(
+                                                    text = if (notifList.size == 1) {
+                                                        Strings.get("notifications_count_one")
+                                                    } else {
+                                                        Strings.format("notifications_count_many", notifList.size)
+                                                    },
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = JellioTextSecondary,
+                                                )
+                                                Surface(
+                                                    onClick = { notificationsViewModel.clearAll() },
+                                                    shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(999.dp)),
+                                                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f, pressedScale = 0.97f),
+                                                    colors = ClickableSurfaceDefaults.colors(
+                                                        containerColor = Color.White.copy(alpha = 0.08f),
+                                                        focusedContainerColor = Color.White.copy(alpha = 0.22f),
+                                                        contentColor = JellioTextSecondary,
+                                                        focusedContentColor = Color.White,
+                                                    ),
+                                                    border = ClickableSurfaceDefaults.border(
+                                                        border = Border(BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))),
+                                                        focusedBorder = Border(BorderStroke(2.dp, Color.White)),
+                                                    ),
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.DeleteSweep,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(14.dp),
-                                                    )
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text(
-                                                        text = Strings.get("notifications_clear_all"),
-                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                                        fontSize = 11.sp,
-                                                    )
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center,
+                                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Filled.DeleteSweep,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(14.dp),
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = Strings.get("notifications_clear_all"),
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                                            fontSize = 11.sp,
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
 
-                                // Group watch invites
-                                items(invites, key = { "invite_${it.Id}" }) { invite ->
-                                    DrawerInviteCard(
-                                        invite = invite,
-                                        onJoin = {
-                                            groupWatchViewModel.joinInvite(invite)
-                                            onDismiss()
-                                        },
-                                        onDismiss = { groupWatchViewModel.dismissInvite(invite) },
-                                    )
-                                }
+                                    // Group watch invites
+                                    items(invites, key = { "invite_${it.Id}" }) { invite ->
+                                        DrawerInviteCard(
+                                            invite = invite,
+                                            onJoin = {
+                                                groupWatchViewModel.joinInvite(invite)
+                                                onDismiss()
+                                            },
+                                            onDismiss = { groupWatchViewModel.dismissInvite(invite) },
+                                        )
+                                    }
 
-                                // Notification cards
-                                if (notifList != null) {
-                                    items(notifList, key = { it.Id }) { n ->
-                                        if (isFriendKind(n.Kind)) {
-                                            FriendNotificationCard(
+                                    // Notification cards
+                                    if (notifList != null) {
+                                        items(notifList, key = { it.Id }) { n ->
+                                            if (isFriendKind(n.Kind)) {
+                                                FriendNotificationCard(
+                                                    notification = n,
+                                                    session = session,
+                                                    viewModel = friendsViewModel,
+                                                    rawImageUrl = rawImageUrl,
+                                                    onOpenItem = { id ->
+                                                        onDismiss()
+                                                        onNavigateToDetail(id)
+                                                    },
+                                                    onOpenWatchlist = {
+                                                        onDismiss()
+                                                        onOpenWatchlist()
+                                                    },
+                                                    onDismiss = { notificationsViewModel.delete(n.Id) },
+                                                )
+                                                return@items
+                                            }
+                                            val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
+                                            val isStreamLink = n.Kind == "streamlink" || n.Kind == "streamlink_removed"
+                                            val isParty = n.Kind == "party_scheduled" || n.Kind == "party_starting"
+                                            val hasAction = isStreamLink || isParty || itemId != null
+
+                                            val actionLabel = when {
+                                                isStreamLink -> Strings.get("now_playing_tune_in")
+                                                isParty -> Strings.get("gw_join")
+                                                else -> Strings.get("details_title")
+                                            }
+                                            val actionIcon = when {
+                                                isStreamLink -> Icons.Filled.LiveTv
+                                                isParty -> Icons.Filled.Groups
+                                                else -> Icons.Filled.Info
+                                            }
+
+                                            NotificationCard(
                                                 notification = n,
                                                 session = session,
-                                                viewModel = friendsViewModel,
                                                 rawImageUrl = rawImageUrl,
-                                                onOpenItem = { id ->
-                                                    onDismiss()
-                                                    onNavigateToDetail(id)
+                                                onOpen = {
+                                                    if (isStreamLink) {
+                                                        onDismiss()
+                                                        onOpenLiveTv()
+                                                    } else if (isParty) {
+                                                        selectedTab = QuickHubTab.GROUP_WATCH
+                                                    } else if (itemId != null) {
+                                                        onDismiss()
+                                                        onNavigateToDetail(itemId)
+                                                    }
                                                 },
-                                                onOpenWatchlist = {
-                                                    onDismiss()
-                                                    onOpenWatchlist()
+                                                onDismiss = {
+                                                    notificationsViewModel.delete(n.Id)
                                                 },
-                                                onDismiss = { notificationsViewModel.delete(n.Id) },
+                                                hasAction = hasAction,
+                                                actionLabel = actionLabel,
+                                                actionIcon = actionIcon,
                                             )
-                                            return@items
                                         }
-                                        val itemId = n.ItemId?.takeIf { n.Kind != "announcement" && it.replace("-", "").trim('0').isNotEmpty() }
-                                        val isStreamLink = n.Kind == "streamlink" || n.Kind == "streamlink_removed"
-                                        val isParty = n.Kind == "party_scheduled" || n.Kind == "party_starting"
-                                        val hasAction = isStreamLink || isParty || itemId != null
-
-                                        val actionLabel = when {
-                                            isStreamLink -> Strings.get("now_playing_tune_in")
-                                            isParty -> Strings.get("gw_join")
-                                            else -> Strings.get("details_title")
-                                        }
-                                        val actionIcon = when {
-                                            isStreamLink -> Icons.Filled.LiveTv
-                                            isParty -> Icons.Filled.Groups
-                                            else -> Icons.Filled.Info
-                                        }
-
-                                        NotificationCard(
-                                            notification = n,
-                                            session = session,
-                                            rawImageUrl = rawImageUrl,
-                                            onOpen = {
-                                                if (isStreamLink) {
-                                                    onDismiss()
-                                                    onOpenLiveTv()
-                                                } else if (isParty) {
-                                                    selectedTab = QuickHubTab.GROUP_WATCH
-                                                } else if (itemId != null) {
-                                                    onDismiss()
-                                                    onNavigateToDetail(itemId)
-                                                }
-                                            },
-                                            onDismiss = {
-                                                notificationsViewModel.delete(n.Id)
-                                            },
-                                            hasAction = hasAction,
-                                            actionLabel = actionLabel,
-                                            actionIcon = actionIcon,
-                                        )
                                     }
                                 }
                             }
                         }
-                    }
 
-                    QuickHubTab.GROUP_WATCH -> {
-                        GroupWatchTabContent(
-                            session = session,
-                            groupWatchViewModel = groupWatchViewModel,
-                            activeGroup = activeGroup,
-                            partyState = partyState,
-                            parties = parties,
-                            groups = groups,
-                            invites = invites,
-                            onRefresh = { gwRefreshKey++ },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                        QuickHubTab.GROUP_WATCH -> {
+                            GroupWatchTabContent(
+                                session = session,
+                                groupWatchViewModel = groupWatchViewModel,
+                                activeGroup = activeGroup,
+                                partyState = partyState,
+                                parties = parties,
+                                groups = groups,
+                                invites = invites,
+                                onRefresh = { gwRefreshKey++ },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
 
-                    QuickHubTab.FRIENDS -> {
-                        QuickHubFriends(
-                            session = session,
-                            sessions = sessions,
-                            viewModel = friendsViewModel,
-                            adding = friendsAdding,
-                            onAddingChange = { friendsAdding = it },
-                            onOpenFriend = { id -> onOpenProfile?.invoke(id) },
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        QuickHubTab.FRIENDS -> {
+                            QuickHubFriends(
+                                session = session,
+                                sessions = sessions,
+                                viewModel = friendsViewModel,
+                                adding = friendsAdding,
+                                onAddingChange = { friendsAdding = it },
+                                onOpenFriend = { id -> onOpenProfile?.invoke(id) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
