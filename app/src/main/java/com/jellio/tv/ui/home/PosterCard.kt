@@ -644,9 +644,11 @@ fun CardOptionsMenu(
 private data class MenuAction(val label: String, val onClick: () -> Unit, val danger: Boolean = false)
 
 @Composable
-private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequester) -> Unit) {
+internal fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequester) -> Unit) {
     val firstFocus = remember { FocusRequester() }
     var armed by remember { mutableStateOf(false) }
+    var sawFreshDown by remember { mutableStateOf(false) }
+    var holdingTrigger by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         repeat(10) {
             if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
@@ -655,7 +657,7 @@ private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequest
     }
     LaunchedEffect(Unit) {
         delay(700)
-        armed = true
+        if (!holdingTrigger) armed = true
     }
     Dialog(
         onDismissRequest = onDismiss,
@@ -673,11 +675,28 @@ private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequest
                         return@onPreviewKeyEvent true
                     }
                     val select = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-                    if (!armed && select) {
-                        if (event.type == KeyEventType.KeyUp) armed = true
+                    if (!select) return@onPreviewKeyEvent false
+                    if (!armed) {
+                        if (event.type == KeyEventType.KeyDown) {
+                            if (event.nativeKeyEvent.repeatCount > 0 && !sawFreshDown) {
+                                holdingTrigger = true
+                            } else if (event.nativeKeyEvent.repeatCount == 0) {
+                                sawFreshDown = true
+                                holdingTrigger = false
+                                armed = true
+                                return@onPreviewKeyEvent false
+                            }
+                        } else if (event.type == KeyEventType.KeyUp) {
+                            holdingTrigger = false
+                            armed = true
+                        }
+                        true
+                    } else if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0 && !sawFreshDown) {
+                        holdingTrigger = true
+                        armed = false
                         true
                     } else {
-                        if (event.type == KeyEventType.KeyDown) armed = true
+                        if (event.type == KeyEventType.KeyDown) sawFreshDown = true
                         false
                     }
                 }
@@ -693,7 +712,7 @@ private fun CardDialog(onDismiss: () -> Unit, content: @Composable (FocusRequest
 }
 
 @Composable
-private fun CardOptionsMenuRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
+internal fun CardOptionsMenuRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
     Surface(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(10.dp)),

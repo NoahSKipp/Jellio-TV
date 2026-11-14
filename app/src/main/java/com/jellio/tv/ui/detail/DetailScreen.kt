@@ -1,17 +1,13 @@
 package com.jellio.tv.ui.detail
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import com.jellio.tv.ui.common.dismissOnBack
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,9 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -98,6 +92,8 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.PlayAction
 import com.jellio.tv.ui.common.MediaTechBadgesRow
 import com.jellio.tv.ui.common.NoOpBringIntoViewSpec
+import com.jellio.tv.ui.home.CardDialog
+import com.jellio.tv.ui.home.CardOptionsMenuRow
 import com.jellio.tv.ui.friends.FriendWatchlistPickerDialog
 import com.jellio.tv.ui.friends.FriendsViewModel
 import com.jellio.tv.ui.friends.canShareType
@@ -334,7 +330,6 @@ fun DetailScreen(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun EpisodeOptionsMenu(
     episode: BaseItemDto,
@@ -344,58 +339,54 @@ private fun EpisodeOptionsMenu(
     onMarkSeasonWatched: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
-    val firstFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        for (attempt in 0 until 10) {
-            withFrameNanos {}
-            if (runCatching { firstFocusRequester.requestFocus() }.isSuccess && attempt >= 1) {
-                break
-            }
-        }
-    }
     val isPlayed = episode.UserData?.Played == true
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .dismissOnBack(onDismiss)
-            .background(Color.Black.copy(alpha = 0.5f))
-            .focusProperties { onExit = { FocusRequester.Cancel } }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
+    val episodeTag = com.jellio.tv.data.i18n.seasonEpisodeTag(episode.ParentIndexNumber, episode.IndexNumber)
+    val episodeTitle = listOf(episodeTag, episode.Name.orEmpty())
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
+    CardDialog(onDismiss = onDismiss) { firstFocus ->
         Column(
             modifier = Modifier
-                .widthIn(min = 280.dp)
+                .widthIn(min = 320.dp, max = 460.dp)
                 .background(JellioBgElevated, RoundedCornerShape(16.dp))
                 .padding(vertical = 12.dp),
         ) {
-            EpisodeMenuRow(
+            if (episodeTitle.isNotBlank()) {
+                Text(
+                    text = episodeTitle,
+                    color = JellioText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+                )
+            }
+            CardOptionsMenuRow(
                 label = if (isPlayed) com.jellio.tv.ui.i18n.string("detail_mark_unwatched") else com.jellio.tv.ui.i18n.string("detail_mark_watched"),
-                onClick = { onToggleWatched(); onDismiss() },
-                modifier = Modifier.focusRequester(firstFocusRequester),
+                onClick = {
+                    onToggleWatched()
+                    onDismiss()
+                },
+                modifier = Modifier.focusRequester(firstFocus),
             )
             if (hasPrevious) {
-                EpisodeMenuRow(label = com.jellio.tv.ui.i18n.string("detail_mark_previous_watched"), onClick = { onMarkPreviousWatched(); onDismiss() })
+                CardOptionsMenuRow(
+                    label = com.jellio.tv.ui.i18n.string("detail_mark_previous_watched"),
+                    onClick = {
+                        onMarkPreviousWatched()
+                        onDismiss()
+                    },
+                )
             }
-            EpisodeMenuRow(label = com.jellio.tv.ui.i18n.string("detail_mark_season_watched"), onClick = { onMarkSeasonWatched(); onDismiss() })
+            CardOptionsMenuRow(
+                label = com.jellio.tv.ui.i18n.string("detail_mark_season_watched"),
+                onClick = {
+                    onMarkSeasonWatched()
+                    onDismiss()
+                },
+            )
         }
-    }
-}
-
-@Composable
-private fun EpisodeMenuRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(0.dp)),
-        colors = ClickableSurfaceDefaults.colors(containerColor = Color.Transparent, contentColor = JellioText, focusedContainerColor = Color.White.copy(alpha = 0.18f), focusedContentColor = JellioText),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp))
     }
 }
 
