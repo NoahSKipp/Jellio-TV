@@ -79,6 +79,12 @@ Jellio TV is built with Kotlin, Jetpack Compose, TV Material 3, and Media3,
 the same real stack [NuvioTV](https://github.com/NuvioMedia/NuvioTV) uses.
 Development requires a JDK and the Android SDK.
 
+## Credits
+
+- UI/UX and stack inspired by [NuvioTV](https://github.com/NuvioMedia/NuvioTV)
+- Ani-Sync inspired by and adapted from
+  [vosmiic/jellyfin-ani-sync](https://github.com/vosmiic/jellyfin-ani-sync)
+
 ## License
 
 GNU General Public License v3.0
