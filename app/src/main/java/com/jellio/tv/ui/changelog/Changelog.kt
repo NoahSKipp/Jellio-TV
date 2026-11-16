@@ -108,7 +108,7 @@ val CHANGELOG_RELEASES = listOf(
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.2",
         features = listOf(
-            ChangelogFeature(Icons.Filled.Sync, "Ani-Sync Timeframes & Setup Guide", "Added a sync timeframe selector (Recent, Last Week, Last Month, Last Year, All Time), replaced the TV credential form with a Jellio Web setup notice and Setup Guide dialog, and centered the empty sync activity text."),
+            ChangelogFeature(Icons.Filled.Sync, "Ani-Sync Timeframes, Setup Guide & Delete Fix", "Added a sync timeframe selector (Recent, Last Week, Last Month, Last Year, All Time), replaced the TV credential form with a Jellio Web setup notice and adaptive Setup Guide dialog, centered the empty sync activity text, and fixed holding to delete custom genre rows immediately closing the confirmation modal on button release."),
         ),
     ),
     ChangelogRelease(

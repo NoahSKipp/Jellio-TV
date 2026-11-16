@@ -830,6 +830,7 @@ data class AniSyncServiceStatusDto(
     val HasRefreshToken: Boolean = false,
     val HasCustomClientId: Boolean = false,
     val ServerClientId: String? = null,
+    val HasServerClientSecret: Boolean = false,
     val SupportsPinAuth: Boolean = false,
     val UpdatedAtUtc: String? = null,
     val LastSyncAtUtc: String? = null,

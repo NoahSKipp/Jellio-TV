@@ -754,6 +754,7 @@ fun SettingsScreen(
 
                     genreToDelete?.let { name ->
                         val cancelFocus = remember { FocusRequester() }
+                        var ignoreInitialKeyUp by remember(name) { mutableStateOf(true) }
                         LaunchedEffect(Unit) {
                             repeat(5) {
                                 if (runCatching { cancelFocus.requestFocus() }.isSuccess) return@LaunchedEffect
@@ -769,6 +770,18 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .background(Color.Black.copy(alpha = 0.65f))
+                                    .onPreviewKeyEvent { event ->
+                                        if (ignoreInitialKeyUp) {
+                                            if (event.type == KeyEventType.KeyUp) {
+                                                ignoreInitialKeyUp = false
+                                                return@onPreviewKeyEvent true
+                                            }
+                                            if (event.type == KeyEventType.KeyDown) {
+                                                ignoreInitialKeyUp = false
+                                            }
+                                        }
+                                        false
+                                    },
                             ) {
                                 Surface(
                                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(16.dp)),
@@ -2117,41 +2130,89 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun AniSyncSetupGuideDialog(onDismiss: () -> Unit) {
+private fun AniSyncSetupGuideDialog(
+    services: List<com.jellio.tv.data.model.AniSyncServiceStatusDto>,
+    onDismiss: () -> Unit,
+) {
     val guideScroll = rememberScrollState()
     val closeFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         delay(80)
         runCatching { closeFocus.requestFocus() }
     }
+    fun isServerConfigured(id: String): Boolean {
+        val svc = services.find { it.Id.equals(id, ignoreCase = true) } ?: return false
+        val hasId = !svc.ServerClientId.isNullOrBlank()
+        return when (id) {
+            "anilist", "myanimelist" -> hasId
+            "shikimori" -> hasId && svc.HasServerClientSecret
+            "simkl" -> hasId
+            else -> false
+        }
+    }
     val sections = listOf(
-        "AniList" to listOf(
-            "1. Open anilist.co/settings/developer in a browser and click Create New Client.",
-            "2. Set Redirect URL to: https://anilist.co/api/v2/oauth/pin",
-            "3. Copy your Client ID (Client Secret is not needed for AniList).",
-            "4. In Jellio Web (Settings > Ani-Sync > AniList), expand Advanced Settings, paste Client ID, and click Authorize with AniList.",
-            "5. Approve on AniList, copy the full redirect URL (#access_token=...), paste it into the token box, and click Save & Connect.",
-        ),
-        "MyAnimeList" to listOf(
-            "1. Open myanimelist.net/apiconfig in a browser and click Create ID.",
-            "2. Set App Type to web and App Redirect URL to your Jellio Web URL.",
-            "3. Copy your Client ID (and Client Secret if provided).",
-            "4. In Jellio Web (Settings > Ani-Sync > MyAnimeList), expand Advanced Settings, paste Client ID (and Secret), and click Authorize with MyAnimeList.",
-            "5. Approve on MyAnimeList, copy the callback URL (?code=...&state=...), paste it into the token box, and click Save & Connect.",
-        ),
-        "Shikimori" to listOf(
-            "1. Open shikimori.one/oauth/applications in a browser and create a new OAuth application.",
-            "2. Set Redirect URI to urn:ietf:wg:oauth:2.0:oob (or your Jellio Web URL).",
-            "3. Copy your Client ID and Client Secret.",
-            "4. In Jellio Web (Settings > Ani-Sync > Shikimori), expand Advanced Settings, paste Client ID and Client Secret, and click Authorize with Shikimori.",
-            "5. Approve on Shikimori, copy the authorization code or callback URL, paste it into the token box, and click Save & Connect.",
-        ),
-        "Simkl" to listOf(
-            "1. Open simkl.com/settings/developer/ in a browser and create an application.",
-            "2. Set Redirect URI to your Jellio Web URL and copy your Client ID (and Client Secret for OAuth redirect).",
-            "3. In Jellio Web (Settings > Ani-Sync > Simkl), expand Advanced Settings and paste your Client ID.",
-            "4. Click Connect with PIN Code (visit simkl.com/pin and enter the code) or click Authorize with Simkl and paste the callback URL.",
-        ),
+        "AniList" to if (isServerConfigured("anilist")) {
+            listOf(
+                "Configured on this server: you only need your own AniList account.",
+                "1. Open Jellio Web (Settings > Ani-Sync > AniList) and click Authorize with AniList.",
+                "2. Log in to your AniList account and approve access.",
+                "3. Copy the full redirect URL (#access_token=...), paste it into the token box, and click Save & Connect.",
+            )
+        } else {
+            listOf(
+                "1. Open anilist.co/settings/developer in a browser and click Create New Client.",
+                "2. Set Redirect URL to: https://anilist.co/api/v2/oauth/pin",
+                "3. Copy your Client ID (Client Secret is not needed for AniList).",
+                "4. In Jellio Web (Settings > Ani-Sync > AniList), expand Advanced Settings, paste Client ID, and click Authorize with AniList.",
+                "5. Approve on AniList, copy the full redirect URL (#access_token=...), paste it into the token box, and click Save & Connect.",
+            )
+        },
+        "MyAnimeList" to if (isServerConfigured("myanimelist")) {
+            listOf(
+                "Configured on this server: you only need your own MyAnimeList account.",
+                "1. Open Jellio Web (Settings > Ani-Sync > MyAnimeList) and click Authorize with MyAnimeList.",
+                "2. Log in to your MyAnimeList account and approve access.",
+                "3. Copy the callback URL (?code=...&state=...), paste it into the token box, and click Save & Connect.",
+            )
+        } else {
+            listOf(
+                "1. Open myanimelist.net/apiconfig in a browser and click Create ID.",
+                "2. Set App Type to web and App Redirect URL to your Jellio Web URL.",
+                "3. Copy your Client ID (and Client Secret if provided).",
+                "4. In Jellio Web (Settings > Ani-Sync > MyAnimeList), expand Advanced Settings, paste Client ID (and Secret), and click Authorize with MyAnimeList.",
+                "5. Approve on MyAnimeList, copy the callback URL (?code=...&state=...), paste it into the token box, and click Save & Connect.",
+            )
+        },
+        "Shikimori" to if (isServerConfigured("shikimori")) {
+            listOf(
+                "Configured on this server: you only need your own Shikimori account.",
+                "1. Open Jellio Web (Settings > Ani-Sync > Shikimori) and click Authorize with Shikimori.",
+                "2. Log in to your Shikimori account and approve access.",
+                "3. Copy the authorization code or callback URL, paste it into the token box, and click Save & Connect.",
+            )
+        } else {
+            listOf(
+                "1. Open shikimori.one/oauth/applications in a browser and create a new OAuth application.",
+                "2. Set Redirect URI to urn:ietf:wg:oauth:2.0:oob (or your Jellio Web URL).",
+                "3. Copy your Client ID and Client Secret.",
+                "4. In Jellio Web (Settings > Ani-Sync > Shikimori), expand Advanced Settings, paste Client ID and Client Secret, and click Authorize with Shikimori.",
+                "5. Approve on Shikimori, copy the authorization code or callback URL, paste it into the token box, and click Save & Connect.",
+            )
+        },
+        "Simkl" to if (isServerConfigured("simkl")) {
+            listOf(
+                "Configured on this server: you only need your own Simkl account.",
+                "1. Open Jellio Web (Settings > Ani-Sync > Simkl) and click Connect with PIN Code (or Authorize with Simkl).",
+                "2. Visit simkl.com/pin and enter the code shown on Jellio Web to link your Simkl account.",
+            )
+        } else {
+            listOf(
+                "1. Open simkl.com/settings/developer/ in a browser and create an application.",
+                "2. Set Redirect URI to your Jellio Web URL and copy your Client ID (and Client Secret for OAuth redirect).",
+                "3. In Jellio Web (Settings > Ani-Sync > Simkl), expand Advanced Settings and paste your Client ID.",
+                "4. Click Connect with PIN Code (visit simkl.com/pin and enter the code) or click Authorize with Simkl and paste the callback URL.",
+            )
+        },
     )
 
     Dialog(onDismissRequest = onDismiss) {
