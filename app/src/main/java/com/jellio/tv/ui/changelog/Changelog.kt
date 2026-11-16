@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.1.5",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.1.5",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Episode Long-Press Menu", "Long-pressing an episode in the episode drawer on an episode's detail page now opens a compact action dialog that stays open when you release the Select button."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.1.4",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.1.4",
