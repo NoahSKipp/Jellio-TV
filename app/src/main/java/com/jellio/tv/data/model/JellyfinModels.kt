@@ -806,6 +806,7 @@ data class AniSyncServiceRequest(
 data class AniSyncSyncNowRequest(
     val Service: String? = null,
     val Limit: Int = 5,
+    val Range: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

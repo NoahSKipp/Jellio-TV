@@ -1435,8 +1435,8 @@ class JellioRepository @Inject constructor(
         return result
     }
 
-    suspend fun syncAniSyncNow(service: String? = null, limit: Int = 5): com.jellio.tv.data.model.AniSyncSyncNowResultDto {
-        val result = api.syncAniSyncNow(com.jellio.tv.data.model.AniSyncSyncNowRequest(Service = service, Limit = limit))
+    suspend fun syncAniSyncNow(service: String? = null, limit: Int = 5, range: String? = null): com.jellio.tv.data.model.AniSyncSyncNowResultDto {
+        val result = api.syncAniSyncNow(com.jellio.tv.data.model.AniSyncSyncNowRequest(Service = service, Limit = limit, Range = range))
         result.Settings?.let { aniSyncSettingsCache["current"] = it }
         return result
     }

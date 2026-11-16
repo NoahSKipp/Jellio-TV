@@ -546,12 +546,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun syncAniSyncNow(service: String) {
+    fun syncAniSyncNow(service: String, range: String? = null) {
         viewModelScope.launch {
             _aniSyncActionBusy.value = "sync-now"
             _aniSyncMessage.value = null
             try {
-                val result = repository.syncAniSyncNow(service = service, limit = 5)
+                val result = repository.syncAniSyncNow(service = service, limit = 5, range = range)
                 if (result.Settings != null) {
                     _aniSyncSettings.value = result.Settings
                 }

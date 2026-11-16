@@ -2068,6 +2068,16 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
             )
 
             if (activeServiceStatus?.Connected == true) {
+                var syncRange by remember { mutableStateOf("recent") }
+                val syncRanges = listOf(
+                    "recent" to string("anisync_range_recent"),
+                    "week" to string("anisync_range_week"),
+                    "month" to string("anisync_range_month"),
+                    "year" to string("anisync_range_year"),
+                    "all" to string("anisync_range_all"),
+                )
+                val activeRangeIndex = syncRanges.indexOfFirst { it.first == syncRange }.coerceAtLeast(0)
+                val activeRangeLabel = syncRanges[activeRangeIndex].second
                 PasswordButton(
                     label = string("anisync_btn_test"),
                     enabled = actionBusy == null,
@@ -2075,10 +2085,16 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
                     onClick = { viewModel.testAniSync(activeServiceId) },
                 )
                 PasswordButton(
+                    label = activeRangeLabel,
+                    enabled = actionBusy == null,
+                    jumpLeftToCategory = false,
+                    onClick = { syncRange = syncRanges[(activeRangeIndex + 1) % syncRanges.size].first },
+                )
+                PasswordButton(
                     label = string("anisync_btn_sync_now"),
                     enabled = actionBusy == null,
                     jumpLeftToCategory = false,
-                    onClick = { viewModel.syncAniSyncNow(activeServiceId) },
+                    onClick = { viewModel.syncAniSyncNow(activeServiceId, syncRange) },
                 )
                 PasswordButton(
                     label = string("anisync_btn_disconnect"),
@@ -2129,6 +2145,7 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
         if (logs.isEmpty()) {
             var isFocused by remember { mutableStateOf(false) }
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
@@ -2142,7 +2159,12 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
                     .onFocusChanged { isFocused = it.isFocused }
                     .padding(horizontal = 20.dp, vertical = 14.dp),
             ) {
-                Text(text = string("anisync_recent_empty"), color = JellioTextSecondary, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = string("anisync_recent_empty"),
+                    color = JellioTextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
             }
         } else {
             logs.take(10).forEachIndexed { index, entry ->

@@ -44,4 +44,9 @@ internal fun fillAniSyncPt(m: HashMap<String, String>) {
     m["anisync_sync_failed"] = "Falha no pedido de sincronização"
     m["anisync_simkl_pin_error"] = "Falha ao gerar o PIN Simkl"
     m["anisync_simkl_pin_expired"] = "O PIN Simkl expirou ou foi cancelado"
+    m["anisync_range_recent"] = "Período: Recentes (5)"
+    m["anisync_range_week"] = "Período: Última semana"
+    m["anisync_range_month"] = "Período: Último mês"
+    m["anisync_range_year"] = "Período: Último ano"
+    m["anisync_range_all"] = "Período: Todo o tempo"
 }
