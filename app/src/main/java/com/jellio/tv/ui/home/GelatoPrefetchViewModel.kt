@@ -8,6 +8,7 @@ import javax.inject.Inject
 
 import androidx.lifecycle.viewModelScope
 import com.jellio.tv.data.session.SessionManager
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
@@ -29,9 +30,9 @@ class GelatoPrefetchViewModel @Inject constructor(
             if (cachedEpId != null) {
                 repository.prefetchStreams(cachedEpId)
             } else {
-                val session = sessionManager.currentSession.value
-                if (session != null) {
-                    viewModelScope.launch {
+                viewModelScope.launch {
+                    val session = sessionManager.sessionFlow.firstOrNull()
+                    if (session != null) {
                         val target = com.jellio.tv.data.catching {
                             repository.resolveSeriesPlayTarget(item.Id, session.userId)
                         }.getOrNull()
@@ -43,9 +44,9 @@ class GelatoPrefetchViewModel @Inject constructor(
                         } else {
                             repository.prefetchStreams(item.Id)
                         }
+                    } else {
+                        repository.prefetchStreams(item.Id)
                     }
-                } else {
-                    repository.prefetchStreams(item.Id)
                 }
             }
         } else {

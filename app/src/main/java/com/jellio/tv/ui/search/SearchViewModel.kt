@@ -200,26 +200,25 @@ class SearchViewModel @Inject constructor(
             suspend fun runSpellCorrectedPass(corrected: String) {
                 hasRunCorrectedPass = true
                 stateLock.withLock {
-                    _uiState.value = _uiState.value.copy(correctedQuery = corrected)
-                    pending += 2
+                    _uiState.value = _uiState.value.copy(correctedQuery = corrected, isSearching = true)
                 }
                 coroutineScope {
                     launch {
                         try {
                             val items = repository.searchMovies(corrected)
                             add(items)
-                        } catch (_: Exception) {} finally {
-                            settle(1, false)
-                        }
+                        } catch (_: Exception) {}
                     }
                     launch {
                         try {
                             val items = repository.searchSeries(corrected)
                             add(items)
-                        } catch (_: Exception) {} finally {
-                            settle(1, false)
-                        }
+                        } catch (_: Exception) {}
                     }
+                }
+                if (_uiState.value.query == query) {
+                    _uiState.value = _uiState.value.copy(isSearching = false)
+                    showSuggestions()
                 }
             }
 

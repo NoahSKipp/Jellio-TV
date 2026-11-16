@@ -15,6 +15,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val TRANSCODE_REASONS_PARAM = Regex("[?&]TranscodeReasons=([^&]*)", RegexOption.IGNORE_CASE)
+private val TRANSCODE_MEDIA_SOURCE_PARAM = Regex("[?&]MediaSourceId=([^&]*)", RegexOption.IGNORE_CASE)
 private const val PLAYBACK_PREFETCH_TTL_MS = 45_000L
 private const val FIRST_BYTES_RANGE_BYTES = 256L * 1024
 private const val FIRST_BYTES_GRACE_MS = 3_000L
