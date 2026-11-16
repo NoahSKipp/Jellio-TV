@@ -45,7 +45,7 @@ fun titleArtCandidates(
 fun titleLogoCandidates(
     item: BaseItemDto,
     url: (itemId: String, tag: String, imageType: String, maxWidth: Int) -> String,
-    maxWidth: Int = 800,
+    maxWidth: Int = 1200,
 ): List<String> = buildList {
     item.ImageTags?.get("Logo")?.let { add(url(item.Id, it, "Logo", maxWidth)) }
     if (item.ParentLogoItemId != null && item.ParentLogoImageTag != null) {

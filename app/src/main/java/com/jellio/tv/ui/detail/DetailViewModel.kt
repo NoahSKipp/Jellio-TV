@@ -249,9 +249,9 @@ class DetailViewModel @Inject constructor(
         val logoUrl = if (isEpisode) {
             val tag = item.ParentLogoImageTag
             val id = item.ParentLogoItemId ?: item.SeriesId
-            if (tag != null && id != null) repository.imageUrl(session.serverAddress, id, tag, "Logo", 800, session.accessToken) else null
+            if (tag != null && id != null) repository.imageUrl(session.serverAddress, id, tag, "Logo", 1200, session.accessToken) else null
         } else {
-            item.ImageTags?.get("Logo")?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Logo", 800, session.accessToken) }
+            item.ImageTags?.get("Logo")?.let { repository.imageUrl(session.serverAddress, item.Id, it, "Logo", 1200, session.accessToken) }
         }
         return TitleLoadingArtInfo(art, logoUrl, if (isEpisode) item.SeriesName.orEmpty() else item.Name.orEmpty())
     }

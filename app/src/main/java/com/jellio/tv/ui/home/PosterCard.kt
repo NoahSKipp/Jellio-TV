@@ -270,7 +270,7 @@ fun PosterCard(
     val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
 
     val logoCandidates = remember(item, imageUrl, wantsBanner) {
-        if (wantsBanner) posterLogoCandidates(item, imageUrl, 300) else emptyList()
+        if (wantsBanner) posterLogoCandidates(item, imageUrl, 800) else emptyList()
     }
     var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeLogoUrl = logoCandidates.getOrNull(logoIndex)

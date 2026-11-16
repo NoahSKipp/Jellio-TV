@@ -216,7 +216,7 @@ private fun ShowcaseLogo(
     title: String,
     imageUrl: (BaseItemDto, String, Int) -> String,
 ) {
-    val candidates = remember(item.Id, series?.Id) { posterLogoCandidates(item, imageUrl, 600, series = series) }
+    val candidates = remember(item.Id, series?.Id) { posterLogoCandidates(item, imageUrl, 1200, series = series) }
     var index by remember(candidates) { mutableIntStateOf(0) }
     val url = candidates.getOrNull(index)
     val context = LocalContext.current
