@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.1",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.1",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Settings, "Settings Sidebar Scrolling", "Made the Settings category sidebar scrollable with bottom padding so the About menu item is never clipped on TV screens."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.2.0",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.0",

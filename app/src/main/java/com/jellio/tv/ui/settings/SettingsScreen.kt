@@ -221,11 +221,15 @@ fun SettingsScreen(
     }
     Row(modifier = Modifier.fillMaxSize().padding(top = 32.dp, start = 48.dp, end = 48.dp)) {
         val currentCategoryFocus = categoryFocus.getValue(category)
+        val categoryScrollState = rememberScrollState()
         Column(modifier = Modifier.width(310.dp)) {
             Text(text = string("settings_title"), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(categoryScrollState)
+                    .padding(bottom = 32.dp)
                     .focusRestorer(currentCategoryFocus)
                     .focusGroup(),
             ) {
