@@ -2123,15 +2123,39 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
         icon = Icons.Filled.Info,
     ) {
         if (logs.isEmpty()) {
-            Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+            var isFocused by remember { mutableStateOf(false) }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isFocused) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+                    .border(
+                        width = if (isFocused) 1.dp else 0.dp,
+                        color = if (isFocused) Color.White.copy(alpha = 0.35f) else Color.Transparent,
+                        shape = RoundedCornerShape(10.dp),
+                    )
+                    .focusable()
+                    .onFocusChanged { isFocused = it.isFocused }
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+            ) {
                 Text(text = string("anisync_recent_empty"), color = JellioTextSecondary, style = MaterialTheme.typography.bodyMedium)
             }
         } else {
             logs.take(10).forEachIndexed { index, entry ->
                 if (index > 0) SettingsDivider()
+                var isFocused by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isFocused) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+                        .border(
+                            width = if (isFocused) 1.dp else 0.dp,
+                            color = if (isFocused) Color.White.copy(alpha = 0.35f) else Color.Transparent,
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                        .focusable()
+                        .onFocusChanged { isFocused = it.isFocused }
                         .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
