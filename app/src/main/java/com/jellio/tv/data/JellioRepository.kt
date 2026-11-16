@@ -229,7 +229,10 @@ class JellioRepository @Inject constructor(
         showcaseCache.clear()
         playback.clear()
         emptyTodayStreamCheckAt.clear()
+        aniSyncSettingsCache.clear()
     }
+
+    private val aniSyncSettingsCache = java.util.concurrent.ConcurrentHashMap<String, com.jellio.tv.data.model.AniSyncSettingsDto>()
 
     suspend fun knownServerAddress(): String? = sessionManager.serverAddress()
 
@@ -658,7 +661,7 @@ class JellioRepository @Inject constructor(
                 limit = limit,
                 startIndex = startIndex,
                 genres = genre,
-                sortBy = "CommunityRating",
+                sortBy = "CommunityRating,ProductionYear",
                 sortOrder = "Descending",
                 fields = "$ITEM_FIELDS,ProductionYear,CommunityRating",
             ).Items,
@@ -765,7 +768,20 @@ class JellioRepository @Inject constructor(
         ).Items
     }
 
-    suspend fun getSearchSuggestions(query: String): com.jellio.tv.data.model.SearchSuggestionsDto = api.getSearchSuggestions(query)
+    suspend fun getSearchSuggestions(
+        query: String,
+        tmdbId: String? = null,
+        mediaType: String? = null,
+        enableVirtual: Boolean = true,
+        userId: String? = null,
+    ): com.jellio.tv.data.model.SearchSuggestionsDto =
+        api.getSearchSuggestions(query, tmdbId = tmdbId, mediaType = mediaType, enableVirtual = enableVirtual, userId = userId)
+
+    suspend fun searchFuzzy(session: Session, term: String, limit: Int = 24): com.jellio.tv.data.model.FuzzySearchResponseDto =
+        catching { api.searchFuzzy(term, session.userId, limit) }.getOrDefault(com.jellio.tv.data.model.FuzzySearchResponseDto())
+
+    suspend fun getTopPicksRecommendations(session: Session, limit: Int = 20): List<BaseItemDto> =
+        catching { api.getTopPicksRecommendations(session.userId, limit, enableVirtual = true).Items }.getOrDefault(emptyList())
 
     suspend fun searchMovies(term: String): List<BaseItemDto> = api.searchGelatoMovies(term)
 
@@ -949,17 +965,80 @@ class JellioRepository @Inject constructor(
         return entry.second.takeIf { System.currentTimeMillis() - entry.first < PRELOAD_TTL_MS }
     }
 
-    suspend fun getRecentlyCompleted(userId: String, limit: Int): List<BaseItemDto> =
-        api.getItems(
-            userId = userId,
-            includeItemTypes = "Movie,Series",
-            recursive = true,
-            filters = "IsPlayed",
-            sortBy = "DatePlayed",
-            sortOrder = "Descending",
-            limit = limit,
-            fields = "Genres,People,ProductionYear,CommunityRating,RunTimeTicks",
-        ).Items
+    suspend fun getRecentlyCompleted(userId: String, limit: Int): List<BaseItemDto> = coroutineScope {
+        val fields = "Genres,People,Studios,ProductionYear,CommunityRating,RunTimeTicks,UserData,DatePlayed"
+        val directDeferred = async {
+            catching {
+                api.getItems(
+                    userId = userId,
+                    includeItemTypes = "Movie,Series",
+                    recursive = true,
+                    filters = "IsPlayed",
+                    sortBy = "DatePlayed",
+                    sortOrder = "Descending",
+                    limit = limit,
+                    fields = fields,
+                ).Items
+            }.getOrDefault(emptyList())
+        }
+        val episodesDeferred = async {
+            catching {
+                api.getItems(
+                    userId = userId,
+                    includeItemTypes = "Episode",
+                    filters = "IsPlayed",
+                    sortBy = "DatePlayed",
+                    sortOrder = "Descending",
+                    limit = 30,
+                    fields = "SeriesId,UserData,DatePlayed",
+                ).Items
+            }.getOrDefault(emptyList())
+        }
+
+        val directItems = directDeferred.await()
+        val episodes = episodesDeferred.await()
+
+        val seriesStats = mutableMapOf<String, Pair<Int, String>>()
+        for (ep in episodes) {
+            val seriesId = ep.SeriesId ?: continue
+            val playedAt = ep.UserData?.LastPlayedDate ?: ep.PremiereDate.orEmpty()
+            val existing = seriesStats[seriesId]
+            if (existing == null) {
+                seriesStats[seriesId] = 1 to playedAt
+            } else {
+                val newCount = existing.first + 1
+                val latest = if (playedAt > existing.second) playedAt else existing.second
+                seriesStats[seriesId] = newCount to latest
+            }
+        }
+
+        val directIds = directItems.map { it.Id }.toSet()
+        val missingSeriesIds = seriesStats.keys.filter { it !in directIds }.take(12)
+
+        val parentSeries = if (missingSeriesIds.isNotEmpty()) {
+            catching {
+                api.getItemsByIds(userId, missingSeriesIds.joinToString(","), fields).Items
+            }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+
+        val merged = (directItems + parentSeries).map { item ->
+            val stat = seriesStats[item.Id]
+            if (stat != null) {
+                val existingUserData = item.UserData ?: UserItemDataDto()
+                val updatedDate = existingUserData.LastPlayedDate ?: stat.second.takeIf { it.isNotEmpty() }
+                item.copy(
+                    UserData = existingUserData.copy(LastPlayedDate = updatedDate),
+                    recentEpisodeCount = stat.first,
+                )
+            } else {
+                item
+            }
+        }
+
+        merged.sortedByDescending { it.UserData?.LastPlayedDate.orEmpty() }.take(limit)
+    }
 
     suspend fun getRecommendationCandidates(userId: String, seed: BaseItemDto, limit: Int): List<CandidateEntry> =
         cachedUnlessEmpty("reccand:$userId:${seed.Id}:$limit") { fetchRecommendationCandidates(userId, seed, limit) }
@@ -1223,16 +1302,27 @@ class JellioRepository @Inject constructor(
         return result
     }
 
-    suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto =
-        if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
+    suspend fun setRating(userId: String, itemId: String, likes: Boolean?): UserItemDataDto {
+        com.jellio.tv.data.recommend.RecommendationEngine.invalidateCache()
+        return if (likes == null) api.clearRating(userId, itemId) else api.setRating(userId, itemId, likes)
+    }
 
     fun prefetchStreams(itemId: String) = streams.prefetchStreams(itemId)
 
-    fun prefetchStreamsBatch(itemIds: List<String>): kotlinx.coroutines.Job? = streams.prefetchStreamsBatch(itemIds)
+    fun prefetchStreamsBatch(itemIds: List<String>, probe: Boolean = false): kotlinx.coroutines.Job? = streams.prefetchStreamsBatch(itemIds, probe = probe)
 
     suspend fun getWarmSources(itemId: String): Map<String, String>? = streams.getWarmSources(itemId)
 
     fun recentWarmSources(itemId: String): Set<String>? = streams.recentWarmSources(itemId)
+
+    fun getLocallyWarmedSourceIds(itemId: String): Set<String> = streams.getLocallyWarmedSourceIds(itemId)
+
+    fun recordWarmedSource(itemId: String, sourceId: String?) = streams.recordWarmedSource(itemId, sourceId)
+
+    fun warmSource(userId: String, itemId: String, sourceId: String) = streams.warmSource(userId, itemId, sourceId)
+
+    fun warmSecondSource(session: Session, itemId: String, sources: List<MediaSourceDto>) =
+        streams.warmSecondSource(session.userId, itemId, sources)
 
     suspend fun getQualityTiers(itemId: String): Map<String, String> = streams.getQualityTiers(itemId)
 
@@ -1280,6 +1370,86 @@ class JellioRepository @Inject constructor(
 
     suspend fun reportRealDuration(itemId: String, durationTicks: Long) =
         api.reportRealDuration(ReportDurationRequest(itemId, durationTicks))
+
+    suspend fun getAniSyncSettings(): com.jellio.tv.data.model.AniSyncSettingsDto {
+        return api.getAniSyncSettings().also {
+            aniSyncSettingsCache["current"] = it
+        }
+    }
+
+    suspend fun updateAniSyncPreferences(
+        selectedService: String? = null,
+        enabled: Boolean? = null,
+        syncAllConnected: Boolean? = null,
+        onlyAnimeItems: Boolean? = null,
+    ): com.jellio.tv.data.model.AniSyncSettingsDto {
+        val updated = api.updateAniSyncPreferences(
+            com.jellio.tv.data.model.AniSyncPreferencesRequest(
+                SelectedService = selectedService,
+                Enabled = enabled,
+                SyncAllConnected = syncAllConnected,
+                OnlyAnimeItems = onlyAnimeItems,
+            )
+        )
+        aniSyncSettingsCache["current"] = updated
+        return updated
+    }
+
+    suspend fun connectAniSync(
+        service: String,
+        username: String? = null,
+        accessToken: String? = null,
+        refreshToken: String? = null,
+        clientId: String? = null,
+        clientSecret: String? = null,
+        authCode: String? = null,
+        redirectUri: String? = null,
+        oauthState: String? = null,
+    ): com.jellio.tv.data.model.AniSyncConnectResultDto {
+        val result = api.connectAniSync(
+            com.jellio.tv.data.model.AniSyncConnectRequest(
+                Service = service,
+                Username = username,
+                AccessToken = accessToken,
+                RefreshToken = refreshToken,
+                ClientId = clientId,
+                ClientSecret = clientSecret,
+                AuthCode = authCode,
+                RedirectUri = redirectUri,
+                OAuthState = oauthState,
+            )
+        )
+        result.Settings?.let { aniSyncSettingsCache["current"] = it }
+        return result
+    }
+
+    suspend fun disconnectAniSync(service: String): com.jellio.tv.data.model.AniSyncSettingsDto {
+        val updated = api.disconnectAniSync(service)
+        aniSyncSettingsCache["current"] = updated
+        return updated
+    }
+
+    suspend fun testAniSync(service: String? = null): com.jellio.tv.data.model.AniSyncTestResultDto {
+        val result = api.testAniSync(com.jellio.tv.data.model.AniSyncServiceRequest(Service = service))
+        result.Settings?.let { aniSyncSettingsCache["current"] = it }
+        return result
+    }
+
+    suspend fun syncAniSyncNow(service: String? = null, limit: Int = 5): com.jellio.tv.data.model.AniSyncSyncNowResultDto {
+        val result = api.syncAniSyncNow(com.jellio.tv.data.model.AniSyncSyncNowRequest(Service = service, Limit = limit))
+        result.Settings?.let { aniSyncSettingsCache["current"] = it }
+        return result
+    }
+
+    suspend fun startSimklPin(clientId: String? = null): com.jellio.tv.data.model.SimklPinStartDto {
+        return api.startSimklPin(com.jellio.tv.data.model.SimklPinRequest(ClientId = clientId))
+    }
+
+    suspend fun pollSimklPin(userCode: String, clientId: String? = null): com.jellio.tv.data.model.SimklPinPollResultDto {
+        val result = api.pollSimklPin(com.jellio.tv.data.model.SimklPinPollRequest(UserCode = userCode, ClientId = clientId))
+        result.Settings?.let { aniSyncSettingsCache["current"] = it }
+        return result
+    }
 
     suspend fun deleteProfileBanner() = api.deleteProfileBanner()
 

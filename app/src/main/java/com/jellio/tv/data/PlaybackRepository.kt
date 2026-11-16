@@ -27,12 +27,12 @@ private val DIRECT_PLAY_VIDEO_CODECS = setOf("h264", "avc", "hevc", "h265", "vp8
 private const val PREWARM_RANGE_BYTES = 64L * 1024
 
 // PlaybackInfo, the stream URL the player opens, its warm-ups and the
-// playback reports sent back to Jellyfin.
 @Singleton
 class PlaybackRepository @Inject constructor(
     private val api: JellyfinApi,
     private val sessionManager: SessionManager,
     private val prefetch: PrefetchScope,
+    private val streams: StreamsRepository,
     apiClient: okhttp3.OkHttpClient,
 ) {
     // Video streams on the API client's pool and trust settings, so a
@@ -117,6 +117,8 @@ class PlaybackRepository @Inject constructor(
             FirstBytesWarm(itemId, prefetch.scope.launch { warmStreamStart(streamUrl, FIRST_BYTES_RANGE_BYTES) })
                 .also { firstBytes = it }
         }
+        val mediaSourceId = TRANSCODE_MEDIA_SOURCE_PARAM.find(streamUrl)?.groupValues?.get(1)
+        streams.recordWarmedSource(itemId, mediaSourceId)
         try {
             warm.job.join()
         } finally {
@@ -230,7 +232,9 @@ class PlaybackRepository @Inject constructor(
             }
         }
 
-        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks, directPlay)
+        return PlaybackTarget(streamUrl, mediaSource, response.PlaySessionId, startTimeTicks, directPlay).also {
+            streams.recordWarmedSource(itemId, resolvedMediaSourceId)
+        }
     }
 
     fun getAudioStreams(mediaSource: MediaSourceDto): List<MediaStreamDto> =

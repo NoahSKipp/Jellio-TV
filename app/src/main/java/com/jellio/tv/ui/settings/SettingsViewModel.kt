@@ -88,6 +88,24 @@ class SettingsViewModel @Inject constructor(
     private val _removeFromWatchlistAfterWatching = MutableStateFlow(true)
     val removeFromWatchlistAfterWatching: StateFlow<Boolean> = _removeFromWatchlistAfterWatching.asStateFlow()
 
+    private val _aniSyncSettings = MutableStateFlow<com.jellio.tv.data.model.AniSyncSettingsDto?>(null)
+    val aniSyncSettings: StateFlow<com.jellio.tv.data.model.AniSyncSettingsDto?> = _aniSyncSettings.asStateFlow()
+
+    private val _aniSyncLoading = MutableStateFlow(false)
+    val aniSyncLoading: StateFlow<Boolean> = _aniSyncLoading.asStateFlow()
+
+    private val _aniSyncActionBusy = MutableStateFlow<String?>(null)
+    val aniSyncActionBusy: StateFlow<String?> = _aniSyncActionBusy.asStateFlow()
+
+    private val _aniSyncMessage = MutableStateFlow<String?>(null)
+    val aniSyncMessage: StateFlow<String?> = _aniSyncMessage.asStateFlow()
+
+    private val _simklPinData = MutableStateFlow<com.jellio.tv.data.model.SimklPinStartDto?>(null)
+    val simklPinData: StateFlow<com.jellio.tv.data.model.SimklPinStartDto?> = _simklPinData.asStateFlow()
+
+    private val _simklPinPolling = MutableStateFlow(false)
+    val simklPinPolling: StateFlow<Boolean> = _simklPinPolling.asStateFlow()
+
     private var loadedUserId: String? = null
 
     init {
@@ -106,6 +124,9 @@ class SettingsViewModel @Inject constructor(
     fun load(session: Session) {
         if (loadedUserId == session.userId) return
         loadedUserId = session.userId
+        _aniSyncSettings.value = null
+        _aniSyncMessage.value = null
+        dismissSimklPin()
         viewModelScope.launch {
             val user = catching { repository.getUser(session.userId) }.getOrNull() ?: return@launch
             user.Configuration?.let { configuration ->
@@ -119,6 +140,7 @@ class SettingsViewModel @Inject constructor(
             _isPrivate.value = settings.IsPrivate
             _removeFromWatchlistAfterWatching.value = settings.RemoveFromWatchlistAfterWatching
         }
+        loadAniSync()
     }
 
     fun setRemoveFromWatchlistAfterWatching(enabled: Boolean) {
@@ -378,4 +400,255 @@ class SettingsViewModel @Inject constructor(
             syncRecommendationsToServer()
         }
     }
+
+    fun loadAniSync() {
+        viewModelScope.launch {
+            _aniSyncLoading.value = true
+            try {
+                _aniSyncSettings.value = repository.getAniSyncSettings()
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to load AniSync settings", err)
+            } finally {
+                _aniSyncLoading.value = false
+            }
+        }
+    }
+
+    fun selectAniSyncService(serviceId: String) {
+        val current = _aniSyncSettings.value ?: return
+        if (current.SelectedService.equals(serviceId, ignoreCase = true)) return
+        _aniSyncSettings.value = current.copy(SelectedService = serviceId)
+        viewModelScope.launch {
+            try {
+                val updated = repository.updateAniSyncPreferences(selectedService = serviceId)
+                _aniSyncSettings.value = updated
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to update selected AniSync service", err)
+                _aniSyncSettings.value = current
+            }
+        }
+    }
+
+    fun setAniSyncEnabled(enabled: Boolean) {
+        val current = _aniSyncSettings.value ?: return
+        _aniSyncSettings.value = current.copy(Enabled = enabled)
+        viewModelScope.launch {
+            try {
+                val updated = repository.updateAniSyncPreferences(enabled = enabled)
+                _aniSyncSettings.value = updated
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to toggle AniSync enabled", err)
+                _aniSyncSettings.value = current
+            }
+        }
+    }
+
+    fun setAniSyncOnlyAnime(onlyAnime: Boolean) {
+        val current = _aniSyncSettings.value ?: return
+        _aniSyncSettings.value = current.copy(OnlyAnimeItems = onlyAnime)
+        viewModelScope.launch {
+            try {
+                val updated = repository.updateAniSyncPreferences(onlyAnimeItems = onlyAnime)
+                _aniSyncSettings.value = updated
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to toggle AniSync onlyAnime", err)
+                _aniSyncSettings.value = current
+            }
+        }
+    }
+
+    fun setAniSyncAllConnected(allConnected: Boolean) {
+        val current = _aniSyncSettings.value ?: return
+        _aniSyncSettings.value = current.copy(SyncAllConnected = allConnected)
+        viewModelScope.launch {
+            try {
+                val updated = repository.updateAniSyncPreferences(syncAllConnected = allConnected)
+                _aniSyncSettings.value = updated
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to toggle AniSync syncAllConnected", err)
+                _aniSyncSettings.value = current
+            }
+        }
+    }
+
+    fun connectAniSync(
+        service: String,
+        username: String?,
+        accessToken: String?,
+        refreshToken: String?,
+        clientId: String?,
+        clientSecret: String?,
+    ) {
+        viewModelScope.launch {
+            _aniSyncActionBusy.value = "connect"
+            _aniSyncMessage.value = null
+            try {
+                val result = repository.connectAniSync(
+                    service = service,
+                    username = username?.takeIf { it.isNotBlank() },
+                    accessToken = accessToken?.takeIf { it.isNotBlank() },
+                    refreshToken = refreshToken?.takeIf { it.isNotBlank() },
+                    clientId = clientId?.takeIf { it.isNotBlank() },
+                    clientSecret = clientSecret?.takeIf { it.isNotBlank() },
+                )
+                if (result.Settings != null) {
+                    _aniSyncSettings.value = result.Settings
+                } else {
+                    loadAniSync()
+                }
+                _aniSyncMessage.value = com.jellio.tv.data.i18n.Strings.get("anisync_connected_success")
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to connect AniSync service", err)
+                _aniSyncMessage.value = extractHttpError(err) ?: com.jellio.tv.data.i18n.Strings.get("anisync_connected_failure")
+            } finally {
+                _aniSyncActionBusy.value = null
+            }
+        }
+    }
+
+    fun disconnectAniSync(service: String) {
+        viewModelScope.launch {
+            _aniSyncActionBusy.value = "disconnect"
+            _aniSyncMessage.value = null
+            try {
+                val updated = repository.disconnectAniSync(service)
+                _aniSyncSettings.value = updated
+                _aniSyncMessage.value = com.jellio.tv.data.i18n.Strings.get("anisync_disconnected_success")
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to disconnect AniSync service", err)
+                _aniSyncMessage.value = extractHttpError(err) ?: com.jellio.tv.data.i18n.Strings.get("anisync_disconnected_failure")
+            } finally {
+                _aniSyncActionBusy.value = null
+            }
+        }
+    }
+
+    fun testAniSync(service: String) {
+        viewModelScope.launch {
+            _aniSyncActionBusy.value = "test"
+            _aniSyncMessage.value = null
+            try {
+                val result = repository.testAniSync(service)
+                if (result.Settings != null) {
+                    _aniSyncSettings.value = result.Settings
+                }
+                _aniSyncMessage.value = if (result.Ok) {
+                    result.Message.ifBlank { com.jellio.tv.data.i18n.Strings.get("anisync_test_success") }
+                } else {
+                    result.Message.ifBlank { com.jellio.tv.data.i18n.Strings.get("anisync_test_failure") }
+                }
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to test AniSync service", err)
+                _aniSyncMessage.value = extractHttpError(err) ?: com.jellio.tv.data.i18n.Strings.get("anisync_test_failure")
+            } finally {
+                _aniSyncActionBusy.value = null
+            }
+        }
+    }
+
+    fun syncAniSyncNow(service: String) {
+        viewModelScope.launch {
+            _aniSyncActionBusy.value = "sync-now"
+            _aniSyncMessage.value = null
+            try {
+                val result = repository.syncAniSyncNow(service = service, limit = 5)
+                if (result.Settings != null) {
+                    _aniSyncSettings.value = result.Settings
+                }
+                _aniSyncMessage.value = result.Message.ifBlank {
+                    com.jellio.tv.data.i18n.Strings.format(
+                        "anisync_synced_summary",
+                        result.SyncedCount,
+                        result.FailedCount,
+                    )
+                }
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to sync AniSync now", err)
+                _aniSyncMessage.value = extractHttpError(err) ?: com.jellio.tv.data.i18n.Strings.get("anisync_sync_failed")
+            } finally {
+                _aniSyncActionBusy.value = null
+            }
+        }
+    }
+
+    fun startSimklPin(clientId: String?) {
+        viewModelScope.launch {
+            _aniSyncActionBusy.value = "simkl-pin"
+            _aniSyncMessage.value = null
+            try {
+                val start = repository.startSimklPin(clientId?.takeIf { it.isNotBlank() })
+                _simklPinData.value = start
+                if (!start.UserCode.isNullOrBlank()) {
+                    pollSimklPinLoop(start.UserCode, clientId)
+                }
+            } catch (err: Exception) {
+                android.util.Log.w("JellioAniSync", "Failed to start Simkl PIN", err)
+                _aniSyncMessage.value = extractHttpError(err) ?: com.jellio.tv.data.i18n.Strings.get("anisync_simkl_pin_error")
+            } finally {
+                _aniSyncActionBusy.value = null
+            }
+        }
+    }
+
+    private fun extractHttpError(err: Exception): String? {
+        val httpEx = err as? retrofit2.HttpException ?: return null
+        val raw = runCatching { httpEx.response()?.errorBody()?.string() }.getOrNull()?.trim()
+            ?.trim('"')
+            ?.trim()
+            ?: return null
+        if (raw.isBlank() || raw.startsWith("<") || raw.length > 240) return null
+        return raw
+    }
+
+    private var simklPollJob: kotlinx.coroutines.Job? = null
+
+    private fun pollSimklPinLoop(userCode: String, clientId: String?) {
+        simklPollJob?.cancel()
+        simklPollJob = viewModelScope.launch {
+            _simklPinPolling.value = true
+            val interval = ((_simklPinData.value?.Interval ?: 5).coerceAtLeast(3)) * 1000L
+            val maxAttempts = 60
+            var attempts = 0
+            while (attempts < maxAttempts && _simklPinData.value?.UserCode == userCode) {
+                kotlinx.coroutines.delay(interval)
+                attempts++
+                try {
+                    val poll = repository.pollSimklPin(userCode, clientId?.takeIf { it.isNotBlank() })
+                    if (poll.Approved) {
+                        _simklPinData.value = null
+                        _simklPinPolling.value = false
+                        if (poll.Settings != null) {
+                            _aniSyncSettings.value = poll.Settings
+                        } else {
+                            loadAniSync()
+                        }
+                        _aniSyncMessage.value = com.jellio.tv.data.i18n.Strings.get("anisync_connected_success")
+                        break
+                    }
+                    if (!poll.Pending) {
+                        // Expired or rejected
+                        _simklPinData.value = null
+                        _simklPinPolling.value = false
+                        _aniSyncMessage.value = poll.Message ?: com.jellio.tv.data.i18n.Strings.get("anisync_simkl_pin_expired")
+                        break
+                    }
+                } catch (err: Exception) {
+                    android.util.Log.w("JellioAniSync", "Simkl PIN poll error", err)
+                }
+            }
+            _simklPinPolling.value = false
+        }
+    }
+
+    fun dismissSimklPin() {
+        simklPollJob?.cancel()
+        simklPollJob = null
+        _simklPinData.value = null
+        _simklPinPolling.value = false
+    }
+
+    fun clearAniSyncMessage() {
+        _aniSyncMessage.value = null
+    }
 }
+

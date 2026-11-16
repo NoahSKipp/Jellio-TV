@@ -33,6 +33,24 @@ class StreamsRepository @Inject constructor(
     private val prefetchSlots = java.util.concurrent.Semaphore(1)
     // Titles the server said are already warm.
     private val knownWarm = ConcurrentHashMap.newKeySet<String>()
+    // Locally warmed sources cache: itemId -> (normalizedSourceId -> timestampMs) with an 8-minute TTL
+    private val warmedSourcesCache = ConcurrentHashMap<String, ConcurrentHashMap<String, Long>>()
+
+    fun recordWarmedSource(itemId: String, sourceId: String?) {
+        if (itemId.isBlank() || sourceId.isNullOrBlank()) return
+        val normSource = com.jellio.tv.data.streams.normalizeSourceId(sourceId)
+        val now = System.currentTimeMillis()
+        val itemMap = warmedSourcesCache.computeIfAbsent(itemId) { ConcurrentHashMap() }
+        itemMap[normSource] = now
+        warmSeen.remove(itemId)
+    }
+
+    fun getLocallyWarmedSourceIds(itemId: String): Set<String> {
+        val itemMap = warmedSourcesCache[itemId] ?: return emptySet()
+        val now = System.currentTimeMillis()
+        itemMap.entries.removeIf { now - it.value > PREFETCH_WINDOW_MS }
+        return itemMap.keys.toSet()
+    }
 
     fun clear() {
         queuedPrefetch = null
@@ -41,6 +59,7 @@ class StreamsRepository @Inject constructor(
         lastSources.clear()
         prefetchedAt.clear()
         knownWarm.clear()
+        warmedSourcesCache.clear()
     }
 
     suspend fun getMediaSources(
@@ -197,6 +216,9 @@ class StreamsRepository @Inject constructor(
             }
             com.jellio.tv.data.streams.StreamLookupLog.prefetch(itemId)
             try {
+                sourceCache.get(itemId, System.currentTimeMillis())?.firstOrNull()?.Id?.let { s0 ->
+                    recordWarmedSource(itemId, s0)
+                }
                 catching { api.prefetchGelatoStreams(itemId) }
             } finally {
                 prefetchSlots.release()
@@ -222,18 +244,18 @@ class StreamsRepository @Inject constructor(
 
     // Stream lists only, a few titles in one call; the job is cancelled
     // when the search that asked for it changes.
-    fun prefetchStreamsBatch(itemIds: List<String>): kotlinx.coroutines.Job? {
+    fun prefetchStreamsBatch(itemIds: List<String>, probe: Boolean = false): kotlinx.coroutines.Job? {
         val ids = itemIds.filter { it.isNotBlank() && !isKnownWarm(it) }.distinct()
         if (ids.isEmpty()) return null
         return prefetch.scope.launch {
             if (!acquirePrefetchSlot(PREFETCH_SLOT_WAIT_MS)) return@launch
             try {
                 val response = catching {
-                    api.prefetchGelatoBatch(com.jellio.tv.data.model.PrefetchBatchRequest(ids, Probe = false))
+                    api.prefetchGelatoBatch(com.jellio.tv.data.model.PrefetchBatchRequest(ids, Probe = probe))
                 }.getOrNull()
                 if (knownWarm.size > MAX_HINTS) knownWarm.clear()
-                response?.body()?.AlreadyWarm.orEmpty().forEach {
-                    knownWarm.add(com.jellio.tv.data.streams.normalizeSourceId(it))
+                response?.body()?.AlreadyWarm.orEmpty().forEach { warmId ->
+                    knownWarm.add(com.jellio.tv.data.streams.normalizeSourceId(warmId))
                 }
             } finally {
                 prefetchSlots.release()
@@ -270,10 +292,27 @@ class StreamsRepository @Inject constructor(
             try {
                 catching {
                     api.getPlaybackInfo(itemId, PlaybackInfoRequest(UserId = userId, MediaSourceId = mediaSourceId))
+                }.onSuccess {
+                    recordWarmedSource(itemId, mediaSourceId)
                 }
             } finally {
                 prefetchSlots.release()
             }
+        }
+    }
+
+    fun warmSource(userId: String, itemId: String, sourceId: String) {
+        probeSource(userId, itemId, sourceId)
+    }
+
+    fun warmSecondSource(userId: String, itemId: String, sources: List<MediaSourceDto>) {
+        if (sources.size < 2) return
+        val bad = sources.filter { com.jellio.tv.ui.player.BadStreams.isBad(itemId, it) }
+        val second = ((sources - bad.toSet()) + bad).getOrNull(1)?.Id ?: return
+        val warm = (getLocallyWarmedSourceIds(itemId) + recentWarmSources(itemId).orEmpty())
+            .map { com.jellio.tv.data.streams.normalizeSourceId(it) }
+        if (com.jellio.tv.data.streams.normalizeSourceId(second) !in warm) {
+            warmSource(userId, itemId, second)
         }
     }
 

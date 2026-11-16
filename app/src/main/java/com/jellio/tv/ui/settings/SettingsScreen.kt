@@ -132,6 +132,7 @@ private enum class SettingsCategory(val labelKey: String, val icon: ImageVector)
     ACCOUNT("settings_cat_account", Icons.Filled.Person),
     PLAYBACK("settings_cat_playback", Icons.Filled.PlayCircle),
     RECOMMENDATIONS("settings_cat_recommendations", Icons.Filled.AutoAwesome),
+    ANISYNC("settings_cat_anisync", Icons.Filled.Sync),
     SHORTCUTS("settings_cat_shortcuts", Icons.Filled.Tune),
     DISPLAY("settings_cat_display", Icons.Filled.Palette),
     ABOUT("settings_cat_about", Icons.Filled.Info);
@@ -850,6 +851,9 @@ fun SettingsScreen(
                         }
                     }
                 }
+                SettingsCategory.ANISYNC -> {
+                    AniSyncCategoryContent(viewModel = viewModel)
+                }
                 SettingsCategory.DISPLAY -> {
                 val displayContext = androidx.compose.ui.platform.LocalContext.current
                 SettingsSection(title = string("settings_cat_display"), icon = Icons.Filled.Tv) {
@@ -1437,7 +1441,13 @@ private fun PasswordSection(session: Session, viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
+private fun PasswordButton(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    jumpLeftToCategory: Boolean = true,
+) {
     val activeCategoryFocus = LocalActiveCategoryFocus.current
     Surface(
         onClick = onClick,
@@ -1455,7 +1465,13 @@ private fun PasswordButton(label: String, onClick: () -> Unit, enabled: Boolean 
                 shape = RoundedCornerShape(999.dp),
             )
         ),
-        modifier = modifier.then(if (activeCategoryFocus != null) Modifier.focusProperties { left = activeCategoryFocus } else Modifier),
+        modifier = modifier.then(
+            if (jumpLeftToCategory && activeCategoryFocus != null) {
+                Modifier.focusProperties { left = activeCategoryFocus }
+            } else {
+                Modifier
+            }
+        ),
     ) {
         Text(text = label, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
     }
@@ -1777,3 +1793,373 @@ private fun SettingsToggleRow(label: String, description: String, checked: Boole
         SettingsSwitch(checked = checked)
     }
 }
+
+@Composable
+private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
+    val settings by viewModel.aniSyncSettings.collectAsState()
+    val loading by viewModel.aniSyncLoading.collectAsState()
+    val actionBusy by viewModel.aniSyncActionBusy.collectAsState()
+    val message by viewModel.aniSyncMessage.collectAsState()
+    val simklPin by viewModel.simklPinData.collectAsState()
+    val simklPolling by viewModel.simklPinPolling.collectAsState()
+
+    var usernameInput by remember { mutableStateOf("") }
+    var tokenInput by remember { mutableStateOf("") }
+    var clientIdInput by remember { mutableStateOf("") }
+    var clientSecretInput by remember { mutableStateOf("") }
+    var refreshTokenInput by remember { mutableStateOf("") }
+    var showAdvanced by remember { mutableStateOf(false) }
+
+    val currentSettings = settings
+    val activeServiceId = currentSettings?.SelectedService ?: "anilist"
+    val services = currentSettings?.Services.orEmpty()
+    val activeServiceStatus = services.find { it.Id.equals(activeServiceId, ignoreCase = true) }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAniSync()
+    }
+
+    LaunchedEffect(activeServiceId, activeServiceStatus?.UpdatedAtUtc) {
+        usernameInput = activeServiceStatus?.Username.orEmpty()
+        tokenInput = ""
+        clientIdInput = ""
+        clientSecretInput = ""
+        refreshTokenInput = ""
+        showAdvanced = false
+    }
+
+    if (loading && currentSettings == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = string("status_loading"), color = JellioTextSecondary)
+        }
+        return
+    }
+
+    // Active Service Selector Card
+    val supportedServices = listOf(
+        "anilist" to "AniList",
+        "myanimelist" to "MyAnimeList",
+        "shikimori" to "Shikimori",
+        "simkl" to "Simkl",
+    )
+
+    SettingsSection(
+        title = string("anisync_active_service"),
+        icon = Icons.Filled.Sync,
+        description = string("anisync_active_service_desc"),
+    ) {
+        supportedServices.forEach { (id, name) ->
+            val status = services.find { it.Id.equals(id, ignoreCase = true) }
+            val isConnected = status?.Connected == true
+            val isSelected = activeServiceId.equals(id, ignoreCase = true)
+            val connectedUsername = status?.Username
+            val desc = if (isConnected) {
+                if (!connectedUsername.isNullOrBlank()) {
+                    formatString("anisync_connected_as", connectedUsername)
+                } else {
+                    string("anisync_connected")
+                }
+            } else {
+                string("anisync_not_connected")
+            }
+
+            SettingsRowSurface(
+                onClick = { viewModel.selectAniSyncService(id) },
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = name,
+                            color = if (isSelected) JellioSecondary else JellioText,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                        if (isConnected) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0xFF2E7D32).copy(alpha = 0.35f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                Text(
+                                    text = string("anisync_connected"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF81C784),
+                                )
+                            }
+                        }
+                    }
+                    Text(text = desc, color = JellioTextSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = JellioSecondary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    // Login Details for Active Service
+    val activeDisplayName = supportedServices.find { it.first.equals(activeServiceId, ignoreCase = true) }?.second ?: activeServiceId
+    SettingsSection(
+        title = formatString("anisync_login_title", activeDisplayName),
+        icon = Icons.Filled.Key,
+        form = true,
+    ) {
+        if (activeServiceStatus?.Connected == true && !activeServiceStatus.MaskedCredential.isNullOrBlank()) {
+            Text(
+                text = formatString("anisync_connected_as", activeServiceStatus.Username ?: activeDisplayName) + " (" + activeServiceStatus.MaskedCredential + ")",
+                color = Color(0xFF81C784),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
+
+        if (activeServiceId.equals("simkl", ignoreCase = true)) {
+            // Simkl Quick TV PIN card
+            if (simklPin != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = string("anisync_simkl_tv_code"),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = JellioText,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = string("anisync_simkl_tv_code_desc"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = JellioTextSecondary,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = simklPin?.UserCode.orEmpty(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = JellioSecondary,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 4.sp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (simklPolling) {
+                        Text(
+                            text = string("anisync_simkl_waiting"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = JellioTextSecondary,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PasswordButton(
+                        label = string("action_cancel"),
+                        onClick = { viewModel.dismissSimklPin() },
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                PasswordButton(
+                    label = string("anisync_simkl_start_pin"),
+                    onClick = { viewModel.startSimklPin(clientIdInput) },
+                    enabled = actionBusy == null,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        JellioTextField(
+            value = usernameInput,
+            onValueChange = { usernameInput = it },
+            label = string("anisync_username"),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        JellioTextField(
+            value = tokenInput,
+            onValueChange = { tokenInput = it },
+            label = string("anisync_token_or_url"),
+            isPassword = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = string("anisync_token_or_url_hint"),
+            color = JellioTextSecondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        PasswordButton(
+            label = string(if (showAdvanced) "anisync_hide_advanced" else "anisync_show_advanced"),
+            onClick = { showAdvanced = !showAdvanced },
+        )
+
+        if (showAdvanced) {
+            Spacer(modifier = Modifier.height(12.dp))
+            JellioTextField(
+                value = clientIdInput,
+                onValueChange = { clientIdInput = it },
+                label = string("anisync_client_id"),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            JellioTextField(
+                value = clientSecretInput,
+                onValueChange = { clientSecretInput = it },
+                label = string("anisync_client_secret"),
+                isPassword = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            JellioTextField(
+                value = refreshTokenInput,
+                onValueChange = { refreshTokenInput = it },
+                label = string("anisync_refresh_token"),
+                isPassword = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        message?.let { msg ->
+            Text(
+                text = msg,
+                color = JellioSecondary,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(top = 16.dp),
+        ) {
+            PasswordButton(
+                label = string("anisync_btn_connect"),
+                enabled = actionBusy == null && (tokenInput.isNotBlank() || activeServiceStatus?.Connected == true),
+                onClick = {
+                    viewModel.connectAniSync(
+                        service = activeServiceId,
+                        username = usernameInput,
+                        accessToken = tokenInput,
+                        refreshToken = refreshTokenInput,
+                        clientId = clientIdInput,
+                        clientSecret = clientSecretInput,
+                    )
+                },
+            )
+
+            if (activeServiceStatus?.Connected == true) {
+                PasswordButton(
+                    label = string("anisync_btn_test"),
+                    enabled = actionBusy == null,
+                    jumpLeftToCategory = false,
+                    onClick = { viewModel.testAniSync(activeServiceId) },
+                )
+                PasswordButton(
+                    label = string("anisync_btn_sync_now"),
+                    enabled = actionBusy == null,
+                    jumpLeftToCategory = false,
+                    onClick = { viewModel.syncAniSyncNow(activeServiceId) },
+                )
+                PasswordButton(
+                    label = string("anisync_btn_disconnect"),
+                    enabled = actionBusy == null,
+                    jumpLeftToCategory = false,
+                    onClick = { viewModel.disconnectAniSync(activeServiceId) },
+                )
+            }
+        }
+    }
+
+    // Sync Preferences
+    SettingsSection(
+        title = string("anisync_preferences_title"),
+        icon = Icons.Filled.Tune,
+    ) {
+        val enabled = currentSettings?.Enabled ?: false
+        SettingsToggleRow(
+            label = string("anisync_enable_title"),
+            description = string("anisync_enable_desc"),
+            checked = enabled,
+            onToggle = { viewModel.setAniSyncEnabled(!enabled) },
+        )
+        SettingsDivider()
+        val onlyAnime = currentSettings?.OnlyAnimeItems ?: true
+        SettingsToggleRow(
+            label = string("anisync_only_anime_title"),
+            description = string("anisync_only_anime_desc"),
+            checked = onlyAnime,
+            onToggle = { viewModel.setAniSyncOnlyAnime(!onlyAnime) },
+        )
+        SettingsDivider()
+        val allConnected = currentSettings?.SyncAllConnected ?: false
+        SettingsToggleRow(
+            label = string("anisync_all_connected_title"),
+            description = string("anisync_all_connected_desc"),
+            checked = allConnected,
+            onToggle = { viewModel.setAniSyncAllConnected(!allConnected) },
+        )
+    }
+
+    // Recent Sync Activity
+    val logs = currentSettings?.RecentLogs.orEmpty()
+    SettingsSection(
+        title = string("anisync_recent_activity_title"),
+        icon = Icons.Filled.Info,
+    ) {
+        if (logs.isEmpty()) {
+            Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                Text(text = string("anisync_recent_empty"), color = JellioTextSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+        } else {
+            logs.take(10).forEachIndexed { index, entry ->
+                if (index > 0) SettingsDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = if (entry.Success) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = if (entry.Success) Color(0xFF81C784) else JellioDanger,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        val epText = entry.EpisodeNumber?.let { " - Ep $it" }.orEmpty()
+                        Text(
+                            text = "${entry.ItemTitle}$epText (${entry.Service})",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = JellioText,
+                        )
+                        if (entry.Message.isNotBlank()) {
+                            Text(
+                                text = entry.Message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = JellioTextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

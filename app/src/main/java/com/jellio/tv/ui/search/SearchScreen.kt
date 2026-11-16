@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -46,10 +47,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -233,8 +236,18 @@ fun SearchScreen(
             }
         }
 
+        if (!uiState.correctedQuery.isNullOrBlank()) {
+            Text(
+                text = "Showing results for \"${uiState.correctedQuery}\"",
+                color = JellioTextSecondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
+
         when {
-            uiState.results.isNotEmpty() || uiState.isSearching -> {
+            uiState.results.isNotEmpty() || uiState.isSearching || uiState.similarResults.isNotEmpty() -> {
                 val placeholders = when {
                     !uiState.isSearching -> 0
                     uiState.results.isEmpty() -> 12
@@ -245,7 +258,11 @@ fun SearchScreen(
                     val spacing = 16.dp
                     val columnCount = maxOf(1, ((maxWidth + spacing) / (scaledPosterWidth + spacing)).toInt())
                     val results = remember(uiState.results) { uiState.results.distinctBy { it.Id } }
-                    val totalCount = results.size
+                    val similar = remember(uiState.similarResults) { uiState.similarResults.distinctBy { it.Id } }
+                    val primaryCount = results.size
+                    val similarCount = similar.size
+                    val totalFocusCount = primaryCount + similarCount
+
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Fixed(columnCount),
@@ -254,7 +271,7 @@ fun SearchScreen(
                         contentPadding = PaddingValues(bottom = 48.dp),
                         modifier = Modifier.fillMaxSize().focusRestorer(focusController.requesterFor(0)),
                     ) {
-                        items(totalCount, key = { results[it].Id }, contentType = { "poster_card" }) { index ->
+                        items(primaryCount, key = { results[it].Id }, contentType = { "poster_card" }) { index ->
                             val item = results[index]
                             RegisterGridFocusItem(focusController, index)
                             PosterCard(
@@ -263,18 +280,55 @@ fun SearchScreen(
                                 onClick = { onItemClick(item) },
                                 onOptionsClick = { openItemOptions(item) },
                                 canExpand = false,
-                                modifier = Modifier.gridColumnFocus(
-                                    controller = focusController,
-                                    index = index,
-                                    totalCount = totalCount,
-                                    columnCount = columnCount,
-                                    allowExitUp = true,
-                                    allowExitLeft = true,
-                                ),
+                                modifier = Modifier
+                                    .gridColumnFocus(
+                                        controller = focusController,
+                                        index = index,
+                                        totalCount = totalFocusCount,
+                                        columnCount = columnCount,
+                                        allowExitUp = true,
+                                        allowExitLeft = true,
+                                    )
+                                    .onFocusChanged { if (it.isFocused) viewModel.onResultFocused(item.Id) },
                             )
                         }
                         items(placeholders, key = { "placeholder-$it" }, contentType = { "placeholder" }) {
                             SkeletonPoster()
+                        }
+                        if (similarCount > 0) {
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "similar_header") {
+                                Text(
+                                    text = uiState.suggestions?.MatchedTitle?.let {
+                                        com.jellio.tv.ui.i18n.formatString("search_suggest_similar", it)
+                                    } ?: com.jellio.tv.ui.i18n.string("search_suggest_similar_generic"),
+                                    color = JellioText,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
+                                )
+                            }
+                            items(similarCount, key = { "similar_${similar[it].Id}" }, contentType = { "poster_card" }) { sIndex ->
+                                val item = similar[sIndex]
+                                val focusIdx = primaryCount + sIndex
+                                RegisterGridFocusItem(focusController, focusIdx)
+                                PosterCard(
+                                    item = item,
+                                    imageUrl = imageUrl,
+                                    onClick = { onItemClick(item) },
+                                    onOptionsClick = { openItemOptions(item) },
+                                    canExpand = false,
+                                    modifier = Modifier
+                                        .gridColumnFocus(
+                                            controller = focusController,
+                                            index = focusIdx,
+                                            totalCount = totalFocusCount,
+                                            columnCount = columnCount,
+                                            allowExitUp = true,
+                                            allowExitLeft = true,
+                                        )
+                                        .onFocusChanged { if (it.isFocused) viewModel.onResultFocused(item.Id) },
+                                )
+                            }
                         }
                     }
                 }

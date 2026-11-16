@@ -6,16 +6,50 @@ import com.jellio.tv.data.model.BaseItemDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
+import androidx.lifecycle.viewModelScope
+import com.jellio.tv.data.session.SessionManager
+import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
+
 val LocalGelatoPrefetch = androidx.compose.runtime.compositionLocalOf<(BaseItemDto) -> Unit> { {} }
 
 @HiltViewModel
 class GelatoPrefetchViewModel @Inject constructor(
     private val repository: JellioRepository,
+    private val sessionManager: SessionManager,
 ) : ViewModel() {
+    private val seriesTargetCache = ConcurrentHashMap<String, String>()
+
     fun prefetch(item: BaseItemDto) {
         repository.seedPreviews(listOf(item))
         if (item.Type != "Movie" && item.Type != "Episode" && item.Type != "Series") return
         repository.preloadDetails(item.Id)
-        repository.prefetchStreams(item.Id)
+        if (item.Type == "Series") {
+            val cachedEpId = seriesTargetCache[item.Id]
+            if (cachedEpId != null) {
+                repository.prefetchStreams(cachedEpId)
+            } else {
+                val session = sessionManager.currentSession.value
+                if (session != null) {
+                    viewModelScope.launch {
+                        val target = com.jellio.tv.data.catching {
+                            repository.resolveSeriesPlayTarget(item.Id, session.userId)
+                        }.getOrNull()
+                        val epId = target?.episode?.Id
+                        if (epId != null) {
+                            seriesTargetCache[item.Id] = epId
+                            repository.preloadDetails(epId)
+                            repository.prefetchStreams(epId)
+                        } else {
+                            repository.prefetchStreams(item.Id)
+                        }
+                    }
+                } else {
+                    repository.prefetchStreams(item.Id)
+                }
+            }
+        } else {
+            repository.prefetchStreams(item.Id)
+        }
     }
 }

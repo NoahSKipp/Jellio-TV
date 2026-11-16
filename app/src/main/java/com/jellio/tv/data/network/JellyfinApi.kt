@@ -303,7 +303,27 @@ interface JellyfinApi {
     suspend fun clearRating(@Path("userId") userId: String, @Path("itemId") itemId: String): UserItemDataDto
 
     @GET("Jellio/search/suggestions")
-    suspend fun getSearchSuggestions(@Query("query") query: String): com.jellio.tv.data.model.SearchSuggestionsDto
+    suspend fun getSearchSuggestions(
+        @Query("query") query: String,
+        @Query("tmdbId") tmdbId: String? = null,
+        @Query("mediaType") mediaType: String? = null,
+        @Query("enableVirtual") enableVirtual: Boolean = true,
+        @Query("userId") userId: String? = null,
+    ): com.jellio.tv.data.model.SearchSuggestionsDto
+
+    @GET("Jellio/search/fuzzy")
+    suspend fun searchFuzzy(
+        @Query("query") query: String,
+        @Query("userId") userId: String,
+        @Query("limit") limit: Int = 24,
+    ): com.jellio.tv.data.model.FuzzySearchResponseDto
+
+    @GET("Jellio/recommendations/top-picks")
+    suspend fun getTopPicksRecommendations(
+        @Query("userId") userId: String,
+        @Query("limit") limit: Int = 20,
+        @Query("enableVirtual") enableVirtual: Boolean = true,
+    ): ItemsResultDto
 
     @GET("Jellio/calendar")
     suspend fun getCalendarEntries(): List<CalendarEntryDto>
@@ -577,6 +597,30 @@ interface JellyfinApi {
 
     @POST("Jellio/real-duration")
     suspend fun reportRealDuration(@Body body: ReportDurationRequest)
+
+    @GET("Jellio/anisync/settings")
+    suspend fun getAniSyncSettings(): com.jellio.tv.data.model.AniSyncSettingsDto
+
+    @retrofit2.http.PUT("Jellio/anisync/preferences")
+    suspend fun updateAniSyncPreferences(@Body body: com.jellio.tv.data.model.AniSyncPreferencesRequest): com.jellio.tv.data.model.AniSyncSettingsDto
+
+    @POST("Jellio/anisync/connect")
+    suspend fun connectAniSync(@Body body: com.jellio.tv.data.model.AniSyncConnectRequest): com.jellio.tv.data.model.AniSyncConnectResultDto
+
+    @DELETE("Jellio/anisync/disconnect")
+    suspend fun disconnectAniSync(@Query("service") service: String): com.jellio.tv.data.model.AniSyncSettingsDto
+
+    @POST("Jellio/anisync/test")
+    suspend fun testAniSync(@Body body: com.jellio.tv.data.model.AniSyncServiceRequest): com.jellio.tv.data.model.AniSyncTestResultDto
+
+    @POST("Jellio/anisync/sync-now")
+    suspend fun syncAniSyncNow(@Body body: com.jellio.tv.data.model.AniSyncSyncNowRequest): com.jellio.tv.data.model.AniSyncSyncNowResultDto
+
+    @POST("Jellio/anisync/simkl/pin")
+    suspend fun startSimklPin(@Body body: com.jellio.tv.data.model.SimklPinRequest): com.jellio.tv.data.model.SimklPinStartDto
+
+    @POST("Jellio/anisync/simkl/pin/poll")
+    suspend fun pollSimklPin(@Body body: com.jellio.tv.data.model.SimklPinPollRequest): com.jellio.tv.data.model.SimklPinPollResultDto
 }
 
 // Sent on every request's Authorization header, so Jellyfin's device list

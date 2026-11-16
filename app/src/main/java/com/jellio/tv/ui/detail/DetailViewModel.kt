@@ -269,6 +269,12 @@ class DetailViewModel @Inject constructor(
         repository.preloadDetails(target.episode.Id)
         if (!isUnreleasedByDate(target.episode)) {
             repository.prefetchStreams(target.episode.Id)
+            viewModelScope.launch {
+                val sources = catching { repository.getMediaSources(session.userId, target.episode.Id) }.getOrNull().orEmpty()
+                if (sources.isNotEmpty()) {
+                    repository.warmSecondSource(session, target.episode.Id, sources)
+                }
+            }
         }
         return target.episode
     }
@@ -351,6 +357,16 @@ class DetailViewModel @Inject constructor(
                 repository.seedPreviews(episodes)
                 _uiState.value = _uiState.value.copy(selectedSeasonEpisodes = episodes)
                 checkTodayEpisodeStreams(session, episodes)
+                val targetEp = episodes.firstOrNull { it.UserData?.Played != true } ?: episodes.firstOrNull()
+                if (targetEp != null && !isUnreleasedByDate(targetEp)) {
+                    repository.prefetchStreams(targetEp.Id)
+                    launch {
+                        val sources = catching { repository.getMediaSources(session.userId, targetEp.Id) }.getOrNull().orEmpty()
+                        if (sources.isNotEmpty()) {
+                            repository.warmSecondSource(session, targetEp.Id, sources)
+                        }
+                    }
+                }
             }
         }
     }

@@ -56,6 +56,7 @@ data class UserItemDataDto(
     val PlayedPercentage: Double? = null,
     val LastPlayedDate: String? = null,
     val Likes: Boolean? = null,
+    val PlayCount: Int = 0,
 )
 
 @Immutable
@@ -172,6 +173,16 @@ data class BaseItemDto(
     val LocationType: String? = null,
     // Friends who put this title on the reader's watchlist (Watchlist rows only).
     val AddedBy: List<CommunityWatcherDto>? = null,
+    val Studios: List<NameGuidPairDto>? = null,
+    val CollectionName: String? = null,
+    val recentEpisodeCount: Int = 0,
+)
+
+@Immutable
+@JsonClass(generateAdapter = true)
+data class NameGuidPairDto(
+    val Name: String? = null,
+    val Id: String? = null,
 )
 
 @Immutable
@@ -757,4 +768,130 @@ data class SuggestionRowDto(
     val Kind: String = "",
     val Name: String? = null,
     val Items: List<BaseItemDto> = emptyList(),
+)
+
+data class FuzzySearchResponseDto(
+    val Items: List<BaseItemDto> = emptyList(),
+    val CorrectedQuery: String? = null,
+    val Confidence: Double = 0.0,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncPreferencesRequest(
+    val SelectedService: String? = null,
+    val Enabled: Boolean? = null,
+    val SyncAllConnected: Boolean? = null,
+    val OnlyAnimeItems: Boolean? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncConnectRequest(
+    val Service: String,
+    val Username: String? = null,
+    val AccessToken: String? = null,
+    val RefreshToken: String? = null,
+    val ClientId: String? = null,
+    val ClientSecret: String? = null,
+    val AuthCode: String? = null,
+    val RedirectUri: String? = null,
+    val OAuthState: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncServiceRequest(
+    val Service: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncSyncNowRequest(
+    val Service: String? = null,
+    val Limit: Int = 5,
+)
+
+@JsonClass(generateAdapter = true)
+data class SimklPinRequest(
+    val ClientId: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class SimklPinPollRequest(
+    val UserCode: String,
+    val ClientId: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncServiceStatusDto(
+    val Id: String = "",
+    val Name: String = "",
+    val Connected: Boolean = false,
+    val Username: String? = null,
+    val MaskedCredential: String? = null,
+    val HasRefreshToken: Boolean = false,
+    val HasCustomClientId: Boolean = false,
+    val ServerClientId: String? = null,
+    val SupportsPinAuth: Boolean = false,
+    val UpdatedAtUtc: String? = null,
+    val LastSyncAtUtc: String? = null,
+    val LastSyncedTitle: String? = null,
+    val LastError: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncLogEntryDto(
+    val TimestampUtc: String? = null,
+    val Service: String = "",
+    val ItemTitle: String = "",
+    val EpisodeNumber: Int? = null,
+    val Success: Boolean = false,
+    val Message: String = "",
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncSettingsDto(
+    val SelectedService: String = "anilist",
+    val Enabled: Boolean = false,
+    val SyncAllConnected: Boolean = false,
+    val OnlyAnimeItems: Boolean = true,
+    val Services: List<AniSyncServiceStatusDto> = emptyList(),
+    val RecentLogs: List<AniSyncLogEntryDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncConnectResultDto(
+    val Connected: Boolean = false,
+    val Service: String = "",
+    val Username: String? = null,
+    val Settings: AniSyncSettingsDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncTestResultDto(
+    val Ok: Boolean = false,
+    val Message: String = "",
+    val Settings: AniSyncSettingsDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class AniSyncSyncNowResultDto(
+    val SyncedCount: Int = 0,
+    val FailedCount: Int = 0,
+    val Message: String = "",
+    val Settings: AniSyncSettingsDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class SimklPinStartDto(
+    val UserCode: String? = null,
+    val VerificationUrl: String? = null,
+    val ExpiresIn: Int = 0,
+    val Interval: Int = 5,
+)
+
+@JsonClass(generateAdapter = true)
+data class SimklPinPollResultDto(
+    val Approved: Boolean = false,
+    val Pending: Boolean = false,
+    val Username: String? = null,
+    val Message: String? = null,
+    val Settings: AniSyncSettingsDto? = null,
 )

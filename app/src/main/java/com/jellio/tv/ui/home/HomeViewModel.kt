@@ -277,9 +277,11 @@ class HomeViewModel @Inject constructor(
                     if (upNextFresh != null && continueWatchingFresh != null) {
                         launch { catching { watchNextSyncer.sync(session, continueWatching, upNext) } }
                     }
-                    repository.prefetchStreamsInTurn(
-                        continueWatching.filter { it.Type == "Movie" || it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT).map { it.Id },
-                    )
+                    val warmableItems = (continueWatching + upNext.take(4))
+                        .filter { it.Type == "Movie" || it.Type == "Episode" }
+                        .distinctBy { it.Id }
+                        .take(CONTINUE_PREFETCH_COUNT)
+                    repository.prefetchStreamsInTurn(warmableItems.map { it.Id })
                     repository.preloadEpisodeSeasonsInTurn(
                         session.userId,
                         (continueWatching + upNext).filter { it.Type == "Episode" }.take(CONTINUE_PREFETCH_COUNT),
@@ -375,6 +377,7 @@ class HomeViewModel @Inject constructor(
                         getRecommendationCandidates = { seed, limit -> repository.getRecommendationCandidates(session.userId, seed, limit) },
                         getGenreItems = { genre, limit -> repository.getGenreItems(session.userId, null, "Movie,Series", genre, limit).filterNot { isAnime(it) } },
                         getGenreItemsPage = { genre, start, size -> repository.getGenreItemsPage(session.userId, null, "Movie,Series", genre, start, size).filterNot { isAnime(it) } },
+                        getTopPicksRecommendations = { limit -> repository.getTopPicksRecommendations(session, limit).filterNot { isAnime(it) } },
                     )
                     val recExclude = mutableSetOf<String>().apply { addAll(animeIds) }
                     val catalogAndGenreDeduplicator = SlidingRowDeduplicator(windowSize = 2, viewportLimit = 6)

@@ -143,9 +143,13 @@ class AppViewModel @Inject constructor(
 
     suspend fun readyInfo(itemId: String): com.jellio.tv.data.streams.ReadyInfo? = kotlinx.coroutines.coroutineScope {
         val tiers = async { repository.getQualityTiers(itemId) }
-        val warm = repository.getWarmSources(itemId) ?: return@coroutineScope null
+        val serverMap = repository.getWarmSources(itemId)
+        val serverWarm = serverMap?.keys.orEmpty().map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet()
+        val localWarm = repository.getLocallyWarmedSourceIds(itemId).map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet()
+        val warm = serverWarm + localWarm
+        if (warm.isEmpty() && serverMap == null) return@coroutineScope null
         com.jellio.tv.data.streams.ReadyInfo(
-            warm.keys.map { com.jellio.tv.data.streams.normalizeSourceId(it) }.toSet(),
+            warm,
             tiers.await().mapKeys { com.jellio.tv.data.streams.normalizeSourceId(it.key) },
         )
     }

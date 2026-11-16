@@ -18,6 +18,7 @@ internal object StringsIt {
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
         fillErrors(m)
+        fillAniSyncIt(m)
         m
     }
 

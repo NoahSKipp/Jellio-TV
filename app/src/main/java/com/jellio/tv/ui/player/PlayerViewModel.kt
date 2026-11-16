@@ -352,6 +352,7 @@ class PlayerViewModel @Inject constructor(
     private var mediaSourceIdParam: String? = null
     private var playbackSession: Session? = null
     private var hasCheckedPreviousEpisodes = false
+    private var hasPrewarmedNextEpisode = false
     private var toastSeq = 0L
 
     // The exception goes to the log; the viewer gets a translated reason.
@@ -428,6 +429,7 @@ class PlayerViewModel @Inject constructor(
             _failover.value = null
             hasCreditedRealWatch = false
             hasCheckedPreviousEpisodes = false
+            hasPrewarmedNextEpisode = false
             currentItem = null
             lastReportedDurationSeconds = 0.0
         }
@@ -1145,6 +1147,16 @@ class PlayerViewModel @Inject constructor(
         if (nextId != null && expected > 0 && positionTicks / 10_000 >= expected * 7 / 10) {
             repository.prefetchStreams(nextId)
         }
+        val currentPositionMs = positionTicks / 10_000L
+        val creditsStartMs = _uiState.value.skipSegments?.credits?.let { (it.start * 1000.0).toLong() } ?: Long.MAX_VALUE
+        val triggerMs = if (expected > 0) minOf(creditsStartMs - 25_000L, expected - 60_000L) else creditsStartMs - 25_000L
+        if (!hasPrewarmedNextEpisode && nextId != null && triggerMs > 0 && currentPositionMs >= triggerMs) {
+            hasPrewarmedNextEpisode = true
+            val session = playbackSession
+            if (session != null) {
+                prewarmNextEpisode(session)
+            }
+        }
         viewModelScope.launch { repository.reportPlaybackProgress(id, uiState.value.mediaSourceId, positionTicks, isPaused) }
     }
 
@@ -1168,6 +1180,12 @@ class PlayerViewModel @Inject constructor(
                     audioPreference = audioPref,
                 )
                 repository.prewarmStreamUrl(target.streamUrl)
+
+                // Prewarm fallback second source as well
+                val sources = catching { repository.getMediaSources(session.userId, nextId, reason = "up next fallback") }.getOrNull().orEmpty()
+                if (sources.isNotEmpty()) {
+                    repository.warmSecondSource(session, nextId, sources)
+                }
             }
         }
     }

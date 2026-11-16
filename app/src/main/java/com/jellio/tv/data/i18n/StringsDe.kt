@@ -18,6 +18,7 @@ internal object StringsDe {
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
         fillErrors(m)
+        fillAniSyncDe(m)
         m
     }
 

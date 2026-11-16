@@ -35,6 +35,9 @@ data class SearchUiState(
     // Nothing found: related titles in the library, the way Netflix answers a
     // title it doesn't carry.
     val suggestions: com.jellio.tv.data.model.SearchSuggestionsDto? = null,
+    val correctedQuery: String? = null,
+    val isSuggestionsLoading: Boolean = false,
+    val similarResults: List<BaseItemDto> = emptyList(),
 )
 
 @HiltViewModel
@@ -60,6 +63,7 @@ class SearchViewModel @Inject constructor(
             com.jellio.tv.data.streams.Cancellable { job.cancel() }
         },
         onSettled = { items -> warmTopResults(items) },
+        onFocused = { id -> repository.prefetchStreams(id) },
         onQueryChanged = {
             warmJob?.cancel()
             warmJob = null
@@ -67,6 +71,10 @@ class SearchViewModel @Inject constructor(
             batchJob = null
         },
     )
+
+    fun onResultFocused(itemId: String) {
+        warmer.focus(itemId)
+    }
 
     private fun warmTopResults(items: List<BaseItemDto>) {
         val session = warmSession ?: return
@@ -80,7 +88,7 @@ class SearchViewModel @Inject constructor(
                 else catching { repository.getSeriesNextUp(item.Id, session.userId)?.Id }.getOrNull() ?: item.Id
             }
             batchJob?.cancel()
-            batchJob = repository.prefetchStreamsBatch(ids)
+            batchJob = repository.prefetchStreamsBatch(ids, probe = true)
         }
     }
 
@@ -90,22 +98,47 @@ class SearchViewModel @Inject constructor(
         warmSession = session
         warmer.query()
         if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(results = emptyList(), isSearching = false, hasSearched = false, error = null, suggestions = null)
+            _uiState.value = _uiState.value.copy(
+                results = emptyList(),
+                isSearching = false,
+                hasSearched = false,
+                error = null,
+                suggestions = null,
+                correctedQuery = null,
+                isSuggestionsLoading = false,
+                similarResults = emptyList(),
+            )
             return
         }
         searchJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true, hasSearched = true, results = emptyList(), error = null, suggestions = null)
+            val variants = com.jellio.tv.data.SearchQueryNormalizer.expandVariants(query)
+            val expandedAlias = variants.firstOrNull { it.lowercase() != query.trim().lowercase() }
+            val primaryQuery = expandedAlias ?: query
+
+            _uiState.value = _uiState.value.copy(
+                isSearching = true,
+                hasSearched = true,
+                results = emptyList(),
+                error = null,
+                suggestions = null,
+                correctedQuery = expandedAlias,
+                isSuggestionsLoading = false,
+                similarResults = emptyList(),
+            )
             delay(DEBOUNCE_MS)
             if (_uiState.value.query != query) return@launch
 
             val stateLock = Mutex()
             val seen = HashSet<String>()
-            var pending = 3
+            var pending = 4
             var failures = 0
             var fellBack = false
             // The library is the main source: with it down, nothing found is not "no results".
             var libraryFailed = false
             var lastError: Throwable? = null
+            var fuzzyCorrectedQuery: String? = null
+            var hasRunCorrectedPass = false
+            var suggestionsRequested = false
 
             suspend fun add(items: List<BaseItemDto>) {
                 stateLock.withLock {
@@ -121,34 +154,106 @@ class SearchViewModel @Inject constructor(
                 }
             }
 
-            suspend fun settle(count: Int, failed: Boolean) {
-                stateLock.withLock {
-                    pending -= count
-                    if (failed) failures += count
-                    if (_uiState.value.query != query || pending > 0) return
-                    val nothing = _uiState.value.results.isEmpty()
-                    val failed = nothing && (failures >= 3 || libraryFailed)
-                    _uiState.value = _uiState.value.copy(
-                        isSearching = false,
-                        error = if (failed) loadFailureOf(lastError) else null,
+            fun pickBestPrimaryHit(): BaseItemDto? {
+                val combined = _uiState.value.results
+                if (combined.isEmpty()) return null
+                val compareQuery = fuzzyCorrectedQuery ?: primaryQuery
+                return combined.maxByOrNull { com.jellio.tv.data.SearchQueryNormalizer.fuzzyScore(compareQuery, it.Name.orEmpty()) }
+            }
+
+            suspend fun showSuggestions() {
+                if (suggestionsRequested) return
+                suggestionsRequested = true
+                val topHit = pickBestPrimaryHit()
+                val topTmdb = topHit?.ProviderIds?.get("Tmdb") ?: topHit?.ProviderIds?.get("tmdb")
+                val topMediaType = if (topHit != null) (if (topHit.Type == "Series") "tv" else "movie") else null
+                val suggestQuery = topHit?.Name ?: fuzzyCorrectedQuery ?: primaryQuery
+
+                _uiState.value = _uiState.value.copy(isSuggestionsLoading = true)
+                val answer = catching {
+                    repository.getSearchSuggestions(
+                        query = suggestQuery,
+                        tmdbId = topTmdb,
+                        mediaType = topMediaType,
+                        enableVirtual = true,
+                        userId = session.userId,
                     )
-                    if (nothing && !failed) {
-                        viewModelScope.launch {
-                            val answer = com.jellio.tv.data.catching { repository.getSearchSuggestions(query) }.getOrNull()
-                            if (answer != null && answer.Rows.isNotEmpty() && _uiState.value.query == query) {
-                                _uiState.value = _uiState.value.copy(suggestions = answer)
-                            }
+                }.getOrNull()
+
+                if (_uiState.value.query != query) return
+                if (answer != null && answer.Rows.isNotEmpty()) {
+                    val rawSuggestions = answer.Rows.flatMap { it.Items }
+                    val filteredSimilar = rawSuggestions.filter { item ->
+                        val keys = identityKeys(item)
+                        keys.none { it in seen }
+                    }.distinctBy { it.Id }
+                    _uiState.value = _uiState.value.copy(
+                        suggestions = answer,
+                        similarResults = filteredSimilar,
+                        isSuggestionsLoading = false,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(isSuggestionsLoading = false)
+                }
+            }
+
+            suspend fun runSpellCorrectedPass(corrected: String) {
+                hasRunCorrectedPass = true
+                stateLock.withLock {
+                    _uiState.value = _uiState.value.copy(correctedQuery = corrected)
+                    pending += 2
+                }
+                coroutineScope {
+                    launch {
+                        try {
+                            val items = repository.searchMovies(corrected)
+                            add(items)
+                        } catch (_: Exception) {} finally {
+                            settle(1, false)
+                        }
+                    }
+                    launch {
+                        try {
+                            val items = repository.searchSeries(corrected)
+                            add(items)
+                        } catch (_: Exception) {} finally {
+                            settle(1, false)
                         }
                     }
                 }
             }
 
+            suspend fun settle(count: Int, failed: Boolean) {
+                var shouldRunCorrection: String? = null
+                var shouldShowSuggestions = false
+                stateLock.withLock {
+                    pending -= count
+                    if (failed) failures += count
+                    if (_uiState.value.query != query || pending > 0) return
+                    val nothing = _uiState.value.results.isEmpty()
+                    val failedAll = nothing && (failures >= 4 || libraryFailed)
+                    _uiState.value = _uiState.value.copy(
+                        isSearching = false,
+                        error = if (failedAll) loadFailureOf(lastError) else null,
+                    )
+                    if (nothing && !failedAll && fuzzyCorrectedQuery != null && !hasRunCorrectedPass && !fuzzyCorrectedQuery.equals(primaryQuery, ignoreCase = true)) {
+                        shouldRunCorrection = fuzzyCorrectedQuery
+                    } else if (!failedAll) {
+                        shouldShowSuggestions = true
+                    }
+                }
+                if (shouldRunCorrection != null) {
+                    runSpellCorrectedPass(shouldRunCorrection!!)
+                } else if (shouldShowSuggestions) {
+                    showSuggestions()
+                }
+            }
+
             suspend fun fallBackToCombined() {
                 val first = stateLock.withLock { if (fellBack) false else { fellBack = true; true } }
-                // The other addon search's 404 is settled with this one.
                 if (!first) return
                 val ok = try {
-                    add(repository.searchItems(session.userId, query))
+                    add(repository.searchItems(session.userId, primaryQuery))
                     true
                 } catch (err: CancellationException) {
                     throw err
@@ -182,7 +287,7 @@ class SearchViewModel @Inject constructor(
             coroutineScope {
                 launch {
                     val ok = try {
-                        add(repository.searchLibrary(session.userId, query))
+                        add(repository.searchLibrary(session.userId, primaryQuery))
                         true
                     } catch (err: CancellationException) {
                         throw err
@@ -193,8 +298,25 @@ class SearchViewModel @Inject constructor(
                     }
                     settle(1, !ok)
                 }
-                launch { runAddon { repository.searchMovies(query) } }
-                launch { runAddon { repository.searchSeries(query) } }
+                launch {
+                    val fuzzyResult = catching { repository.searchFuzzy(session, query, 24) }.getOrNull()
+                    if (_uiState.value.query == query && fuzzyResult != null) {
+                        if (!fuzzyResult.CorrectedQuery.isNullOrBlank()) {
+                            fuzzyCorrectedQuery = fuzzyResult.CorrectedQuery
+                            if (fuzzyResult.Items.isNotEmpty()) {
+                                stateLock.withLock {
+                                    _uiState.value = _uiState.value.copy(correctedQuery = fuzzyResult.CorrectedQuery)
+                                }
+                            }
+                        }
+                        if (fuzzyResult.Items.isNotEmpty()) {
+                            add(fuzzyResult.Items)
+                        }
+                    }
+                    settle(1, false)
+                }
+                launch { runAddon { repository.searchMovies(primaryQuery) } }
+                launch { runAddon { repository.searchSeries(primaryQuery) } }
             }
         }
     }

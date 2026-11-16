@@ -18,6 +18,7 @@ internal object StringsEn {
         fillPlaybackAndAuth(m)
         fillPlaybackOutlook(m)
         fillErrors(m)
+        fillAniSyncEn(m)
         m
     }
 
@@ -272,6 +273,7 @@ internal object StringsEn {
         m["search_no_results_for"] = "No results for \"%s\""
         m["search_suggest_intro"] = "Couldn't find “%s”. You might like these instead."
         m["search_suggest_similar"] = "Similar to %s"
+        m["search_suggest_similar_generic"] = "Similar Results"
         m["search_suggest_person"] = "More with %s"
         m["search_suggest_genre"] = "Top %s"
         m["search_placeholder"] = "Search movies and shows"
