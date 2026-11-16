@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.2",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.2",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Ani-Sync Timeframes & Setup Guide", "Added a sync timeframe selector (Recent, Last Week, Last Month, Last Year, All Time), replaced the TV credential form with a Jellio Web setup notice and Setup Guide dialog, and centered the empty sync activity text."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.2.1",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.1",
