@@ -1913,128 +1913,35 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
         }
     }
 
-    // Login Details for Active Service
+    // Status & Actions for Active Service (setup is done on Jellio Web)
     val activeDisplayName = supportedServices.find { it.first.equals(activeServiceId, ignoreCase = true) }?.second ?: activeServiceId
+    var showSetupGuide by remember { mutableStateOf(false) }
     SettingsSection(
         title = formatString("anisync_login_title", activeDisplayName),
         icon = Icons.Filled.Key,
         form = true,
     ) {
-        if (activeServiceStatus?.Connected == true && !activeServiceStatus.MaskedCredential.isNullOrBlank()) {
+        if (activeServiceStatus?.Connected == true) {
+            val credSuffix = activeServiceStatus.MaskedCredential?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
             Text(
-                text = formatString("anisync_connected_as", activeServiceStatus.Username ?: activeDisplayName) + " (" + activeServiceStatus.MaskedCredential + ")",
+                text = formatString("anisync_connected_as", activeServiceStatus.Username ?: activeDisplayName) + credSuffix,
                 color = Color(0xFF81C784),
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 12.dp),
             )
-        }
-
-        if (activeServiceId.equals("simkl", ignoreCase = true)) {
-            // Simkl Quick TV PIN card
-            if (simklPin != null) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = string("anisync_simkl_tv_code"),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = JellioText,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = string("anisync_simkl_tv_code_desc"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = JellioTextSecondary,
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = simklPin?.UserCode.orEmpty(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = JellioSecondary,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 4.sp,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (simklPolling) {
-                        Text(
-                            text = string("anisync_simkl_waiting"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = JellioTextSecondary,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    PasswordButton(
-                        label = string("action_cancel"),
-                        onClick = { viewModel.dismissSimklPin() },
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            } else {
-                PasswordButton(
-                    label = string("anisync_simkl_start_pin"),
-                    onClick = { viewModel.startSimklPin(clientIdInput) },
-                    enabled = actionBusy == null,
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
-
-        JellioTextField(
-            value = usernameInput,
-            onValueChange = { usernameInput = it },
-            label = string("anisync_username"),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        JellioTextField(
-            value = tokenInput,
-            onValueChange = { tokenInput = it },
-            label = string("anisync_token_or_url"),
-            isPassword = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = string("anisync_token_or_url_hint"),
-            color = JellioTextSecondary,
-            style = MaterialTheme.typography.bodySmall,
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-        PasswordButton(
-            label = string(if (showAdvanced) "anisync_hide_advanced" else "anisync_show_advanced"),
-            onClick = { showAdvanced = !showAdvanced },
-        )
-
-        if (showAdvanced) {
-            Spacer(modifier = Modifier.height(12.dp))
-            JellioTextField(
-                value = clientIdInput,
-                onValueChange = { clientIdInput = it },
-                label = string("anisync_client_id"),
-                modifier = Modifier.fillMaxWidth(),
+            val syncSummary = activeServiceStatus.LastSyncedTitle?.takeIf { it.isNotBlank() }
+                ?.let { formatString("anisync_last_synced", it) }
+                ?: string("anisync_never_synced")
+            Text(
+                text = syncSummary,
+                color = JellioTextSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            JellioTextField(
-                value = clientSecretInput,
-                onValueChange = { clientSecretInput = it },
-                label = string("anisync_client_secret"),
-                isPassword = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            JellioTextField(
-                value = refreshTokenInput,
-                onValueChange = { refreshTokenInput = it },
-                label = string("anisync_refresh_token"),
-                isPassword = true,
-                modifier = Modifier.fillMaxWidth(),
+        } else {
+            Text(
+                text = formatString("anisync_setup_on_web_notice", activeDisplayName),
+                color = JellioTextSecondary,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
 
@@ -2052,21 +1959,6 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(top = 16.dp),
         ) {
-            PasswordButton(
-                label = string("anisync_btn_connect"),
-                enabled = actionBusy == null && (tokenInput.isNotBlank() || activeServiceStatus?.Connected == true),
-                onClick = {
-                    viewModel.connectAniSync(
-                        service = activeServiceId,
-                        username = usernameInput,
-                        accessToken = tokenInput,
-                        refreshToken = refreshTokenInput,
-                        clientId = clientIdInput,
-                        clientSecret = clientSecretInput,
-                    )
-                },
-            )
-
             if (activeServiceStatus?.Connected == true) {
                 var syncRange by remember { mutableStateOf("recent") }
                 val syncRanges = listOf(
@@ -2103,7 +1995,18 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
                     onClick = { viewModel.disconnectAniSync(activeServiceId) },
                 )
             }
+
+            PasswordButton(
+                label = string("anisync_btn_setup_guide"),
+                enabled = actionBusy == null,
+                jumpLeftToCategory = false,
+                onClick = { showSetupGuide = true },
+            )
         }
+    }
+
+    if (showSetupGuide) {
+        AniSyncSetupGuideDialog(onDismiss = { showSetupGuide = false })
     }
 
     // Sync Preferences
@@ -2212,4 +2115,99 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
         }
     }
 }
+
+@Composable
+private fun AniSyncSetupGuideDialog(onDismiss: () -> Unit) {
+    val guideScroll = rememberScrollState()
+    val closeFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(80)
+        runCatching { closeFocus.requestFocus() }
+    }
+    val sections = listOf(
+        "AniList" to listOf(
+            "1. Open anilist.co/settings/developer in a browser and click Create New Client.",
+            "2. Set Redirect URL to: https://anilist.co/api/v2/oauth/pin",
+            "3. Copy your Client ID (Client Secret is not needed for AniList).",
+            "4. In Jellio Web (Settings > Ani-Sync > AniList), expand Advanced Settings, paste Client ID, and click Authorize with AniList.",
+            "5. Approve on AniList, copy the full redirect URL (#access_token=...), paste it into the token box, and click Save & Connect.",
+        ),
+        "MyAnimeList" to listOf(
+            "1. Open myanimelist.net/apiconfig in a browser and click Create ID.",
+            "2. Set App Type to web and App Redirect URL to your Jellio Web URL.",
+            "3. Copy your Client ID (and Client Secret if provided).",
+            "4. In Jellio Web (Settings > Ani-Sync > MyAnimeList), expand Advanced Settings, paste Client ID (and Secret), and click Authorize with MyAnimeList.",
+            "5. Approve on MyAnimeList, copy the callback URL (?code=...&state=...), paste it into the token box, and click Save & Connect.",
+        ),
+        "Shikimori" to listOf(
+            "1. Open shikimori.one/oauth/applications in a browser and create a new OAuth application.",
+            "2. Set Redirect URI to urn:ietf:wg:oauth:2.0:oob (or your Jellio Web URL).",
+            "3. Copy your Client ID and Client Secret.",
+            "4. In Jellio Web (Settings > Ani-Sync > Shikimori), expand Advanced Settings, paste Client ID and Client Secret, and click Authorize with Shikimori.",
+            "5. Approve on Shikimori, copy the authorization code or callback URL, paste it into the token box, and click Save & Connect.",
+        ),
+        "Simkl" to listOf(
+            "1. Open simkl.com/settings/developer/ in a browser and create an application.",
+            "2. Set Redirect URI to your Jellio Web URL and copy your Client ID (and Client Secret for OAuth redirect).",
+            "3. In Jellio Web (Settings > Ani-Sync > Simkl), expand Advanced Settings and paste your Client ID.",
+            "4. Click Connect with PIN Code (visit simkl.com/pin and enter the code) or click Authorize with Simkl and paste the callback URL.",
+        ),
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 560.dp, max = 720.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(JellioBgElevated)
+                .border(1.dp, JellioBorder, RoundedCornerShape(18.dp))
+                .padding(24.dp),
+        ) {
+            Text(
+                text = string("anisync_guide_title"),
+                style = MaterialTheme.typography.headlineSmall,
+                color = JellioText,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(guideScroll),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                sections.forEach { (serviceName, steps) ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = serviceName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = JellioSecondary,
+                        )
+                        steps.forEach { step ->
+                            Text(
+                                text = step,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = JellioTextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            PasswordButton(
+                label = string("anisync_guide_close"),
+                onClick = onDismiss,
+                modifier = Modifier.focusRequester(closeFocus),
+            )
+        }
+    }
+}
+
 

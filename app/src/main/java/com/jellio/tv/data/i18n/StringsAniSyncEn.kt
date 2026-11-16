@@ -49,4 +49,8 @@ internal fun fillAniSyncEn(m: HashMap<String, String>) {
     m["anisync_range_month"] = "Range: Last Month"
     m["anisync_range_year"] = "Range: Last Year"
     m["anisync_range_all"] = "Range: All Time"
+    m["anisync_setup_on_web_notice"] = "Set up and connect %s on Jellio Web (Settings > Ani-Sync). TV cannot open a browser to copy OAuth links, and once connected on Web your account syncs automatically to this TV."
+    m["anisync_btn_setup_guide"] = "Setup Guide"
+    m["anisync_guide_title"] = "Ani-Sync Setup Guide"
+    m["anisync_guide_close"] = "Close"
 }
