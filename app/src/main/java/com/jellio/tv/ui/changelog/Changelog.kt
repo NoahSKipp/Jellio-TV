@@ -104,6 +104,17 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.0",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.0",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Per-User Ani-Sync", "Connect AniList, MyAnimeList, Shikimori, or Simkl (with quick TV PIN support) per user in Settings. Credentials are encrypted on the server and synced with Jellio Web."),
+            ChangelogFeature(Icons.Filled.PlayCircle, "Expanded Stream Warmup & Ready Badge", "Streams warm up ahead of time across Home, detail pages, and backup sources, with a Ready badge in the stream picker for pre-warmed streams."),
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Smarter Personal Top Picks", "Recommendations combine watch history weighting, recency decay, cast and director affinity, diversity caps, and deduplication across Home rows."),
+            ChangelogFeature(Icons.Filled.Tune, "Fuzzy Search & Similar Results", "Search tolerates typos and aliases with corrected query hints and shows a Similar results row alongside your search matches."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.1.5",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.1.5",
