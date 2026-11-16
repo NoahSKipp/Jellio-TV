@@ -2,9 +2,9 @@ package com.jellio.tv.data.i18n
 
 internal fun fillAniSyncEn(m: HashMap<String, String>) {
     m["settings_cat_anisync"] = "Ani-Sync"
-    m["settings_cat_anisync_desc"] = "Sync your anime watching and manga reading progress to AniList, MyAnimeList, Shikimori, and Simkl"
+    m["settings_cat_anisync_desc"] = "Sync your anime watching and manga reading progress to AniList, MyAnimeList, Shikimori, and Simkl (saved to your profile across devices)"
     m["anisync_active_service"] = "Active Service"
-    m["anisync_active_service_desc"] = "Choose your primary anime and manga tracking service"
+    m["anisync_active_service_desc"] = "Choose your primary anime and manga tracking service. Credentials and preferences are saved to your Jellyfin profile and synced automatically across Jellio Web and Jellio TV, so you can set up accounts with long OAuth links on Web."
     m["anisync_connected"] = "Connected"
     m["anisync_not_connected"] = "Not connected"
     m["anisync_connected_as"] = "Connected as %s"
