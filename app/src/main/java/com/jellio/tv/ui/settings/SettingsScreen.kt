@@ -2019,7 +2019,10 @@ private fun AniSyncCategoryContent(viewModel: SettingsViewModel) {
     }
 
     if (showSetupGuide) {
-        AniSyncSetupGuideDialog(onDismiss = { showSetupGuide = false })
+        AniSyncSetupGuideDialog(
+            services = currentSettings?.Services.orEmpty(),
+            onDismiss = { showSetupGuide = false },
+        )
     }
 
     // Sync Preferences
