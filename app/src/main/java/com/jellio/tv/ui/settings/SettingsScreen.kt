@@ -111,6 +111,7 @@ import com.jellio.tv.data.session.Session
 import com.jellio.tv.ui.common.JellioTextField
 import com.jellio.tv.ui.theme.JellioBg
 import com.jellio.tv.ui.theme.JellioBgElevated
+import com.jellio.tv.ui.theme.JellioBorder
 import com.jellio.tv.ui.theme.JellioDanger
 import com.jellio.tv.ui.theme.JellioSecondary
 import com.jellio.tv.ui.theme.JellioText
