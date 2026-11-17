@@ -270,10 +270,12 @@ fun PosterCard(
     val activeBackdropUrl = backdropCandidates.getOrNull(backdropIndex) ?: activeUrl
 
     val logoCandidates = remember(item, imageUrl, wantsBanner) {
-        if (wantsBanner) posterLogoCandidates(item, imageUrl, 800) else emptyList()
+        if (wantsBanner) posterLogoCandidates(item, imageUrl, 1200) else emptyList()
     }
     var logoIndex by remember(item.Id, logoCandidates) { androidx.compose.runtime.mutableIntStateOf(0) }
     val activeLogoUrl = logoCandidates.getOrNull(logoIndex)
+    val logoDecodeWidthPx = maxOf(expandedWidthPx, 900)
+    val logoDecodeHeightPx = maxOf(logoHeightPx * 3, 240)
 
     // Resting on a card warms its banner and logo with the exact requests the
     // widened card makes, so they are in memory by the time it widens.
@@ -285,7 +287,7 @@ fun PosterCard(
         if (!canExpand) return@LaunchedEffect
         val loader = coil3.SingletonImageLoader.get(context)
         backdropCandidates.firstOrNull()?.let { loader.enqueue(sizedImageRequest(context, it, expandedWidthPx, baseHeightPx)) }
-        logoCandidates.firstOrNull()?.let { loader.enqueue(sizedImageRequest(context, it, expandedWidthPx, logoHeightPx)) }
+        logoCandidates.firstOrNull()?.let { loader.enqueue(sizedImageRequest(context, it, logoDecodeWidthPx, logoDecodeHeightPx)) }
     }
 
     val animatedWidth by animateDpAsState(
@@ -366,7 +368,7 @@ fun PosterCard(
                 ) {
                     if (activeLogoUrl != null) {
                         AsyncImage(
-                            model = remember(activeLogoUrl) { sizedImageRequest(context, activeLogoUrl, expandedWidthPx, logoHeightPx) },
+                            model = remember(activeLogoUrl, logoDecodeWidthPx, logoDecodeHeightPx) { sizedImageRequest(context, activeLogoUrl, logoDecodeWidthPx, logoDecodeHeightPx) },
                             contentDescription = item.SeriesName ?: item.Name,
                             onError = { logoIndex += 1 },
                             contentScale = ContentScale.Fit,

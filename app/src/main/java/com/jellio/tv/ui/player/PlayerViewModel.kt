@@ -743,7 +743,7 @@ class PlayerViewModel @Inject constructor(
         val logoTag = if (isEpisode) item.ParentLogoImageTag else item.ImageTags?.get("Logo")
         val logoArtId = if (isEpisode && item.ParentLogoItemId != null) item.ParentLogoItemId else artId
         val logoUrl = logoTag?.let {
-            repository.imageUrl(session.serverAddress, logoArtId, it, "Logo", 800, session.accessToken)
+            repository.imageUrl(session.serverAddress, logoArtId, it, "Logo", 1200, session.accessToken)
         }
         val hasEpisodeCode = item.ParentIndexNumber != null && item.IndexNumber != null
         return PauseOverlayInfo(

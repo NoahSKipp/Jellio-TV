@@ -80,6 +80,6 @@ class TitleArtTest {
     @Test
     fun logoPrefersItsOwnThenTheShows() {
         val episode = BaseItemDto(Id = "e", ParentLogoItemId = "s", ParentLogoImageTag = "sl", ImageTags = mapOf("Logo" to "l"))
-        assertEquals(listOf("e/Logo/l/800", "s/Logo/sl/800"), titleLogoCandidates(episode, url))
+        assertEquals(listOf("e/Logo/l/1200", "s/Logo/sl/1200"), titleLogoCandidates(episode, url))
     }
 }

@@ -38,7 +38,8 @@ class ImageUrls @Inject constructor() {
             return itemId
         }
         val cleanServer = com.jellio.tv.di.normalizeServerAddress(serverAddress)
-        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=85"
+        val quality = if (imageType.equals("Logo", ignoreCase = true)) 100 else 85
+        val base = "$cleanServer/Items/$itemId/Images/$imageType?maxWidth=$maxWidth&quality=$quality"
         val withTag = if (!tag.isNullOrEmpty()) "$base&tag=$tag" else base
         return if (!accessToken.isNullOrEmpty()) "$withTag&ApiKey=$accessToken&api_key=$accessToken" else withTag
     }

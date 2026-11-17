@@ -221,8 +221,8 @@ private fun ShowcaseLogo(
     val url = candidates.getOrNull(index)
     val context = LocalContext.current
     val density = LocalDensity.current
-    val logoWidthPx = with(density) { 340.dp.scaled().roundToPx() }.coerceAtLeast(1)
-    val logoHeightPx = with(density) { 72.dp.scaled().roundToPx() }.coerceAtLeast(1)
+    val logoWidthPx = maxOf(with(density) { 340.dp.scaled().roundToPx() }, 1000)
+    val logoHeightPx = maxOf(with(density) { 72.dp.scaled().roundToPx() } * 3, 300)
     Box(contentAlignment = Alignment.BottomStart, modifier = Modifier.height(72.dp.scaled())) {
         if (url != null) {
             AsyncImage(
