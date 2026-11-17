@@ -273,6 +273,7 @@ internal object StringsIt {
         m["search_no_results_for"] = "Nessun risultato per \"%s\""
         m["search_suggest_intro"] = "Non abbiamo trovato «%s». Potrebbero piacerti questi."
         m["search_suggest_similar"] = "Simili a %s"
+        m["search_suggest_similar_generic"] = "Risultati simili"
         m["search_suggest_person"] = "Altro con %s"
         m["search_suggest_genre"] = "Il meglio: %s"
         m["search_placeholder"] = "Cerca film e serie TV"

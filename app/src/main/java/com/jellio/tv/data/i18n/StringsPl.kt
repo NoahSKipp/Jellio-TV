@@ -273,6 +273,7 @@ internal object StringsPl {
         m["search_no_results_for"] = "Brak wyników dla \"%s\""
         m["search_suggest_intro"] = "Nie znaleziono „%s”. Może spodoba Ci się to."
         m["search_suggest_similar"] = "Podobne do %s"
+        m["search_suggest_similar_generic"] = "Podobne wyniki"
         m["search_suggest_person"] = "Więcej z %s"
         m["search_suggest_genre"] = "Najlepsze: %s"
         m["search_placeholder"] = "Szukaj filmów i seriali"

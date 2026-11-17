@@ -10,18 +10,19 @@ class TopPicksPaginationTest {
 
     @Test
     fun topPicksRowIncludesFetchPageWhenAvailable() = runBlocking {
+        RecommendationEngine.invalidateCache()
         val history = listOf(
-            BaseItemDto(Id = "h1", Name = "History Movie 1", Genres = listOf("Sci-Fi")),
-            BaseItemDto(Id = "h2", Name = "History Movie 2", Genres = listOf("Sci-Fi")),
-            BaseItemDto(Id = "h3", Name = "History Movie 3", Genres = listOf("Sci-Fi")),
+            BaseItemDto(Id = "h1", Name = "Arrival", Genres = listOf("Sci-Fi")),
+            BaseItemDto(Id = "h2", Name = "Ex Machina", Genres = listOf("Sci-Fi")),
+            BaseItemDto(Id = "h3", Name = "Blade Runner", Genres = listOf("Sci-Fi")),
         )
         val initialItems = listOf(
-            BaseItemDto(Id = "item1", Name = "Movie 1", ProductionYear = 2020),
-            BaseItemDto(Id = "item2", Name = "Movie 2", ProductionYear = 2021),
+            BaseItemDto(Id = "item1", Name = "Inception", ProductionYear = 2020),
+            BaseItemDto(Id = "item2", Name = "Interstellar", ProductionYear = 2021),
         )
         val pagedItems = listOf(
-            BaseItemDto(Id = "item3", Name = "Movie 3", ProductionYear = 2022),
-            BaseItemDto(Id = "item4", Name = "Movie 4", ProductionYear = 2023),
+            BaseItemDto(Id = "item3", Name = "Tenet", ProductionYear = 2022),
+            BaseItemDto(Id = "item4", Name = "Dunkirk", ProductionYear = 2023),
         )
 
         var pagedRequestedStart = -1

@@ -273,6 +273,7 @@ internal object StringsDe {
         m["search_no_results_for"] = "Keine Ergebnisse für \"%s\""
         m["search_suggest_intro"] = "„%s“ gibt es hier nicht. Vielleicht gefällt Dir das hier."
         m["search_suggest_similar"] = "Ähnlich wie %s"
+        m["search_suggest_similar_generic"] = "Ähnliche Ergebnisse"
         m["search_suggest_person"] = "Mehr mit %s"
         m["search_suggest_genre"] = "Top: %s"
         m["search_placeholder"] = "Filme und Serien suchen"

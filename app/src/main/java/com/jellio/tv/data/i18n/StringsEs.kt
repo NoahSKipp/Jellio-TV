@@ -273,6 +273,7 @@ internal object StringsEs {
         m["search_no_results_for"] = "Sin resultados para \"%s\""
         m["search_suggest_intro"] = "No encontramos «%s». Quizá te guste esto."
         m["search_suggest_similar"] = "Parecido a %s"
+        m["search_suggest_similar_generic"] = "Resultados similares"
         m["search_suggest_person"] = "Más con %s"
         m["search_suggest_genre"] = "Lo mejor de %s"
         m["search_placeholder"] = "Buscar películas y series"
