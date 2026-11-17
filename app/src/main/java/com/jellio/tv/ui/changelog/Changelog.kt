@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.3",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.3",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.AutoAwesome, "Crisper Show Logos", "Prevented Coil from downsampling decoded show logos to 40px/72px on cards and the home showcase, increased logo request resolution to 1200px, and switched Logo image requests to quality=100."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.2.2",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.2",
