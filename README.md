@@ -1,13 +1,35 @@
-<div align="center">
+<p align="center">
+  <img src="assets/jellio-mark-animated.svg" width="140" alt="Jellio TV">
+</p>
 
-  <h1>Jellio TV</h1>
+<h1 align="center">Jellio TV</h1>
 
-  <p>
-    The Android TV client for Jellio: a Nuvio lookalike, backed by a
-    Jellio-Plugin server (Jellyfin + Gelato) instead of any local media.
-  </p>
+<p align="center">
+  The Android TV client for Jellio: a Nuvio lookalike, backed by a<br>
+  Jellio-Plugin server (Jellyfin + Gelato) instead of any local media.
+</p>
 
-</div>
+## Features
+
+- **10-foot Home experience**: hero carousel with full-quality show logos, Continue
+  Watching, Next Up, weighted personal Top Picks, Because You Watched, Studio Hubs,
+  customizable row layouts synced with Jellio Web, and Google TV launcher channels
+  (Watch Next and Top Picks).
+- **Quick Hub & Dynamic Island Home pill**: slide-over Quick Hub drawer and top-screen
+  status pill for live Now Playing handoff across devices, server notifications,
+  Group Watch invites, and Friends, with custom remote button mapping.
+- **Media3 ExoPlayer & stream intelligence**: frame-rate matching, proactive stream
+  warmup with `Ready` badges, automatic stream failover, multi-edition selector
+  (Theatrical, Director's Cut, Extended, IMAX), hold-to-seek scrubbing, and multi-tier
+  Skip Intro and Skip Credits.
+- **Social, Group Watch & Ani-Sync**: watch parties over SyncPlay, Friends and shared
+  watchlists (add titles directly to friends' watchlists with avatar badges), profiles
+  with achievement badges and activity feed, and per-user two-way Ani-Sync (AniList,
+  MyAnimeList, Shikimori, Simkl).
+- **Live TV, Casting & Search**: live channel browser and player, local network cast
+  receiver from Jellio Web, voice and typo-tolerant fuzzy search, rich actor and crew
+  pages, full localization in 7 languages (English, German, Spanish, French, Italian,
+  Polish, Portuguese), and much more.
 
 ## Get Jellio TV
 
@@ -49,7 +71,7 @@ You also need a Jellyfin server running the
 2. In the address box, type
    `github.com/NoahSKipp/Jellio-TV/releases/latest` and select **Go**.
 3. The release page opens in Downloader's browser. Scroll down to **Assets** and
-   select the file ending in `.apk` (for example `jellio-tv-0.28.2.apk`).
+   select the file ending in `.apk` (for example `jellio-tv-1.2.3.apk`).
 4. When the download finishes, select **Install**, then **Open**.
 5. Downloader offers to delete the APK afterwards. Select **Delete**; it isn't
    needed any more.
@@ -62,10 +84,11 @@ Enter your Jellyfin server address (for example `http://192.168.1.10:8096` or
 ### Updates
 
 Jellio TV checks for new versions by itself when it opens and every few hours
-while it's running, and offers to download and install them. You can also check
-from **Settings > Check for Updates**. The first time, Android asks you to allow
-Jellio TV to install apps: turn it on the same way you did for Downloader, then
-select **Install** again. You don't need Downloader for updates.
+while it's running, and offers to download and install signature-verified updates
+in-app. You can also check from **Settings > Check for Updates**. The first time,
+Android asks you to allow Jellio TV to install apps: turn it on the same way you
+did for Downloader, then select **Install** again. You don't need Downloader for
+updates.
 
 ## Build from source
 
