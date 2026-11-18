@@ -12,3 +12,8 @@
 *.keystore
 *.jks
 .kotlin/
+
+# Internal agent rules
+CLAUDE.md
+GEMINI.md
+AGENTS.md
