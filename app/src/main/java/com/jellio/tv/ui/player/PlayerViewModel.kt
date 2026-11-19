@@ -59,6 +59,7 @@ class PlayerViewModel @Inject constructor(
     private val directRetriedSourceIds = mutableSetOf<String>()
     private var failoverLanguage: String? = null
     private var failingOver = false
+    private var forceTranscodeActive = false
     private var currentSource: com.jellio.tv.data.model.MediaSourceDto? = null
     // Streams passed over for needing a video re-encode, so a wrong guess
     // from a stream's name can't bounce between two of them.
@@ -131,6 +132,7 @@ class PlayerViewModel @Inject constructor(
                 }.getOrNull()
                 ensureActive()
                 if (target != null) {
+                    forceTranscodeActive = true
                     val subtitleTracks = buildSubtitleTracks(id, target.mediaSource, target.startPositionTicks)
                     _uiState.value = _uiState.value.copy(
                         streamUrl = target.streamUrl,
@@ -395,6 +397,7 @@ class PlayerViewModel @Inject constructor(
         loadJob = null
         loadedItemId = null
         failingOver = false
+        forceTranscodeActive = false
         _failover.value = null
     }
 
@@ -426,6 +429,7 @@ class PlayerViewModel @Inject constructor(
             }
 
             failingOver = false
+            forceTranscodeActive = false
             _failover.value = null
             hasCreditedRealWatch = false
             hasCheckedPreviousEpisodes = false
@@ -762,6 +766,7 @@ class PlayerViewModel @Inject constructor(
 
     fun restart(session: Session) {
         val id = itemId ?: return
+        forceTranscodeActive = false
         viewModelScope.launch {
             try {
                 val target = repository.resolvePlayback(
@@ -985,28 +990,33 @@ class PlayerViewModel @Inject constructor(
         return index.takeIf { _uiState.value.subtitleTracks.firstOrNull { it.streamIndex == index }?.isTextBased == false }
     }
 
-    fun reloadAt(session: Session, positionTicks: Long) {
-        val id = itemId ?: return
-        viewModelScope.launch {
-            try {
-                val target = repository.resolvePlayback(
-                    session.userId,
-                    id,
-                    mediaSourceIdParam,
-                    positionTicks,
-                    burnInSubtitleStreamIndex = burnedInSubtitleIndex(),
-                    audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
-                )
-                _uiState.value = _uiState.value.copy(
-                    streamUrl = target.streamUrl,
-                    startPositionTicks = target.startPositionTicks,
-                    resumePercent = null,
-                    directPlay = target.directPlay,
-                    subtitleTracks = subtitleTracksFor(id, target),
-                )
-            } catch (err: Exception) {
-                showToast(Strings.get("tv_seek_failed"))
-            }
+    suspend fun reloadAt(session: Session, positionTicks: Long, forceTranscode: Boolean = false): Boolean {
+        val id = itemId ?: return false
+        val useTranscode = forceTranscode || forceTranscodeActive
+        return try {
+            val target = repository.resolvePlayback(
+                session.userId,
+                id,
+                mediaSourceIdParam,
+                positionTicks,
+                burnInSubtitleStreamIndex = burnedInSubtitleIndex(),
+                audioStreamIndex = _uiState.value.selectedAudioStreamIndex,
+                forceTranscode = useTranscode,
+            )
+            if (useTranscode) forceTranscodeActive = true
+            _uiState.value = _uiState.value.copy(
+                streamUrl = target.streamUrl,
+                startPositionTicks = target.startPositionTicks,
+                resumePercent = null,
+                directPlay = target.directPlay,
+                subtitleTracks = subtitleTracksFor(id, target),
+            )
+            true
+        } catch (err: kotlinx.coroutines.CancellationException) {
+            throw err
+        } catch (err: Exception) {
+            showToast(Strings.get("tv_seek_failed"))
+            false
         }
     }
 
@@ -1039,6 +1049,7 @@ class PlayerViewModel @Inject constructor(
     fun switchSource(session: Session, source: MediaSourceDto, currentPositionTicks: Long) {
         val id = itemId ?: return
         if (source.Id == _uiState.value.mediaSourceId) return
+        forceTranscodeActive = false
         _uiState.value = _uiState.value.copy(switchingTo = sourceLabel(source), switchingLoaded = false)
         viewModelScope.launch {
             try {

@@ -158,7 +158,7 @@ fun PlayerScreen(
                 onShowToast = { message -> viewModel.showToast(message) },
                 switchingTo = uiState.switchingTo,
                 switchingLoaded = uiState.switchingLoaded,
-                onSeekReload = { ticks -> viewModel.reloadAt(session, ticks) },
+                onSeekReload = { ticks, forceTranscode -> viewModel.reloadAt(session, ticks, forceTranscode) },
                 onSwitchSettled = { viewModel.clearSwitching() },
                 onBufferSwitch = { ticks -> viewModel.switchForBuffering(session, ticks) },
                 expectedRuntimeMs = uiState.expectedRuntimeMs,

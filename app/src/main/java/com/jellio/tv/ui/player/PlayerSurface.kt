@@ -116,7 +116,7 @@ internal fun PlayerSurface(
     switchingLoaded: Boolean,
     onSwitchSettled: () -> Unit,
     onBufferSwitch: suspend (Long) -> Boolean,
-    onSeekReload: (Long) -> Unit,
+    onSeekReload: suspend (Long, Boolean) -> Boolean,
     expectedRuntimeMs: Long = 0,
     reencodingVideo: Boolean = false,
     onStreamFailed: (String) -> Unit = {},
@@ -283,20 +283,52 @@ internal fun PlayerSurface(
     val streamOffsetMs = if (directPlay) 0L else startPositionTicks / TICKS_PER_MS
     fun realPositionMs(): Long = streamOffsetMs + player.currentPosition
 
+    val seekWatch = remember(streamUrl) { SeekWatch() }
     var pendingReloadMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
+    var pendingReloadForceTranscode by remember(streamUrl) { mutableStateOf(false) }
+    var seekReloading by remember(streamUrl) { mutableStateOf(false) }
+
+    fun requestServerSeek(targetMs: Long, forceTranscode: Boolean = false) {
+        val clamped = targetMs.coerceAtLeast(0L)
+        seekWatch.clearDirectSeek()
+        pendingReloadForceTranscode = forceTranscode
+        pendingReloadMs = clamped
+        positionMs = clamped
+    }
+
     fun seekToReal(targetMs: Long) {
-        bufferWatch.lastSeekAt = System.currentTimeMillis()
+        val clamped = targetMs.coerceAtLeast(0L)
+        val now = System.currentTimeMillis()
+        bufferWatch.lastSeekAt = now
         if (directPlay) {
-            player.seekTo(targetMs.coerceAtLeast(0L))
+            if (!player.isCurrentMediaItemSeekable) {
+                if (!com.jellio.tv.data.playback.VideoTranscodePolicy.blocking) {
+                    android.util.Log.w("JellioPlayer", "direct play stream is not seekable, reloading via server remux at ${clamped}ms")
+                    requestServerSeek(clamped, forceTranscode = true)
+                } else {
+                    onShowToast(Strings.get("tv_seek_failed"))
+                }
+                return
+            }
+            seekWatch.noteDirectSeek(clamped, now)
+            player.seekTo(clamped)
         } else {
-            pendingReloadMs = targetMs.coerceAtLeast(0L)
-            positionMs = pendingReloadMs!!
+            requestServerSeek(clamped)
         }
     }
     LaunchedEffect(pendingReloadMs) {
         val target = pendingReloadMs ?: return@LaunchedEffect
         delay(700)
-        onSeekReload(target * TICKS_PER_MS)
+        seekReloading = true
+        val ok = try {
+            onSeekReload(target * TICKS_PER_MS, pendingReloadForceTranscode)
+        } finally {
+            seekReloading = false
+        }
+        if (!ok && pendingReloadMs == target) {
+            pendingReloadMs = null
+            positionMs = realPositionMs()
+        }
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -559,7 +591,14 @@ internal fun PlayerSurface(
                 }
             }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
-                if (reason == Player.DISCONTINUITY_REASON_SEEK) bufferWatch.lastSeekAt = System.currentTimeMillis()
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    bufferWatch.lastSeekAt = System.currentTimeMillis()
+                } else if (oldPosition.positionMs - newPosition.positionMs > BACKWARD_JUMP_THRESHOLD_MS) {
+                    android.util.Log.w(
+                        "JellioPlayer",
+                        "unexpected backward discontinuity reason=$reason from=${oldPosition.positionMs}ms to=${newPosition.positionMs}ms",
+                    )
+                }
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 playWhenReadyState = playWhenReady
@@ -1086,9 +1125,9 @@ internal fun PlayerSurface(
         if (problem != null) {
             LaunchedEffect(problem) { controlsVisible = false }
             PlaybackErrorPanel(problem = problem, onBack = onBack)
-        } else if (isBuffering && pauseInfo != null) {
+        } else if ((isBuffering || seekReloading) && pauseInfo != null) {
             BufferingOverlay(info = pauseInfo!!)
-        } else if (isBuffering) {
+        } else if (isBuffering || seekReloading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 PulsingTitle(text = title.ifBlank { Strings.get("tv_loading") })
             }
