@@ -133,6 +133,15 @@ fun HomeScreen(
     var restorePending by remember { mutableStateOf(true) }
 
     LaunchedEffect(uiState.rows) {
+        if (lastFocus == null) {
+            val firstCard = uiState.rows
+                .filterIsInstance<PosterHomeRow>()
+                .firstNotNullOfOrNull { row -> row.section.items.firstOrNull()?.let { row.section.key to it.Id } }
+            if (firstCard != null) {
+                lastFocus = listOf(firstCard.first, firstCard.second)
+                restorePending = true
+            }
+        }
         if (lastFocus != null) {
             restorePending = true
         }

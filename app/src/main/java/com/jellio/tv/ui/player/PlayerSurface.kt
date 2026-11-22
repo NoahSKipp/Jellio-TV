@@ -287,6 +287,13 @@ internal fun PlayerSurface(
     var pendingReloadMs by remember(streamUrl) { mutableStateOf<Long?>(null) }
     var pendingReloadForceTranscode by remember(streamUrl) { mutableStateOf(false) }
     var seekReloading by remember(streamUrl) { mutableStateOf(false) }
+    var userSeekBuffering by remember(streamUrl) { mutableStateOf(false) }
+
+    LaunchedEffect(userSeekBuffering, isBuffering, seekReloading) {
+        if (!userSeekBuffering || isBuffering || seekReloading) return@LaunchedEffect
+        delay(2_000)
+        if (!isBuffering && !seekReloading) userSeekBuffering = false
+    }
 
     fun requestServerSeek(targetMs: Long, forceTranscode: Boolean = false) {
         val clamped = targetMs.coerceAtLeast(0L)
@@ -347,6 +354,8 @@ internal fun PlayerSurface(
     }
 
     fun userSeek(targetMs: Long) {
+        userSeekBuffering = true
+        positionMs = targetMs.coerceAtLeast(0L)
         if (syncPlaylistItemId != null && groupWatch.party.shouldAsk()) {
             groupWatch.party.ask("seek", targetMs.coerceAtLeast(0L) * TICKS_PER_MS)
         } else if (syncPlaylistItemId != null) {
@@ -614,6 +623,7 @@ internal fun PlayerSurface(
             }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) PlayStartTrace.markOnce("player ready")
+                if (state == Player.STATE_READY) userSeekBuffering = false
                 isEnded = state == Player.STATE_ENDED
                 isBuffering = state == Player.STATE_BUFFERING || (state == Player.STATE_IDLE && exoError == null)
                 if (isEnded && !looksLikePlaceholder(realPositionMs(), expectedRuntimeMs) && !stoppedTooEarly(realPositionMs(), expectedRuntimeMs)) {
@@ -737,7 +747,7 @@ internal fun PlayerSurface(
                     onPlaybackStarted()
                 }
             }
-            if (pendingReloadMs == null) positionMs = realPositionMs()
+            if (pendingReloadMs == null && !userSeekBuffering) positionMs = realPositionMs()
             if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9 && !looksLikePlaceholder(durationMs, expectedRuntimeMs)) {
                 onMarkRealWatchComplete()
             }
@@ -1125,6 +1135,11 @@ internal fun PlayerSurface(
         if (problem != null) {
             LaunchedEffect(problem) { controlsVisible = false }
             PlaybackErrorPanel(problem = problem, onBack = onBack)
+        } else if ((isBuffering || seekReloading) && userSeekBuffering && hasReportedStart) {
+            // Keep the last video frame visible while a user seek is resolving.
+            // The title art is useful for initial loading, but looks like a
+            // playback failure when it replaces the picture during a seek.
+            Box(Modifier.fillMaxSize())
         } else if ((isBuffering || seekReloading) && pauseInfo != null) {
             BufferingOverlay(info = pauseInfo!!)
         } else if (isBuffering || seekReloading) {

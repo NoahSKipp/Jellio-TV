@@ -93,7 +93,41 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberTvGridState()
     val focusController = rememberGridFocusController()
+    val fieldSurfaceFocusRequester = remember { FocusRequester() }
+    var focusFirstResultAfterSearch by remember { mutableStateOf(false) }
+    var isEditingQuery by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    LaunchedEffect(
+        focusFirstResultAfterSearch,
+        isEditingQuery,
+        uiState.isSearching,
+        uiState.results.firstOrNull()?.Id,
+    ) {
+        if (!focusFirstResultAfterSearch || isEditingQuery || uiState.isSearching) return@LaunchedEffect
+
+        if (uiState.results.isNotEmpty()) {
+            val firstResult = focusController.requesterFor(0)
+            for (attempt in 0 until 12) {
+                if (runCatching { firstResult.requestFocus() }.isSuccess) {
+                    focusFirstResultAfterSearch = false
+                    return@LaunchedEffect
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        } else {
+            // No result card to focus; keep focus in Search instead of letting
+            // it fall back to the sidebar when the keyboard closes.
+            for (attempt in 0 until 12) {
+                if (runCatching { fieldSurfaceFocusRequester.requestFocus() }.isSuccess) {
+                    focusFirstResultAfterSearch = false
+                    return@LaunchedEffect
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+        focusFirstResultAfterSearch = false
+    }
 
     val voiceIntent = remember {
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -117,8 +151,6 @@ fun SearchScreen(
             }.getOrDefault(false)
         }
     }
-
-    var isEditingQuery by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -203,6 +235,8 @@ fun SearchScreen(
                 label = com.jellio.tv.ui.i18n.string("search_placeholder"),
                 isEditing = isEditingQuery,
                 onEditingChange = { isEditingQuery = it },
+                fieldSurfaceFocusRequester = fieldSurfaceFocusRequester,
+                onSubmit = { focusFirstResultAfterSearch = true },
                 modifier = Modifier.width(480.dp),
             )
 
@@ -381,9 +415,10 @@ private fun TvSearchField(
     label: String,
     isEditing: Boolean,
     onEditingChange: (Boolean) -> Unit,
+    fieldSurfaceFocusRequester: FocusRequester,
+    onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val fieldSurfaceFocusRequester = remember { FocusRequester() }
     val inputFocusRequester = remember { FocusRequester() }
 
     BackHandler(enabled = isEditing) {
@@ -410,12 +445,12 @@ private fun TvSearchField(
             ),
             keyboardActions = KeyboardActions(
                 onSearch = {
+                    onSubmit()
                     onEditingChange(false)
-                    runCatching { fieldSurfaceFocusRequester.requestFocus() }
                 },
                 onDone = {
+                    onSubmit()
                     onEditingChange(false)
-                    runCatching { fieldSurfaceFocusRequester.requestFocus() }
                 },
             ),
             modifier = modifier

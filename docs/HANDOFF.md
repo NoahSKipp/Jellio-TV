@@ -79,10 +79,10 @@ node or any descendant," so there's no manual per-item focus bookkeeping.
 `MainActivity` always reserves `SidebarReservedWidth` (= the collapsed width)
 of horizontal padding on non-immersive screens regardless of expand state —
 the rail overlays content when expanded rather than reflowing the grid
-underneath. Cold-start focus fix: a `LaunchedEffect(Unit) {
-initialFocusRequester.requestFocus() }` claims initial focus onto whichever
-item matches the selected route, so the first D-pad press on cold start
-doesn't fall through to Compose's generic default. Because the rail sits at
+underneath. The rail does not claim focus on initial composition; Home seeds
+its remembered focus target to the first available poster card so launch
+focus starts in Home content. When a panel closes, focus is restored to the
+rail only after it becomes focusable again. Because the rail sits at
 real x=0 with genuinely reserved layout space (not an overlay while
 collapsed), Compose's default spatial focus search finds it reliably on a
 Left press from any screen content — this specifically avoids the flaky
@@ -167,7 +167,10 @@ defines, leaves everything else at tv-material3 defaults. `TvScale.kt` — the
 LocalTvScale.current` is called pervasively on every hardcoded size (rail
 widths, icon sizes, splash mark size, card dimensions) so the UI reads
 consistently across different TV panel dp-widths rather than looking right
-only on the one reference viewport it was tuned against.
+only on the one reference viewport it was tuned against. `DisplayPreferences`
+stores the Display > Interface size choice (80%, 90%, or 100%); `Theme.kt`
+applies it through `LocalDensity` so standard dimensions, text, and buttons
+scale alongside explicit `.scaled()` sizes. This is separate from overscan.
 
 ## Focus/navigation system — the most fragile subsystem in this repo
 
@@ -287,6 +290,12 @@ yet), renames it, generates md5/sha256 checksums, uploads as release assets.
    noting as a real, if lucky, validation — future vector/animator XML edits
    here still can't be visually verified before CI, so double-check the XML
    by hand (structure, path data, gradient stops) before pushing.
+5. **Playback, focus, and display refinements**: Continue Watching keeps
+   resumed episodes with a positive playback position even when Jellyfin marks
+   them played; Search submission moves focus to the first result; Home starts
+   focus on its first poster; seeking keeps the current video frame visible,
+   and the paused banner delay is 10 seconds. Display settings now include a
+   persisted Interface size control applied app-wide through Compose density.
 
 ## Known gaps / deliberately deferred
 

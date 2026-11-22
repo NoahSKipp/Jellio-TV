@@ -9,7 +9,7 @@ internal const val PROGRESS_REPORT_INTERVAL_MS = 10_000L
 internal const val CONTROLS_HIDE_DELAY_MS = 4_000L
 // Paused this long with nothing open, the controls give way to the
 // "You're watching" screen (NuvioTV does the same).
-internal const val PAUSE_OVERLAY_DELAY_MS = 5_000L
+internal const val PAUSE_OVERLAY_DELAY_MS = 10_000L
 internal const val TOAST_DURATION_MS = 4_000L
 internal const val TICKS_PER_MS = 10_000L
 // Further apart than this from the group, a play or pause also seeks.

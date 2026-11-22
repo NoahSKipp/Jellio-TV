@@ -882,6 +882,24 @@ fun SettingsScreen(
                         onClick = { openField = LanguageField.DISPLAY },
                     )
                     SettingsDivider()
+                    val interfaceScale = com.jellio.tv.data.prefs.DisplayPreferences.interfaceScalePercent
+                    SettingsPickerRow(
+                        label = string("settings_interface_size"),
+                        value = string(when (interfaceScale) {
+                            80 -> "settings_interface_size_small"
+                            90 -> "settings_interface_size_medium"
+                            else -> "settings_interface_size_default"
+                        }),
+                        onClick = {
+                            val next = when (interfaceScale) {
+                                100 -> 90
+                                90 -> 80
+                                else -> 100
+                            }
+                            com.jellio.tv.data.prefs.DisplayPreferences.setInterfaceScale(displayContext, next)
+                        },
+                    )
+                    SettingsDivider()
                     MotionRow()
                     SettingsDivider()
                     val overscan = com.jellio.tv.data.prefs.DisplayPreferences.overscanPercent

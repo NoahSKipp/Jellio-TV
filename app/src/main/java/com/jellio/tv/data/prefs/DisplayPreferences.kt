@@ -41,6 +41,7 @@ object DisplayPreferences {
     private const val KEY_DISPLAY_LANGUAGE = "display_language"
     private const val KEY_SHOW_NOW_PLAYING_PILL = "show_now_playing_pill"
     private const val KEY_CLOCK_STYLE = "clock_style"
+    private const val KEY_INTERFACE_SCALE = "interface_scale_percent"
 
     const val MIN_PERCENT = 0
     const val MAX_PERCENT = 8
@@ -57,6 +58,9 @@ object DisplayPreferences {
     var clockStyle by mutableStateOf(ClockStyle.HOURS_24)
         private set
 
+    var interfaceScalePercent by mutableIntStateOf(100)
+        private set
+
     var isCalibrating by mutableStateOf(false)
 
     fun init(context: Context) {
@@ -67,6 +71,7 @@ object DisplayPreferences {
         displayLanguage = AppLanguage.fromCode(langCode)
         showNowPlayingPill = sp.getBoolean(KEY_SHOW_NOW_PLAYING_PILL, true)
         clockStyle = ClockStyle.fromCode(sp.getString(KEY_CLOCK_STYLE, null))
+        interfaceScalePercent = sp.getInt(KEY_INTERFACE_SCALE, 100).coerceIn(80, 100)
     }
 
     fun setClockStyle(context: Context, style: ClockStyle) {
@@ -75,6 +80,16 @@ object DisplayPreferences {
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_CLOCK_STYLE, style.code)
+            .apply()
+    }
+
+    fun setInterfaceScale(context: Context, percent: Int) {
+        val clamped = percent.coerceIn(80, 100)
+        interfaceScalePercent = clamped
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_INTERFACE_SCALE, clamped)
             .apply()
     }
 
