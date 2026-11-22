@@ -104,8 +104,6 @@ fun SidebarNav(
         label = "sidebarShadowAlpha",
     )
 
-    LaunchedEffect(Unit) { restoreFocusRequester?.requestFocus() }
-
     // A closing panel hands focus back here before the rail is focusable
     // again; take it once it is.
     var wasBlocked by remember { mutableStateOf(!focusable) }
