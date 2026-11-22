@@ -1135,10 +1135,10 @@ internal fun PlayerSurface(
         if (problem != null) {
             LaunchedEffect(problem) { controlsVisible = false }
             PlaybackErrorPanel(problem = problem, onBack = onBack)
-        } else if ((isBuffering || seekReloading) && userSeekBuffering && hasReportedStart) {
-            // Keep the last video frame visible while a user seek is resolving.
-            // The title art is useful for initial loading, but looks like a
-            // playback failure when it replaces the picture during a seek.
+        } else if (isBuffering && !seekReloading && userSeekBuffering && hasReportedStart) {
+            // Keep the last video frame visible while a user seek is resolving
+            // in the same player. A seek that reloads the stream builds a new
+            // player with no picture yet, so it shows the loading screen.
             Box(Modifier.fillMaxSize())
         } else if ((isBuffering || seekReloading) && pauseInfo != null) {
             BufferingOverlay(info = pauseInfo!!)
