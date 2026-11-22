@@ -141,6 +141,7 @@ interface JellyfinApi {
         @Query("Fields") fields: String? = null,
         @Query("seriesId") seriesId: String? = null,
         @Query("enableResumable") enableResumable: Boolean? = null,
+        @Query("enableRewatching") enableRewatching: Boolean? = null,
     ): ItemsResultDto
 
     @GET("Shows/{seriesId}/Seasons")

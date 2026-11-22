@@ -1088,8 +1088,7 @@ internal fun List<BaseItemDto>.withoutStaleEpisodes(upNext: List<BaseItemDto>): 
     fun order(item: BaseItemDto) = (item.ParentIndexNumber ?: 0) * 10_000 + (item.IndexNumber ?: 0)
     val nextBySeries = upNext.filter { it.SeriesId != null }.associateBy { it.SeriesId }
     return filter { item ->
-        if ((item.UserData?.PlaybackPositionTicks ?: 0L) > 0L) return@filter true
-        if (item.UserData?.Played == true) return@filter false
+        if (com.jellio.tv.data.isFinished(item)) return@filter false
         val next = item.SeriesId?.let { nextBySeries[it] } ?: return@filter true
         order(item) >= order(next)
     }

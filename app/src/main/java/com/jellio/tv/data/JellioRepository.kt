@@ -547,8 +547,15 @@ class JellioRepository @Inject constructor(
         api.hideSeriesFromNextUp(seriesId)
     }
 
-    suspend fun getSeriesNextUp(seriesId: String, userId: String): BaseItemDto? {
-        val items = api.getNextUp(userId, limit = 5, fields = "PrimaryImageAspectRatio,RunTimeTicks,PremiereDate,EndDate", seriesId = seriesId).Items
+    // rewatching: when every episode is watched, the one after the last played.
+    suspend fun getSeriesNextUp(seriesId: String, userId: String, rewatching: Boolean = false): BaseItemDto? {
+        val items = api.getNextUp(
+            userId,
+            limit = 5,
+            fields = "PrimaryImageAspectRatio,RunTimeTicks,PremiereDate,EndDate",
+            seriesId = seriesId,
+            enableRewatching = if (rewatching) true else null,
+        ).Items
         return filterReadyToWatchItems(userId, items).firstOrNull()
     }
 
@@ -1168,7 +1175,7 @@ class JellioRepository @Inject constructor(
 
     suspend fun resolveSeriesPlayTarget(seriesId: String, userId: String): SeriesPlayTarget? {
         val continueWatchingEp = catching {
-            getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId && it.UserData?.Played != true }
+            getContinueWatching(userId).firstOrNull { it.SeriesId == seriesId && !isFinished(it) }
         }.getOrNull()
         val seriesNextUp = catching {
             getSeriesNextUp(seriesId, userId)
@@ -1178,7 +1185,9 @@ class JellioRepository @Inject constructor(
             continueWatchingEp != null && (seriesNextUp == null || epOrder(continueWatchingEp) >= epOrder(seriesNextUp)) -> continueWatchingEp
             else -> seriesNextUp
         }
-        val episode = nextUp ?: try {
+        // A series that is watched through has no Next Up: carry on after the last one played.
+        val rewatchNext = if (nextUp == null) catching { getSeriesNextUp(seriesId, userId, rewatching = true) }.getOrNull() else null
+        val episode = nextUp ?: rewatchNext ?: try {
             val seasons = getSeasons(seriesId, userId)
             val ordered = seasons.sortedBy { if (isSpecialsSeason(it)) 1 else 0 }
             val firstSeason = ordered.firstOrNull()
