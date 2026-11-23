@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.6",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.6",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.PlayCircle, "Streams That Jump Back", "When a stream suddenly jumps back a few minutes or a seek lands in the wrong place, Jellio now carries on from where you were on another stream instead of leaving you stranded."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.2.5",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.5",
