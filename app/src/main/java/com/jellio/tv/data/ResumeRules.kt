@@ -17,3 +17,7 @@ fun isPartlyWatched(item: BaseItemDto): Boolean {
 
 // Marked played and not being resumed partway.
 fun isFinished(item: BaseItemDto): Boolean = item.UserData?.Played == true && !isPartlyWatched(item)
+
+// Most recently played first; items without a date go last, order otherwise kept.
+fun List<BaseItemDto>.recentlyPlayedFirst(): List<BaseItemDto> =
+    sortedByDescending { it.UserData?.LastPlayedDate.orEmpty() }

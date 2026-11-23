@@ -84,6 +84,8 @@ private data class CardMenuTarget(val item: BaseItemDto, val row: PosterHomeRow)
 
 @OptIn(ExperimentalFoundationApi::class)
 private const val WATCHLIST_POLL_MS = 20_000L
+// Continue Watching and Next Up are asked again every third check, and on every return to the front.
+private const val WATCH_ROWS_EVERY_TICKS = 3
 
 @Composable
 fun HomeScreen(
@@ -186,8 +188,11 @@ fun HomeScreen(
     val homeLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(homeLifecycle, session.userId) {
         homeLifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            var tick = 0
             while (true) {
+                if (tick % WATCH_ROWS_EVERY_TICKS == 0) viewModel.refreshWatchRows(session)
                 viewModel.refreshWatchlist(session)
+                tick++
                 kotlinx.coroutines.delay(WATCHLIST_POLL_MS)
             }
         }

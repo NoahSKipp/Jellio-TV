@@ -67,4 +67,13 @@ class ResumeRulesTest {
         val next = episode("e4", 1, 4, played = false, position = 0L)
         assertEquals(listOf("e5"), listOf(ahead).withoutStaleEpisodes(listOf(next)).map { it.Id })
     }
+
+    @Test
+    fun recentlyPlayedComesFirstAndUndatedLast() {
+        fun dated(id: String, date: String?) =
+            BaseItemDto(Id = id, UserData = UserItemDataDto(LastPlayedDate = date))
+        val sorted = listOf(dated("old", "2026-11-01T10:00:00.0000000Z"), dated("none", null), dated("new", "2026-11-22T20:00:00.0000000Z"))
+            .recentlyPlayedFirst()
+        assertEquals(listOf("new", "old", "none"), sorted.map { it.Id })
+    }
 }

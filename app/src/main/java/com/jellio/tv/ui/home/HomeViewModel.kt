@@ -293,17 +293,7 @@ class HomeViewModel @Inject constructor(
                     if (isReturningVisit) {
                         // The two watch rows are swapped in as soon as they are back; the rest of Home follows when it is all in.
                         val current = _uiState.value
-                        val watchRows = freshTop.map { row ->
-                            if (row is PosterHomeRow && row.section.key == "continue-watching") {
-                                val remaining = row.section.items.filterNot { it.Id in removedContinueWatchingIds || it.Id in removedItemIds }
-                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
-                            } else if (row is PosterHomeRow && row.section.key == "up-next") {
-                                val remaining = row.section.items.filterNot { it.Id in removedItemIds || (it.SeriesId != null && it.SeriesId in hiddenSeriesIds) }
-                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
-                            } else {
-                                row
-                            }
-                        }.filterNotNull()
+                        val watchRows = watchRowsFor(continueWatching, upNext)
                         _uiState.value = current.copy(rows = withWatchRowsReplaced(current.rows, watchRows, { it.key }, WATCH_ROW_KEYS))
                     }
                     if (upNextFresh != null && continueWatchingFresh != null) {
@@ -754,6 +744,42 @@ class HomeViewModel @Inject constructor(
     }
 
     private var watchlistJob: kotlinx.coroutines.Job? = null
+    private var watchRowsJob: kotlinx.coroutines.Job? = null
+
+    private fun watchRowsFor(continueWatching: List<BaseItemDto>, upNext: List<BaseItemDto>): List<HomeRow> = buildList {
+        val cw = continueWatching.filterNot { it.Id in removedContinueWatchingIds || it.Id in removedItemIds }
+        val un = upNext.filterNot { it.Id in removedItemIds || (it.SeriesId != null && it.SeriesId in hiddenSeriesIds) }
+        if (cw.isNotEmpty()) {
+            add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_continue_watching"), cw, key = "continue-watching"), landscape = true))
+        }
+        if (un.isNotEmpty()) {
+            add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_next_up"), un, key = "up-next"), landscape = true))
+        }
+    }
+
+    private fun watchRowSignature(rows: List<HomeRow>): List<String> =
+        rows.filter { it.key in WATCH_ROW_KEYS }.flatMap { row ->
+            (row as? PosterHomeRow)?.section?.items.orEmpty().map { item ->
+                row.key + ":" + item.Id + ":" + (item.UserData?.PlaybackPositionTicks ?: 0L) + ":" + (item.UserData?.Played == true)
+            }
+        }
+
+    // Continue Watching and Next Up on their own, for a Home that has been open
+    // a while or has just come back to the front: whatever was watched or removed
+    // on another device shows without a full reload.
+    fun refreshWatchRows(session: Session) {
+        if (loadJob?.isActive == true || watchRowsJob?.isActive == true) return
+        watchRowsJob = viewModelScope.launch {
+            val next = catching { repository.getNextUp(session.userId) }.getOrNull() ?: return@launch
+            val resume = catching { repository.getContinueWatching(session.userId) }.getOrNull() ?: return@launch
+            val state = _uiState.value
+            if (state.isLoading || state.rows.isEmpty()) return@launch
+            val rows = withWatchRowsReplaced(state.rows, watchRowsFor(resume.withoutStaleEpisodes(next), next), { it.key }, WATCH_ROW_KEYS)
+            if (watchRowSignature(rows) == watchRowSignature(state.rows)) return@launch
+            _uiState.value = _uiState.value.copy(rows = rows)
+            persistCurrentSnapshot(session.userId)
+        }
+    }
 
     // Home asks on every open and while it stays up: whatever was added or
     // taken off the watchlist elsewhere (a friend, another device) redraws

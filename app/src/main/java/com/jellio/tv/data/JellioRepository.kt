@@ -491,7 +491,7 @@ class JellioRepository @Inject constructor(
         ).Items
 
     suspend fun getContinueWatching(userId: String): List<BaseItemDto> =
-        api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks,UserData").Items.also { seedPreviews(it) }
+        api.getResumeItems(userId, fields = "$ITEM_FIELDS,RunTimeTicks,UserData").Items.recentlyPlayedFirst().also { seedPreviews(it) }
 
     suspend fun hasValidStreamForTodayItem(userId: String, item: BaseItemDto): Boolean {
         if (!isReleasedToday(item)) return true
