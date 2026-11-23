@@ -610,6 +610,7 @@ internal object StringsFr {
         m["player_buffer_keep"] = "Continuer"
         m["player_buffer_always"] = "Toujours changer automatiquement"
         m["player_buffer_no_other"] = "Aucun autre flux disponible."
+        m["player_jump_switched"] = "Le flux a reculé, Jellio est passé à un autre."
         m["settings_buffer_switch_label"] = "Quand un flux charge sans arrêt"
         m["settings_buffer_switch_ask"] = "Me demander"
         m["settings_buffer_switch_auto"] = "Changer automatiquement"

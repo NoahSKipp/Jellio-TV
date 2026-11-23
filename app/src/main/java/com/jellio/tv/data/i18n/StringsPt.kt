@@ -610,6 +610,7 @@ internal object StringsPt {
         m["player_buffer_keep"] = "Continuar assistindo"
         m["player_buffer_always"] = "Sempre trocar automaticamente"
         m["player_buffer_no_other"] = "Não há outro stream para trocar."
+        m["player_jump_switched"] = "O stream voltou atrás, por isso o Jellio mudou para outro."
         m["settings_buffer_switch_label"] = "Quando um stream fica carregando"
         m["settings_buffer_switch_ask"] = "Perguntar"
         m["settings_buffer_switch_auto"] = "Trocar automaticamente"

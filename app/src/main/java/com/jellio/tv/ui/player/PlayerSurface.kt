@@ -557,6 +557,40 @@ internal fun PlayerSurface(
             }
         }
     }
+    // A jump back nobody asked for means this stream's container is broken.
+    // Playback carries on from where it was on another stream; with none left,
+    // on a server reload where transcoding is allowed, else by seeking back.
+    var jumpRecoveries by remember(streamUrl) { mutableStateOf(0) }
+    fun recoverFromBackwardJump(jump: BackwardJump) {
+        android.util.Log.w("JellioPlayer", "backward jump ${jump.fromMs}ms -> ${jump.toMs}ms (#${jump.count}), recovering")
+        jumpRecoveries++
+        bufferScope.launch {
+            if (onBufferSwitch(jump.fromMs * TICKS_PER_MS)) {
+                onShowToast(Strings.get("player_jump_switched"))
+            } else if (directPlay && !com.jellio.tv.data.playback.VideoTranscodePolicy.blocking) {
+                requestServerSeek(jump.fromMs, forceTranscode = true)
+            } else if (!directPlay) {
+                requestServerSeek(jump.fromMs)
+            } else {
+                player.seekTo((jump.fromMs - streamOffsetMs).coerceAtLeast(0L))
+            }
+        }
+    }
+
+    // A direct seek that landed far from where it was asked to go (truncated
+    // container index): reload at the target on the server, or on another stream.
+    fun recoverFromSeekDrift(targetMs: Long) {
+        android.util.Log.w("JellioPlayer", "direct seek missed its target ${targetMs}ms, recovering")
+        jumpRecoveries++
+        bufferScope.launch {
+            if (!com.jellio.tv.data.playback.VideoTranscodePolicy.blocking) {
+                requestServerSeek(targetMs, forceTranscode = true)
+            } else if (onBufferSwitch(targetMs * TICKS_PER_MS)) {
+                onShowToast(Strings.get("player_jump_switched"))
+            }
+        }
+    }
+
     LaunchedEffect(isBuffering, streamUrl) {
         if (!isBuffering || PlayerPrefs.bufferSwitch == "off") return@LaunchedEffect
         val now = System.currentTimeMillis()
@@ -748,6 +782,18 @@ internal fun PlayerSurface(
                 }
             }
             if (pendingReloadMs == null && !userSeekBuffering) positionMs = realPositionMs()
+            if (syncGroup == null && pendingReloadMs == null && !seekReloading && jumpRecoveries < MAX_JUMP_RECOVERIES &&
+                player.playbackState == Player.STATE_READY && !player.isPlayingAd
+            ) {
+                val nowMs = System.currentTimeMillis()
+                val recentSeek = nowMs - bufferWatch.lastSeekAt < RECENT_SEEK_WINDOW_MS
+                seekWatch.notePosition(realPositionMs(), recentSeek)?.let { recoverFromBackwardJump(it) }
+                if (directPlay) {
+                    seekWatch.checkDirectSeekResult(realPositionMs(), nowMs)?.let { target ->
+                        if (durationMs <= 0 || target < durationMs - SEEK_DRIFT_FALLBACK_MS) recoverFromSeekDrift(target)
+                    }
+                }
+            }
             if (durationMs > 0 && positionMs.toDouble() / durationMs.toDouble() >= 0.9 && !looksLikePlaceholder(durationMs, expectedRuntimeMs)) {
                 onMarkRealWatchComplete()
             }

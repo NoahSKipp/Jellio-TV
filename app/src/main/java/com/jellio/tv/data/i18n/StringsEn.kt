@@ -610,6 +610,7 @@ internal object StringsEn {
         m["player_buffer_keep"] = "Keep watching"
         m["player_buffer_always"] = "Always switch automatically"
         m["player_buffer_no_other"] = "No other stream to switch to."
+        m["player_jump_switched"] = "The stream jumped back, so Jellio switched to another one."
         m["settings_buffer_switch_label"] = "When a stream keeps buffering"
         m["settings_buffer_switch_ask"] = "Ask me"
         m["settings_buffer_switch_auto"] = "Switch automatically"

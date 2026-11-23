@@ -610,6 +610,7 @@ internal object StringsPl {
         m["player_buffer_keep"] = "Oglądaj dalej"
         m["player_buffer_always"] = "Zawsze zmieniaj automatycznie"
         m["player_buffer_no_other"] = "Brak innego strumienia."
+        m["player_jump_switched"] = "Strumień cofnął się, więc Jellio przełączył na inny."
         m["settings_buffer_switch_label"] = "Gdy strumień ciągle buforuje"
         m["settings_buffer_switch_ask"] = "Pytaj mnie"
         m["settings_buffer_switch_auto"] = "Zmieniaj automatycznie"

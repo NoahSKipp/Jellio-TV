@@ -5,6 +5,8 @@ import kotlin.math.abs
 internal const val SEEK_DRIFT_FALLBACK_MS = 30_000L
 internal const val DIRECT_SEEK_SETTLE_MS = 1_500L
 internal const val BACKWARD_JUMP_THRESHOLD_MS = 30_000L
+internal const val MAX_JUMP_RECOVERIES = 3
+internal const val RECENT_SEEK_WINDOW_MS = 5_000L
 
 internal data class BackwardJump(
     val fromMs: Long,

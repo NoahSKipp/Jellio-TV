@@ -610,6 +610,7 @@ internal object StringsEs {
         m["player_buffer_keep"] = "Seguir viendo"
         m["player_buffer_always"] = "Cambiar siempre automáticamente"
         m["player_buffer_no_other"] = "No hay otra emisión a la que cambiar."
+        m["player_jump_switched"] = "La emisión retrocedió, así que Jellio cambió a otra."
         m["settings_buffer_switch_label"] = "Cuando una emisión se queda cargando"
         m["settings_buffer_switch_ask"] = "Preguntarme"
         m["settings_buffer_switch_auto"] = "Cambiar automáticamente"

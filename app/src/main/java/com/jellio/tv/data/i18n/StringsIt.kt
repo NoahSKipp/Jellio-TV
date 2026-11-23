@@ -610,6 +610,7 @@ internal object StringsIt {
         m["player_buffer_keep"] = "Continua a guardare"
         m["player_buffer_always"] = "Cambia sempre automaticamente"
         m["player_buffer_no_other"] = "Nessun altro stream disponibile."
+        m["player_jump_switched"] = "Lo stream è tornato indietro, Jellio è passato a un altro."
         m["settings_buffer_switch_label"] = "Quando uno stream continua a caricare"
         m["settings_buffer_switch_ask"] = "Chiedimelo"
         m["settings_buffer_switch_auto"] = "Cambia automaticamente"

@@ -610,6 +610,7 @@ internal object StringsDe {
         m["player_buffer_keep"] = "Weiterschauen"
         m["player_buffer_always"] = "Immer automatisch wechseln"
         m["player_buffer_no_other"] = "Kein anderer Stream verfügbar."
+        m["player_jump_switched"] = "Der Stream ist zurückgesprungen, Jellio hat zu einem anderen gewechselt."
         m["settings_buffer_switch_label"] = "Wenn ein Stream ständig puffert"
         m["settings_buffer_switch_ask"] = "Fragen"
         m["settings_buffer_switch_auto"] = "Automatisch wechseln"
