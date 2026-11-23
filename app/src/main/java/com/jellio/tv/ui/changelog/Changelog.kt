@@ -104,6 +104,14 @@ fun isBigRelease(version: String): Boolean {
 
 val CHANGELOG_RELEASES = listOf(
     ChangelogRelease(
+        version = "1.2.7",
+        title = "What's New in Jellio TV",
+        subtitle = "Version 1.2.7",
+        features = listOf(
+            ChangelogFeature(Icons.Filled.Sync, "Home Stays Current", "Continue Watching and Next Up refresh when you come back to the app and every minute while Home is open, newest first, so what you watched or removed elsewhere shows up without a restart."),
+        ),
+    ),
+    ChangelogRelease(
         version = "1.2.6",
         title = "What's New in Jellio TV",
         subtitle = "Version 1.2.6",
