@@ -115,6 +115,7 @@ private const val COMMUNITY_ROW_KEY = "rec:What Others Are Watching"
 private const val HOME_BACKGROUND_RETRIES = 3
 // Coming back to Home this soon after a complete load does not ask again.
 private const val HOME_FRESH_MS = 10_000L
+private val WATCH_ROW_KEYS = setOf("continue-watching", "up-next")
 private const val HOME_RETRY_DELAY_MS = 20_000L
 private const val ADDED_BY_WAIT_MS = 2_500L
 
@@ -160,6 +161,7 @@ class HomeViewModel @Inject constructor(
 
     private var loadedForUserId: String? = null
     private var freshAtMs: Long? = null
+    private var lastLoadStartedMs = 0L
 
     private val failedFetches = java.util.concurrent.atomic.AtomicInteger()
     @Volatile private var lastFailure: Throwable? = null
@@ -202,6 +204,9 @@ class HomeViewModel @Inject constructor(
     fun load(session: Session, force: Boolean = false) {
         nowPlayingManager.startPolling(session)
         val loadKey = "${session.userId}:${com.jellio.tv.data.prefs.DisplayPreferences.displayLanguage.code}"
+        // Something was watched after this Home was asked for its rows: ask again, even mid-load.
+        val watchedSinceLoad = loadedForUserId == loadKey && repository.lastPlaybackStopElapsedMs > lastLoadStartedMs
+        if (watchedSinceLoad) loadJob?.cancel()
         val action = decideHomeLoad(
             key = loadKey,
             loadedKey = loadedForUserId,
@@ -209,17 +214,20 @@ class HomeViewModel @Inject constructor(
             freshAtMs = freshAtMs,
             nowMs = android.os.SystemClock.elapsedRealtime(),
             freshForMs = HOME_FRESH_MS,
-            force = force,
+            force = force || watchedSinceLoad,
         )
         if (action == HomeLoadAction.SKIP) return
         val isReturningVisit = action == HomeLoadAction.REFRESH
         loadedForUserId = loadKey
+        lastLoadStartedMs = android.os.SystemClock.elapsedRealtime()
         freshAtMs = null
         loadJob?.cancel()
         homeRetryJob?.cancel()
         failedFetches.set(0)
         lastFailure = null
         loadJob = viewModelScope.launch {
+            // Coming back from watching: the last stop report is in before the rows are asked for.
+            if (isReturningVisit) repository.awaitPendingStop()
             // Read alongside the requests below instead of before them.
             val snapshotRead = if (isReturningVisit) null else async {
                 catching { rowSnapshotStore.loadHomeSnapshot(session.userId) }.getOrNull()
@@ -274,6 +282,30 @@ class HomeViewModel @Inject constructor(
                     val upNext = upNextFresh ?: previousSection("up-next")?.items.orEmpty()
                     val continueWatching = continueWatchingFresh?.withoutStaleEpisodes(upNext)
                         ?: previousSection("continue-watching")?.items.orEmpty()
+                    val freshTop = buildList<HomeRow> {
+                        if (continueWatching.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
+                        }
+                        if (upNext.isNotEmpty()) {
+                            add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_next_up"), upNext, key = "up-next"), landscape = true))
+                        }
+                    }
+                    if (isReturningVisit) {
+                        // The two watch rows are swapped in as soon as they are back; the rest of Home follows when it is all in.
+                        val current = _uiState.value
+                        val watchRows = freshTop.map { row ->
+                            if (row is PosterHomeRow && row.section.key == "continue-watching") {
+                                val remaining = row.section.items.filterNot { it.Id in removedContinueWatchingIds || it.Id in removedItemIds }
+                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                            } else if (row is PosterHomeRow && row.section.key == "up-next") {
+                                val remaining = row.section.items.filterNot { it.Id in removedItemIds || (it.SeriesId != null && it.SeriesId in hiddenSeriesIds) }
+                                if (remaining.isEmpty()) null else row.copy(section = row.section.copy(items = remaining))
+                            } else {
+                                row
+                            }
+                        }.filterNotNull()
+                        _uiState.value = current.copy(rows = withWatchRowsReplaced(current.rows, watchRows, { it.key }, WATCH_ROW_KEYS))
+                    }
                     if (upNextFresh != null && continueWatchingFresh != null) {
                         launch { catching { watchNextSyncer.sync(session, continueWatching, upNext) } }
                     }
@@ -294,14 +326,6 @@ class HomeViewModel @Inject constructor(
                     val user = userDeferred.await()
                     val customization = customizationDeferred.await()
                     if (!isReturningVisit) {
-                        val freshTop = buildList<HomeRow> {
-                            if (continueWatching.isNotEmpty()) {
-                                add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_continue_watching"), continueWatching, key = "continue-watching"), landscape = true))
-                            }
-                            if (upNext.isNotEmpty()) {
-                                add(PosterHomeRow(HomeSection(com.jellio.tv.data.i18n.Strings.get("home_next_up"), upNext, key = "up-next"), landscape = true))
-                            }
-                        }
                         _uiState.value = HomeUiState(
                             isLoading = false,
                             heroItems = heroCandidates,

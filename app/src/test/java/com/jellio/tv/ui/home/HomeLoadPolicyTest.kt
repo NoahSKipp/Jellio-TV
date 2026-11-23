@@ -91,3 +91,35 @@ class HomeLoadPolicyTest {
         assertEquals(listOf("a", "c"), merge(emptyList(), listOf("a", "b", "c"), setOf("a", "c")))
     }
 }
+
+class WatchRowsReplacedTest {
+    private val keys = setOf("continue-watching", "up-next")
+
+    @Test
+    fun freshRowsTakeTheOldOnesPlaceAndOtherRowsStay() {
+        val rows = listOf("continue-watching", "up-next", "watchlist", "top-picks")
+        val result = withWatchRowsReplaced(rows, listOf("continue-watching", "up-next"), { it }, keys)
+        org.junit.Assert.assertEquals(listOf("continue-watching", "up-next", "watchlist", "top-picks"), result)
+    }
+
+    @Test
+    fun aRowThatNoLongerHasItemsIsLeftOut() {
+        val rows = listOf("continue-watching", "up-next", "watchlist")
+        val result = withWatchRowsReplaced(rows, listOf("up-next"), { it }, keys)
+        org.junit.Assert.assertEquals(listOf("up-next", "watchlist"), result)
+    }
+
+    @Test
+    fun noOldWatchRowsPutTheFreshOnesAtTheTop() {
+        val rows = listOf("watchlist", "top-picks")
+        val result = withWatchRowsReplaced(rows, listOf("continue-watching"), { it }, keys)
+        org.junit.Assert.assertEquals(listOf("continue-watching", "watchlist", "top-picks"), result)
+    }
+
+    @Test
+    fun watchRowsAfterOtherRowsKeepTheirPlace() {
+        val rows = listOf("hero", "continue-watching", "watchlist")
+        val result = withWatchRowsReplaced(rows, listOf("continue-watching", "up-next"), { it }, keys)
+        org.junit.Assert.assertEquals(listOf("hero", "continue-watching", "up-next", "watchlist"), result)
+    }
+}

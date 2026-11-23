@@ -322,6 +322,29 @@ class PlaybackRepository @Inject constructor(
         }
     }
 
+    // Stop reports run here so Home can wait for the last one before it asks
+    // the server for the new Continue Watching and Next Up.
+    private val stopScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    @Volatile
+    private var lastStop: kotlinx.coroutines.Job? = null
+
+    @Volatile
+    var lastStopElapsedMs: Long = 0L
+        private set
+
+    fun reportPlaybackStoppedAsync(itemId: String, mediaSourceId: String?, positionTicks: Long): kotlinx.coroutines.Job {
+        lastStopElapsedMs = android.os.SystemClock.elapsedRealtime()
+        val job = stopScope.launch { reportPlaybackStopped(itemId, mediaSourceId, positionTicks) }
+        lastStop = job
+        return job
+    }
+
+    suspend fun awaitPendingStop(timeoutMs: Long = PENDING_STOP_WAIT_MS) {
+        val job = lastStop ?: return
+        if (job.isActive) kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { job.join() }
+    }
+
     suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) {
         catching {
             api.reportPlaybackStopped(PlaybackReportRequest(itemId, mediaSourceId, positionTicks))
@@ -376,3 +399,5 @@ class PlaybackRepository @Inject constructor(
         }
     }
 }
+
+private const val PENDING_STOP_WAIT_MS = 3_000L

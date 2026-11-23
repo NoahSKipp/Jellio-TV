@@ -51,3 +51,12 @@ internal fun <R> mergeKeepingPending(
     while (next < kept.size) result.add(kept[next++])
     return result
 }
+
+// The Continue Watching and Next Up rows swapped for fresh ones where the old
+// ones stood (at the top when there were none), every other row untouched.
+internal fun <R> withWatchRowsReplaced(rows: List<R>, fresh: List<R>, keyOf: (R) -> String, watchKeys: Set<String>): List<R> {
+    val first = rows.indexOfFirst { keyOf(it) in watchKeys }
+    val rest = rows.filterNot { keyOf(it) in watchKeys }
+    val at = if (first < 0) 0 else first.coerceAtMost(rest.size)
+    return rest.take(at) + fresh + rest.drop(at)
+}

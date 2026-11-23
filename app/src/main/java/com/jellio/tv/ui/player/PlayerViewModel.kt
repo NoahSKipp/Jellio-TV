@@ -1215,8 +1215,9 @@ class PlayerViewModel @Inject constructor(
         // Not viewModelScope: the player is usually closing, and the Google TV
         // row should catch up even when the viewer leaves for the launcher.
         val mediaSourceId = uiState.value.mediaSourceId
+        val stop = repository.reportPlaybackStoppedAsync(id, mediaSourceId, reportedPositionTicks)
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            repository.reportPlaybackStopped(id, mediaSourceId, reportedPositionTicks)
+            stop.join()
             watchNextSyncer.refresh()
         }
     }

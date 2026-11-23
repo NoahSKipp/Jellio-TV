@@ -1615,6 +1615,13 @@ class JellioRepository @Inject constructor(
     suspend fun reportPlaybackStopped(itemId: String, mediaSourceId: String?, positionTicks: Long) =
         playback.reportPlaybackStopped(itemId, mediaSourceId, positionTicks)
 
+    fun reportPlaybackStoppedAsync(itemId: String, mediaSourceId: String?, positionTicks: Long) =
+        playback.reportPlaybackStoppedAsync(itemId, mediaSourceId, positionTicks)
+
+    suspend fun awaitPendingStop() = playback.awaitPendingStop()
+
+    val lastPlaybackStopElapsedMs: Long get() = playback.lastStopElapsedMs
+
     suspend fun reportCapabilities(): Result<Unit> = playback.reportCapabilities()
 
     fun imageUrl(
