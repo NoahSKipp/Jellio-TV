@@ -132,6 +132,7 @@ interface JellyfinApi {
         @Path("userId") userId: String,
         @Query("Limit") limit: Int = 20,
         @Query("Fields") fields: String? = null,
+        @Query("MediaTypes") mediaTypes: String? = null,
     ): ItemsResultDto
 
     @GET("Shows/NextUp")
