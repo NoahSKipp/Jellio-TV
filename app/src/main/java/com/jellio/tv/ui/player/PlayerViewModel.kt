@@ -599,6 +599,8 @@ class PlayerViewModel @Inject constructor(
                             _uiState.value = _uiState.value.copy(upNextInfo = buildUpNextInfo(session, next))
                             // The stream list is cheap: warm it as soon as the next episode is known.
                             repository.prefetchStreams(next.Id)
+                        } else {
+                            loadRecommendations(session, item)
                         }
                     }
                     launch {
@@ -606,6 +608,8 @@ class PlayerViewModel @Inject constructor(
                         if (previous != null) _uiState.value = _uiState.value.copy(previousEpisodeId = previous.Id)
                     }
                 }
+
+                if (item.Type != "Episode") launch { loadRecommendations(session, item) }
 
                 launch { loadSkipSegments(session, itemId, item.RunTimeTicks) }
 
@@ -705,6 +709,30 @@ class PlayerViewModel @Inject constructor(
         val parentTag = episode.ParentThumbImageTag ?: return null
         val parentId = episode.ParentThumbItemId ?: return null
         return repository.imageUrl(session.serverAddress, parentId, parentTag, "Thumb", 400, session.accessToken)
+    }
+
+    private suspend fun loadRecommendations(session: Session, item: BaseItemDto) {
+        val sourceId = recommendationSourceId(item.Id, item.Type, item.SeriesId)
+        val similar = catching { repository.getSimilarItems(session.userId, sourceId, END_RECS_LIMIT + 4) }.getOrNull()
+            ?: return
+        val kept = keepRecommendations(similar, setOfNotNull(item.Id, item.SeriesId))
+        if (kept.isEmpty()) return
+        val recs = kept.map { rec ->
+            val tag = rec.ImageTags?.get("Primary") ?: rec.PrimaryImageTag
+            EndRec(
+                itemId = rec.Id,
+                title = rec.Name.orEmpty(),
+                overview = rec.Overview,
+                posterUrl = tag?.let { repository.imageUrl(session.serverAddress, rec.Id, it, "Primary", 300, session.accessToken) },
+                backdropUrl = com.jellio.tv.ui.common.titleArtCandidates(
+                    rec,
+                    { id, t, type, width -> repository.imageUrl(session.serverAddress, id, t, type, width, session.accessToken) },
+                    backdropWidth = 1280,
+                ).firstOrNull { !it.blurred }?.url,
+                year = rec.ProductionYear?.toString(),
+            )
+        }
+        _uiState.value = _uiState.value.copy(recommendations = recs)
     }
 
     private fun buildUpNextInfo(session: Session, episode: BaseItemDto): UpNextInfo {

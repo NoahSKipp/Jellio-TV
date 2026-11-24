@@ -85,6 +85,8 @@ data class PlayerUiState(
     val reencodingVideo: Boolean = false,
     val pauseInfo: PauseOverlayInfo? = null,
     val upNextInfo: UpNextInfo? = null,
+    // "More like this" for the end screen when no episode follows.
+    val recommendations: List<EndRec> = emptyList(),
     // An episode of a series, and the one before it once known.
     val isEpisode: Boolean = false,
     val previousEpisodeId: String? = null,
