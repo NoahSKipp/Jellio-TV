@@ -1,6 +1,7 @@
 package com.jellio.tv.ui.player
 
 import com.jellio.tv.data.model.BaseItemDto
+import com.jellio.tv.data.model.SuggestionRowDto
 import com.jellio.tv.data.model.UserItemDataDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -29,6 +30,34 @@ class EndRecsTest {
         val items = (1..20).map { item("i$it") }
         assertEquals(12, keepRecommendations(items, emptySet()).size)
         assertEquals(3, keepRecommendations(items, emptySet(), limit = 3).size)
+    }
+
+    private fun tmdbItem(id: String, tmdb: String) = BaseItemDto(Id = id, ProviderIds = mapOf("Tmdb" to tmdb))
+
+    @Test fun tmdbRowIsPrimaryAndJellyfinOnlyFallsBack() {
+        val tmdb = listOf(item("t1"), item("t2"))
+        val jf = listOf(item("j1"))
+        assertEquals(listOf("t1", "t2"), chooseRecommendations(tmdb, jf, emptySet()).map { it.Id })
+        assertEquals(listOf("j1"), chooseRecommendations(emptyList(), jf, emptySet()).map { it.Id })
+        assertEquals(listOf("j1"), chooseRecommendations(listOf(item("t1", played = true)), jf, emptySet()).map { it.Id })
+    }
+
+    @Test fun excludesTheTitleByTmdbIdAndCapsAtTwelve() {
+        val row = listOf(tmdbItem("v1", "10"), tmdbItem("v2", "11")) + (1..20).map { item("i$it") }
+        val kept = chooseRecommendations(row, emptyList(), emptySet(), excludeTmdbId = "10")
+        assertEquals(12, kept.size)
+        assertEquals("v2", kept.first().Id)
+    }
+
+    @Test fun picksTheSimilarRowAndMediaType() {
+        val rows = listOf(SuggestionRowDto("genre", null, listOf(item("g"))), SuggestionRowDto("Similar", null, listOf(item("s"))))
+        assertEquals(listOf("s"), similarRowItems(rows).map { it.Id })
+        assertEquals(emptyList<BaseItemDto>(), similarRowItems(emptyList()))
+        assertEquals("tv", recommendationMediaType("Episode"))
+        assertEquals("tv", recommendationMediaType("Series"))
+        assertEquals("movie", recommendationMediaType("Movie"))
+        assertEquals("5", tmdbIdOf(tmdbItem("a", "5")))
+        assertNull(tmdbIdOf(item("a")))
     }
 
     @Test fun previewNeedsASettledCardWithSomethingToShow() {

@@ -713,9 +713,35 @@ class PlayerViewModel @Inject constructor(
 
     private suspend fun loadRecommendations(session: Session, item: BaseItemDto) {
         val sourceId = recommendationSourceId(item.Id, item.Type, item.SeriesId)
-        val similar = catching { repository.getSimilarItems(session.userId, sourceId, END_RECS_LIMIT + 4) }.getOrNull()
-            ?: return
-        val kept = keepRecommendations(similar, setOfNotNull(item.Id, item.SeriesId))
+        val excludeIds = setOfNotNull(item.Id, item.SeriesId)
+        var tmdbId = tmdbIdOf(item)
+        var sourceTitle = if (item.Type == "Episode") item.SeriesName else item.Name
+        if (item.Type == "Episode" || tmdbId == null) {
+            val source = if (sourceId == item.Id) item else catching { repository.getItemDetails(session.userId, sourceId) }.getOrNull()
+            tmdbId = tmdbIdOf(source) ?: tmdbId
+            sourceTitle = sourceTitle ?: source?.Name
+        }
+        val tmdbRow = if (tmdbId != null) {
+            catching {
+                similarRowItems(
+                    repository.getSearchSuggestions(
+                        query = sourceTitle.orEmpty(),
+                        tmdbId = tmdbId,
+                        mediaType = recommendationMediaType(item.Type),
+                        enableVirtual = true,
+                        userId = session.userId,
+                    ).Rows,
+                )
+            }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        val jellyfin = if (keepRecommendations(tmdbRow, excludeIds, END_RECS_LIMIT, tmdbId).isEmpty()) {
+            catching { repository.getSimilarItems(session.userId, sourceId, END_RECS_LIMIT + 4) }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        val kept = chooseRecommendations(tmdbRow, jellyfin, excludeIds, tmdbId)
         if (kept.isEmpty()) return
         val recs = kept.map { rec ->
             val tag = rec.ImageTags?.get("Primary") ?: rec.PrimaryImageTag
