@@ -250,6 +250,7 @@ internal object StringsDe {
         m["player_play_now_countdown"] = "Jetzt abspielen ({seconds})"
         m["player_react"] = "Reagieren"
         m["player_replay"] = "Wiederholen"
+        m["player_more_like_this"] = "Ähnliche Titel"
         m["player_resume"] = "Fortsetzen"
         m["player_resume_prompt"] = "Wiedergabe fortsetzen?"
         m["player_start_over"] = "Von vorne beginnen"

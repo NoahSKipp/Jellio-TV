@@ -86,6 +86,8 @@ internal fun PlayerSurface(
     onDismissToast: (Long) -> Unit,
     pauseInfo: PauseOverlayInfo?,
     upNextInfo: UpNextInfo?,
+    recommendations: List<EndRec> = emptyList(),
+    onOpenRecommendation: (String) -> Unit = {},
     skipSegments: SkipSegments?,
     skipSegmentsResolved: Boolean = false,
     sleepTimerEndTimeMs: Long?,
@@ -1438,6 +1440,8 @@ internal fun PlayerSurface(
                 onBack = onBack,
                 art = pauseInfo?.art.orEmpty(),
                 info = pauseInfo,
+                recs = recommendations,
+                onOpenRec = onOpenRecommendation,
             )
         }
 

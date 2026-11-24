@@ -467,6 +467,10 @@ private fun JellioTvApp(
                     routeStack = routeStack.dropLast(1)
                     playItem(previousId, null, 0L)
                 },
+                onOpenDetail = { detailId ->
+                    routeStack = routeStack.dropLast(1)
+                    push(JellioRoute.Detail(detailId))
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             JellioRoute.LiveTv -> com.jellio.tv.ui.live.LiveTvScreen(

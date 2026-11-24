@@ -250,6 +250,7 @@ internal object StringsIt {
         m["player_play_now_countdown"] = "Riproduci ora ({seconds})"
         m["player_react"] = "Reagisci"
         m["player_replay"] = "Rigioca"
+        m["player_more_like_this"] = "Simili a questo"
         m["player_resume"] = "Riprendi"
         m["player_resume_prompt"] = "Riprendere la riproduzione?"
         m["player_start_over"] = "Ricomincia"

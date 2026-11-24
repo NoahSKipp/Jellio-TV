@@ -250,6 +250,7 @@ internal object StringsPt {
         m["player_play_now_countdown"] = "Reproduzir agora ({seconds})"
         m["player_react"] = "Reagir"
         m["player_replay"] = "Repetir"
+        m["player_more_like_this"] = "Mais como este"
         m["player_resume"] = "Continuar"
         m["player_resume_prompt"] = "Continuar reprodução?"
         m["player_start_over"] = "Reiniciar"

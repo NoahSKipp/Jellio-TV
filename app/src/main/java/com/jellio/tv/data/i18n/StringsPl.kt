@@ -250,6 +250,7 @@ internal object StringsPl {
         m["player_play_now_countdown"] = "Odtwórz teraz ({seconds})"
         m["player_react"] = "Zareaguj"
         m["player_replay"] = "Powtórz"
+        m["player_more_like_this"] = "Podobne tytuły"
         m["player_resume"] = "Wznów"
         m["player_resume_prompt"] = "Wznowić odtwarzanie?"
         m["player_start_over"] = "Zacznij od nowa"

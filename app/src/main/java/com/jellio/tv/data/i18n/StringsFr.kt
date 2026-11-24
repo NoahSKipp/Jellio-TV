@@ -250,6 +250,7 @@ internal object StringsFr {
         m["player_play_now_countdown"] = "Lire maintenant ({seconds})"
         m["player_react"] = "Réagir"
         m["player_replay"] = "Rejouer"
+        m["player_more_like_this"] = "Dans le même esprit"
         m["player_resume"] = "Reprendre"
         m["player_resume_prompt"] = "Reprendre la lecture ?"
         m["player_start_over"] = "Recommencer"

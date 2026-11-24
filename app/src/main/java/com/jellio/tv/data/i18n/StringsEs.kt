@@ -250,6 +250,7 @@ internal object StringsEs {
         m["player_play_now_countdown"] = "Reproducir ahora ({seconds})"
         m["player_react"] = "Reaccionar"
         m["player_replay"] = "Repetir"
+        m["player_more_like_this"] = "Más como esto"
         m["player_resume"] = "Reanudar"
         m["player_resume_prompt"] = "¿Reanudar reproducción?"
         m["player_start_over"] = "Empezar de nuevo"

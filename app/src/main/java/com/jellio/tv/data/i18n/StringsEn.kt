@@ -250,6 +250,7 @@ internal object StringsEn {
         m["player_play_now_countdown"] = "Play now ({seconds})"
         m["player_react"] = "React"
         m["player_replay"] = "Replay"
+        m["player_more_like_this"] = "More like this"
         m["player_resume"] = "Resume"
         m["player_resume_prompt"] = "Resume playback?"
         m["player_start_over"] = "Start Over"

@@ -9,6 +9,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.tv.material3.Border
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
@@ -343,8 +350,30 @@ internal fun EndScreen(
     onBack: () -> Unit,
     art: List<com.jellio.tv.ui.common.ArtCandidate>,
     info: PauseOverlayInfo?,
+    recs: List<EndRec> = emptyList(),
+    onOpenRec: (String) -> Unit = {},
 ) {
     val firstFocus = remember { FocusRequester() }
+    val showRecs = next == null && recs.isNotEmpty()
+    var recsIn by remember { mutableStateOf(false) }
+    var focusedRec by remember { mutableStateOf<Int?>(null) }
+    var settledRec by remember { mutableStateOf<Int?>(null) }
+    val recFocus = remember { FocusRequester() }
+    LaunchedEffect(showRecs) {
+        if (!showRecs) return@LaunchedEffect
+        delay(400)
+        recsIn = true
+        delay(350)
+        runCatching { recFocus.requestFocus() }
+    }
+    // A card that stays focused earns a preview of its backdrop and overview.
+    LaunchedEffect(focusedRec) {
+        settledRec = null
+        if (focusedRec == null) return@LaunchedEffect
+        delay(END_RECS_PREVIEW_DELAY_MS)
+        settledRec = focusedRec
+    }
+    val preview = if (showRecs) previewRec(recs, settledRec) else null
     // A press meant for the screen before (Play Next held or tapped twice)
     // must not land on this one's buttons.
     val shownAt = remember { System.currentTimeMillis() }
@@ -371,6 +400,16 @@ internal fun EndScreen(
                 .graphicsLayer { scaleX = zoom; scaleY = zoom }
                 .alpha(0.7f),
         )
+        Crossfade(targetState = preview?.backdropUrl, animationSpec = tween(900), label = "endRecPreview") { url ->
+            if (url != null) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().alpha(0.7f),
+                )
+            }
+        }
         Box(
             modifier = Modifier.fillMaxSize().background(
                 Brush.horizontalGradient(0f to JellioBg, 0.45f to JellioBg.copy(alpha = 0.85f), 1f to Color.Transparent),
@@ -382,7 +421,10 @@ internal fun EndScreen(
             ),
         )
         Column(
-            modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 72.dp).widthIn(max = 760.dp),
+            modifier = Modifier
+                .align(if (showRecs) Alignment.TopStart else Alignment.CenterStart)
+                .padding(start = 72.dp, end = 72.dp, top = if (showRecs) 40.dp else 0.dp)
+                .widthIn(max = 760.dp),
         ) {
             if (next != null) {
                 Text(text = Strings.get("player_up_next").uppercase(), color = JellioSecondary, style = androidx.tv.material3.MaterialTheme.typography.labelLarge, letterSpacing = 1.5.sp)
@@ -437,7 +479,7 @@ internal fun EndScreen(
                         contentDescription = finishedTitle,
                         contentScale = ContentScale.Fit,
                         alignment = Alignment.CenterStart,
-                        modifier = Modifier.padding(top = 18.dp).height(120.dp).widthIn(max = 520.dp),
+                        modifier = Modifier.padding(top = 18.dp).height(if (showRecs) 80.dp else 120.dp).widthIn(max = 520.dp),
                     )
                 } else {
                     Text(
@@ -454,7 +496,7 @@ internal fun EndScreen(
                     Text(text = finishedSubtitle, color = JellioText, style = androidx.tv.material3.MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
                 }
                 val details = listOfNotNull(info?.year, info?.officialRating)
-                if (details.isNotEmpty() || info?.rating != null) {
+                if (!showRecs && (details.isNotEmpty() || info?.rating != null)) {
                     Row(modifier = Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.isNotEmpty()) {
                             Text(text = details.joinToString("  ·  "), color = JellioTextSecondary)
@@ -462,7 +504,7 @@ internal fun EndScreen(
                         info?.rating?.let { com.jellio.tv.ui.home.RatingChip(it, fontSize = 15.sp, badgeWidth = 28.dp, badgeHeight = 12.dp) }
                     }
                 }
-                info?.overview?.takeIf { it.isNotBlank() }?.let {
+                info?.overview?.takeIf { it.isNotBlank() && !showRecs }?.let {
                     Text(text = it, color = JellioTextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
                 }
             }
@@ -481,6 +523,83 @@ internal fun EndScreen(
                     EndScreenButton(label = Strings.get("player_replay"), primary = true, icon = androidx.compose.material.icons.Icons.Filled.Replay, onClick = armed(onReplay), modifier = Modifier.focusRequester(firstFocus))
                     EndScreenButton(label = Strings.get("nav_back"), icon = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, onClick = armed(onBack))
                 }
+            }
+        }
+        if (showRecs) {
+            AnimatedVisibility(
+                visible = recsIn,
+                enter = slideInVertically(animationSpec = tween(450)) { it } + fadeIn(tween(450)),
+                modifier = Modifier.align(Alignment.BottomStart),
+            ) {
+                Column(modifier = Modifier.padding(bottom = 20.dp)) {
+                    Row(
+                        modifier = Modifier.padding(start = 72.dp, end = 72.dp, bottom = 10.dp).height(24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = Strings.get("player_more_like_this"), color = JellioText, fontWeight = FontWeight.Bold)
+                        if (preview != null) {
+                            val line = listOfNotNull(preview.title, preview.overview?.takeIf { it.isNotBlank() })
+                                .joinToString("  -  ")
+                            Text(
+                                text = line,
+                                color = JellioTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 16.dp),
+                            )
+                        }
+                    }
+                    LazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 72.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(recs, key = { _, rec -> rec.itemId }) { index, rec ->
+                            EndRecCard(
+                                rec = rec,
+                                onClick = armed { onOpenRec(rec.itemId) },
+                                onFocused = { focused ->
+                                    if (focused) focusedRec = index else if (focusedRec == index) focusedRec = null
+                                },
+                                modifier = if (index == 0) Modifier.focusRequester(recFocus) else Modifier,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndRecCard(
+    rec: EndRec,
+    onClick: () -> Unit,
+    onFocused: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(shape = shape),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.White.copy(alpha = 0.12f),
+            focusedContainerColor = Color.White.copy(alpha = 0.12f),
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(border = BorderStroke(3.dp, Color.White), shape = shape),
+        ),
+        modifier = modifier.width(96.dp).height(144.dp).onFocusChanged { onFocused(it.isFocused) },
+    ) {
+        if (rec.posterUrl != null) {
+            AsyncImage(
+                model = rec.posterUrl,
+                contentDescription = rec.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize().padding(8.dp), contentAlignment = Alignment.Center) {
+                Text(text = rec.title, color = JellioText, maxLines = 4, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
             }
         }
     }
