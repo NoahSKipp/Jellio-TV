@@ -545,6 +545,9 @@ class JellioRepository @Inject constructor(
         return filtered.take(limit)
     }
 
+    suspend fun getSimilarItems(userId: String, itemId: String, limit: Int = 12): List<BaseItemDto> =
+        api.getSimilarItems(itemId, userId, limit, fields = "$ITEM_FIELDS").Items
+
     suspend fun hideSeriesFromNextUp(seriesId: String) {
         api.hideSeriesFromNextUp(seriesId)
     }

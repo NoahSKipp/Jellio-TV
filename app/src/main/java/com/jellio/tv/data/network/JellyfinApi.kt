@@ -135,6 +135,14 @@ interface JellyfinApi {
         @Query("MediaTypes") mediaTypes: String? = null,
     ): ItemsResultDto
 
+    @GET("Items/{itemId}/Similar")
+    suspend fun getSimilarItems(
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String,
+        @Query("limit") limit: Int = 12,
+        @Query("fields") fields: String? = null,
+    ): ItemsResultDto
+
     @GET("Shows/NextUp")
     suspend fun getNextUp(
         @Query("userId") userId: String,
